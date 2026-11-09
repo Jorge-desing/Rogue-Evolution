@@ -47,7 +47,196 @@ bpy.ops.export_scene.fbx(
 
 ---
 
-## 3. 5-Tone PBR Structural Palette Standard
+## 3. Real Functional Engineering & Form Hierarchy Standard
+
+Rogue Command visuals must depart completely from primitive geometric boxes and decorative, random "greeble noise." Every vehicle, combat unit, and industrial factory structure must be grounded in real-world mechanical and structural engineering principles.
+
+### 3.1 Three-Tier Form Hierarchy & The 70/30 Rest Rule (Vitaly Bulgarov / Neil Blevins)
+- **Primary Macro Forms (70% Visual Mass):** Establishes the silhouette, tactical silhouette stance, and center of gravity.
+  - *Vehicles & Mobile Units:* Low-profile, aggressive ground clearance, sloped ballistic hulls, and functional wheel/track wheelbase proportions.
+  - *Factories & Strategic Facilities:* Broad structural bases, pyramidical or stepped mass distribution, anchored pylons, and defined vertical/horizontal logistics flow.
+- **Secondary Meso Forms (20% Visual Mass):** Articulated mechanical assemblies that explain how the machine operates.
+  - Sponsons, engine decks, armored turrets, suspension swing arms, exhaust stacks, hoppers, pressure vessels, and conveyor housings.
+- **Tertiary Micro Forms (10% Visual Mass):** Scale-defining engineering details.
+  - Fasteners, flanges, latches, lifting shackles, warning placards, sensor lenses, and hydraulic fittings.
+- **The 70/30 Rest Rule:** 70% of visible surfaces must remain clean, continuous planar plates or smooth cast hulls where the viewer's eye can rest. Concentrate the remaining 30% of high-density mechanical complexity into purposeful functional clusters (engine bays, suspension linkages, process manifold manifolds, and turret rings). *Never scatter random geometric cuts across all surfaces.*
+
+### 3.2 Combat Unit Functional Engineering Anatomy
+Every combat unit must incorporate authentic military defense and mobility subsystems:
+1. **Ballistic & Blast Deflection Geometry:**
+   - Sloped armor glacis plates angled at $55^\circ$ to $70^\circ$ from vertical.
+   - V-hull shaped chassis bottoms engineered for mine and IED blast deflection.
+   - Compound chamfers (e.g. $45^\circ$ and $22.5^\circ$ double facets) along vulnerable hull shoulders.
+2. **Layered Composite Armor & ERA:**
+   - Visual stratification: structural inner chassis $\rightarrow$ composite ceramic matrix plates $\rightarrow$ modular stand-off spaced armor skirts or reactive armor (ERA) tile cassettes with welded brackets.
+   - Distinct shutlines and panel gaps ($0.003\text{m} - 0.008\text{m}$) indicating field-replaceable modular armor blocks.
+3. **Authentic Running Gear & Suspension:**
+   - Tracked chassis must feature: toothed drive sprockets, idler wheels with visible mechanical/hydraulic tensioning screws, dual road wheels with solid rubber tires and heavy 6/8-bolt planetary hubs, return rollers, and track mud scrapers.
+   - Articulated trailing swing arms with torsion bar housings or hydropneumatic struts featuring polished chrome cylinder rods.
+   - Track loops with individual shoes, rubber road pads, connector pins, and center guide horns.
+4. **Active Protection Systems (APS) & Sensor Suites:**
+   - Millimeter-wave radar panels (Trophy/Iron Fist style) flush-mounted on turret corners with armored cable conduits.
+   - Directional soft/hard-kill countermeasure launchers mounted on articulated gimbals.
+   - $66\text{mm} / 76\text{mm}$ smoke grenade discharger banks with wired ignition manifolds.
+   - Independent panoramic commander sights (CITV) featuring anti-reflective germanium optical elements (deep violet/amber tint) and integrated wiper blades.
+5. **Ergonomics & Field Maintenance Provisions:**
+   - Forged steel recovery shackles and D-rings welded to structural hull hardpoints for crane recovery.
+   - Folding crew steps, grab handles, and high-traction textured anti-slip coatings on crew transit surfaces.
+   - Rear bustle stowage racks for expeditionary gear, tool pioneer tools (axes, shovels, tow cables), and thermal exhaust louver diffusers.
+
+### 3.3 Factory & Industrial Facility Engineering Standards
+Strategic industrial buildings must feel like functional, high-throughput chemical/mechanical plants rather than hollow sci-fi buildings:
+1. **Modular Structural Metric Grid:**
+   - Strict metric spacing based on powers of two or standard metric intervals ($0.5\text{m}, 1\text{m}, 2\text{m}, 4\text{m}, 8\text{m}$).
+   - Structural column bays at $6\text{m} \times 6\text{m}$ or $8\text{m} \times 8\text{m}$; standard story heights of $4.0\text{m} - 4.5\text{m}$.
+   - Heavy structural steel framing: standard I-beams (IPE/HEB), C-channels (UPN), and angle irons connected via triangular gusset plates and heavy hexagonal structural bolt assemblies (A325/A490).
+2. **Process Piping Standards (ASME B31.3 / ISO):**
+   - Standard nominal pipe diameters: DN50 (2"), DN100 (4"), DN200 (8"), DN300 (12").
+   - Long-radius ($1.5D$) and short-radius ($1.0D$) $90^\circ$ and $45^\circ$ flanged/welded elbows.
+   - Concentric and eccentric reducers to prevent sediment pooling in liquid lines.
+   - Weld-neck flanges with visible bolt circles and sealing gaskets.
+   - Handwheel gate valves, pneumatic actuator butterfly valves, and spring-loaded pressure relief valves with vertical discharge horns.
+   - Overhead pipe racks with U-bolt clamping, spring hangers for thermal/vibrational absorption, and U-shaped thermal expansion loops on long lines.
+   - **ASME A13.1 Fluid Color Coding:**
+     - *Yellow:* Flammable gases and liquids (fuel, natural gas).
+     - *Green:* Potable, industrial, or cooling water.
+     - *Blue:* Compressed air systems.
+     - *Red:* Fire suppression manifolds.
+     - *Orange:* Corrosive acids and caustic chemicals.
+     - *Silver / Grey:* High-pressure superheated steam.
+3. **Pressure Vessels & Storage Silos:**
+   - Dished heads (toriespherical / ASME $2:1$ ellipsoidal code heads) instead of flat cylinder caps.
+   - External circumferential stiffener rings, manways with swinging davit arms, armored liquid level sight glasses, and flared skirt bases anchored to reinforced concrete footings with double-nut anchor bolts.
+4. **Heavy Logistics & Material Handling:**
+   - Overhead gantry cranes: runway I-beams with rail clips, polyurethane end buffers, wire-rope hoist drums with double-sheave forged crane hooks, and C-rail festoon cable loops.
+   - Industrial scaffolding & walkways: $48.3\text{mm}$ standard pipe tubing with swiveling couplers, threaded leveling screw jacks, $150\text{mm}$ safety kick plates / toe boards, two-tier safety handrails ($0.5\text{m}$ and $1.1\text{m}$), and caged safety ladders.
+   - Industrial ventilation: Conical cyclone dust separators, pulse-jet baghouse collector banks, and spiral-wound ductwork with crimped standing seams.
+
+### 3.4 The 4 Functional Engineering Questions Checklist
+Before approving any modeled component, verify it answers all four engineering criteria:
+- **Power & Fluid Conveyance:** Does every moving or energized component show hydraulic hoses with realistic catenary slack, armored conduits, or rigid hard-lines with bulkhead fittings?
+- **Heat Dissipation:** Are engines, reactors, and energy capacitors paired with cooling louvers, core radiators, or thermal exhaust diffusers?
+- **Human Maintenance Access:** Can human technicians service the unit via visible access latches, hoist points, drain plugs, and inspection hatches?
+- **Structural Load Distribution:** Do cantilevered arms, masts, and weapon mounts feature gussets, corner reinforcement fillets, and heavy pin hinges designed to transfer mechanical loads?
+
+---
+
+## 4. Native Bevel Modifier + Weighted Normal Modifier Pipeline
+
+This is the project's primary modeling and shading standard for achieving photorealistic, SubD-quality specular highlights on hard-surface assets without high-poly polygon bloat.
+
+### 4.1 The Shading Challenge & The Solution
+Traditional low-poly hard-surface models suffer from an inherent flaw:
+- Flat shading produces harsh, razor-sharp edges that look like paper-thin computer graphics.
+- Naive smooth shading averages face normals across right angles, causing broad armor plates to bend and distort light (unsightly "shading gradient" or "pinch").
+- SubD modeling requires dense support loops ($50\text{k} - 200\text{k}$ polygons per asset), destroying real-time RTS performance.
+
+**The Solution:** The non-destructive pairing of a scale-aware **Bevel Modifier** followed by a **Weighted Normal Modifier**. Broad planar faces receive overwhelming mathematical normal priority over tiny edge chamfers. Consequently, large armor plates reflect light as perfectly flat surfaces, while the beveled edges catch crisp, physical specular highlights.
+
+### 4.2 Modifier Stack Configuration in Blender 4.5.14
+Apply the following stack in order on all hard-surface components:
+
+1. **Bevel Modifier (Machined Chamfers):**
+   - **Width:** Scale-aware based on component role:
+     - *Small hardware & latches:* $0.003\text{m} - 0.006\text{m}$
+     - *Armor plate edges & chassis rails:* $0.010\text{m} - 0.025\text{m}$
+     - *Cast housings, road wheels, and silo shoulders:* $0.030\text{m} - 0.060\text{m}$
+   - **Segments:**
+     - `1` for crisp machined chamfers (LOD0 & LOD1 standard).
+     - `2` or `3` for rounded cast hulls, cylinders, and piping.
+   - **Limit Method:** `ANGLE` with Angle Limit $= 35^\circ$ ($0.61\text{ rad}$) or `WEIGHT` for hand-tuned edge sharpness.
+   - **Profile:** `0.50` (creates a planar chamfer at 1 segment, true circular arc at $\ge 2$ segments).
+   - **Clamp Overlap:** `True` (prevents self-intersection on acute corners).
+   - **Harden Normals:** `False` (let the dedicated `WEIGHTED_NORMAL` modifier govern).
+
+2. **Angle-Based Auto-Smooth:**
+   - Execute in Blender 4.5+:
+     ```python
+     bpy.ops.object.shade_smooth_by_angle(angle=math.radians(38.0))
+     ```
+   - Smooths cylindrical barrels and curved pipes while preserving sharp boundaries between planar faces.
+
+3. **Weighted Normal Modifier (`RCL_WeightedNormal`):**
+   - **Mode:** `FACE_AREA` (weights vertex normals proportionally to the surface area of connected faces).
+   - **Weight:** `50` to `60` (ensures massive hull plates dominate the vertex normal vector).
+   - **Keep Sharp:** `True` (preserves tagged sharp edges and angle splits).
+   - **Face Influence:** `False`.
+
+### 4.3 Automated Python Integration (`RogueModelKit.py`)
+In project generator scripts, invoke the verified native helper:
+```python
+import RogueModelKit as rmk
+
+# Apply directly to an authored object
+rmk.apply_weighted_normals(
+    obj,
+    weight=50,
+    mode="FACE_AREA",
+    keep_sharp=True,
+    apply_modifier=True  # Bakes custom split normals into mesh loops
+)
+
+# Or automatically during material batching:
+batched = rmk.batch_and_join_by_material(
+    model_objects,
+    prefix="VanguardTank",
+    smooth_by_angle=True,
+    smooth_angle_deg=38.0,
+    weighted_normals=True,
+    normal_weight=50
+)
+```
+
+### 4.4 Unity URP FBX Export & Import Contract
+- **Blender FBX Export Call:**
+  - `mesh_smooth_type="FACE"` (MANDATORY: exports custom split normals directly to FBX mesh attributes).
+  - `use_mesh_modifiers=True`
+  - `bake_space_transform=False`
+- **Unity Model Importer Configuration:**
+  - **Normals:** `Import` (do NOT set to `Calculate`, which discards Blender's custom weighted normals).
+  - **Normal Generation Method:** `MikkTSpace`
+  - **Tangents:** `Calculate MikkTSpace` (ensures baked normal maps and micro-detail textures align perfectly without tangent distortion).
+
+---
+
+## 5. Project-Adapted FOSS & Advanced Toolchain
+
+To ensure zero vendor lock-in, zero cost, and seamless integration with Rogue Command's engine pipeline:
+
+### 5.1 Procedural PBR Texturing: Material Maker 1.7 (Mandatory FOSS)
+- Node-based procedural PBR authoring built on Godot engine. Replaces proprietary Substance Designer.
+- Automated pipeline runner via `tools/Run-MaterialMakerBake.ps1 -Workflow urp`.
+- Outputs strictly 4 PBR texture maps:
+  - `<Name>_Albedo.png` (sRGB, base color + macro dirt)
+  - `<Name>_MetallicGloss.png` (Linear, RGB = Metallic, Alpha = Smoothness $1 - \text{roughness}$)
+  - `<Name>_Normal.png` (Normal map, tangent-space MikkTSpace)
+  - `<Name>_Emission.png` (sRGB, HDR optic and energy glow)
+- *Strict Invariant:* Material Maker outputs PNG textures only; never import its meshes or `.mat` files into Unity.
+
+### 5.2 Trim Sheets & Rapid UV Layout: DreamUV (FOSS Blender Addon)
+- Integrates into Blender 3D Viewport (`Shift + D`).
+- Enables 1-click snapping, cycling, and scaling of low-poly geometry UV islands directly to industrial trim sheet strips (hazard stripes, panel seams, pipe collars, catwalk grates).
+- Eliminates manual UV unwrapping for modular factory kits and structural beams.
+
+### 5.3 Parametric Structural Modeling: BagaPie Free & JMesh Tools (FOSS)
+- **BagaPie Free:** Geometry Nodes-based parametric generation of catenary cables, industrial piping networks with elbow joints, railings, and structural stairs.
+- **JMesh Tools:** Rapid non-destructive booleans, surface extraction, and symmetrical hard-surface slicing.
+
+### 5.4 Unity URP Rendering & Optimization
+- **URP Decal Projectors (D-Buffer Mode):**
+  - Project stencils, hazard warnings, weld beads, and grease streaks without adding geometry.
+  - D-Buffer mode writes directly to G-Buffer / Depth before lighting, ensuring decals receive physically accurate shadows and specular highlights.
+- **Detail Normal Maps:**
+  - In `URP Lit` materials, enable *Detail Inputs* with high-tiling ($20\times20$) micro-normals (rolled steel mill-scale or cast iron stipple). Guarantees photorealistic micro-tactility even when zoomed to centimeters.
+- **Automated LOD Chains with UnityMeshSimplifier:**
+  - Open-source mesh reduction integrated into Unity asset pipelines:
+    - *LOD0 (100%):* Full fidelity ($1,500 - 5,000$ tris), complete chamfers and mechanical linkages.
+    - *LOD1 (50%):* Collapses minor hardware while preserving silhouette and weighted normal boundaries.
+    - *LOD2 (20%):* Coarse mass for distant tactical overview.
+
+---
+
+## 6. 5-Tone PBR Structural Palette Standard
 
 | Material Role | Proportion | Surface Description | Metallic | Smoothness | Emission |
 |---|---|---|---|---|---|
@@ -63,7 +252,7 @@ bpy.ops.export_scene.fbx(
 
 ---
 
-## 4. 4-Channel Vertex Shading Contract (`VehiclePBR_VertexWear`)
+## 7. 4-Channel Vertex Shading Contract (`VehiclePBR_VertexWear`)
 
 Stored in `Mesh.colors32` (RGBA) for consumption by `RogueCommand/VehiclePBR_VertexWear` shader:
 
@@ -76,7 +265,7 @@ Stored in `Mesh.colors32` (RGBA) for consumption by `RogueCommand/VehiclePBR_Ver
 
 ---
 
-## 5. Generator Architecture (`generate_unit_model.py` & `RogueModelKit`)
+## 8. Generator Architecture (`generate_unit_model.py` & `RogueModelKit`)
 
 ### CLI Scope & Archetypes
 - **42 Mobile Archetypes:** `tank`, `walker`, `bike`, `artillery`, `arc_tank`, `hover`, `spider`, `vtol`, `halftrack`, `super_heavy`, `buggy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `quad_mech`, `combat_harvester`, `colossus_titan`, `hover_cruiser`, `heavy_dropship`, `shield_truck`, `demolition_breacher`, `artillery_strider`, `thermobaric_tank`, `ew_jammer`, `mobile_sam_launcher`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `hexapod_assault`, `assault_hovercraft`, `bridge_layer`, `command_hq_rig`, `flying_wing_bomber`, `mortar_carrier`, `siege_drill_mole`, `heavy_crane_mech`, `nanite_support_rover`, `gravity_siege_breaker`, `tactical_relay_carrier`, `amphibious_assault_tank`, `plasma_mortar_strider`, `stealth_recon_skimmer`.
@@ -94,7 +283,7 @@ Key presets include: `siege_breaker` (super_heavy dual_cannon), `recon_intercept
 
 ---
 
-## 6. Procedural Animations & Procedural Action Clips
+## 9. Procedural Animations & Procedural Action Clips
 
 - **Action Clips Contract:** `Action_Idle`, `Action_Walk`/`Action_Drive`, `Action_FireRecoil`, and `Action_Death`.
   - `Action_Idle`: Peaks at f15 with f8/f22 easing; never keyframes `Bone_Root`.
@@ -104,7 +293,7 @@ Key presets include: `siege_breaker` (super_heavy dual_cannon), `recon_intercept
 
 ---
 
-## 7. Socket-to-Gameplay Runtime Binding Map (`RuntimeVisualDirector`)
+## 10. Socket-to-Gameplay Runtime Binding Map (`RuntimeVisualDirector`)
 
 Visuals bind dynamically to native units via canonical unprefixed sockets:
 
@@ -124,7 +313,7 @@ Visuals bind dynamically to native units via canonical unprefixed sockets:
 
 ---
 
-## 8. Template Dimensions & Native Hierarchy Alignment
+## 11. Template Dimensions & Native Hierarchy Alignment
 
 | Native Template | Sample Unit | `visualRootPath` | Collider Dimensions (W × H × L) |
 |---|---|---|---|
@@ -136,7 +325,7 @@ Visuals bind dynamically to native units via canonical unprefixed sockets:
 
 ---
 
-## 9. Material Maker Texture Runner & Card Sprite Rules
+## 12. Material Maker Texture Runner & Card Sprite Rules
 
 ### Texture Generation
 - Blender 4.5.14 bakes geometry/UVs/wear; Material Maker 1.7 generates final textures:
@@ -153,7 +342,7 @@ Visuals bind dynamically to native units via canonical unprefixed sockets:
 
 ---
 
-## 10. References & Detailed Guides
+## 13. References & Detailed Guides
 
 - [Art Style & Palette Guide](references/art-style-and-palette.md) — Proportions, silhouette tests, and faction palettes.
 - [Blender Procedural Techniques](references/blender-procedural-techniques.md) — In-depth `bpy` recipes for tracks, bevels, and hulls.

@@ -84,18 +84,57 @@ Keep shape and shading checks separate: bevels change mesh geometry and highligh
 
 ---
 
-## 5. Functional Construction Details
+## 5. Functional Construction Details & Engineering Reality
 
-Every added detail should explain protection, access, cooling, sensing, propulsion, ammunition, or field repair. Avoid decorative repetition and scattered “greebles” without a visible attachment point.
+Every modeled component must answer the call of practical, real-world mechanical and structural engineering. Eliminate arbitrary geometric "greebles" that have no physical function.
 
-1. **Continuous Track Loops**: Sloped front approach angles (~25°–35° climb), rounded return idlers, and individual tread shoes (`0.15m–0.22m` spacing).
-2. **Road Wheel Rims & Hubs**: Stepped cylinders: outer rubber tire (matte), recessed rim, and central 6-bolt planetary axle cap (gunmetal).
-3. **Engine Grilles**: 2–4 angled chamfered cooling louvers on the rear engine deck.
-4. **Sensor Masts**: Armored hood visor with recessed glowing optical lens.
-5. **Weapon Sleeves**: Stepped muzzle brakes or heat-dissipation collars at the barrel tip.
-6. **Conduit Rails**: Insulated charge rails along flanks for energy weapons.
-7. **Applique Armor (ERA)**: Spaced armor tiles on frontal glacis angled at 20°–35°.
-8. **Fasteners & Seams**: Place small fasteners along real plate flanges, access covers, and mounting rails; keep scale and spacing consistent with the panel they secure.
+### The 4 Functional Engineering Questions
+Before accepting any detail onto a vehicle hull or factory wall, verify:
+1. **Power & Fluid Conveyance:** How does power or hydraulic pressure reach actuators? Model braided high-pressure hoses with natural catenary slack (`Cablerator` / curves), rigid hard-lines with bulkhead pass-throughs, and armored electrical conduits.
+2. **Thermal Dissipation:** Where does waste heat exhaust? Model angled cooling louvers, multi-bank radiators, thermal insulation blankets on exhaust manifolds, and infrared suppression shrouds.
+3. **Human Maintenance & Ergonomics:** How do field mechanics service or recover the unit? Include forged steel lifting shackles / D-rings (minimum 4 points on hull/turret), folding steps, grab rails, quick-release access latches, fluid drain plugs, and textured non-slip transit paths.
+4. **Structural Load & Stress Transfer:** How does the structure resist torsion and recoil? Model triangular gusset plates (*gussets*), corner stress-relief fillets, heavy pin clevises, and standard structural steel shapes (IPE, HEB, UPN).
+
+### Mobile Combat Unit Engineering Checklist
+1. **Continuous Track Loops & Suspension:**
+   - Sloped approach angle ($25^\circ - 35^\circ$ climb angle) with toothed drive sprocket and rear/front idler wheel featuring mechanical/hydraulic tensioning adjustment screws.
+   - Dual road wheels with thick solid rubber rims and 6-to-8 bolt planetary hub caps.
+   - Articulated trailing swing arms mounted to transverse torsion bar tubes or independent hydropneumatic struts with exposed polished chrome pistons.
+   - Individual track shoes ($0.15\text{m} - 0.22\text{m}$ pitch) with rubber road pads, connector cross-pins, and center guide horns.
+   - Top return rollers (2 to 4 per side) and track mud scrapers to clear frozen or packed soil.
+2. **Blast & Ballistic Protection:**
+   - Sloped glacis ($55^\circ - 70^\circ$) to induce projectile ricochet.
+   - Underside V-hull deflectors for landmine and IED survivability.
+   - Layered armor assemblies: structural steel base $\rightarrow$ composite ceramic inserts $\rightarrow$ modular stand-off spaced skirts or reactive armor (ERA) cassette tiles with welded mounting racks.
+   - Distinct $3\text{mm} - 8\text{mm}$ panel shutlines indicating modular armor blocks.
+3. **Active Defense & Optronics:**
+   - Millimeter-wave active radar arrays flush-mounted to turret corners with armored signal conduits.
+   - Directional soft/hard-kill launchers and $66\text{mm}/76\text{mm}$ smoke grenade banks with wired ignition manifolds.
+   - Commander Independent Thermal Viewer (CITV) masts with anti-reflective coated germanium lenses (amber/violet sheen) and integrated wiper blades.
+
+### Strategic Factory & Industrial Facility Architecture Checklist
+1. **Modular Structural Metric Grid:**
+   - Standard structural bays ($6\text{m} \times 6\text{m}$ or $8\text{m} \times 8\text{m}$) and story heights of $4.0\text{m} - 4.5\text{m}$.
+   - Heavy structural steel framing: standard IPE/HEB I-beams and UPN channels joined by gusset plates and hexagonal structural bolts (A325/A490).
+2. **Process Piping Standards (ASME B31.3 / ISO):**
+   - Standardized nominal diameters: DN50 (2"), DN100 (4"), DN200 (8"), DN300 (12").
+   - Long-radius ($1.5D$) flanged elbows, concentric/eccentric reducers, weld-neck flanges with visible bolt circles, handwheel gate valves, and vertical whistle relief valves.
+   - Pipe racks with U-bolt clamping, spring hangers for vibration damping, and U-shaped thermal expansion loops on long runs.
+   - **ASME A13.1 Fluid Color Coding:**
+     - *Yellow:* Flammable gases and fuels.
+     - *Green:* Cooling water and industrial fluids.
+     - *Blue:* Compressed pneumatic air.
+     - *Red:* Fire suppression manifolds.
+     - *Orange:* Corrosive chemicals and acids.
+     - *Silver / Grey:* High-pressure steam.
+3. **Pressure Vessels & Heavy Logistics:**
+   - Dished heads (toriespherical code heads) on cylindrical pressure tanks instead of flat discs.
+   - Circumferential stiffener rings, manways with davit arms, and anchored skirt supports.
+   - Overhead gantry crane runway beams with polyurethane bumpers, hoist drums, forged hooks, and C-rail cable festoons.
+   - Scaffolding & walkways: $48.3\text{mm}$ tubing with swiveling couplers, $150\text{mm}$ toe boards, double safety handrails ($0.5\text{m}$ and $1.1\text{m}$), and caged safety ladders.
+
+
+
 
 ---
 

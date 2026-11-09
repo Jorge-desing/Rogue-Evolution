@@ -249,7 +249,27 @@ optimized_objects = rmk.batch_and_join_by_material(
 ```
 
 - **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to smooth round barrels, road wheels, hubs, and exhaust pipes while preserving deliberate hard edges between planar armor faces.
-- **Face-Area Weighted Normals (`apply_weighted_normals`)**: Applies Blender's `WEIGHTED_NORMAL` modifier (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) to reduce shading pinch across broad armor faces and their intentional edge treatments. Use it to improve shading, not to conceal poor topology or an unsuitable cross-section. Exported via `mesh_smooth_type="FACE"`.
+- **The Native Bevel + Face-Area Weighted Normals Pipeline**:
+  - *Mathematical Shading Principle:*
+    A vertex shared between a large plate and a narrow bevel face normally interpolates their normals evenly, creating an artificial bend (shading gradient/pinch) across the flat armor plate. Under face-area weighting:
+    $$\vec{N}_v = \frac{\sum_i A(f_i) \cdot \vec{N}_{f_i}}{\|\sum_i A(f_i) \cdot \vec{N}_{f_i}\|}$$
+    For a hull plate ($3.0\text{m}^2$) adjacent to a $15\text{mm}$ chamfer ($0.03\text{m}^2$), the plate contributes $>99\%$ of the normal vector. The plate remains optically flat without requiring dense SubD support loops.
+  - *Bevel Modifier Parameters:*
+    - `width`: $0.003\text{m} - 0.006\text{m}$ (hardware), $0.010\text{m} - 0.025\text{m}$ (armor plates), $0.030\text{m} - 0.060\text{m}$ (castings/silos).
+    - `segments`: 1 (crisp machined chamfer), 2–3 (rolled edges / castings).
+    - `limit_method`: `'ANGLE'` (`angle_limit = math.radians(35.0)`).
+    - `profile`: `0.50` (planar chamfer / circular fillet).
+    - `clamp_overlap`: `True`.
+  - *Weighted Normal Modifier Parameters (`apply_weighted_normals`):*
+    - `mode`: `'FACE_AREA'`
+    - `weight`: `50` to `60`
+    - `keep_sharp`: `True`
+  - *Export & Unity URP Alignment:*
+    - FBX Export: `mesh_smooth_type="FACE"`, `use_mesh_modifiers=True`, `bake_space_transform=False`.
+    - Unity Import: `Normals = Import`, `Normal Generation = MikkTSpace`, `Tangents = Calculate MikkTSpace`.
+- **Integrated FOSS Ecosystem:**
+  - *DreamUV:* Viewport trim sheet alignment (`Shift + D`) for modular factory panels and catwalks.
+  - *BagaPie Free / JMesh:* Geometry Nodes-based parametric pipes, cables, and non-destructive boolean cuts.
 - **Batching Estimate**: The authoring report estimates fewer mesh/material groups after batching; confirm actual draw calls in Unity with the selected prefab source and rendering settings.
 - **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
 
