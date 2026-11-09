@@ -12,438 +12,190 @@ metadata:
 
 # Rogue Command Clean-Room Diagnostics & Multi-Agent MCP Integration
 
-Use this skill when reading in-game state, building runtime telemetry censuses, dispatching tactical gameplay commands, or coordinating multiple autonomous agents (Hermes, Antigravity, Claude, Cursor, VS Code/Windsurf, Codex) communicating with Rogue Command via the BepInEx MCP bridge without visual captures or GUI dependencies.
+Use this skill to inspect in-game state, read telemetry censuses, dispatch gameplay commands, and coordinate autonomous agents via the BepInEx MCP bridge.
 
 ---
 
 ## 1. Clean-Room Invariants
 
-Every diagnostic utility, census DTO, and runtime command MUST follow these rules:
-
-1. **Independent Authoring**: Never copy or decompile proprietary structures, closed palettes, or external mod code. Use open standards (FNV-1a) and independently calibrated data.
-2. **Zero External JSON Libraries in Runtime**: Do NOT use `Newtonsoft.Json`, `System.Text.Json`, or third-party serializers in the game loader runtime (`src/RogueCommandExpansionLoader/`). Handcraft manual, string-escaped JSON writers in `AgentDiagnosticsFormatter.cs`.
-3. **Decoupled Primitive DTOs**: DTOs and command result structs must contain only primitive CLR types (`string`, `int`, `long`, `float`, `double`, `bool`, `IReadOnlyList<T>`). Never expose `UnityEngine.Color`, `Vector3`, `GameObject`, or `Component` across the DTO interface so that tests run cleanly against minimal stubs.
-4. **Omission & Loss Counters First**: In bounded diagnostic collections (rosters, censuses, catalogs, agent sessions), place loss/omission counters (`omittedCount`, `lossFraction`, `omittedSessionCount`, `omittedLockCount`) at the beginning of the serialized JSON and DTO. This prevents tail truncation from hiding data loss.
-5. **Fail-Closed Reflection**: When reflecting game assembly members (`AiBehaviourManager`, `Harvest`, `UpdateFogOfWar`, `AudioMixerHelper`), wrap calls in null guards and try-catch blocks. Return explicit failure DTOs (`success: false`) instead of throwing unhandled exceptions.
+1. **Independent Authoring**: Never copy proprietary structures or external mod code. Use FNV-1a hashing and calibrated data.
+2. **Zero External JSON Libraries in Runtime**: Do NOT use `Newtonsoft.Json` or `System.Text.Json` in the plugin runtime (`src/RogueCommandExpansionLoader/`). Use the manual string-escaped writer in `AgentDiagnosticsFormatter.cs`.
+3. **Decoupled Primitive DTOs**: DTOs and command results must contain only primitive CLR types (`string`, `int`, `long`, `float`, `double`, `bool`, `IReadOnlyList<T>`). Never expose `UnityEngine.Color`, `Vector3`, `GameObject`, or `Component`.
+4. **Omission & Loss Counters First**: In bounded diagnostic collections, place loss/omission counters (`omittedCount`, `lossFraction`, `omittedSessionCount`, `omittedLockCount`) at the start of the serialized JSON and DTO.
+5. **Fail-Closed Reflection**: Null-check reflected members, catch exceptions, and return explicit failure DTOs (`success: false`).
 
 ---
 
 ## 2. High-Performance MCP Aggregators
 
-When monitoring match progression or running autonomous agent loops, avoid issuing dozens of single-purpose HTTP requests. Use high-performance aggregators:
+Use aggregators to minimize HTTP round-trips during agent decision cycles:
 
-| Tool | Format | Purpose |
+| Tool | Format | Purpose & Contents |
 |---|---|---|
-| diagnostics_runtime_snapshot | Composite JSON | Combines BattlefieldCensus, RunProgressionCensus, SystemHealth, MatchSummary, and VisualRenderCensus into a single payload. Ideal for match setup, tick ticks, and end-of-turn audits. |
-| diagnostics_runtime_scalars | Flat key-value JSON | Emits high-density numeric telemetry (LiveBattlefieldEntityCount, LivePlayerUnitCount, LiveAiUnitCount, LiveAiBuildingCount, LiveHarvesterCount, RegisteredUnitMechanicsProfileCount, RangeDisplayGeometryMinimumSegments, RangeDisplayGeometryMaximumSegments, RangeDisplayCirclePointCount, LiveSkinnedMeshUnitCount, LiveAnimatedUnitCount, LivePbrShaderUnitCount). Ideal for high-frequency pacing monitors. |
-| `diagnostics_get_agent_coordination` | Composite JSON | Emits multi-agent coordination telemetry (`activeSessionCount`, `activeLockCount`, `sessions[]`, `locks[]`). Ideal for checking whether other agents are holding locks before commanding units. |
+| `diagnostics_runtime_snapshot` | Composite JSON | Parallel multi-census snapshot with `_meta` timing block. Combines Battlefield, Progression, Health, MatchSummary, and Visuals. Filters via `getters`/`exclude`. |
+| `diagnostics_runtime_scalars` | Flat key-value JSON | High-frequency telemetry: 44 scalar counters (living entities, squads, harvesters, skinned meshes, PBR units, range display segments). |
+| `diagnostics_runtime_summary` | Compact JSON | Summary metrics and operational status across subsystems. |
+| `diagnostics_call_getters` | Batch JSON | Executes a custom list of getters in parallel via `ThreadPoolExecutor`. |
+| `diagnostics_list_runtime_getters` | Array JSON | Discovers all runtime getter names available on the bridge. |
+| `diagnostics_get_visual_health_summary` | Composite JSON | Bounded single-pass audit of visual quality, surfaces, materials, and sockets (capped at 256 units, 4,096 nodes). |
+| `diagnostics_get_combat_health_summary` | Composite JSON | Consolidates 11 combat, stance, affix, and targeting telemetry sources. |
+| `diagnostics_get_entity_detail` | Detailed JSON | Deep-dive telemetry for a single unit/building across 11 diagnostic subsystems (`entityKeyId`). |
+| `diagnostics_get_agent_lock_status` | JSON | Checks advisory lock ownership, TTL remaining, and session validity. |
+| `diagnostics_diff_snapshots` | Diff JSON | Top-level comparison between two JSON snapshots with bounded added/removed/changed entries. |
 
 ---
 
-## 3. Diagnostic Censuses
+## 3. Diagnostic Censuses Catalog
 
-All censuses query live game singletons through fail-closed reflection and format primitive DTOs:
+All censuses query live singletons through fail-closed reflection, format primitive DTOs, and emit omission counters first:
 
-- **System Health** (`diagnostics_get_system_health`): Readiness of native registry, active content packs, registered units and AI modules, player and AI credit balances.
-- **Core Harmony Hook Telemetry** (`diagnostics_get_runtime_hooks`): Live execution status and counters for the 53 installed Harmony patches and the 12 core simulation hooks: `hooksInstalled` (bool), `installedHookCount` (53), `harmonyOwnerId` (`RogueCommand.ExpansionLoader.Runtime`), `registeredCombatXpCount`, unit creation/reuse (`unitCreationHookCount`, `unitReuseHookCount`), placement ghosts (`placementGhostHookCount`, and `GetLastPlacementGhostEntityId()`), factory production (`factoryProduceHookCount`, with tracking by entity key and `GetFactoryProducedCountByEntityId`), battlefield registration/unregistration (`entityRegistryResetCount`, `entityRegisteredCount`, `entityUnregisteredCount`, `activeRegisteredEntityCount`), and command loop execution (`commandExecutedCount`, `commandNextStepCount`, `commandResetCount`, `commandChainDeletedCount`, `lastExecutedCommandKind`).
-- **Threat Prioritization** (`diagnostics_get_threat_prioritization`): Active threat-prioritization behaviors, evaluated enemy units, friendly targets, and dynamic retargeting counters. Each tick also censuses AI units (`AiUnits()`) and allied player units (`PlayerUnits()`), exposing `AutoControlledAlliedUnitCount` / `_lastProcessedAiUnitCount` for diagnostics only; it does **not** mutate control/faction identity (allied units stay `IsControlledByPlayer=true`). An earlier reflection-based control-flag reassignment was reverted in `5b88d65`.
-- **Production Queues** (`diagnostics_get_production_census`): Living factories, active production queues, build durations, and progress ratios.
-- **Base Integrity** (`diagnostics_get_base_integrity`): Engineering HQ existence, player HQ health ratio, enemy structure count, and average structure health.
-- **Battlefield Census** (`diagnostics_get_battlefield_census`): Living units, tactical roles, positions, and current health ratios.
-- **Player & AI Rosters** (`diagnostics_get_player_roster`, `diagnostics_get_ai_roster`): Unit lists split by team alignment with orders, health, and threat values.
-- **Match Summary** (`diagnostics_get_match_summary`): Unified view combining combat, economy, and AI status.
-- **Run Progression** (`diagnostics_get_run_progression`): Current stage, level number, Heat/Ascension level, and offered blueprint reward pools.
-- **Selection & Control Groups** (`diagnostics_get_selection_census`): Selected units, active skill availability, focused target, and counts across 10 control groups.
-- **Fog of War** (`diagnostics_get_fog_state`): Fog enabled status, update intervals, grid dimensions.
-- **Spatial Grid** (`diagnostics_get_grid_metrics`, `diagnostics_evaluate_grid_cell`): Map boundary coordinates, cell traversability, elevation, and hazard status.
-- **AI Director** (`diagnostics_get_ai_director_census`): Attack wave counter, categorized command queues (attack, defend, scout, build, produce, other), queue summary, tick duration.
-- **Camera Viewport** (`diagnostics_get_camera_census`): Viewport ground boundary min/max X/Z, center coordinates, FOV, orthographic status.
-- **Harvester Telemetry** (`diagnostics_get_harvester_census`): Harvester counts, crystal loads, load fractions, mining states (Mining, Returning, Idle).
-- **Audio Mixer** (`diagnostics_get_audio_census`): Volume slider levels (0.0 to 1.0) and dB attenuation for Master, Music, Gameplay, and UI.
-- **Catalogs** (`diagnostics_get_tech_catalog`, `diagnostics_get_entity_catalog`): Upgrades, research branches, relics, units, buildings, and factories registered in balancing stores.
-- **Veterancy & Combat XP** (`diagnostics_get_veterancy_census`): Live combat XP points, rank tiers (0 to 5), and calculated stat bonuses across living units.
-- **Command Auras** (`diagnostics_get_command_aura_census`): Active captain command auras, subordinate linkage counts, and aura remaining durations.
-- **Environmental Hazard Zones** (`diagnostics_get_hazard_census`): Active battlefield hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField), trigger metrics, and damage per tick.
-- **Unit Loadouts & Pre-Spawn Pools** (`diagnostics_get_unit_loadout_census`): Live unit loadout assignments, active combat variant IDs, unit stat profiles (Damage, Range, Speed, Cooldown), and EntityFactory anti-hitch pre-spawn pool quotas and warmed instances.
-- **AI Tactical Doctrine & Deck Reinforcement** (`diagnostics_get_ai_doctrine_census`): Active AI combat doctrine, aggression scaling multiplier, and live deck unit quotas (`countAtStart`, `maxLiving`) per AI base.
-- **Tactical Combat Stances** (`diagnostics_get_tactical_stance_census`): Active combat stances (`Standard`, `Aggressive`, `Defensive`, `HoldFire`, `Kiting`), movement speeds, and weapon ranges across living units.
-- **Unit Elite Affixes & Traits** (`diagnostics_get_unit_affix_census`): Active elite modifiers (`Swift`, `Juggernaut`, `Overcharged`, `Vampiric`, `Bulwark`, `Volatile`) applied to living units.
-- **Multi-Agent Coordination** (`diagnostics_get_agent_coordination`): Active agent sessions, heartbeats, and advisory locks held on entities or camera.
-- **Visual Render, Rig & Animation Telemetry** (`diagnostics_get_visual_census`, `diagnostics_inspect_entity_visual`, `diagnostics_get_loaded_unit_visual_audit`): In-game and load-time evidence of 3D asset instantiation, active renderer components (`MeshRenderer`, `SkinnedMeshRenderer`, `ParticleSystemRenderer`), submesh and vertex counts, bounding boxes, assigned shaders (`RogueCommand/VehiclePBR_VertexWear`, `Standard`) and keywords (`_METALLICSPECGLOSSMAP`, `_NORMALMAP`), GPU instancing flags, LOD levels, rig architecture classification (`SkeletalArmature`, `NativeTransformRig`, `StaticVehicle`), root bone and bone count, canonical weapon/VFX/audio sockets (`Socket_MuzzlePrimary`, `FirePoint_0`, `Socket_WeaponAudio`, `Socket_EngineAudio`, `Socket_DamageSmoke`, `Socket_FootContact_*`), socket role ambiguity detection, Animator parameters (`RCL_IsMoving`, `RCL_Fire`, `RCL_Death`), active clips, playback speed, and `RuntimeVisualDirector` damage/jamming/recoil states. `diagnostics_inspect_entity_visual` automatically falls back to inspecting the registered loaded prefab template (`prefab:<entityId>`) when no living battlefield instance matches.
-- **Visual Surface & Vertex-Wear Census** (`diagnostics_get_visual_surface_census`): Per-living-unit telemetry of renderer/material counts, vertex counts, shader names, and averaged plus distribution counts for vertex-color channels on `RogueCommand/VehiclePBR_VertexWear` surfaces: R cavity AO/micro-relief (`R <= 0.4`), G edge wear/welds (`G >= 0.7`), B thermal soot/mud (`B >= 0.5`), and A team mask. Omission counter first.
-- **Visual Material & Texture Binding Census** (`diagnostics_get_visual_material_census`): Per-living-unit telemetry of renderer/material counts, material and shader names, bound texture names, and counts of materials exposing main/albedo, metallic-gloss, normal, and emission maps, plus shader keywords. Omission counter first.
-- **Socket Audit Census** (`diagnostics_get_socket_audit_census`): Per-living-unit telemetry of canonical `Socket_*` transforms (muzzle primary, damage smoke/fire, foot contact, engine/weapon audio, hardpoints, radar, antenna), counts, and ambiguity detection. Omission counter first.
-- **Collider Audit Census** (`diagnostics_get_collider_audit_census`): Per-living-unit collider counts (trigger vs solid), collider type names, and rigidbody kinematic state. Omission counter first.
-- **Particle VFX Census** (`diagnostics_get_particle_vfx_census`): Per-living-unit particle system counts (active vs total), trail and line renderer counts, and particle system names. Omission counter first.
-- **LOD Audit Census** (`diagnostics_get_lod_audit_census`): Per-living-unit LOD group counts, total LOD levels, and renderer names. Omission counter first.
-- **Visual health summary performance contract**: `GetVisualHealthSummaryJson` performs one bounded live-unit sweep instead of invoking four full visual censuses. It deduplicates the player/AI roster, caps rows at 256, caps hierarchy traversal at 4,096 nodes, checks `Material.HasProperty` before texture reads, samples geometry only for loader-owned units (at most 32 meshes per unit), and reports bounded geometry sampling as a quality issue for PBR rows. Native rows retain renderer/material/texture telemetry while avoiding the expensive base-game mesh walk. Runtime validation must record the elapsed direct bridge call and must not claim the old timeout as fixed from local tests alone.
-- **Intermission & Level Progression Telemetry** (`diagnostics_get_intermission_census`, `diagnostics_get_level_map_state`, `diagnostics_get_intermission_node`, `diagnostics_get_intermission_graph`, `diagnostics_get_intermission_reward_state`, `diagnostics_get_navigator_state`):
-  - `diagnostics_get_intermission_census`: Scans both `OverWorldMapEnemy` and `OverWorldMapBoss` (Boss node at `level = LevelCount, field = 0`). Exposes `isIntermissionActive`, `currentStage`, `currentLevel`, `nodes[]` (`level`, `field`, `isChoosable`, `isCurrentNodeOfPath`, `hasCardReward`, `position`, `instanceId`).
-  - `diagnostics_get_level_map_state`: Live `LevelMap` route state (`Game.StageMap.CurrentLevelMap`): CurrentLevel/Field, finished/first/lastBeforeBoss/boss flags, LevelCount, MaxWidth, chosenPath, next field, choosableFieldCount (native `IsChoosable` rule), total fields, boss prefab names.
-  - `diagnostics_get_intermission_node`: In-depth inspection of any node `(level, field)`: `isChoosable`, reward flags (`isRestSite`, `isShop`, `hasCardReward`, `hasUpgradeReward`, `hasRelicReward`, `hasResearchReward`, `hasCoinReward`, `hasStartCrystalReward`, `hasResearchPointsReward`, `hasDropReward`), `blueprintPoolId`, edge connections.
-  - `diagnostics_get_intermission_graph`: Full LevelMap graph snapshot (`nodes` + Boss `4:0`), reward types, and scored forward routes from choosable frontier to Boss based on `preferredRewardType` (e.g. `RelicReward`, `CardReward`, `Shop`, `RestSite`).
-  - `diagnostics_get_intermission_reward_state`: Live intermission sub-screen state: currencies (`currentCoins`, `currentStartCrystals`, `currentDropPodCount`, `currentRerollCount`, `currentResearchPoints`), open reward queues (`OpenEngineerRewards`, `OpenEconomyRewards`, `OpenSpecialistRewards`, `OpenSpecialistRelicRewards`, `OpenCardRewards`, `OpenRelicRewards`, `OpenUpgradeRewards`, `OpenResearchRewards`), live `ChooseCard` offered slots (`CardNew`, `UpgradeCard`, `RelicCard`, `ResearchCard`), sub-screens (`DeckOverview`, `AssignUpgradeToCardView`, `RemoveCardView`), and deck cards with attached upgrades.
-  - `diagnostics_get_navigator_state`: Reads navigator state (current level node, `paused` flag, and simulation status).
-- **AI Architecture Census** (`diagnostics_get_ai_architecture_census`): Real-time telemetry for HUB-D 2.0 (`sample:tactical-director`, `sample:squad-operations-director`), live blackboard metrics (`AlliedDispersionRadius`, centroids, hazard zones), status vulnerabilities (`Stunned`, `Vulnerable`, `Slowed`, `Burning`, `Overclocked`), and elite affix modifiers.
-- **Standalone visual census performance contract**: `RuntimeVisualQualityCensus`, `RuntimeVisualSurfaceCensus`, `RuntimeVisualMaterialCensus`, and `RuntimeSocketAuditCensus` use the shared `RuntimeVisualCensusSupport` pass. Each reads player/AI registries once, deduplicates by entity reference, clamps rows to 256, traverses at most 4,096 hierarchy nodes, caps renderer components at 256, material slots at 512, diagnostic names at 256, mesh color inspections at 32, and color samples at 4,096. Disabled renderers remain counted in `RendererCount` but do not contribute material, texture, or mesh telemetry. Texture reads require `Material.HasProperty`; standalone bridge getters accept `maxTrackedUnits` and forward `[64]` in bounded snapshots. The material census caches binding metadata by material reference for the duration of one sweep, so repeated native shared materials do not repeat shader-keyword/property/texture reflection; non-loader-owned native rows retain renderer/material-slot counts while intentionally omitting detailed binding names/maps and expose partial-coverage flags. Rows expose truncation/sampling flags so partial coverage is not mistaken for a complete audit.
-- **MCP Snapshot Evolution**: `diagnostics_runtime_snapshot` now runs its getters in parallel (ThreadPoolExecutor), emits a `_meta` block (getterCount, successCount, errorCount, elapsedMs, per-getter timingsMs), and accepts `getters`/`exclude` filters. Companion tools: `diagnostics_call_getters` (parallel batch), `diagnostics_runtime_summary` (compact scalars), `diagnostics_list_runtime_getters` (discovery). Snapshot includes `GetVisualSurfaceCensusJson`, `GetVisualMaterialCensusJson`, and `GetGameTimeScaleJson`; `diagnostics_runtime_scalars` exposes 44 scalar properties plus circle point count. New aggregators: `diagnostics_get_visual_health_summary` (C# `GetVisualHealthSummaryJson` consolidating quality/surface/material/socket), `diagnostics_get_combat_health_summary` (11 getters), `diagnostics_get_entity_detail` (single-entity drill-down across 11 sources), `diagnostics_get_agent_lock_status` (lock owner/remaining/session check).
-- **Performance, Frame Timing & Snapshot Diff**: `diagnostics_get_performance_census` (`GetPerformanceCensusJson`) samples live FPS, frame time, time scale, managed memory and a budget verdict (Healthy/Degraded/Critical); `diagnostics_get_frame_timing_census` (`GetFrameTimingCensusJson`) aggregates a windowed frame-timing census (avg/min/max/p95, stutter/hitch counts, Smooth/MinorStutter/MajorStutter); `diagnostics_diff_snapshots` (`GetSnapshotDiffJson`) compares two JSON snapshots at the top level with bounded added/removed/changed rows and omission counters. All three follow the three-part pattern and place omission counters first. Their Unity stubs require `UnityEngine.Time.deltaTime`, `Time.frameCount`, `Time.timeScale`, and `Application.targetFrameRate` (plus `Application.unityVersion`) in `UnityEngineTestStub.cs`; without these the offline harness cannot exercise `RuntimePerformanceCensus.Current()` or `RuntimeFrameTimingCensus.Current()`.
-- **Unit & AI Loader Runtime Integration & Audit** (`diagnostics_get_loader_audit_census`, `diagnostics_order_reconcile_loader_state`):
-  - Units can declare `defaultTacticalStance`, `defaultLoadout` (`"Standard"`, `"AP"`, `"HE"`, `"Speed"`, `"Siege"`, `"Reinforced"`, or a local `variants[].id`), `startingAffixes`, and `startingVeterancyRank` (`0..5`) in `content.json`, applied automatically on spawn by `RuntimeUnitMechanicsDirector` and reset on pooled reuse.
-  - AI profiles can declare squad-wide defaults (`doctrine`, `aggressionMultiplier`, `defaultUnitStance`, `defaultUnitLoadout`, `startingUnitAffixes`, `startingUnitVeterancyRank`) in `content.json`. These apply automatically to AI units on spawn (`RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity`) and on AI initialization (`ApplyActiveAiUnitDefaultsToAiUnits`) without overriding explicit unit-level defaults.
-  - Every loaded unit, production building, and standalone building prefab is audited at load time via `RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit` and exposed through `diagnostics_get_loaded_unit_visual_audit`.
-  - AI profiles automatically warm `EntityFactory` pre-spawn pools on initialization (`RuntimeGameplayCommandDirector.TryWarmPrespawnPool`) and can bind the `sample:adaptive-commander` AI module (`AdaptiveCommanderAiModule`) to promote a Squad Commander, pulse command auras, modulate squad tactical stances (`Aggressive`/`Defensive`/`Standard`), apply preferred loadouts, and adapt AI tactical doctrine (`Assault`/`Fortify`).
-  - `diagnostics_get_loader_audit_census` (`GetLoaderAuditCensusJson`) audits runtime readiness across all loaded units and AI profiles (balancing row registration, visual prefab audit, rig/animator state, runtime mechanics profile, prespawn pool warming, and active battlefield mechanics).
-  - `diagnostics_order_reconcile_loader_state` (`OrderReconcileLoaderStateJson`) actively warms un-warmed `EntityFactory` pre-spawn pools, attaches missing `RuntimeUnitMechanicsDirector` / `RuntimeVisualDirector` components on living modded entities, re-applies unit and AI profile squad defaults, and synchronizes active AI doctrine.
+| Census Category | MCP Tool | Scope & Key Output Fields |
+|---|---|---|
+| **System Health** | `diagnostics_get_system_health` | Registry readiness, pack status, registered unit/AI counts, player/AI credits. |
+| **Core Harmony Hooks** | `diagnostics_get_runtime_hooks` | Status of 53 installed patches and 12 simulation hooks (`unitCreation`, `unitReuse`, `placementGhost`, `factoryProduce`, `entityRegistryReset`, `entityRegistered`, `entityUnregistered`, `commandExecuted`, `commandNextStep`, `commandReset`, `commandChainDeleted`, `lastExecutedCommandKind`). |
+| **Battlefield & Rosters** | `diagnostics_get_battlefield_census`<br>`diagnostics_get_player_roster`<br>`diagnostics_get_ai_roster` | Living units, roles, positions, health ratios, orders, and threat scores split by alignment. Omission counters first. |
+| **Combat & Match Summary** | `diagnostics_get_match_summary`<br>`diagnostics_get_base_integrity`<br>`diagnostics_get_threat_prioritization` | Unified combat/economy state, HQ health ratio, enemy structure counts, evaluated hostile threat scores. |
+| **Production & Factories** | `diagnostics_get_production_census` | Living factories, production queues, build durations, progress ratios. |
+| **Run & Level Progression** | `diagnostics_get_run_progression`<br>`diagnostics_get_level_map_state`<br>`diagnostics_get_navigator_state` | Current stage/level, Heat/Ascension tier, reward pools, LevelMap chosen path, frontier choosable fields, navigator status. |
+| **Intermission Deep Reads** | `diagnostics_get_intermission_census`<br>`diagnostics_get_intermission_node`<br>`diagnostics_get_intermission_graph`<br>`diagnostics_get_intermission_reward_state` | OverWorldMap nodes (`level`, `field`, `isChoosable`, rewards, Boss `4:0`), forward routes to Boss, currencies (`coins`, `crystals`, `dropPods`, `rerolls`), and `ChooseCard` offers. |
+| **Selection & Controls** | `diagnostics_get_selection_census` | Selected units, skill availability, focused target, and 10 control group counts. |
+| **Spatial Grid & Fog** | `diagnostics_get_grid_metrics`<br>`diagnostics_evaluate_grid_cell`<br>`diagnostics_get_fog_state` | Map boundaries, cell traversability, elevation, hazard status, and Fog of War visibility. |
+| **Camera & Audio** | `diagnostics_get_camera_census`<br>`diagnostics_get_audio_census`<br>`diagnostics_get_game_time_scale` | Ground viewport min/max coordinates, FOV, mixer volume sliders (Master/Music/Gameplay/UI), simulation time scale. |
+| **Economy & Harvesters** | `diagnostics_get_harvester_census` | Harvester counts, crystal loads, load fractions, mining states (Mining/Returning/Idle). |
+| **Catalogs** | `diagnostics_get_tech_catalog`<br>`diagnostics_get_entity_catalog` | Registered upgrades, research branches, relics, units, and factory definitions. |
+| **Veterancy & Auras** | `diagnostics_get_veterancy_census`<br>`diagnostics_get_command_aura_census` | Unit combat XP, veterancy rank (0–5), stat boosts, active captain auras, follower links, remaining durations. |
+| **Hazards & Loadouts** | `diagnostics_get_hazard_census`<br>`diagnostics_get_unit_loadout_census` | Trigger hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField), active unit variants, stat overrides, and warmed prespawn pools. |
+| **Stances & Affixes** | `diagnostics_get_tactical_stance_census`<br>`diagnostics_get_unit_affix_census` | Stances (`Standard`, `Aggressive`, `Defensive`, `HoldFire`, `Kiting`), elite traits (`Swift`, `Juggernaut`, `Overcharged`, `Vampiric`, `Bulwark`, `Volatile`). |
+| **AI Architecture & Doctrine** | `diagnostics_get_ai_architecture_census`<br>`diagnostics_get_ai_director_census`<br>`diagnostics_get_ai_doctrine_census` | HUB-D 2.0 blackboard metrics (`AlliedDispersionRadius`, centroids, hazard zones), wave counter, attack queues, AI doctrine & aggression scale. |
+| **Visual Render & Rig** | `diagnostics_get_visual_census`<br>`diagnostics_inspect_entity_visual`<br>`diagnostics_get_loaded_unit_visual_audit`<br>`diagnostics_get_unit_mechanics_census` | Active renderers, bounds, shaders (`VehiclePBR_VertexWear`), keywords, rig classification (`SkeletalArmature`, `NativeTransformRig`, `StaticVehicle`), bone count, sockets, Animator clips & parameters. |
+| **Surface, Material & LOD** | `diagnostics_get_visual_surface_census`<br>`diagnostics_get_visual_material_census`<br>`diagnostics_get_socket_audit_census`<br>`diagnostics_get_collider_audit_census`<br>`diagnostics_get_particle_vfx_census`<br>`diagnostics_get_lod_audit_census` | Vertex wear channels (R cavity $\le 0.4$, G edge wear $\ge 0.7$, B soot/mud $\ge 0.5$, A team mask), texture bindings, socket roles, colliders, particle systems, and LOD levels. |
+| **Performance & Timing** | `diagnostics_get_performance_census`<br>`diagnostics_get_frame_timing_census` | Live FPS, frame times, managed memory, budget verdict (Healthy/Degraded/Critical), windowed stutter/hitch metrics. |
+| **Loader & Prespawn Audit** | `diagnostics_get_loader_audit_census` | Audits runtime readiness: balancing rows, visual prefabs, animator state, mechanics profiles, prespawn warming, and active battlefield mechanics. |
+| **Multi-Agent Coordination** | `diagnostics_get_agent_coordination` | Active agent sessions, heartbeats, and advisory locks held on entities or camera. |
 
 ---
 
 ## 4. Runtime Gameplay Command Director
 
-The `RuntimeGameplayCommandDirector` class dispatches safe in-game actions for automated testing:
+Dispatches validated, safe in-game actions for automated testing and agent execution:
 
-### Tactical Orders & Stances
-- `diagnostics_order_unit_move`: Dispatches a movement order (`entityKeyId`, `targetX`, `targetZ`).
-- `diagnostics_order_unit_attack`: Orders an attack on an enemy entity (`entityKeyId`, `targetEntityKeyId`).
-- `diagnostics_order_unit_stop`: Halts the entity's active order (`entityKeyId`).
-- `diagnostics_order_unit_hold_position`: Commands the unit to hold position and engage targets in range (`entityKeyId`).
-- `diagnostics_order_unit_attack_move`: Orders an attack-move toward coordinates (`entityKeyId`, `targetX`, `targetZ`).
-- `diagnostics_order_coordinated_assault`: Coordinates a bounded attack against one hostile target using only eligible hostile combat attackers (`targetEntityKeyId`, `attackerEntityKeyIds`, `maxAttackers`).
-- `diagnostics_order_retreat`: Orders an evasive retreat away from a threat position (`entityKeyId`, `threatX`, `threatZ`, `distance`).
-- `diagnostics_order_unit_patrol`: Dispatches a native patrol route with parallel X/Z waypoints (`entityKeyId`, `waypointX`, `waypointZ`).
-- `diagnostics_order_group_command`: Dispatches a command (`Move`, `Stop`, `HoldPosition`, `AttackMove`) across multiple units (`entityKeyIds`, `commandType`, `targetX`, `targetZ`).
-- `diagnostics_order_formation_move`: Dispatches a synchronized formation movement (`Line`, `Wedge`, `Column`, `Box`, `Surround`) to multiple units (`entityKeyIds`, `formationType`, `targetX`, `targetZ`, `spacing`).
-- `diagnostics_run_synthetic_gameplay_scenario`: Executes a bounded paused synthetic seam in one bridge call (`unitIdsCsv`, `targetX`, `targetZ`, optional `formationType`/`spacing`), applies reconciliation, spawn, stance, loadout, affix, veterancy, formation, aura, tactical pulse, hazard, and visual feedback checks, then clears and destroys only the entities created by that call. Its result is always `synthetic-seam`; it is not natural offer, production, rendering, or AI-decision evidence.
-- `diagnostics_order_unit_tactical_stance`: Assigns a tactical combat stance (`Standard`, `Aggressive`, `Defensive`, `HoldFire`, `Kiting`) to a unit (`entityKeyId`, `stanceName`).
-- `diagnostics_order_group_tactical_stance`: Assigns a tactical combat stance across multiple units (`entityKeyIds`, `stanceName`).
-- `diagnostics_order_apply_unit_affix`: Grants an elite trait/modifier (`Swift`, `Juggernaut`, `Overcharged`, `Vampiric`, `Bulwark`, `Volatile`) to a unit (`entityKeyId`, `affixName`).
-- `diagnostics_order_remove_unit_affix`: Removes an active elite trait from a unit or clears all (`entityKeyId`, `affixName`).
-- `diagnostics_order_dispatch_ai_assault_wave`: Manually triggers and coordinates an AI assault wave with elevated aggression (`waveNumber`, `aggressionBoost`, `targetBaseIndex`).
+### Tactical Movement, Combat & Stances
+- `diagnostics_order_unit_move`: Issues movement order (`entityKeyId`, `targetX`, `targetZ`).
+- `diagnostics_order_unit_attack`: Orders attack on target (`entityKeyId`, `targetEntityKeyId`).
+- `diagnostics_order_unit_stop` / `diagnostics_order_unit_hold_position`: Halts orders or locks position (`entityKeyId`).
+- `diagnostics_order_unit_attack_move`: Orders attack-move toward coordinates (`entityKeyId`, `targetX`, `targetZ`).
+- `diagnostics_order_coordinated_assault`: Coordinates focused attack with up to `maxAttackers` (`targetEntityKeyId`, `attackerEntityKeyIds`, `maxAttackers`).
+- `diagnostics_order_retreat`: Commands evasive retreat away from a threat (`entityKeyId`, `threatX`, `threatZ`, `distance`).
+- `diagnostics_order_unit_patrol`: Dispatches native patrol route (`entityKeyId`, `waypointX`, `waypointZ`).
+- `diagnostics_order_group_command`: Dispatches command (`Move`, `Stop`, `HoldPosition`, `AttackMove`) across multiple units (`entityKeyIds`, `commandType`, `targetX`, `targetZ`).
+- `diagnostics_order_formation_move`: Synchronized formation movement (`Line`, `Wedge`, `Column`, `Box`, `Surround`) (`entityKeyIds`, `formationType`, `targetX`, `targetZ`, `spacing`).
+- `diagnostics_order_unit_tactical_stance` / `diagnostics_order_group_tactical_stance`: Applies stance (`Standard`, `Aggressive`, `Defensive`, `HoldFire`, `Kiting`) (`entityKeyId` / `entityKeyIds`, `stanceName`).
+- `diagnostics_order_apply_unit_affix` / `diagnostics_order_remove_unit_affix`: Grants or removes elite traits (`Swift`, `Juggernaut`, `Overcharged`, `Vampiric`, `Bulwark`, `Volatile`).
+- `diagnostics_order_dispatch_ai_assault_wave`: Triggers coordinated AI assault wave (`waveNumber`, `aggressionBoost`, `targetBaseIndex`).
+- `diagnostics_run_synthetic_gameplay_scenario`: Executes an isolated synthetic test seam in one call, verifying reconciliation, spawn, stances, loadouts, affixes, formations, and visuals before cleaning up.
 
-### Intermission & Map Navigation Orders
-- `diagnostics_order_select_level_node`: Selects a choosable level node (regular `OverWorldMapEnemy` or `OverWorldMapBoss`) via screen coordinate raycast (`level`, `field`).
-- `diagnostics_order_enter_level`: Full-flow director: selects the choosable node and drives native `LoadScene.LoadLevel()` (`level`, `field`).
-- `diagnostics_order_trigger_load_level`: Direct invocation of `LoadScene.LoadLevel()` for the selected node (or Boss when `IsLastLevelBeforeBoss`).
-- `diagnostics_order_choose_intermission_reward`: Selects an offered reward in `ChooseCard` by `rewardId` or `slotIndex`.
-- `diagnostics_order_skip_intermission_reward`: Clicks `ChooseCard.ClickedOnSkipButton()` when active.
-- `diagnostics_order_reroll_intermission_reward`: Clicks `ChooseCard.ClickedOnRerollButton()` when active and rerolls > 0.
-- `diagnostics_order_assign_intermission_upgrade`: Assigns a pending upgrade in `AssignUpgradeToCardView` to a viable deck card (`entityId`) or cancels.
-- `diagnostics_order_set_deck_overview_open`: Opens or closes the `DeckOverview` screen (`open` boolean).
-- `diagnostics_order_navigator_pause`: Pauses or unpauses the navigator (`paused` boolean).
-- `diagnostics_jump_to_level`: User-authorized synthetic stage jump (`level`, `finished`).
-- `diagnostics_load_next_level`: User-authorized synthetic level load (`LoadScene.LoadNextLevel`).
+### Intermission & Level Map Navigation
+- `diagnostics_order_select_level_node`: Selects a choosable level node via screen coordinate raycast (`level`, `field`).
+- `diagnostics_order_enter_level`: Full navigation director: selects choosable node and invokes native `LoadScene.LoadLevel()` (`level`, `field`).
+- `diagnostics_order_trigger_load_level`: Direct invocation of `LoadScene.LoadLevel()` for current node or Boss.
+- `diagnostics_order_choose_intermission_reward`: Chooses card/reward in `ChooseCard` by `rewardId` or `slotIndex`.
+- `diagnostics_order_skip_intermission_reward`: Clicks skip reward button (`ChooseCard.ClickedOnSkipButton`).
+- `diagnostics_order_reroll_intermission_reward`: Clicks reroll button (`ChooseCard.ClickedOnRerollButton`).
+- `diagnostics_order_assign_intermission_upgrade`: Assigns upgrade in `AssignUpgradeToCardView` to deck card (`entityId`).
+- `diagnostics_order_set_deck_overview_open`: Opens or closes `DeckOverview` screen (`open` bool).
+- `diagnostics_order_navigator_pause`: Pauses or unpauses navigator simulation (`paused` bool).
+- `diagnostics_jump_to_level` / `diagnostics_load_next_level`: Synthetic stage jump or level load.
 
-### Active Skills, Status Effects & Vitality Adjustments
-- `diagnostics_order_unit_active_skill`: Fires tactical active skills (`entityKeyId`, `targetingMode` `"Self"`/`"TargetUnit"`/`"TargetPosition"`, `targetUnitKeyId`, `targetX`, `targetZ`).
-- `diagnostics_apply_status_effect`: Applies effects like `SlowedDown`, `OnFire`, `Stun`, `CombatBoost` (`entityKeyId`, `statusEffectName`, `durationSeconds`).
-- `diagnostics_clear_status_effect`: Clears active status effects (`entityKeyId`, `statusEffectName`).
-- `diagnostics_adjust_entity_vitality`: Modifies health, armor, or shields directly (`entityKeyId`, `adjustmentType` `"Heal"`/`"RepairArmor"`/`"ChargeShield"`/`"Damage"`, `amount`, `ignoreArmor`).
+### Skills, Status Effects & Vitality
+- `diagnostics_order_unit_active_skill`: Fires tactical skill (`entityKeyId`, `targetingMode` `"Self"`/`"TargetUnit"`/`"TargetPosition"`, `targetUnitKeyId`, `targetX`, `targetZ`).
+- `diagnostics_apply_status_effect` / `diagnostics_clear_status_effect`: Applies/clears effects (`SlowedDown`, `OnFire`, `Stun`, `CombatBoost`) (`entityKeyId`, `statusEffectName`, `durationSeconds`).
+- `diagnostics_adjust_entity_vitality`: Direct vitality modification (`entityKeyId`, `adjustmentType` `"Heal"`/`"RepairArmor"`/`"ChargeShield"`/`"Damage"`, `amount`, `ignoreArmor`).
 
-### Veterancy, Command Auras & Environmental Hazards
-- `diagnostics_order_grant_combat_xp`: Grants combat experience (XP) to a unit, promoting rank when thresholds are met (`entityKeyId`, `xpAmount`).
-- `diagnostics_order_set_veterancy_level`: Sets a unit's veterancy level directly (`entityKeyId`, `targetLevel`).
-- `diagnostics_order_command_aura_pulse`: Dispatches a dynamic command aura pulse linking nearby squad units (`captainKeyId`, `auraType` `"Inspire"`/`"Aegis"`/`"Swiftness"`, `radius`, `durationSeconds`).
-- `diagnostics_order_clear_command_aura_links`: Clears command aura links for a captain entity (`captainKeyId`).
+### Veterancy, Auras, Hazards & Loadouts
+- `diagnostics_order_grant_combat_xp` / `diagnostics_order_set_veterancy_level`: Grants XP or sets rank 0–5 (`entityKeyId`, `xpAmount`/`targetLevel`).
+- `diagnostics_order_command_aura_pulse` / `diagnostics_order_clear_command_aura_links`: Dispatches aura pulse (`Inspire`, `Aegis`, `Swiftness`) or clears links (`captainKeyId`, `auraType`, `radius`, `durationSeconds`).
+- `diagnostics_order_spawn_hazard_zone` / `diagnostics_order_clear_hazard_zones`: Spawns/clears hazard zones (`Firestorm`, `AcidPool`, `EmpField`, `CryoMist`, `NaniteField`).
+- `diagnostics_order_apply_unit_loadout`: Switches unit variant (`"Standard"`, `"AP"`, `"HE"`, `"Speed"`, `"Siege"`, `"Reinforced"`).
+- `diagnostics_order_apply_visual_variant`: Applies visual variant overlay (`entityKeyId`, `variantId`).
+- `diagnostics_order_warm_prespawn_pool`: Warms EntityFactory pool to prevent runtime hitches (`entityId`, `count` 1–50).
+- `diagnostics_order_set_ai_doctrine`: Configures AI doctrine (`"Standard"`, `"Assault"`, `"Siege"`, `"Kiting"`, `"Fortify"`, `aggressionMultiplier` 0.1–5.0).
+- `diagnostics_order_inject_ai_deck_unit`: Dynamically reinforces AI deck with unit quotas (`baseIndex`, `unitId`, `countAtStart`, `maxLiving`).
+- `diagnostics_order_reconcile_loader_state`: Warms unwarmed pools, attaches missing directors, and reapplies profile squad defaults.
 
-### Command Aura Renewal & Link Ownership
-
-When pulsing or renewing a dynamic command aura, track which follower links were **created by that specific aura** (e.g. a `CreatedFollowerLinks` collection per aura state). On expiry or replacement:
-- Release **only** the links created by the expiring aura.
-- Preserve pre-existing native links (e.g. from `AddCaptain`, hierarchy, or prior native auras) that were not created by this mod's aura.
-- Do **not** blindly clear all links for the captain — that clobbers legitimate native relationships and breaks native telemetry.
-- Clear links only when the captain's aura is explicitly cleared or the aura state is removed.
-
-Pitfall: Renewing an aura without tracking ownership either (a) leaves stale links from the expired aura attached to the captain, or (b) releases native links that the game depends on. Always distinguish created links from pre-existing ones before releasing.
-
-### Command Director Fail-Closed Rules
-
-- `TryOrderAttackMove` must resolve and validate the requested entity before calling native `AttackMove_Static`; a missing key must fail instead of commanding the previously selected unit.
-- Hostility guards must be written as `unit.IsEnemy == null || !unit.IsEnemy(target)`; the inverted `unit.IsEnemy != null && !unit.IsEnemy(target)` form skips hostility when the delegate is null.
-- Candidate filters that invoke `source.IsEnemy(candidate)` or `attacker.IsEnemy(target)` must check `== null` first; otherwise a null delegate throws and can abort the whole sweep or assault.
-- Clamp floating-point distances, radii, durations, and magnitudes with `Mathf.Clamp` and preserve the clamped `float`; do not truncate through `int`.
-- Validate every float coordinate, radius, magnitude, and duration for `NaN`/infinity before reflection or command dispatch, returning `success: false`.
-- Game-speed, spawn, camera, audio, aura, doctrine, patrol, hazard, and group commands each need their own finite guard at method entry; `Mathf.Clamp(NaN, ...)` is not a substitute and can propagate `NaN`.
-- Group commands with non-finite targets should fail before iterating members, even though the member commands also guard, so no partial work or confusing per-unit failures occur.
-- `IsEnemy` delegates are nullable and can throw; check `== null` before invocation and wrap candidate evaluation in try/catch so one unusable candidate is omitted instead of aborting the sweep or assault.
-- `SetEnumField` is best-effort and swallows parse failures; validate enum names against the decompiled type instead of relying on runtime no-ops.
-- Map relic `CardChange.side` labels to the native `Side` enum in both `RuntimeCardChangeApplier` and `RelicContentRuntimeRegistrar.SetEnumField`; content validation accepts only the native labels `False`, `True`, and `Irrelevant`.
-- Compute `omitted*Count` from requested versus dispatched/selected counts, not from already-filtered candidate counts.
-- Test stubs whose `MoveTo` mutates `Position` invalidate assertions that compare a returned destination against `unit.Position` after the call; capture the original position before invoking the command.
-- When a test uses an entity key, match the key type the assertion expects: unique numeric IDs resolve to the target but `TargetEntityKeyId`/result keys are normalized from the input string, so assert against the same identifier passed in (entity ID string vs numeric key).
-### AI Module Eligibility and Hostility
-
-- **Intermission director idempotency**: `TrySelectLevelNode` must pre-check a fresh census so that a node already observed as `IsCurrentNodeOfPath` skips the coordinate click entirely — after the first real click the camera moves, so a second click can land off-screen (huge reprojection coords) even though the selection had already stuck. The pure predicate is `IsAlreadySelected(rows, level, field)`; verify it with pure regression tests before relying on it.
-- **Intermission frontier semantics**: `LevelMap.IsChoosable(level, field)` is `CurrentLevel == -1 && level == 0` (every level-0 field) or `level == CurrentLevel + 1` plus connection `(CurrentField, field)` present in `Connections(level)`. The boss step (level `LevelCount`) is not an overworld map node, so at `isLastLevelBeforeBoss` the frontier is legitimately empty and a fail-closed director is CORRECT (selected=false with the node-pick stop point), not a bug. Never force a transition against an empty frontier.
-- **Deep-read tool contract for the same family** (all three parts, in order): pure DTO/struct + collector in `src/RogueCommandExpansionLoader/Runtime/RuntimeIntermissionDeepReads.cs` (or existing family file) → serializer in `AgentDiagnosticsFormatter.cs` with counters before detail → component getter returning JSON → MCP spec in `tools/build_bepinex_mcp.py` + handler in `tools/bepinex_mcp_server.py` → pure-logic tests including the choosable-count mirror of `IsChoosable`. Reflection seams must be decompiled-pinned (`Game.StageMap.CurrentLevelMap`, public `LevelMap` API); a runtime resolution failure must return the row/counter-neutral `Unavailable` struct, never throw.
-
-- AI modules that dispatch combat units must filter candidates through `IsControlledByAi`, `IsUnit`, `IsCombatUnit`, `CanAttackAndIsAttackEnabled`, and `CanMoveAndMovementIsEnabled` before issuing orders. Support or repair modules should require the relevant `IsUnit`/`CanMove` constraints instead of combat-attack eligibility.
-- Treat reflected `IsEnemy` as nullable: use `unit.IsEnemy == null || !unit.IsEnemy(target)`, and catch exceptions so one unusable candidate is omitted instead of aborting the whole sweep or assault.
-- Do not promote player-roster entries to hostile targets unless hostility is positively established against a real source unit; never use a squad centroid or `Vector3` as the source.
-- Counter-battery artillery classification requires `minAttackRange >= ThreatTriggerDistance`; a merely positive `minAttackRange` is not sufficient.
-- `SquadFormationAiModule` must track only mod-created captain links and release those on destruction; never call `ReleaseAllCaptains` over native links.
-
-### AssetBundle Registry
-
-- `GlobalBundleRegistry.LoadBundleAsync(string, string)` must validate `bundleId` and `path` before locking.
-- On a race where another caller registers the same `bundleId`, unload the duplicate bundle with `Unload(false)` before returning the existing instance; otherwise the path overload leaks an AssetBundle.
-- Keep the stream and path overloads behaviorally aligned for duplicate handling.
-- Treat `UnloadAll` as terminal for all returned bundle handles; do not use a handle after it has been unloaded.
-
-### Native CardChange Contract
-
-- Decompile `CardChangeScriptableObject` before changing `RuntimeCardChangeApplier`; do not assume field names or CLR types from the mod DTO.
-- `side` is the `Side` enum (`False`, `True`, `Irrelevant`), not a faction string: map player/friendly/allied to `False`, enemy/AI/hostile to `True`, and all/any/neutral to `Irrelevant`.
-- `multiplyValueWithMetaProgressionMultiplier` is a `string` multiplier key, not a `bool`; passing `false` compiles only if mistyped and silently leaves the field unset.
-- `SetEnumField` is best-effort and swallows parse failures; validate enum names against the decompiled type instead of relying on runtime no-ops.
-- `valueToChange` must be an exact `EntityBalancingStore.ChangeableValue` name.
-
-### Environmental Hazards
-
-- `diagnostics_order_spawn_hazard_zone`: Spawns a battlefield environmental hazard zone (`hazardType` `"Firestorm"`/`"AcidPool"`/`"EmpField"`/`"CryoMist"`/`"NaniteField"`, `x`, `z`, `radius`, `durationSeconds`, `tickDamage`) with trigger collider and amortized tick rate (>= 0.5s).
-- `diagnostics_order_clear_hazard_zones`: Clears all active hazard zones and colliders.
-
-### Dynamic Unit Loadouts & Anti-Hitch Pre-Spawn Pools
-- `diagnostics_order_apply_unit_loadout`: Switches or applies a unit loadout/variant (`entityKeyId`, `loadoutId` `"AP"`/`"HE"`/`"Speed"`/`"Siege"`/`"Reinforced"`/`"Standard"`). Applies stat adjustments (Damage, Range, Cooldown, Speed, Armor) via the native stat modification pipeline and records active variant state.
-- `diagnostics_order_warm_prespawn_pool`: Manually warms an EntityFactory pre-spawn pool (`entityId`, `count` 1 to 50), pre-allocating instances to eliminate runtime hitching during mass production.
-
-### AI Tactical Doctrine & Deck Reinforcement
-- `diagnostics_order_set_ai_doctrine`: Configures the active AI tactical doctrine (`doctrineName` `"Standard"`/`"Assault"`/`"Siege"`/`"Kiting"`/`"Fortify"`, `aggressionMultiplier` 0.1 to 5.0). Modulates AI update cadence, retarget intervals, and wave aggressiveness.
-- `diagnostics_order_inject_ai_deck_unit`: Dynamically reinforces an AI base deck with production quotas (`baseIndex`, `unitId`, `countAtStart`, `maxLiving`), escalating AI capabilities during matches.
-
-### Multi-Agent Coordination & Advisory Locks
-- **Visual Render, Rig & Animation Telemetry** (`diagnostics_get_visual_census`, `diagnostics_inspect_entity_visual`, `diagnostics_get_loaded_unit_visual_audit`): In-game and load-time evidence of 3D asset instantiation, active renderer components (`MeshRenderer`, `SkinnedMeshRenderer`, `ParticleSystemRenderer`), submesh and vertex counts, bounding boxes, assigned shaders (`RogueCommand/VehiclePBR_VertexWear`, `Standard`) and keywords (`_METALLICSPECGLOSSMAP`, `_NORMALMAP`), GPU instancing flags, LOD levels, rig architecture classification (`SkeletalArmature`, `NativeTransformRig`, `StaticVehicle`), root bone and bone count, canonical weapon/VFX/audio sockets (`Socket_MuzzlePrimary`, `FirePoint_0`, `Socket_WeaponAudio`, `Socket_EngineAudio`, `Socket_DamageSmoke`, `Socket_FootContact_*`), socket role ambiguity detection, Animator parameters (`RCL_IsMoving`, `RCL_Fire`, `RCL_Death`), active clips, playback speed, and `RuntimeVisualDirector` damage/jamming/recoil states. `diagnostics_inspect_entity_visual` automatically falls back to inspecting the registered loaded prefab template (`prefab:<entityId>`) when no living battlefield instance matches.
-- **Unit & AI Loader Runtime Integration & Audit** (`diagnostics_get_loader_audit_census`, `diagnostics_order_reconcile_loader_state`):
-  - Units can declare `defaultTacticalStance`, `defaultLoadout` (`"Standard"`, `"AP"`, `"HE"`, `"Speed"`, `"Siege"`, `"Reinforced"`, or a local `variants[].id`), `startingAffixes`, and `startingVeterancyRank` (`0..5`) in `content.json`, applied automatically on spawn by `RuntimeUnitMechanicsDirector` and reset on pooled reuse.
-  - AI profiles can declare squad-wide defaults (`doctrine`, `aggressionMultiplier`, `defaultUnitStance`, `defaultUnitLoadout`, `startingUnitAffixes`, `startingUnitVeterancyRank`) in `content.json`. These apply automatically to AI units on spawn (`RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity`) and on AI initialization (`ApplyActiveAiUnitDefaultsToAiUnits`) without overriding explicit unit-level defaults.
-  - Every loaded unit, production building, and standalone building prefab is audited at load time via `RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit` and exposed through `diagnostics_get_loaded_unit_visual_audit`.
-  - AI profiles automatically warm `EntityFactory` pre-spawn pools on initialization (`RuntimeGameplayCommandDirector.TryWarmPrespawnPool`) and can bind the `sample:adaptive-commander` AI module (`AdaptiveCommanderAiModule`) to promote a Squad Commander, pulse command auras, modulate squad tactical stances (`Aggressive`/`Defensive`/`Standard`), apply preferred loadouts, and adapt AI tactical doctrine (`Assault`/`Fortify`).
-  - `diagnostics_get_loader_audit_census` (`GetLoaderAuditCensusJson`) audits runtime readiness across all loaded units and AI profiles (balancing row registration, visual prefab audit, rig/animator state, runtime mechanics profile, prespawn pool warming, and active battlefield mechanics).
-  - `diagnostics_order_reconcile_loader_state` (`OrderReconcileLoaderStateJson`) actively warms un-warmed `EntityFactory` pre-spawn pools, attaches missing `RuntimeUnitMechanicsDirector` / `RuntimeVisualDirector` components on living modded entities, re-applies unit and AI profile squad defaults, and synchronizes active AI doctrine.
-- `diagnostics_register_agent_session`: Registers or updates an agent session in runtime (`agentId`, `agentRole`, `notes`).
-- `diagnostics_ping_agent`: Heartbeat ping to verify bridge health and update agent activity timestamp (`agentId`, `message`).
-- `diagnostics_acquire_agent_lock`: Acquires or renews an advisory lock on a resource (`agentId`, `resourceKey`, `durationSeconds`). Fails if already locked by a different agent until expired.
-- `diagnostics_release_agent_lock`: Explicitly releases an advisory lock before TTL expiry (`agentId`, `resourceKey`).
-
-### Selection & Control Groups
-- `diagnostics_select_units`: Selects entities by CSV or key list (`entityKeysCsv`, `additive`).
-- `diagnostics_deselect_all`: Clears active player selection.
-- `diagnostics_select_category`: Selects units by category (`"CombatUnits"`, `"Harvesters"`, `"IdleHarvesters"`, `"SkillBuildings"`, `"Factories"`).
+### Selection, Harvesters, Economy & Environment
+- `diagnostics_select_units` / `diagnostics_deselect_all`: Controls unit selection by CSV key list or clears selection.
+- `diagnostics_select_category`: Selects units by role (`"CombatUnits"`, `"Harvesters"`, `"IdleHarvesters"`, `"SkillBuildings"`, `"Factories"`).
 - `diagnostics_assign_control_group` / `diagnostics_select_control_group`: Manages control groups 0 through 9.
+- `diagnostics_order_harvester_harvest` / `diagnostics_order_harvester_return`: Directs harvesters to mine or return to refinery.
+- `diagnostics_set_attack_wave_number` / `diagnostics_increment_attack_wave`: Overrides/steps AI attack waves.
+- `diagnostics_toggle_ai_debug_visuals`: Toggles on-screen tactical command and role tags (`showTags`, `showCommands`).
+- `diagnostics_move_camera` / `diagnostics_focus_camera_on_entity` / `diagnostics_set_camera_zoom`: Viewport navigation and zoom.
+- `diagnostics_set_audio_volume`: Sets normalized volume (0.0–1.0) for Master, Music, Gameplay, UI.
+- `diagnostics_set_fog_of_war` / `diagnostics_reveal_fog_of_war`: Toggles fog or reveals areas.
+- `diagnostics_set_game_time_scale`: Controls simulation speed.
+- `diagnostics_grant_credits` / `diagnostics_order_production` / `diagnostics_spawn_entity` / `diagnostics_trigger_match_end`: Economy and entity spawning.
+- `diagnostics_apply_card_change` / `diagnostics_preview_card_change`: Applies/previews data-driven card modifications.
+- `diagnostics_order_unit_visual_feedback`: Triggers visual feedback (recoil, hit impact, turret jam, bay door, footsteps).
+- `diagnostics_order_unit_attachment`: Toggles visual modular attachments (`Armor`, `Shield`, `Radar`, `APS`).
 
-### Harvesters & AI Director
-- `diagnostics_order_harvester_harvest`: Orders a harvester to claim the nearest crystal node and commence extraction (`harvesterKeyId`).
-- `diagnostics_order_harvester_return`: Orders a harvester to deliver payload to nearest refinery (`harvesterKeyId`).
-- `diagnostics_set_attack_wave_number` / `diagnostics_increment_attack_wave`: Overrides or steps AI attack waves.
-- `diagnostics_toggle_ai_debug_visuals`: Toggles AI tactical command and role tags on screen (`showTags`, `showCommands`).
-
-### Camera, Audio, Environment & Economy
-- `diagnostics_move_camera` / `diagnostics_focus_camera_on_entity` / `diagnostics_set_camera_zoom`: Viewport navigation and FOV adjustments.
-- `diagnostics_set_audio_volume`: Normalized slider volume adjustment for Master, Music, Gameplay, UI.
-- `diagnostics_set_fog_of_war` / `diagnostics_reveal_fog_of_war`: Controls Fog of War visibility.
-- `diagnostics_set_game_time_scale` / `diagnostics_get_game_time_scale`: Controls simulation speed.
-- `diagnostics_grant_credits` / `diagnostics_order_production` / `diagnostics_spawn_entity` / `diagnostics_trigger_match_end`: Economy grants, factory orders, unit spawning, match completion.
-- `diagnostics_apply_card_change` / `diagnostics_preview_card_change`: In-game data-driven card changes routed through native `EntityBalancingStore`.
+### Multi-Agent Coordination Tools
+- `diagnostics_register_agent_session`: Registers agent session (`agentId`, `agentRole`, `notes`).
+- `diagnostics_ping_agent`: Heartbeat ping updating agent activity timestamp (`agentId`, `message`).
+- `diagnostics_acquire_agent_lock` / `diagnostics_release_agent_lock`: Acquires/releases advisory locks (`agentId`, `resourceKey`, `durationSeconds`).
 
 ---
 
-## 5. Multi-Agent & Cross-Platform Integration
+## 5. Command Director Fail-Closed Invariants
 
-The BepInEx MCP server is built with universal cross-agent compatibility supporting stdio newline-delimited JSON and Content-Length HTTP-style framing.
-
-### 5.1 Hermes Integration (Native Plugin & Skills)
-Hermes agents can communicate with the bridge using three distinct channels:
-1. **Hermes Plugin (`bepinex-mcp`)**: Installed at `C:\Users\Alex\AppData\Local\hermes\plugins\bepinex-mcp/` and enabled in `C:\Users\Alex\AppData\Local\hermes\config.yaml` (`plugins.enabled: [bepinex-mcp]`). All 223 tools are discovered as native MCP tools.
-2. **Hermes Skill Catalog**: Registered under `C:\Users\Alex\AppData\Local\hermes\skills\rogue-command\rogue-command-clean-room-diagnostics/`.
-3. **Hermes Direct CLI Execution**: When running in a shell or terminal without an active MCP connection:
-   ```bash
-| diagnostics_runtime_snapshot | Composite JSON | Combines BattlefieldCensus, RunProgressionCensus, SystemHealth, MatchSummary, and VisualRenderCensus into a single payload. Ideal for match setup, tick ticks, and end-of-turn audits. |
-   python tools/bepinex_mcp_server.py --call diagnostics_ping_agent --args '{"agentId":"hermes-tactician","message":"alive"}'
-   python tools/bepinex_mcp_server.py --call diagnostics_acquire_agent_lock --args '{"agentId":"hermes-tactician","resourceKey":"unit:scout_1","durationSeconds":30.0}'
-   ```
-
-### 5.2 Antigravity & Google Gemini CLI
-- Fully registered under `bepinex_mcp` with 223 generated schemas in `C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp/`.
-- Call eagerly or lazily using `call_mcp_tool(ServerName="bepinex_mcp", ToolName="...", Arguments={...})`.
-
-### 5.3 Anthropic Claude Desktop
-- Configuration snippet located at `artifacts/mcp-configs/claude_desktop_config.json`:
-  ```json
-  {
-    "mcpServers": {
-      "bepinex_mcp": {
-        "command": "python",
-        "args": ["C:/Users/Alex/Documents/Mod Rogue Command/tools/bepinex_mcp_server.py"],
-        "env": {
-          "BEPINEX_MCP_URL": "http://127.0.0.1:8080/mcp/"
-        }
-      }
-    }
-  }
-  ```
-
-### 5.4 Cursor IDE & VS Code / Windsurf
-- Cursor configuration generated at `.cursor/mcp.json` and `artifacts/mcp-configs/cursor_mcp.json`.
-- VS Code / Windsurf configuration generated at `.vscode/mcp.json` and `artifacts/mcp-configs/vscode_mcp.json`.
-
-### 5.5 Multi-Agent Advisory Locking Protocol
-When two or more autonomous agents collaborate on the same match (e.g. Hermes managing strategic economy and base construction while Antigravity controls micro-combat):
-1. **Session Announcement**: Call `diagnostics_register_agent_session` with your `agentId` and `agentRole`.
-2. **Resource Reservation**: Before sending move/attack orders to a unit or adjusting the camera, call `diagnostics_acquire_agent_lock(agentId, "unit:<keyId>", durationSeconds=30)`.
-3. **Lock Check**: If the lock call returns `success: false`, check `diagnostics_get_agent_coordination` to coordinate with the owning agent.
-4. **Order Execution & Release**: Perform tactical micro and immediately call `diagnostics_release_agent_lock`.
+- **Finite Number Validation**: Validate every float coordinate, radius, and duration for `NaN`/infinity before dispatch; return `success: false`.
+- **Nullable Hostility Delegates**: Write `unit.IsEnemy == null || !unit.IsEnemy(target)`. Null-check delegates before calling; catch exceptions.
+- **Link Ownership on Command Auras**: Track `CreatedFollowerLinks` per aura state. On expiration or replacement, release **only** aura-created links; never clobber native captain relationships.
+- **Intermission Selection Idempotency**: Call `IsAlreadySelected(rows, level, field)` before coordinate raycasting to avoid duplicate clicks after camera pan.
+- **Intermission Frontier Semantics**: When `isLastLevelBeforeBoss` is true, the node frontier is legitimately empty; fail-closed behavior (`selected: false`) is correct.
 
 ---
 
 ## 6. Extending Clean-Room Diagnostics (The Three-Part Pattern)
 
-### Test harness execution
-
-- Build both projects first: `dotnet build src/RogueCommandExpansionLoader/RogueCommandExpansionLoader.csproj -c Release --no-incremental --artifacts-path artifacts/dotnet-build` and `dotnet build tests/RogueCommandExpansionLoader.ValidationTests/RogueCommandExpansionLoader.ValidationTests.csproj -c Release --no-incremental --artifacts-path artifacts/dotnet-build`.
-- Run the full harness: `dotnet exec artifacts/dotnet-build/bin/RogueCommandExpansionLoader.ValidationTests/release/RogueCommandExpansionLoader.ValidationTests.dll "C:/Users/Alex/Documents/Mod Rogue Command"` (pass the repo root as the single argument).
-- Run a single suite: append `--suite <SuiteName>` (e.g., `--suite RuntimeAndDiagnostics`). The suite name must be passed after the repo root, not before it; passing it as a positional argument before the root causes a manifest-not-found error.
-- The harness reports `N/M validation checks passed; K skipped.` The skip is typically a Windows symlink-privilege test and is not a failure.
-- For TDD regression detection: temporarily mutate the source, rebuild, run only the new test with `--suite`, confirm it fails with the expected message, then restore the source and verify SHA-256 matches the pre-mutation hash.
-
-When adding any new telemetry or command endpoint:
-
-1. **Pure Formatter / DTO** (`AgentDiagnosticsFormatter.cs`):
-   - Declare the pure struct/class DTO with primitive fields.
-   - Implement manual JSON serialization emitting a `"kind"` discriminator and placing loss/omission counters strictly first.
-   - For numeric fields, store the raw `float`/`double` in the view dictionary. `Serialize` -> `WriteValue` already routes `float`/`double` through `WriteFiniteNumber(StringBuilder, ...)`, which emits `null` for `NaN`/infinity and preserves finite precision. Do **not** call `WriteFiniteNumber(value)` as a dictionary value: it returns `void` and will not compile, and pre-converting loses the finite-formatting path.
-2. **Bridge Method** (`LoaderDiagnosticsComponent.cs`):
-   - Add a public MonoBehaviour method returning a JSON string.
-   - Perform null-safe delegation to the DTO collector or `RuntimeGameplayCommandDirector`.
-3. **Validation Unit Test** (`RuntimeAndDiagnosticsValidationTests.cs`):
-   - Add a test verifying JSON schema structure, values, and fail-closed error handling.
-   - Re-run the validation test harness (`dotnet run --project tests/... -c Release`).
-4. **MCP Tool Registration**:
-   - Add tool spec to `tools/build_bepinex_mcp.py` and handler in `tools/bepinex_mcp_server.py`.
-   - Run `python tools/build_bepinex_mcp.py` to regenerate all schemas.
-   - Run `python tools/bepinex_mcp_server.py --generate-configs` to keep agent manifests in sync.
-
-### 6.1 Census additions that read Unity materials/textures
-
-- When a new census reads `Material.mainTexture` or `Material.GetTexture(...)`, add a `Texture` stub class with `name`/`width`/`height` to `UnityEngineTestStub.cs` and add `mainTexture`/`GetTexture`/`SetTexture` members to the `Material` stub, otherwise the offline harness cannot construct the row.
-- When a census reads `Collider`, `Rigidbody`, `TrailRenderer`, or `LineRenderer`, add corresponding stub classes to `UnityEngineTestStub.cs` (with the properties the census reads, e.g. `isTrigger`, `isKinematic`) before running the harness.
-- Add the new `Runtime*.cs` file to `tests/.../RogueCommandExpansionLoader.ValidationTests.csproj` as an explicit `<Compile Include>` entry (the test project does not glob `src/`); the plugin project does glob and needs no entry.
-- Keep the new tool count consistent across the skill, generated schemas, and agent manifests.
+When adding a new diagnostic census or command endpoint:
+1. **Pure Formatter / DTO** (`AgentDiagnosticsFormatter.cs`): Declare pure primitive DTO; implement manual JSON serializer placing omission counters first. Store raw numbers; `WriteFiniteNumber` handles `NaN`/infinity safely.
+2. **Bridge Method** (`LoaderDiagnosticsComponent.cs`): Add public MonoBehaviour method returning JSON string with null-safe delegation.
+3. **Validation Unit Test** (`RuntimeAndDiagnosticsValidationTests.cs`): Add schema and fail-closed regression tests.
+4. **MCP Registration**: Register tool in `tools/build_bepinex_mcp.py` and handler in `tools/bepinex_mcp_server.py`. Run `python tools/build_bepinex_mcp.py` and `python tools/bepinex_mcp_server.py --generate-configs`.
+5. **UnityEngineTestStub**: If reading textures, colliders, or renderers, add stubs (`Texture`, `Collider.isTrigger`, `Rigidbody.isKinematic`) in `UnityEngineTestStub.cs`.
 
 ---
 
-## 7. Operational Safety Rules
+## 7. Multi-Agent Advisory Locking Protocol
 
-- **Dedicated QA Profile**: Always perform live testing on `Profile2` (the user's designated dedicated QA profile without a tutorial). Never touch user profile saves or bypass tutorial flags on active user profiles.
-- **Preserve Unrelated Changes**: Never use `git add -A`. Stage only task-owned files explicitly.
-- **Label Evidence Accurately**: Local build and test harness passes are local validation; in-game live MCP responses are runtime evidence.
-- **Installed vs. Local DLL Hash**: Before attributing runtime behavior to a source change, compare `BepInEx/plugins/RogueCommandExpansionLoader.dll` SHA-256 against the local build artifact. A mismatch means the running game exercises stale code; deploy the updated DLL or abort the runtime step.
-- **Session-End Deploy**: At the end of every session that changes the loader, rebuild in Release and copy `artifacts/plugin/RogueCommandExpansionLoader.dll` to `BepInEx/plugins/RogueCommandExpansionLoader.dll`, verifying SHA-256 matches. This keeps the game folder current for the next run.
-- **Time Scale Is Not Pause**: `currentTimeScale == 0.1` is slow motion, not a confirmed pause. Reversible mutation smokes must require `currentTimeScale == 0` (and ideally a stable scaled clock across two reads) before issuing orders.
-- **Profile Checkpoint Scope**: The Profile2 checkpoint covers `currentProfile.txt` plus `Profile1`, `Profile2`, `Profile4`, and `Profile5` (16 files). `Profile3` is not in the checkpoint. Compare the full file set, not just Profile2, after runtime work.
+When multiple autonomous agents operate on the same match (e.g., economy manager + combat tactician):
+1. **Register Session**: Call `diagnostics_register_agent_session` with `agentId` and `agentRole`.
+2. **Reserve Resource**: Call `diagnostics_acquire_agent_lock(agentId, "unit:<keyId>", durationSeconds=30)` before issuing commands.
+3. **Verify Lock**: If lock returns `false`, check `diagnostics_get_agent_coordination` to wait or coordinate.
+4. **Release Lock**: Call `diagnostics_release_agent_lock` immediately upon completing tactical orders.
 
 ---
 
-## 8. Diagnostics Host Scene Placement (Lifecycle)
+## 8. Operational Safety & Scene Placement Rules
 
-The MCP bridge's `LoaderDiagnosticsComponent` is intentionally **scene-local** (never `DontDestroyOnLoad`) and recreated per scene. On **additive** scene loads, Unity fires `sceneLoaded` **before** `activeSceneChanged`, so `new GameObject("LoaderDiagnostics")` lands in the still-active previous scene and is destroyed when that scene unloads. `OnActiveSceneChanged` must therefore also (re)create or relocate the host.
+- **Dedicated QA Profile**: Always test on `Profile2` (the dedicated QA profile without a tutorial). Never touch active player saves.
+- **Preserve Unrelated Work**: Stage only task-owned files explicitly. Never run `git add -A`.
+- **Installed DLL Parity**: Ensure `BepInEx/plugins/RogueCommandExpansionLoader.dll` SHA-256 matches the local Release build artifact before live validation.
+- **Scene-Local Diagnostics Host**: `LoaderDiagnosticsComponent` is intentionally scene-local. On additive loads (`sceneLoaded` fires before `activeSceneChanged`), `EnsureDiagnosticsComponent` moves the GameObject via `SceneManager.MoveGameObjectToScene`.
+- **MCP Exit Codes**: The Python MCP server returns exit code 0 even on JSON error payloads (`{"status": "error"}`). Always verify JSON payload contents.
 
-Pattern:
-- `EnsureDiagnosticsComponent(provider, targetScene)` accepts the target `Scene`; create the host there, and if `new GameObject` lands elsewhere, `SceneManager.MoveGameObjectToScene` it before adding the component. Abort (and destroy the transient host) if the move fails.
-- Keep the existing `_diagnostics == null` guard and null-reset for idempotency; also reinitialize when the host's scene differs from the target.
-- `ShouldEnsureOnSceneLoaded(hasHost, loadedSceneName, isSingleLoad, hostAlreadyInLoadedScene)`: on an additive load with an existing host, only re-ensure when the loaded scene is `Game` (or the host's own scene); unrelated additive scenes must not displace the host.
-- Guard `provider == null` and `!scene.IsValid() || !scene.isLoaded` before touching Unity objects.
-
-Pitfalls:
-- A successful MCP response or a single isolated `find_objects_with_component` hit does **not** prove the host survived a scene transition. Recheck after the transition and after the previous scene unloads.
-- The installed plugin DLL hash can differ from the local build. Before attributing runtime behavior to a source change, compare `BepInEx/plugins/RogueCommandExpansionLoader.dll` SHA-256 against the local build artifact; a mismatch means the runtime exercises stale code.
-- Test the ordering with a stub where the active scene differs from the loaded scene; a stub that always returns the same active scene hides the additive-load bug.
-- **Tool naming**: the Python MCP server exposes `find_objects_with_component` (no `scene:` prefix) and `scene:find_objects_with_component` (HTTP route). Use the unprefixed name when calling via the Python server; the short component name works because it resolves via `FindType`.
-- **`mod_inject_class` parameter**: pass the full C# source as `classCode` (not `code`). The class must compile standalone. A minimal MonoBehaviour with `Application.Quit()` in `Awake` is the reliable close pattern when no UI button is available.
-
-### 8.1 MCP exit code 0 is not functional success
-
-The BepInEx MCP server and the Python wrapper return process exit code 0 even when the JSON payload contains `{"error": ...}` or `{"status": "error"}`. Always inspect the payload content and, when possible, verify the observable effect (component present in scene, census populated, order applied and restored). A ping returning `{"status": "ok"}` only proves the bridge is alive, not that diagnostics or commands work.
-
-### 8.2 TDD regression-detection via temporary mutation
-
-When adding a regression test for a lifecycle or ordering bug, temporarily mutate the source to reintroduce the bug (e.g., change `return host.scene.handle == targetScene.handle;` to `return false;`), rebuild, run only the new test, and confirm it **fails** with the expected message. Then restore the source (verify SHA-256 matches the pre-mutation hash) and rebuild. This proves the test detects the regression rather than passing vacuously. Document the expected failure message in the test or skill so future maintainers know what a regression looks like.
-
-### 8.3 Full DLL deploy-test-restore cycle
-
-When runtime evidence requires a code change that is not yet deployed:
-
-1. **Predeploy manifest**: Record target path, size, and SHA-256 of the installed DLL; back up the installed DLL.
-2. **Deploy**: Copy the local build over the installed DLL; verify hashes match.
-3. **Launch**: Start the game through Steam (never the exe directly). Wait for bridge ping.
-4. **Verify component in Game scene**: Call `find_objects_with_component` after the Game scene loads. A result of 1 (not 0) confirms the host survived the transition.
-5. **Test diagnostics**: Call `diagnostics_get_system_health` or the specific census. A populated response confirms the bridge works in-game.
-6. **Restore**: Close the game (via `mod_inject_class` with `Application.Quit()` if no UI close is available). Restore the original DLL from backup. Verify restored hash matches the manifest.
-7. **Profile check**: Verify the profile selector and file hashes against the checkpoint. `metaSavegame.dat` changes are expected; flag only other changes.
-
-Pitfall: The installed DLL hash can differ from the local build even after a successful build. Always compare before attributing runtime behavior to a source change.
 ---
 
-## 9. Visual Render, Rig & Animation In-Game Evidence Contract
+## 9. Visual Render, Rig & Animation Verification Contracts
 
-A unit's visual presence and correct rigging/animation in a live match cannot be inferred from clean compile, asset bundle manifests, or data-row registration alone. Autonomous agents must verify runtime visual evidence using diagnostics_get_visual_census and diagnostics_inspect_entity_visual:
-
-### 9.1 Render Evidence
-- **Active Renderer**: ctiveRendererCount > 0 and isVisible == true when in camera view frustum.
-- **Renderer Classification**:
-endererType confirms expected component (SkinnedMeshRenderer for rigged walkers, MeshRenderer for static vehicle chassis/turrets, ParticleSystemRenderer for exhaust/muzzle VFX).
-- **Geometry Bounds**: Non-zero bounding box ounds (, Y, Z > 0.05\text{m}$) and realistic vertex/submesh counts.
-- **Shader & Material Verification**:
-  - materialCount >= 1
-  - Shaders must match modded URP variants: RogueCommand/VehiclePBR_VertexWear or Standard.
-  - Shader keywords must confirm PBR channels: _METALLICSPECGLOSSMAP and _NORMALMAP.
-  - enableGPUInstancing == true verified where material batching is intended.
-
-### 9.2 Rig & Hierarchy Evidence
-- **Rig Architecture**:
-  - SkeletalArmature: Bone hierarchy with Bone_Root, Bone_Pelvis, and limbs with oneCount >= 4.
-  - NativeTransformRig: Discrete Unity transforms (RotHor, ROTVERT, LEGS).
-  - StaticVehicle: Rigid vehicle body without bone armatures.
-- **Canonical Sockets**:
-  - Primary weapon: Socket_MuzzlePrimary containing nested FirePoint_0 child for projectile origin and muzzle flash.
-  - Positional 3D audio: Socket_EngineAudio parented over engine deck and Socket_WeaponAudio parented at primary muzzle.
-  - Locomotion contact: Socket_FootContact_L/R (or _FL/FR/RL/RR) at ground level  = 0.0$ for walkers.
-  - Damage smoke/fire anchors: Socket_DamageSmoke and Socket_DamageFire.
-- **Zero Socket Role Ambiguity**: hasAmbiguousRoles == false (mbiguousRoles list empty); multiple transforms claiming the same socket role disable runtime directors.
-
-### 9.3 Animation & Visual Director Evidence
-- **Generic Avatar & Animator**: hasAnimator == true, nimatorEnabled == true, and isAvatarValid == true.
-- **Playback Telemetry**: ctiveClipName non-empty, clipLength > 0,
-ormalizedTime progressing across game ticks, and playbackSpeed > 0.
-- **Motion Parameters**: Standard parameters bound:
-  - RCL_IsMoving (bool) toggling with flocking velocity.
-  - RCL_Fire (trigger) firing on primary attack pulses.
-  - RCL_Death (trigger) transitioning to death ragdoll/collapse clip.
-- **RuntimeVisualDirector**: When attached, exposes real-time state:
-  - isDamagedActive: triggers when health $\le 50\%$.
-  - isCriticalActive: triggers when health $\le 25\%$.
-  - isTurretJammed: jamming flag during weapon malfunctions.
-  - currentRecoilOffset: barrel displacement during fire recoil.
-  - doorOpenProgress: deploy/bay doors opening ratio ($[0.0, 1.0]$).
-
-
-### 9.4 Runtime Unit Mechanics & Visual Director Synchronization
-
-Units with active combat mechanics (`RuntimeUnitMechanicsDirector`) and visual representations (`RuntimeVisualDirector`) synchronize state dynamically during live matches:
-- **Status Effect Reactions in `Update()`**:
-  - `Stun`: Jams weapon turret, freezes locomotion animation and halts radar traverse.
-  - `OnFire`: Triggers damage fire/smoke emitters and procedural soot vertex color blending.
-  - `CombatBoost` / `Overclocked` / `Turbo`: Multiplies radar mast rotation speed to $2.5\times$ RPM.
-- **Combat Tactical Stance Modulations**:
-  - `HoldFire`: Suppresses weapon traverse and fire recoil animations.
-  - `Aggressive`: Increases turret traverse speed by $+50\%$.
-  - `Defensive`: Auto-deploys defensive modular attachments (`Armor`, `Shield`, `APS`).
-- **Telemetry & Diagnostic Censuses**:
-  - `diagnostics_get_unit_mechanics_census`: Snapshots living unit mechanics, stances, veterancy, shield regeneration, critical hit chance, and visual director overrides (with `omittedUnitCount` placed strictly first).
-  - `diagnostics_order_unit_visual_feedback`: Commands localized weapon recoil, critical hit impacts, turret jamming overrides, bay door toggles, and footstep ground pulses.
-  - `diagnostics_order_unit_attachment`: Toggles visual hardpoint attachments (`Armor`, `Shield`, `Radar`, `APS`) dynamically.
-
-### 9.5 Visual Surface & Vertex-Wear Census Implementation
-
-- Channel thresholds are contract-derived, not cosmetic: R <= 0.4 counts micro-relief/cavity, G >= 0.7 counts weld/edge wear, and B >= 0.5 counts mud/thermal soot.
-- Unity test stubs must expose `Mesh.colors` (and `colors32` when used) before asserting vertex-color channels; otherwise the census has no readable vertex-wear data.
-- Guard nullable `sharedMaterials` and inactive renderers returned by `GetComponentsInChildren<Renderer>(true)`.
-- Keep `omittedUnitCount` before renderer, material, vertex, shader, and channel details.
+Live in-game visual verification requires checking `diagnostics_get_visual_census` and `diagnostics_inspect_entity_visual`:
+- **Active Renderers**: `activeRendererCount > 0`, `isVisible == true`, non-zero bounding box ($X, Y, Z > 0.05\text{m}$).
+- **Shader & Material Verification**: Shaders must match `RogueCommand/VehiclePBR_VertexWear` or `Standard`; keywords `_METALLICSPECGLOSSMAP` and `_NORMALMAP` verified.
+- **Rig Hierarchy**:
+  - `SkeletalArmature`: Bone hierarchy with `Bone_Root`, `Bone_Pelvis`, limbs, and `boneCount >= 4`.
+  - `NativeTransformRig`: Discrete Unity transforms (`RotHor`, `ROTVERT`, `LEGS`).
+  - `StaticVehicle`: Rigid vehicle mesh without armatures.
+- **Canonical Sockets**: `Socket_MuzzlePrimary` (with nested `FirePoint_0`), `Socket_EngineAudio`, `Socket_WeaponAudio`, `Socket_FootContact_*` ($Z = 0.0$), `Socket_DamageSmoke`, `Socket_DamageFire`. Zero ambiguous socket roles (`hasAmbiguousRoles == false`).
+- **Generic Avatar & Animator**: `hasAnimator == true`, `isAvatarValid == true`, standard parameters bound (`RCL_IsMoving`, `RCL_Fire`, `RCL_Death`).
+- **RuntimeVisualDirector**: Reflects dynamic state (`isDamagedActive` at $\le 50\%$ HP, `isCriticalActive` at $\le 25\%$ HP, `isTurretJammed`, `currentRecoilOffset`, `doorOpenProgress`).
+- **Vertex-Wear Channels**: R cavity/AO ($\le 0.4$), G edge wear ($\ge 0.7$), B soot/mud ($\ge 0.5$), A team mask.

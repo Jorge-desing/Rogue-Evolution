@@ -1,7 +1,7 @@
 ---
 name: rogue-command-modding-tools
 description: "Use Rogue Command tools for verified asset and pack work."
-version: 1.2.0
+version: 1.3.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -12,130 +12,75 @@ metadata:
 
 # Rogue Command Modding Tools
 
-Use this skill to select the repository's verified asset, pack, and research workflows for Rogue Command. Generic asset-pipeline examples are not assumed to exist in this checkout; the pinned project tools and their contracts are authoritative.
+Authoritative directory of verified asset, pack, and research workflows for Rogue Command.
 
-## When to use
+---
 
-- Preparing or auditing a model, Unity visual prefab, PBR maps, VFX, or AssetBundle.
-- Choosing the correct offline validator or inspector for a pack or model.
-- Planning evidence collection for a live game claim.
+## 1. Environment & Execution Guidelines
 
-Load the domain skill for detailed authoring: [3D Model Authoring](../rogue-command-3d-model-authoring/SKILL.md), [Mech Rigging](../rogue-command-mech-rigging-authoring/SKILL.md), [PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md), [VFX Authoring](../rogue-command-vfx-authoring/SKILL.md), [Animation Authoring](../rogue-command-animation-authoring/SKILL.md), [AssetBundle Authoring](../rogue-command-assetbundle-authoring/SKILL.md), or [Reverse Engineering](../rogue-command-reverse-engineering/SKILL.md).
+- **Python Environment:** Run scripts via `.venv` with `PYTHONPATH=.venv/Lib/site-packages`. Never install dependencies globally into system Python.
+- **Import Contract:** `tests/python/` scripts load `tools/` modules via `load_tool_module()` (`tools/` is not a Python package).
+- **Blender 4.5.14 LTS:** Authoritative geometry, UV, socket, LOD, and vertex-wear generator (`.tools/Blender-4.5.14/.../blender.exe`).
+- **Unity 2021.3.45f2:** Authoring project at `unity/RogueCommandAssetAuthoring/`. Standalone from user projects; preserve all `ProjectSettings`.
+- **Material Maker 1.7:** Authoritative PBR image generator (`tools/Run-MaterialMakerBake.ps1`). Outputs PNGs only.
 
-## Asset Pipeline
+---
 
-### Learn the target contract first
+## 2. Content Pack Authoring & Inspection Tools
 
-Before conversion, inspect the game's reference assets and the actual consumer in the current Unity project. Record dimensions, orientation/axes, pivot, alpha, style, texture/channel layout, shader/material, hierarchy, and serialized asset type. Do not assume a generic pipeline or file extension matches the game's contract.
+| Script / Tool | CLI Invocations & Arguments | Primary Function |
+|---|---|---|
+| `tools/scaffold_pack.py` | `--name <Name> [--validate]` | Generates minimal valid `content.json` with 1:1 unit/factory pairs |
+| `tools/validate_content_pack.py`| `<pack_dir>` | Fast preflight check for manifest paths and duplicate IDs |
+| `tools/validate_loader_registry.py` | `[--json]` | Authoritative loader registry validation across all packs |
+| `tools/merge_content_packs.py` | `--left <dir> --right <dir> --out-dir <dir>` | Additive manifest merger with collision warnings |
+| `tools/diff_content_packs.py` | `--left <dir> --right <dir> [--json]` | Diff analysis of units, stages, and profiles |
+| `tools/audit_content_references.py`| `<pack_dir> [--all] [--json]` | Detects dangling IDs, shared factories, and missing `en-US` strings |
+| `tools/clone_content_pack.py` | `--pack-dir <dir> --new-id <id>` | Re-prefixes namespaced IDs into a new isolated pack |
+| `tools/inspect_content_pack.py`| `<pack_dir> [--json]` | Summarizes factory-unit links, pools, and localizations |
+| `tools/validate_ai_modules.py` | `<pack_dir> [--all] [--json]` | Validates AI profiles against the 23-module registry |
+| `tools/analyze_blueprint_pools.py` | `<pack_dir> [--json]` | Scans stage blueprint pool coverage and fallback risks |
+| `tools/analyze_relic_synergy.py`| `<pack_dir> [--json]` | Cross-references relic `neededSystemTags` vs unit `offeredSystemTags` |
+| `tools/validate_native_templates.py`| `<pack_dir> [--json]` | Verifies `nativeTemplateId` values against native presets |
+| `tools/export_balance_table.py`| `<pack_dir> [--json\|--csv]` | Dumps resolved unit balance adhering to loader precedence |
+| `tools/lint_content_pack.py` | `<pack_dir> [--all] [--json]` | Quality linter for missing `es-XL`, map size inverted ranges |
+| `tools/audit_unity_bundle.py` | `<bundle> [--output out.json]` | Inspects serialized object counts, shaders, and dependencies |
 
-### Project authoring path
+---
 
-- Preserve editable sources under `content/source-art/` and use the repository's deterministic Blender 4.5.14 tools: `tools/Build-*.py`, `tools/generate_unit_model.py`, and `tools/RogueModelKit.py`.
-- Author/import/build only in `unity/RogueCommandAssetAuthoring/` using Unity 2021.3.45f2. It is separate from the user's `Rogue Evolution` Unity Hub project; preserve `ProjectSettings`, `Packages`, Version Control metadata, and Cloud settings.
-- Keep canonical socket names unprefixed and unique. Search recursively for imported sockets before builders create new ones. Native visual overlays keep the native gameplay hierarchy but do not automatically retarget animations or weapon rigs.
-- Keep maps, previews, logs, and diagnostics under ignored `artifacts/`. Put only deliberate distributable outputs under `content/packs/<pack-id>/bundles/`.
+## 3. Asset & Visual Validation Commands
 
-### PBR maps and sprite formats
+```powershell
+# Validate AssetBundle references declared in content manifest
+python tools/validate_content_bundle_references.py content/packs/sample-native-expansion
 
-- Use the existing Blender bake for `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png`.
-- Preserve the project packing: MetallicGloss RGB = metallic, A = smoothness (`1 - roughness`), imported linear with alpha from input; Albedo/Emission are sRGB; Normal is imported as a normal map. Keep mesh vertex-wear RGBA separate from these texture channels.
-- Material Maker 1.7 is the required image-only authoring pass for mod textures; ArmorPaint remains optional. Do not replace the authoritative Blender mesh, UVs, hierarchy, sockets, LODs, or vertex colors with a painter's mesh export.
-- Before image conversion, inspect stock game's dimensions, facing, pivot/hotspot, alpha, palette, and format. Follow the current card sprite and image-authoring rules; generic sprite-strip commands are not assumed to be available.
+# Validate native visual roots and renderer extent boundaries
+python tools/validate_native_visual_roots.py content/packs/sample-native-expansion
 
-### External generic workflows are not project commands
+# Validate mech rigging hierarchies and Generic Avatar bone structures
+python tools/validate_mech_rigging.py --pack content/packs/sample-native-expansion --json
 
-The `um sprite`, `um render3d`, and `um scan` commands from the universal-modder reference are not verified repository tools. Do not present them as runnable or required unless a separate installation was checked. Do not require fal, Blender MCP, remote generation, Addressables, or a newer Unity Editor for the reproducible pipeline. A generated image or a 3D render is a reference/input, not a validated FBX, prefab, or runtime bundle.
+# Validate VFX hierarchies and ParticleSystem sockets
+python tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion --json
 
-## Research Pipeline
-
-### Game and artifact reconnaissance
-
-1. Read the repository handoff and baseline before inspecting assets or code.
-2. Establish target version, Unity/backend, assembly identity, relevant serialized assets, and tool versions from current local evidence.
-3. Use UnityPy/UnityDataTool for serialized inventories and the repository's validators for specific contracts; keep decompiled code outside the repository.
-4. Record the exact observation and its evidence class in `docs/research/` only when it is durable and verified.
-
-### Rogue Command identity and modding route
-
-- Current documented target: Rogue Command 1.0.9, Unity 2021.3.45f2, Mono x64, BepInEx 5.4.23.5 + Harmony. Recheck before relying on this tuple.
-- The loader's supported path combines compiled plugin code for behavior, JSON manifests for declarative content, and Unity AssetBundles for serialized assets. Bundles do not carry new executable `MonoBehaviour` gameplay classes.
-- Before relying on reflected signatures or metadata tokens, verify the full tuple together: Rogue Command version, Unity version, `Assembly-CSharp.dll` SHA-256, and MVID. A remembered hash or same-named member is insufficient.
-- Keep BepInEx/Harmony/game assemblies out of distributable ZIPs. Only the local development build may reference them.
-
-## Game Automation and Runtime Safety
-
-- Launch/observe Rogue Command only through Steam and follow `docs/research/STEAM-RUNTIME-CONTROL.md` plus the Steam Runtime Validation skill. Check process and bridge independently; tools installed locally do not prove a live connection.
-- Begin with read-only bridge observations. Do not use mutating RPC calls, runtime code injection, or Harmony patches as proof of ordinary mod behavior.
-- Verify pause using native pause state or `Time.timeScale == 0` / stable scaled clock; a visible menu is not proof of pause.
-- Before live deployment, record hashes for every touched installation file, the authoritative selector, and each file in each profile. Use the dedicated authorized QA profile and preserve all saves; restore deployment and selector and verify hashes after the game exits.
-- Keep Steam Cloud in its instructed state. Never edit `tutorialState.txt` directly or infer safe profile state from stale notes.
-- **Synthetic state seams (user-authorized, fail-closed)** — The loader ships two sanctioned seams for runtime-validation automation of the intermission→combat transition when the natural map reports no choosable node (e.g. `ChosenPath` full with `IsCurrentLevelFinished`): `diagnostics_jump_to_level(level, finished?)` → `LoaderDiagnosticsComponent.TryJumpToLevelJson` → `RuntimeIntermissionSyntheticJump.TryJumpToLevel` (reflection on `StageMap.JumpTo`; bool overload absent, int overload probed) and `diagnostics_load_next_level` → `TryLoadNextLevelJson` (reflection on `LoadScene.StartCoroutine("LoadNextLevel")`). Both return `kind=syntheticJumpResult` with `synthetic=true`, the resolved overload name and before/after stage/level; neither touches profile/save files and neither proves natural progression. Use only under the Profile2 checkpoint discipline.
-- **Intermission Telemetry & Action Suite (verified 2026-11-08)**:
-  - `diagnostics_get_intermission_census` scans both `OverWorldMapEnemy` and `OverWorldMapBoss` (`level = LevelCount, field = 0`), reporting world positions, choosable state, and active path status.
-  - `diagnostics_get_intermission_graph` evaluates the complete LevelMap graph and ranks forward paths toward the Boss node based on `preferredRewardType` (`RelicReward`, `CardReward`, `Shop`, `RestSite`).
-  - `diagnostics_get_intermission_reward_state` tracks live currencies (`currentCoins`, `currentStartCrystals`, `currentDropPodCount`), open reward queues, `ChooseCard` offered slots, and deck cards with attached upgrades.
-  - Sub-screen actions provide fail-closed execution: `diagnostics_order_choose_intermission_reward` (by `rewardId` or `slotIndex`), `diagnostics_order_skip_intermission_reward`, `diagnostics_order_reroll_intermission_reward`, `diagnostics_order_assign_intermission_upgrade` (assign to viable card or cancel), and `diagnostics_order_set_deck_overview_open` (`open: true/false`).
-  - `diagnostics_order_select_level_node` clicks either standard enemy nodes or `OverWorldMapBoss` (e.g. stage 0 Boss at level 4 field 0) via coordinate raycast (`WorldToScreenPoint` + `Physics.Raycast` → `OnMouseEnter`/`OnMouseDown`), setting `isCurrentNodeOfPath = true` and initiating level entry.
-- **Intermission→combat entry chain (verified in live Steam, no-jump preferred)**: `Continue Run` (Michsky click) → single native `LoadScene.LoadLevel()` method call on the `LoadNextLevel` GameObject (via `component/call_method`, component name `LoadScene`) on the conserved map → the combat branch transitions because the current stage world is already generated (`InitMap.MapIsReady`) → native level intro `LoadingHider` appears (GO `LoadingHider` under `Game` scene, active; level title/objective text) → click its **INICIAR** Unity UI button (GO `Button` under `LoadingHider`, NOT the Michsky map `LaunchButton` which stays inactive) → live combat (`GetNavigatorStateJson` timeScale=1). Verified 2026-11-08 (`artifacts/runtime-smoke/live-reads-20261108-nojump/`): Intermission stage 0/level 3 → single `LoadLevel()` → census stage 0/level 4 with `LoadingHider` GO 1008320 → `Button` GO 1008136 real click at 960,322.3 (`pointerEnter→pointerDown→pointerUp→pointerClick`) → timeScale=1, 4054 root GameObjects. The big map triangles (`BossTriangle`, MeshFilter/MeshRenderer) are decorative and have no input handlers — do not click them.
-- **`LoadLevel()` stall mechanism (do not loop the jump chain)**: the `Jump → coroutine → LoadLevel` synthetic chain stalls because post-jump `LoadNextLevel` waits without timeout on `InitMap.MapIsReady_Static()` and the only known `StartInit_Static` caller runs solely for boss flow (`LevelProgression.InitMapIfBossComesNext`, `IsLastLevelBeforeBoss`) — full trace in `docs/research/LOADLEVEL-PRECONDITIONS.md`. Prefer the no-jump `LoadLevel()` on the conserved map; keep the synthetic jump as last resort for ungenerated stages. No error appears in `BepInEx/LogOutput.log` or `Player.log` when stalled.
-- **MCP argument quirks**: `component/call_method` requires the FULL component type name (`RogueCommandExpansionLoader.Runtime.LoaderDiagnosticsComponent`, not the short name — short name returns HTTP 500); the `LoaderDiagnostics` GameObject id changes per scene (resolve via `find_objects_with_component` after every scene change; cached ids return HTTP 500); `diagnostics_ui_press_button` can return `{"success": false, "message": "button has no id"}` even when the button exists — resolve the id first via `search_gameobjects`, then call `TryUiClickJson("[name, id]")` directly; bridge `component/call_method` receives `args` as a JSON string in a query param `args=`, not a JSON body; batch getters with one optional `int = 64` parameter (`GetRelicCensusJson`, `GetUpgradeCensusJson`, `GetVisualVariantCensusJson`) need explicit `[64]` in `_RUNTIME_SNAPSHOT_GETTER_ARGS` (empty `[]` → HTTP 500 because the bridge ignores C# optional defaults; fixed 2026-11-08 in `tools/bepinex_mcp_server.py`); `diagnostics_diff_snapshots`/`GetSnapshotDiffJson` fails when the JSON args contain embedded commas (bridge CSV arg parser) — use `{}` payloads or comma-free JSON.
-
-## Pack and Asset Validation
-
-### Content pack authoring and comparison tools
-
-- `tools/scaffold_pack.py` generates a minimal valid `content.json` (unit, 1:1 production building, stage, AI profile) with namespaced IDs. Use `--validate` to check against `content/schema/content.schema.json`.
-- `tools/merge_content_packs.py --left <pack> --right <pack> --out-dir <dir>` merges two packs additively (units, stages, AI profiles, bundles), reporting ID/content conflicts; use `--pack-id` to resolve differing pack IDs and `--force` only when conflicts are acceptable.
-- `tools/diff_content_packs.py --left <pack> --right <pack>` reports added/removed/changed units, stages, AI profiles, and metadata; use `--json` for machine-readable output.
-- These tools operate on `content.json` files or pack directories. Tests in `tests/python/` load them via `load_tool_module()` from `tests/python/helpers.py`; do not import them as a package.
-- `tools/validate_content_pack.py` is a quick preflight only (embedded simplified schema, does not consume `--schema`); use `tools/validate_loader_registry.py` and the C# harness for authoritative checks.
-- `tools/audit_content_references.py <pack-dir> [--all] [--json]` detects dangling cross-references (stage `unitIds`/`aiProfileIds`, blueprint pool entries, AI `unitEntries`/`productionBuildingEntries`), shared factories, and missing `en-US` localizations; use `known_*` ID sets to resolve cross-pack references.
-- `tools/clone_content_pack.py` clones a pack into a new namespaced `packId`, re-prefixing only `ns:` IDs; native template names are never rewritten.
-- `tools/migrate_content_pack.py` migrates a pack between supported schema versions, applying bounded mechanical upgrades.
-- `tools/inspect_content_pack.py <pack-dir> [--json]` summarizes pack identity, counts, factory→unit mapping, stages with pools, AI profiles/modules, and localization coverage.
-- `tools/validate_ai_modules.py <pack-dir> [--all] [--json]` validates AI profiles against the loader's compiled module registry (21 `sample:*` modules): module count cap (8/profile), unknown modules/parameters, parameter bounds, `scopeToReferencedStages`, and dangling `unitEntries`.
-- `tools/analyze_blueprint_pools.py <pack-dir> [--json]` reports per-stage blueprint pool scoping: declared vs pool-covered units, uncovered (fallback-dependent) units, and factory mapping.
-- `tools/analyze_relic_synergy.py <pack-dir> [--json]` cross-checks relic `neededSystemTags` against unit `offeredSystemTags` (via `systemTags`) and flags `cardChanges` using unknown `ChangeableValue` names.
-- `tools/validate_native_templates.py <pack-dir> [--json]` checks `nativeTemplateId` values against known game template IDs for units, factories, stages, landscapes, and AI profiles.
-- `tools/export_balance_table.py <pack-dir> [--json|--csv]` exports the effective per-unit balance with loader precedence (`customBalance` > `balanceOverrides` > structured fields) for balance-simulator integration.
-- `tools/lint_content_pack.py <pack-dir> [--all] [--json]` emits quality warnings: missing `es-XL` localizations, factory IDs used in AI `unitEntries`, and inverted `mapSizeMin`/`mapSizeMax` ranges.
-
-- Run `./tools/run_python_checks.sh` from the repository root for the supported Python verification path. It selects the project `.venv`, clears inherited `PYTHONPATH` so Hermes' cp314 packages cannot shadow cp312 wheels, runs `tests/python`, then checks bundle references, the loader registry, and whitespace. Do not substitute a system interpreter or install dependencies globally.
-- Tests in `tests/python/` load scripts from `tools/` through `load_tool_module()` in `tests/python/helpers.py`; do not use direct `from tools.X import Y` imports because `tools/` is not a Python package.
-- With UnityPy 1.25.4, bundle dependencies are stored on the serialized `AssetBundle` object's `m_Dependencies`; `env.file.dependencies` is not a `BundleFile` API.
-- `tools/audit_unity_bundle.py <bundle> [--output report.json]` reports serialized object counts, shader/texture metadata, bundle size, and declared dependencies. It is offline inventory only; it does not prove Unity import, resource selection, rendering, or gameplay.
-- `tools/validate_content_pack.py <pack-dir>` is a quick manifest/path/duplicate-ID preflight. It uses an embedded simplified schema, not the authoritative `content/schema/content.schema.json`; although `--schema` appears in its CLI help, the current implementation does not consume that argument. Do not rely on it for full schema or loader-contract validation; use the repository schema checks, `tools/validate_loader_registry.py`, and the C# harness as appropriate.
-- `tools/profile_hash_audit.py <profile-dir> <manifest.json>` compares one profile directory with `profileFiles` entries and reports added, missing, and changed files. It is read-only; keep checkpoint manifests and reports under ignored `artifacts/`, include all profile files in the checkpoint, and do not commit or publish profile data or hashes.
-- `tools/extract_game_strings.py <binary> [--min-length N] [--output strings.txt]` extracts printable ASCII and zero-paired UTF-16LE strings. Treat output as a search aid, not decompilation or semantic/runtime evidence; keep generated reports under ignored `artifacts/`.
-- Keep the project dependency set in `requirements.txt` and use the checked-in runner to select the interpreter. Do not install packages into Hermes or another global Python environment to repair project tests.
-
-Run these commands from the repository root via `terminal` with the project virtual environment; explicit `PYTHONPATH` prevents globally visible Hermes packages from shadowing local dependencies. Use `--help` for exact current options.
-
-```text
-terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/sample-native-expansion")
-terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_native_visual_roots.py content/packs/sample-native-expansion")
-terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_mech_rigging.py --pack content/packs/sample-native-expansion --json")
-terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion --json")
-terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_loader_registry.py --json")
+# Run complete loader registry audit
+python tools/validate_loader_registry.py --json
 ```
 
-Interpret each tool only within its implementation: bundle references check declared serialized names/types; visual-root validation checks native path uniqueness/renderers against the local game's assets; rigging/VFX validators check only their documented structural rules; registry validation checks manifests, not in-game registration. Preserve real diagnostics and exit codes.
+---
 
-For a serialized inventory, use the pinned UnityDataTool 2.4.0 (`.tools/UnityDataTool-2.4.0/UnityDataTool.exe`) or UnityPy in the project venv. These inspect bundle contents offline; neither proves runtime selection or rendering.
+## 4. Live Runtime & Intermission Progression Reference
 
-## Evidence and Showcase
+- **No-Jump Native Progression (Preferred):** Intermission `Continue Run` $\rightarrow$ `LoadScene.LoadLevel()` on conserved map $\rightarrow$ `LoadingHider` active in `Game` scene $\rightarrow$ Click **INICIAR** button (`1008136`) $\rightarrow$ Live match (`timeScale=1`).
+- **Boss Node raycast:** Coordinate raycast `diagnostics_order_select_level_node(level=LevelCount, field=0)` on `OverWorldMapBoss`. Never click decorative `BossTriangle`.
+- **Synthetic Advancement (User-Authorized):** `diagnostics_jump_to_level` and `diagnostics_load_next_level` advance state when natural path is blocked; tagged with `synthetic=true`.
+- **MCP Quirks:** `component/call_method` requires full type names; `LoaderDiagnostics` ID is scene-dependent (re-resolve via `find_objects_with_component`).
 
-- Record outcomes as **static inspection**, **local build/validation**, or **in-game runtime evidence**. A clean build, parsed bundle, passed validator, plugin-loaded line, or registered resource name does not prove gameplay, animation, or rendering.
-- For screenshots/recording, identify the game version, pack, unit/effect, scene, and test path. Do not stage a forced spawn or modified state as evidence of a natural offer or ordinary behavior.
-- Update `docs/research/AGENT-HANDOFF.md` only with durable, verified findings and retain the narrower scenario and evidence boundary.
+---
 
-## References
+## 5. References
 
-- [Skill search and adoption workflow](references/skill-search-and-adoption.md) — evaluate external skills without assuming compatibility or local installation.
-- [Game research](../rogue-command-game-research/SKILL.md)
-- [Steam runtime validation](../rogue-command-steam-runtime-validation/SKILL.md)
-- [AssetBundle authoring](../rogue-command-assetbundle-authoring/SKILL.md)
-- [VFX authoring](../rogue-command-vfx-authoring/SKILL.md)
-- [Animation authoring](../rogue-command-animation-authoring/SKILL.md)
-- [Reverse engineering](../rogue-command-reverse-engineering/SKILL.md)
-- [Content authoring tools](../../../docs/research/CONTENT-AUTHORING-TOOLS.md)
+- [3D Model Authoring](../rogue-command-3d-model-authoring/SKILL.md) & [Mech Rigging](../rogue-command-mech-rigging-authoring/SKILL.md)
+- [PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md) & [VFX Authoring](../rogue-command-vfx-authoring/SKILL.md)
+- [Steam Runtime Validation](../rogue-command-steam-runtime-validation/SKILL.md) & [Reverse Engineering](../rogue-command-reverse-engineering/SKILL.md)
+- [Pack Validation](../rogue-command-pack-validation/SKILL.md)

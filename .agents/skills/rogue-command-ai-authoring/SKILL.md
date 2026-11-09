@@ -5,429 +5,147 @@ description: "Implement or review Rogue Command AI profiles and compiled behavio
 
 # Rogue Command AI Authoring
 
-Use this skill when implementing an AI profile, adding a compiled module, or changing how game AI instances receive modules. Read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `README.md`, and `content/schema/README.md` before changing content or game-facing integration.
+Use this skill when implementing an AI profile, adding a compiled module, or configuring tactical AI behavior.
 
-## Keep code and pack data separate
+---
 
-- New AI logic belongs in a C# implementation of `IRogueCommandAiModule` compiled with the loader. A content pack selects a stable `moduleId` and passes string-pair parameters; it cannot ship an executable DLL or new game `MonoBehaviour` class.
-- Give modules a stable ID and API version, reject unknown/duplicate/out-of-range parameters, and bound time, attempts, target count, and other repeated work.
-- Follow initialization, update, and destruction callbacks. If a module fails, disable its behavior and attempt cleanup for all created module states in reverse order.
+## 1. Core Architecture & Invariants
 
-## Choose profile scope deliberately
+- **Code vs Pack Boundary**:
+  - New AI logic MUST be a compiled C# implementation of `IRogueCommandAiModule` linked in the loader.
+  - Content packs select stable `moduleId` strings and pass key-value parameters; packs cannot ship executable DLLs or `MonoBehaviour` classes.
+  - Max 8 modules per AI profile. Modules must declare API versions, validate parameter bounds, and clean up in reverse order on failure.
+- **Profile Scope & AI Rosters**:
+  - Native templates MUST declare `scopeToReferencedStages: true` to generate an isolated `RCL_` alias over contiguous stage ranges.
+  - Custom AI prefabs require reserved `RCL_` naming, active state, and a single `DefaultAiBehaviour`.
+  - `unitEntries` and `productionBuildingEntries` reference **produced unit IDs**, never factory IDs.
+  - Only units with `isAllowedForAi: true` and present in `stage.unitIds` may be added to AI rosters.
+  - Cross-pack load order is established by `unitEntries`; do not duplicate entries in `unitDependencies`.
+- **Faction & Hostility Invariant (CRITICAL)**:
+  - **NEVER mutate `IsControlledByPlayer` or `IsControlledByAi`**. These flags define hostility for native `IsEnemy()`.
+  - Mutating them corrupts friend/foe detection game-wide. Module ownership MUST be tracked via internal state or command tags only.
 
-- A native-template profile must set `scopeToReferencedStages: true`. The loader creates an isolated `RCL_` alias and calculates the contiguous stage range; validation rejects missing, cross-pack, or non-contiguous references. Native templates stay unchanged.
-- Custom AI prefabs must satisfy the schema's active state, reserved `RCL_` name, single `DefaultAiBehaviour`, and serialized data requirements. Do not infer that the Unity Editor can author these components from precompiled game assemblies.
-- AI rosters must reference produced unit IDs, never factory IDs. `unitEntries` and `productionBuildingEntries` both use unit IDs; production-building entries grant buildable factories only through their product unit.
-- A scoped native profile can only include units present in its referenced stages. Use `stage.unitIds` as the availability boundary before adding roster entries.
-- Set `isAllowedForAi` to `true` for every unit included in any AI roster; buildings and command HQs should remain `false`.
-- Keep `countAtStart` and `maxLiving` bounded and conservative; production-building entries normally use `maxLiving: 1`.
+---
 
-## AI Behavior Patterns (enriched from game-ai and unity-navmesh)
+## 2. AI Layering & Decision Frameworks
 
-Source patterns: gamedev-skills/awesome-gamedev-agent-skills `unity-navmesh` and `game-ai` (Apache-2.0). Adapt to Rogue Command's Unity 6 / URP runtime and compiled `IRogueCommandAiModule` boundaries; keep decision, steering, and pathing decoupled.
+1. **Decide** (FSM / Behavior Tree / Utility Scorer) $\rightarrow$ Intent & Target
+2. **Path** (NavMesh / Bounded A*) $\rightarrow$ Waypoints (timer-gated repaths, never every frame)
+3. **Steer** (`EntityController` movement forces) $\rightarrow$ Motion ($\Delta\text{pos} \cdot dt$)
 
-### Layering
-
-1. **Decide** what to do (FSM/BT/utility) -> intent (target position/action).
-2. **Path** how to route (engine NavMesh or bounded A*) -> waypoints.
-3. **Steer** how to move (NavMeshAgent or steering forces) -> motion.
-
-Keep modules bounded: timer-gated repaths, capped target counts, and fail-safe cleanup.
-
-### Finite State Machine (FSM)
-
-- States: Idle, Patrol, Chase, Attack, Flee, Dead
-- Transitions triggered by: distance to target, health threshold, cooldown timers, line-of-sight
-- Implementation: enum-based state with switch in `Update()`, transition checks in `CheckTransitions()`
-- One state owns one behavior; keep transitions inside the state, not scattered `if state == ...`
-- Bound all timers and counters to prevent runaway loops
-
-### Behavior Tree (BT)
-
-Node taxonomy and status model (`SUCCESS`, `FAILURE`, `RUNNING`):
+### Behavior Tree (BT) Taxonomy
 
 | Category | Node | Behavior |
 |---|---|---|
-| Composite | Sequence | Tick children left->right; return on first non-SUCCESS (logical AND) |
-| Composite | Selector (Fallback) | Tick children left->right; return on first non-FAILURE (logical OR) |
-| Composite | Parallel | Tick all children; succeed/fail on a policy (e.g. N must succeed) |
-| Decorator | Inverter | Swap SUCCESS<->FAILURE; pass RUNNING through |
-| Decorator | Repeat / RepeatUntilFail | Re-tick a child N times |
-| Decorator | Cooldown / Timeout | Gate or time-limit a child |
-| Leaf | Condition | Test world/blackboard -> SUCCESS/FAILURE (no side effects) |
-| Leaf | Action | Do something; return RUNNING until complete |
-
-Stateful composites must remember the running child index and resume there; naive composites restart from the first child every tick and break multi-frame actions.
-
-Blackboard pattern: shared key-value store on the agent for cross-node communication (`player`, `home`, `path`, `target`, timers). Conditions read it, actions write it; no node holds a hard reference to another. This lets the same `MoveTo` action serve chase, patrol, and flee subtrees.
-
-Hot-reload: serialize tree structure to JSON and reload at runtime when authoring tools support it.
-
-Use BT when many behaviors, priorities, interruption, reuse, or data-driven tuning are needed; use FSM for 2-5 clear states. Many games use an FSM for top-level mode (Idle/Combat/Dead) and a BT inside Combat.
-
-Leaf examples:
-
-```csharp
-// Condition leaf: pure test, no side effects.
-public sealed class CanSeePlayer : IBtNode
-{
-    public BtStatus Tick(AiContext ctx, float dt)
-        => ctx.Agent.CanSee(ctx.Blackboard.Player) ? BtStatus.Success : BtStatus.Failure;
-}
-
-// Action leaf: multi-frame, returns RUNNING until it arrives.
-public sealed class MoveTo : IBtNode
-{
-    private readonly string _key;
-    public MoveTo(string key) => _key = key;
-    public BtStatus Tick(AiContext ctx, float dt)
-    {
-        var dest = ctx.Blackboard.Get<Vector3?>(_key);
-        if (dest is null) return BtStatus.Failure;
-        ctx.Agent.MoveToward(dest.Value, dt);
-        return ctx.Agent.Position.DistanceTo(dest.Value) < 4.0f
-            ? BtStatus.Success : BtStatus.Running;
-    }
-}
-```
-
-Guard tree:
-
-```
-Selector
-├── Sequence            # attack branch (highest priority)
-│   ├── CanSeePlayer
-│   ├── MoveTo(player)
-│   └── Attack
-└── Patrol              # fallback when nothing else applies
-```
-
-Utility AI: score each candidate action with a utility function and pick the highest; use for nuanced trade-offs (heal vs attack vs flee by health/ammo/distance). Harder to debug than a tree.
-
-### Steering Behaviors
-
-Seek, Flee, Arrive, Pursue, Evade, Wander, Obstacle Avoidance. Combine with weighted blending for smooth movement. Rogue Command uses `EntityController` movement; steer toward target position. Always scale motion by `dt`; arrive ramps speed down inside `slowRadius` to stop cleanly. Follow the next waypoint, not the final goal, so agents round corners.
-
-### A* Pathfinding (Unity NavMesh + custom)
-
-- NavMeshAgent for ground units; custom pathfinding for flying units.
-- Obstacle avoidance via NavMeshObstacle components.
-- Dynamic obstacles: destructible buildings update navmesh at runtime.
-- Rogue Command stages use procedurally generated maps; ensure navmesh bakes after stage generation.
-- Recompute on a timer or when the goal moves; cache the path; only the waypoint index advances. Never pathfind every frame.
-
-A* correctness (engine-neutral):
-
-- `f(n) = g(n) + h(n)`; priority queue ordered by smallest f; goal checked when popping, not pushing.
-- Relaxation: accept an edge only if `newCost < costSoFar[nxt]`.
-- Tie-breaker: monotonic counter alongside node so the heap never compares nodes.
-- Heuristic must be admissible (never overestimate true remaining cost) for optimal paths; match movement: Manhattan for 4-dir, octile for 8-dir, Euclidean for any-angle.
-- `h = 0` degenerates to Dijkstra. Weighted A* (overestimating h) is faster but non-optimal; use deliberately.
-
-Grid adapter sketch:
-
-```csharp
-public sealed class GridGraph
-{
-    private readonly HashSet<(int,int)> _walls;
-    private readonly int _w, _h;
-    public bool InBounds((int,int) p) => p.Item1 >= 0 && p.Item1 < _w && p.Item2 >= 0 && p.Item2 < _h;
-    public bool Passable((int,int) p) => !_walls.Contains(p);
-    public IEnumerable<(int,int)> Neighbors((int,int) p)
-    {
-        var (x,y) = p;
-        var c = new[] { (x+1,y),(x-1,y),(x,y+1),(x,y-1) }; // add diagonals for octile
-        foreach (var n in c) if (InBounds(n) && Passable(n)) yield return n;
-    }
-    public float Cost((int,int) a, (int,int) b) => 1.0f; // terrain weight for varied cost
-}
-```
-
-Performance: shrink graph first (merge open areas, waypoint graphs), cap pathfinding work per frame (budget N searches, queue rest), flow field (one Dijkstra from goal) for many agents to one goal.
-
-Prefer engine navmesh for 3D arbitrary geometry, dynamic obstacle avoidance, agent radius/height; use A* directly for discrete grid/graph or full cost control.
-
-### Unity NavMesh API Patterns
-
-Version note: Unity 6 baking is component-based via AI Navigation package (`com.unity.ai.navigation`); old Navigation window is gone. Runtime `NavMeshAgent`/`NavMesh` API stays in `UnityEngine.AI`.
-
-Core workflow:
-
-1. Install AI Navigation package.
-2. Bake: add `NavMeshSurface` to static level geometry, set agent type/area, click Bake. Re-bake when geometry/modifiers/settings change.
-3. Add `NavMeshAgent` to each moving NPC; radius/height/speed must match baked agent type; spawn on baked mesh.
-4. Drive with `SetDestination(targetPos)`; agent steers and avoids other agents. Detect arrival via `remainingDistance`/`pathPending`.
-5. Dynamic blockers via `NavMeshObstacle` (carving).
-6. Verify with AI Navigation overlay and `NavMeshPath.status`.
-
-Chase/seek:
-
-```csharp
-using UnityEngine;
-using UnityEngine.AI;
-
-[RequireComponent(typeof(NavMeshAgent))]
-public sealed class Chaser : MonoBehaviour
-{
-    [SerializeField] private Transform target;
-    private NavMeshAgent _agent;
-    private void Awake() => _agent = GetComponent<NavMeshAgent>();
-    private void Update()
-    {
-        if (target) _agent.SetDestination(target.position); // re-path toward target
-    }
-    private bool HasArrived() =>
-        !_agent.pathPending && _agent.remainingDistance <= _agent.stoppingDistance;
-}
-```
-
-Reachability check:
-
-```csharp
-using UnityEngine.AI;
-public bool CanReach(NavMeshAgent agent, Vector3 destination)
-{
-    var path = new NavMeshPath();
-    agent.CalculatePath(destination, path);
-    return path.status == NavMeshPathStatus.PathComplete; // vs Partial / Invalid
-}
-```
-
-Runtime bake (procedural/streamed levels):
-
-```csharp
-using Unity.AI.Navigation;
-[SerializeField] private NavMeshSurface surface;
-public void RebuildNav() => surface.BuildNavMesh(); // after spawning level geometry
-```
-
-Snap agent to mesh if not on it: `NavMesh.SamplePosition`.
-
-Dynamic obstacle (carving): add `NavMeshObstacle` with `carving = true` to door/crate; while present it cuts a hole so agents route around; remove/disable to reopen path without re-bake.
-
-Bridge separate mesh islands with `NavMeshLink` (`Unity.AI.Navigation`): assign Start/End Transforms, Width (0 = point-to-point), toggle Bidirectional. Replaces deprecated built-in `OffMeshLink`.
-
-Pitfalls:
-
-- Agent not on baked mesh / no surface baked -> warps to origin; bake and spawn on mesh.
-- Runtime-spawned obstacles need `NavMeshObstacle` carving or `surface.BuildNavMesh()` re-bake.
-- `SetDestination` every frame is wasteful; re-path on timer (e.g. 0.2s).
-- Agent radius/height mismatch with baked agent type -> stuck/float.
-- Agents jitter -> tune `avoidancePriority`/quality, or use obstacle for static blockers.
-- `CalculatePath` returns `PathPartial` when destination is on a different baked island; bridge with `NavMeshLink` or extend geometry.
-- `OffMeshLink` deprecated in AI Navigation 2.0; use `NavMeshLink`.
-
-### Obstacle Avoidance (dynamic navmesh updates for destructible buildings)
-
-- Static blockers: `NavMeshObstacle` with carving for doors/crates.
-- Destructible buildings in Rogue Command: when a building is destroyed, either remove/disable its `NavMeshObstacle` (reopen path) or re-bake affected `NavMeshSurface` via `BuildNavMesh()` if geometry changes.
-- For dynamic runtime geometry changes, prefer carving obstacles for discrete objects; full re-bake for structural changes.
-- Ensure navmesh bakes after procedural stage generation before spawning AI agents.
-- Add stuck/timeout checks: if an agent fails to progress, force repath or state change.
-
-### Rogue Command AI Module Pattern
-
-- Modules implement `IRogueCommandAiModule` with `Initialize`, `Update`, `Destroy` callbacks.
-- String-pair parameters bound at load time; reject unknown/duplicate/out-of-range.
-- Fail-safe: disable module on exception, cleanup in reverse order.
-- Bound time, attempts, target count, and repeated work.
-- Static evidence only: in-game runtime proof required for acceptance.
-
-### Role-profile specialization (pure, offline-testable)
-
-When a module's behavior should vary by the allied unit's role (e.g. sniper vs melee vs support), do NOT mutate control/hostility flags or branch on unit identity inside the tick. Instead:
-
-1. Create a pure `readonly struct` (no Unity/game types) in a separate file (e.g. `ThreatPrioritizationRoleProfile.cs`) with behavioral knobs (engagement-range multiplier, distance weight, combat-engagement gate, ...) as get-only fields and named static instances (`Default`, `Sniper`, `Melee`, `Supporter`, ...).
-2. Provide two resolvers that must agree: `Resolve(UnitRole role)` (pure, bitwise on role flags; testable without an `EntityController`) and `ResolveFor(EntityController unit)` (uses `unit.HasRole(...)` so multi-role units classify consistently; degrades to `Default` on null).
-3. In the module tick, resolve the profile per allied unit, gate on `EngagesCombat`, and scale the engagement radius / scoring penalties by the profile's knobs. Default/generic units keep the historical behavior so existing packs are unaffected.
-4. Add the new `.cs` file as a `<Compile Include>` in the test project (the loader csproj globs implicitly) — otherwise the harness cannot see the type.
-5. Test both resolvers agree (`ResolveFor(unit).Equals(Resolve(unit.Role))`) and test behavioral boundaries: a role with extended range engages a target beyond the base radius but within the scaled radius; a non-combat role never engages even with a nearby enemy.
-
-Pitfall: keep the resolver pure and free of Unity types so it compiles in the harness without game assemblies; pass only primitive knobs (floats/bools) into scoring functions rather than the whole profile to keep signatures stable.
-
-### Registered AI Modules
-
-The loader includes 23 compiled AI modules registered in `AiModuleRegistry.CreateDefault()` (available for content packs, with a per-profile limit of up to 8 modules):
-
-1. **`sample:trace-default`**:
-   - Diagnostic trace module monitoring native AI lifecycle events and logging execution milestones.
-2. **`sample:scheduled-base-build`**:
-   - Uses `DefaultAiBehaviour.CreateBuilding_Static` to construct a building already present in the active native deck.
-   - Parameters: `entityId` (namespaced string), `intervalSeconds` (finite 1–300s), `cooldownSeconds` (finite 0–300s), `maxAttempts` (integer 1–100), `maxSuccessfulBuilds` (integer 1–100).
-3. **`sample:reactive-base-defense`**:
-   - Intercepts player units attacking AI structures and inserts attack-move counterattacks before selected defenders' current commands.
-   - Parameters: `baseIndex` (0–31), `cooldownSeconds` (1–60s), `defenseRadiusCells` (1–64; default 12), `maxResponders` (1–4; default 2), `protectedTargetType` (`Buildings` [default], `Harvesters`, `BuildingsAndHarvesters`).
-4. **`sample:harvester-raider`**:
-   - Actively hunts player crystal gatherers to disrupt enemy economy.
-   - Parameters: `baseIndex` (0–31), `scanIntervalSeconds` (2–120s; default 10s), `cooldownSeconds` (5–300s; default 25s), `raidSquadSize` (1–8; default 3), `minGameTimeSeconds` (0–600s; default 15s).
-   - Scans `ExistingControllers.Instance.Harvesters`, gathers combat units from the AI base, and dispatches attack-move orders directly against player harvesters.
-5. **`sample:siege-assault`**:
-   - Coordinates multi-unit assault waves against player fortifications and infrastructure.
-   - Parameters: `baseIndex` (0–31), `cooldownSeconds` (10–300s; default 30s), `minSquadSize` (1–12; default 4), `targetPriority` (`ClosestBuilding` [default], `Refinery`, `Hq`), `minGameTimeSeconds` (0–600s; default 30s).
-   - Scans known player structures (`PlayerBuildingsKnownToAi`, `PlayerRefineries`, or `EngineeringHq`), gathers available combat troops, and coordinates offensive siege strikes.
-6. **`sample:threat-prioritization`**:
-   - Scores hostile player units and retargets AI combat units with hysteresis and a per-tick command budget.
-   - Parameters: `baseIndex` (-1–31; default -1), `checkIntervalSeconds` (0.5–30s; default 3s), `priorityMode` (`HighestThreat` [default], `LowestHealth`, `HighestDps`; normalized to canonical PascalCase), `engagementRadius` (5–120; default 35), `retargetThreshold` (1.0–3.0; default 1.25), `maxRetargetsPerTick` (1–32; default 8).
-   - Filters candidates with `unit.IsEnemy(candidate)` and re-checks hostility on the current target before hysteresis; consumes the retarget budget before native dispatch via `EntityCommand.AttackMoveOnTarget` with `ExecuteBeforeCurrentCommand`.
-   - Each tick also censuses AI units (`AiUnits()`) and allied player units (`PlayerUnits()`), exposing `AutoControlledAlliedUnitCount` / `_lastProcessedAiUnitCount` for diagnostics only. It does **not** mutate control/faction identity: allied units stay `IsControlledByPlayer=true` so `IsEnemy` and sibling modules keep treating the player force as hostile. An earlier reflection-based `IsControlledByPlayer`/`IsControlledByAi` reassignment was reverted in `5b88d65` because those flags define hostility and are consumed elsewhere; track module ownership in state or command tags, never in those flags.
-   - Targeting is specialized per allied unit role through the pure, offline-testable `ThreatPrioritizationRoleProfile` (`ThreatPrioritizationRoleProfile.cs`, added as a Compile link in the test project): sniper/scout roles extend engagement range and tolerate distance, melee/tank/frontal roles close range and penalize distance, mass-destruction units keep a heavy single-target focus, and pure support/healer units (`Supporter`/`Heal`) are never retargeted onto enemy combat targets (`EngagesCombat == false`). The profile is resolved from `unit.HasRole(...)` and never mutates control or hostility flags; default/generic units keep the historical composite behavior (`Default` profile).
-7. **`sample:skirmish-kiting`**:
-   - Tactical harassment module that activates for fast, long-range units (`MoveSpeed >= MinKiteSpeed`, `WeaponRange >= 5.0`).
-   - Parameters: `baseIndex` (-1–31; default -1), `checkIntervalSeconds` (0.2–10s; default 1.0s), `minKiteSpeed` (5.0–30.0; default 10.0), `retreatDistanceRatio` (0.2–0.9; default 0.6), `kiteCooldownSeconds` (0.5–30s; default 2.0s).
-   - Monitors encroaching hostiles and commands retreat moves opposite the threat vector when enemies enter the retreat distance ratio of weapon range.
-8. **`sample:support-repair`**:
-   - Autonomous logistics and field repair module directing dedicated support units to damaged friendlies.
-   - Parameters: `baseIndex` (-1–31; default -1), `scanIntervalSeconds` (0.5–30s; default 2.0s), `repairRadiusCells` (5–60; default 25), `targetPriority` (`HarvestersFirst` [default], `FactoriesFirst`, `LowestHealthRatio`), `maxRepairersPerTarget` (1–4; default 2).
-   - Scans damaged allies, prioritizes Harvesters and production factories, and queues repair moves.
-9. **`sample:counter-battery`**:
-   - Dispatches fast, mobile interceptors against long-range player artillery and siege weapons.
-   - Parameters: `baseIndex` (-1–31; default -1), `scanIntervalSeconds` (1.0–30s; default 3.0s), `artilleryRangeThreshold` (10.0–50.0; default 18.0), `interceptSquadSize` (1–6; default 2).
-   - Pinpoints hostile units exceeding the range threshold and assigns high-speed units to neutralize them.
-10. **`sample:wave-escalation`**:
-    - Periodically increments the AI attack wave counter and coordinates timed offensive pushes.
-    - Parameters: `baseIndex` (-1–31; default -1), `escalationIntervalSeconds` (30–600s; default 120s), `maxWaveNumber` (1–50; default 10), `orderAssaultOnWave` (true/false; default true).
-    - Interfaces with `AiBehaviourManager.CurrentAttackWaveNumber` to escalate match pressure.
-11. **`sample:squad-formation`**:
-    - Binds follower combat units to an anchor captain unit with designated geometric offsets.
-    - Parameters: `baseIndex` (-1–31; default -1), `formationType` (`Wedge` [default], `Line`, `Column`), `spacingCells` (1–10; default 2), `maxFollowers` (1–8; default 4).
-    - Automatically unbinds followers when captain is destroyed.
-12. **`sample:tactical-skill-activation`**:
-    - Triggers entity active tactical skills when enemy units are detected in range or upon health drops.
-    - Parameters: `baseIndex` (-1–31; default -1), `checkIntervalSeconds` (0.5–10s; default 1.5s), `enemyTriggerRadiusCells` (2–40; default 15).
-    - Evaluates `UnitRuntimeMechanicsProfile.AiActivationTrigger` (`EnemiesInRange` vs `LowHealth`); triggers self-buffs or target-directed skills accordingly.
-13. **`sample:focus-fire`**:
-    - Coordinates multiple allied combatants to concentrate fire on single high-priority targets.
-    - Parameters: `baseIndex` (-1–31; default -1), `evalIntervalSeconds` (0.5–15s; default 2.0s), `selectionMode` (`LowestHealth` [default], `HighestThreat`, `HighestDps`).
-14. **`sample:construction-expansion`**:
-    - Manages dynamic AI base expansion and defensive perimeter construction.
-    - Parameters: `baseIndex` (0–31), `expansionIntervalSeconds` (10–300s; default 45s), `maxExpansions` (1–10; default 3).
-15. **`sample:tactical-regroup`**:
-    - Pulls combatants back to a safe rally point when squad casualties exceed a configurable threshold.
-    - Parameters: `baseIndex` (-1–31; default -1), `healthRatioThreshold` (0.1–0.7; default 0.35), `regroupRadiusCells` (5–50; default 15).
-16. **`sample:factory-reinforcement`**:
-    - Automatically routes newly produced factory units directly to bolster active front-line combat squads.
-    - Parameters: `baseIndex` (0–31), `rallyDistanceThreshold` (5.0–100.0; default 25.0).
-17. **`sample:flanking-strike`**:
-    - Coordinates secondary assault groups to navigate around primary battle lines and strike flanks or rear infrastructure.
-    - Parameters: `baseIndex` (0–31), `flankAngleDegrees` (30–90; default 60), `squadSize` (2–6; default 3).
-18. **`sample:retreat-and-regroup`**:
-    - Pulls severely damaged units back to base repair zones.
-    - Parameters: `baseIndex` (0–31), `retreatHealthRatio` (0.1–0.5; default 0.25), `cooldownSeconds` (5–120s; default 20s).
-19. **`sample:harvester-escort`**:
-    - Assigns dedicated combat escorts to shadow and protect friendly harvesters during resource collection runs.
-    - Parameters: `baseIndex` (0–31), `escortsPerHarvester` (1–3; default 1), `leashDistance` (3.0–20.0; default 8.0).
-20. **`sample:patrol-and-intercept`**:
-    - Manages tactical perimeter patrol and interception. `AttackMove` remains the default mode.
-    - Opt-in native Patrol route motion requires `CurrentPlayerCommandName == DoNothing` AND verified empty private `_commandChain` queue (`LinkedList<EntityCommand>`), failing closed otherwise to preserve queued orders.
-21. **`sample:adaptive-commander`**:
-    - Dynamically shifts AI macro posture and assault wave cadence based on battlefield economy and force ratios.
-22. **`sample:tactical-director`** (HUB-D Coordinated Architecture):
-    - Implements `ICoordinatedAiRuntimeBehaviour` over the 3-layer Hierarchical Utility-Blackboard Director (`AiBattlefieldBlackboard` -> `StrategicDoctrinePolicy` & `TacticalUtilityScorer` -> `AiCommandArbiterPolicy`).
-    - Parameters: `baseIndex` (-1–31; default -1), `evalIntervalSeconds` (0.1–10.0; default 0.5), `engagementRadius` (5–120; default 40), `defenseRadius` (5–60; default 20), `retreatHealthRatio` (0.05–0.80; default 0.30), `maxProposalsPerUnit` (1–4; default 2), `enableSurvivalKiting` (bool; default true), `enableBaseDefense` (bool; default true), `enableFocusTargeting` (bool; default true), `enableFlanking` (bool; default true), `minFlankSpeed` (3.0–25.0; default 7.5).
-    - Emits prioritized `AiIntentProposal` rows (`SurvivalKite` via 8-ray `AiSafeVectorPolicy.ComputeTacticalRetreatDestination` biasing retreat towards friendly defensive structures, support repairers, or the allied cluster centroid tracked by `AlliedDispersionRadius`; `TacticalSkill` for ready skills; `FlankingManeuver` with dual-wing spatial vectors around hostile centroids; `CombatTargeting` with target status vulnerabilities [`Stunned`, `Vulnerable`, `Slowed`, `Burning`, `Overclocked`], elite affix synergies [`Overcharged`, `Vampiric`, `Volatile`, `Bulwark`, `Juggernaut`, `Swift`], and `ScoreCombatTargetWithOverkill` anti-overkill damping) arbitrated centrally per unit in `CompositeAiRuntimeBehaviour` and surfaced via `RuntimeAiArchitectureCensus` (`GetAiArchitectureCensusJson`, with `omittedInstanceCount` first).
-23. **`sample:squad-operations-director`** (HUB-D 2.0 Specialist Coordinated Module):
-    - Implements `ICoordinatedAiRuntimeBehaviour` for support/engineer repair logistics (`ScoreSupportOrRepair`), fast counter-battery interception (`MoveSpeed >= 9.0` against hostile artillery), hazard evacuation for support units, and specialist tactical skills.
-    - Parameters: `baseIndex` (-1–31; default -1), `evalIntervalSeconds` (0.20–10.0; default 0.75), `supportRadius` (5.0–80.0; default 30.0), `counterBatteryMinRangeThreshold` (8.0–50.0; default 14.0), `enableSupportLogistics` (bool; default true), `enableCounterBattery` (bool; default true), `enableTacticalSkills` (bool; default true).
-    - Coordinates with `TacticalDirectorAiModule` through shared `AiBattlefieldSnapshot` and hazard-aware safe evacuation vectors.
-
-### HUB-D 2.0 Coordinated Tactical Architecture (Phase 9 & 10)
-
-The Hierarchical Utility-Blackboard Director (HUB-D 2.0) coordinates macro-strategy and squad micro-tactics across `sample:tactical-director` and `sample:squad-operations-director`:
-
-1. **Dynamic Tactical Regroup Geometry (`AiSafeVectorPolicy.ComputeTacticalRetreatDestination`)**:
-   - Computes an 8-ray candidate fan ($0^\circ, 45^\circ, 90^\circ, 135^\circ, 180^\circ, 225^\circ, 270^\circ, 315^\circ$) around the incoming threat vector.
-   - Evaluates terrain traversability, hazard zone clearance, and artillery dead-zone distance.
-   - Biases the selected retreat vector toward:
-     - Friendly defensive structures (`IsBuilding` with attack capability or base HQ).
-     - Allied support/repair units (`IsSupportUnit`).
-     - The allied cluster centroid when units become overly dispersed.
-   - Modulates retreat distance based on `AlliedDispersionRadius` to keep squad cohesion without stacking into lethal area-of-effect hazards.
-
-2. **Battlefield Spatial Blackboard (`AiBattlefieldBlackboard`)**:
-   - `AlliedDispersionRadius`: Root-mean-square distance of living combat units from the group centroid; detects when forces are tightly grouped vs. dangerously strung out.
-   - `FriendlyCentroid` and `HostileCentroid`: Center-of-mass positions driving dual-wing flanking vectors and retreat anchors.
-   - `HazardZones`: Active trigger hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField) that retreat and kiting vectors must strictly avoid.
-
-3. **Bitmask Status & Affix Telemetry (`AiUnitSnapshot`, `RuntimeAiBattlefieldCollector`)**:
-   - `statusEffectFlags` (`AiCombatStatusFlags` bitmask): `Stunned = 1 << 0`, `Vulnerable = 1 << 1`, `Slowed = 1 << 2`, `Burning = 1 << 3`, `Overclocked = 1 << 4`.
-   - `affixFlags` (`AiAffixFlags` bitmask): `Overcharged = 1 << 0`, `Vampiric = 1 << 1`, `Volatile = 1 << 2`, `Bulwark = 1 << 3`, `Juggernaut = 1 << 4`, `Swift = 1 << 5`.
-   - Extracted during `RuntimeAiBattlefieldCollector` projection with zero heap allocations per tick.
-
-4. **Dynamic Combat Target Utility Scoring (`TacticalUtilityScorer.ScoreCombatTarget`)**:
-   - **Status Vulnerabilities**: Grants heavy focus-fire bonuses against incapacitated or debuffed enemies:
-     - `Stunned`: $+40\%$ utility score (punish immobile targets unable to retaliate).
-     - `Vulnerable`: $+50\%$ utility score (capitalize on increased incoming damage).
-     - `Slowed`: $+20\%$ utility score (kite or collapse on sluggish targets).
-     - `Burning`: $+15\%$ utility score.
-   - **Elite Affix Synergies & Threat Dampening**:
-     - High-priority burst against dangerous offensive modifiers (`Overcharged`, `Vampiric`, `Volatile`).
-     - Dampens priority against defensive tanks (`Bulwark`, `Juggernaut`) while healthy, preventing AI squads from dumping all DPS into damage sponges when squishier priority units are in range.
-   - **Anti-Overkill Damping (`ScoreCombatTargetWithOverkill`)**: Dampens target utility when incoming allied DPS already exceeds the target's remaining effective health (HP + Shields), distributing fire across multiple hostiles.
-
-5. **Closed-Loop Command Loop & Arbiter Synchronization (`AiCommandArbiterPolicy`, `AiCommandArbiterState`)**:
-   - **Order Lease Enforcement**: The arbiter tracks approved module orders with category tiers (`SurvivalKite` = 50, `TacticalSkill` = 40, `BaseAndHarvesterDefense` = 30, `CombatTargeting` = 20, `FlankingManeuver` = 15, `SiegeAndFormation` = 10), target hysteresis, and lockout expiration timestamps.
-   - **Reactive Lease Invalidation**: When a unit's command chain is reset or deleted by native game events (`EntityController.ResetCurrentCommand` or `DeleteCommandChain`), Harmony hooks immediately notify `CompositeAiRuntimeBehaviour.NotifyUnitLeaseInvalidated(unitId)`, releasing the lease in `AiCommandArbiterState`. This eliminates artificial lockout delays, allowing units to immediately respond to emergency kiting or retreat proposals on the very next tick.
-   - **Command Tag Tracking & Mismatch Release**: Dispatched commands carry `command.tag`. When an external order is executed with a different tag, `CompositeAiRuntimeBehaviour.NotifyUnitCommandExecuted(unitId, tag)` releases the lease (`ReleaseLeaseIfTagDiffers`), ensuring external player or director interventions take immediate priority.
-   - **Perception Tag Reflection**: `RuntimeAiBattlefieldCollector` reads the current active tag via `RuntimeGameplayCommandDirector.GetLastUnitCommandTag(entityKey)` to populate `AiUnitSnapshot.CurrentCommandTag`, allowing modules to recognize whether an allied or enemy unit is engaged in tactical maneuvers vs unmanaged movement.
-   - **Battlefield Reset Synchronization**: When a stage finishes or restarts, `ExistingControllers.Init` triggers `NotifyBattlefieldRegistryReset()`, clearing all active leases and wiping stale blackboard buffers across every running composite instance.
-
-### Runtime mechanics profile consumption
-
-- Some module behavior depends on per-unit runtime mechanics (e.g. `aiActivationTrigger` on the first active skill). The trigger lives in content (`unit.activeSkills[0].aiActivationTrigger`) and must be copied by `ContentPackRuntimeLoader` into `UnitRuntimeMechanicsProfile.AiActivationTrigger` when the profile is created; the module then reads it via `RuntimeUnitMechanicsDirector.TryGetProfile(unit.EntityId, out ...)`.
-- Always default to `"EnemiesInRange"` when the profile is missing or the trigger is blank, so existing packs and units without the field behave exactly as before.
-- Only count a non-default trigger as mechanics in `UnitRuntimeMechanicsProfile.HasAnyMechanics` (i.e. `!string.Equals(trigger, "EnemiesInRange", OrdinalIgnoreCase)`); otherwise every unit with an active skill would be flagged as having mechanics and could change load/offer behavior.
-- In tests, initialize the profile directly (`new UnitRuntimeMechanicsProfile { EntityId = ..., AiActivationTrigger = "LowHealth" }`) and `RegisterProfile` it; reflection-based assignment is fragile and fails to compile against partial test views.
-- When a trigger bypasses the usual enemy-in-range gate (e.g. `LowHealth` for self skills), keep the health check (`CurrentHealth / MaxHealth <= 0.5`) before any command dispatch, and only skip the enemy search for `TargetOrigin.Self` skills; non-self skills still require a nearby enemy within `enemyTriggerRadiusCells`.
-
-### Implementation checklist for a new compiled module
-
-1. Create `Modules/<Name>Parameters.cs` with a parser that rejects unknown, duplicate, and out-of-range values, plus documented defaults.
-2. Write parser tests in `tests/RogueCommandExpansionLoader.ValidationTests/Program.cs` before implementing the parser; expect the RED failure, then make them GREEN.
-3. Create `Modules/<Name>AiModule.cs` implementing `IRogueCommandAiModule`; keep the runtime behaviour private and timer-gated.
-4. Add `<Compile Include=\"...\">` entries for both new source files in `RogueCommandExpansionLoader.ValidationTests.csproj`; otherwise the offline harness will not see the module.
-5. Register the module in `RogueCommandExpansionPlugin.Awake()` before content packs load.
-6. Document the module and its parameter bounds in `content/schema/README.md`.
-7. Re-run the full validation harness and a Release build before committing.
-
-Pitfalls:
-
-- The validation harness compiles source files through explicit `Compile` links; a new module that builds in the plugin but is absent from the test project's links will leave parser tests unable to compile.
-- Command dispatch must be guarded by null checks and wrapped in try/catch; a single native call failure must not abort the whole module tick.
-- Tag every issued command and skip units already tagged with the same tag; otherwise a timer-gated scan can repeatedly stack orders on the same units.
-- Use `ExistingControllers` as the source of truth for AI units, harvesters, and player units; do not cache entity lists across ticks.
-- Keep scan intervals and target counts bounded and fail closed on missing native fields or incompatible types.
-- Do not mutate `IsControlledByPlayer`/`IsControlledByAi` for **any** reason — including to "apply" a module to allied units. These flags define hostility and are consumed by `IsEnemy` and sibling modules; reassigning them silently converts the player force into an AI-controlled enemy (or vice versa) and breaks every hostility check downstream. An earlier attempt to reassign them via reflection on REA-verified setters had to be reverted for exactly this reason. Track module ownership in state or command tags; census allied units for diagnostics only.
-- Filter AI target candidates with `unit.IsEnemy(candidate)` and re-check hostility on the current target before applying hysteresis; never assume player-side entities are hostile after control-flag changes.
-- Require both `IsCombatUnit` and `CanAttackAndIsAttackEnabled` for AI combat-unit eligibility; avoid inverted `!A && !B` conditions.
-- Consume retarget/command budgets before native dispatch so exceptions cannot bypass caps.
-- AI combat modules must filter candidates through `IsControlledByAi`, `IsUnit`, `IsCombatUnit`, `CanAttackAndIsAttackEnabled`, and `CanMoveAndMovementIsEnabled`; support/repair modules use relevant `IsUnit`/`CanMove` constraints.
-- Treat reflected `IsEnemy` as nullable: write `unit.IsEnemy == null || !unit.IsEnemy(target)` and wrap candidate evaluation in try/catch so one unusable candidate is omitted rather than aborting the sweep or assault.
-- Counter-battery artillery classification requires `minAttackRange >= ThreatTriggerDistance`; a merely positive `minAttackRange` is not sufficient.
-- `SquadFormationAiModule` must track only mod-created captain links and release those on destruction; never call `ReleaseAllCaptains` over native links.
-- Tactical skill activation should not require combat or attack eligibility by default; filter destroyed, non-AI, and non-unit entries, but allow valid tactical-skill units to activate.
-- AI profiles allow at most 8 modules. When adding a standard module such as `sample:threat-prioritization` to every profile, append it as the last module and verify each profile stays within the limit; profiles already at 8 must have a module removed or consolidated first.
-- When adding a target field to the test `EntityCommand` stub, update every factory that carries a target (`Attack`, `AttackMoveOnTarget`, `ActiveSkillOnTarget`, etc.) consistently.
-
-### Integration with Existing AI Authoring
-
-- `AiBase.entitiesInAiDeck` includes mobile units and buildings.
-- `unitEntries` on native profiles establish cross-pack load order.
-- `countAtStart` controls starting units; `maxLiving` bounds native deck field.
-- Stage-scoped native AI uses isolated `RCL_` alias and contiguous stage range.
-
-### References
-
-- gamedev-skills game-ai: FSM/BT/steering/A* (Apache-2.0)
-- gamedev-skills unity-navmesh: Unity 6 NavMesh API (Apache-2.0)
-- Unity NavMesh documentation: https://docs.unity3d.com/Manual/nav-NavigationSystem.html
-- AI Navigation package manual: https://docs.unity3d.com/Packages/com.unity.ai.navigation@2.0/manual/index.html
-- Rogue Command AI module contract: `src/RogueCommandExpansionLoader/Ai/IRogueCommandAiModule.cs`
-
-## Be precise about behavior
-
-- Before replacing or looping a persistent native order, verify both the current command and queued command chain: a current `DoNothing` can coexist with a queued `Move`, and a looping native Patrol may not resume it. If the queue is private, pin the complete game identity and exact declaring type/member signature before reflection, fail closed on mismatch, and add a queued-order regression test; stub tests do not validate runtime reflection.
-- When a module makes protected target classes configurable, test that the default still excludes newly supported classes and that each class in a combined mode triggers the expected dispatch. Parser acceptance alone does not prove selection; keep offline harness results separate from in-game evidence.
-- `AiBase.entitiesInAiDeck` can contain mobile units as well as buildings. Static inspection of the pinned 1.0.9 assembly found that `AiBehaviour.BuildBaseStartSetup` sends non-building entries through `EntityFactory.InstantiateEntity`, tags them as AI, and assigns their AI base index. Add mod units through `unitEntries` on a `scopeToReferencedStages: true` native profile so only its isolated clone changes; the loader validates the unit reference and target base index and resolves cross-pack unit dependencies. `countAtStart` controls starting units; `maxLiving` preserves the native deck field and is bounded against it. This is static and offline-validation evidence, not in-game proof.
-- `unitEntries` establishes cross-pack load order itself. The full runtime deck check must accept that declaration after appending those entries; do not require the same ID again in `unitDependencies`. External IDs authored directly into a custom AI prefab's serialized deck still require `unitDependencies`.
-
-The scheduled-build sample constructs buildings already present in the native AI deck; it does not add a deck. The reactive-defense sample dispatches bounded counterattacks; it does not prove a new strategy works. Treat every module as unverified in-game until a Steam-launched match shows the intended decision and lifecycle. Use static inspection and offline parser/registry checks first, then a reversible test profile for authorized runtime validation.
+| **Composite** | `Sequence` | Ticks children left $\rightarrow$ right; returns on first non-`SUCCESS` (logical AND). |
+| **Composite** | `Selector` | Ticks children left $\rightarrow$ right; returns on first non-`FAILURE` (logical OR). |
+| **Composite** | `Parallel` | Ticks all children; evaluates policy (e.g., $N$ must succeed). |
+| **Decorator** | `Inverter` | Inverts `SUCCESS` $\leftrightarrow$ `FAILURE`; passes `RUNNING` through. |
+| **Decorator** | `Repeat` / `Cooldown` | Loops execution $N$ times or enforces a cooldown lockout window. |
+| **Leaf** | `Condition` | Pure read of world/blackboard $\rightarrow$ returns `SUCCESS` or `FAILURE` without side effects. |
+| **Leaf** | `Action` | Executes behavior; returns `RUNNING` until complete, then `SUCCESS`/`FAILURE`. |
+
+*Stateful composite rule: Always remember the running child index across frames; never restart from child 0 each tick.*
+
+### NavMesh & Dynamic Obstacle Invariants
+- Unity 6 component-based baking via `com.unity.ai.navigation` (`NavMeshSurface.BuildNavMesh()`).
+- Static & dynamic obstacles use `NavMeshObstacle` with `carving = true` (cuts holes dynamically without full re-bake).
+- Destructible structures: on destruction, disable `NavMeshObstacle` to reopen pathways.
+- Islands & elevation gaps: bridge using `NavMeshLink` (`OffMeshLink` is deprecated).
+- Re-path on a timer (e.g. 0.2s–0.5s) or on destination drift; never call `SetDestination` every frame.
+
+---
+
+## 3. Catalog of Compiled AI Modules (23 Modules)
+
+All 23 modules are registered in `AiModuleRegistry.CreateDefault()`:
+
+| Module ID | Role & Core Behavior | Parameters & Valid Ranges | Documented Defaults |
+|---|---|---|---|
+| `sample:trace-default` | Diagnostic trace logging native AI lifecycle milestones | None | None |
+| `sample:scheduled-base-build` | Constructs structures from native AI deck via `CreateBuilding_Static` | `entityId` (str), `intervalSeconds` (1–300s), `cooldownSeconds` (0–300s), `maxAttempts` (1–100), `maxSuccessfulBuilds` (1–100) | `interval: 60s`, `cooldown: 30s`, `maxAttempts: 5`, `maxSuccess: 1` |
+| `sample:reactive-base-defense` | Dispatches counterattacks when structures or harvesters take damage | `baseIndex` (0–31), `cooldownSeconds` (1–60s), `defenseRadiusCells` (1–64), `maxResponders` (1–4), `protectedTargetType` (`Buildings`, `Harvesters`, `BuildingsAndHarvesters`) | `cooldown: 10s`, `defenseRadius: 12`, `maxResponders: 2`, `type: Buildings` |
+| `sample:harvester-raider` | Hunts enemy harvesters to disrupt economy | `baseIndex` (0–31), `scanIntervalSeconds` (2–120s), `cooldownSeconds` (5–300s), `raidSquadSize` (1–8), `minGameTimeSeconds` (0–600s) | `scan: 10s`, `cooldown: 25s`, `squadSize: 3`, `minTime: 15s` |
+| `sample:siege-assault` | Coordinates siege assault waves against structures | `baseIndex` (0–31), `cooldownSeconds` (10–300s), `minSquadSize` (1–12), `targetPriority` (`ClosestBuilding`, `Refinery`, `Hq`), `minGameTimeSeconds` (0–600s) | `cooldown: 30s`, `minSquad: 4`, `priority: ClosestBuilding`, `minTime: 30s` |
+| `sample:threat-prioritization` | Scores enemies & retargets combatants with hysteresis; uses `ThreatPrioritizationRoleProfile` | `baseIndex` (-1–31), `checkIntervalSeconds` (0.5–30s), `priorityMode` (`HighestThreat`, `LowestHealth`, `HighestDps`), `engagementRadius` (5–120), `retargetThreshold` (1.0–3.0), `maxRetargetsPerTick` (1–32) | `base: -1`, `check: 3s`, `mode: HighestThreat`, `radius: 35`, `threshold: 1.25`, `maxRetargets: 8` |
+| `sample:skirmish-kiting` | Tactical kiting for fast ranged units (`MoveSpeed >= minKiteSpeed`, `WeaponRange >= 5.0`) | `baseIndex` (-1–31), `checkIntervalSeconds` (0.2–10s), `minKiteSpeed` (5.0–30.0), `retreatDistanceRatio` (0.2–0.9), `kiteCooldownSeconds` (0.5–30s) | `base: -1`, `check: 1.0s`, `minSpeed: 10.0`, `retreatRatio: 0.6`, `cooldown: 2.0s` |
+| `sample:support-repair` | Dispatches dedicated repairers to damaged friendlies | `baseIndex` (-1–31), `scanIntervalSeconds` (0.5–30s), `repairRadiusCells` (5–60), `targetPriority` (`HarvestersFirst`, `FactoriesFirst`, `LowestHealthRatio`), `maxRepairersPerTarget` (1–4) | `base: -1`, `scan: 2.0s`, `radius: 25`, `priority: HarvestersFirst`, `maxRepairers: 2` |
+| `sample:counter-battery` | Fast mobile interceptors hunt enemy artillery (`minAttackRange >= threshold`) | `baseIndex` (-1–31), `scanIntervalSeconds` (1.0–30s), `artilleryRangeThreshold` (10.0–50.0), `interceptSquadSize` (1–6) | `base: -1`, `scan: 3.0s`, `threshold: 18.0`, `squadSize: 2` |
+| `sample:wave-escalation` | Escalates match pressure via `CurrentAttackWaveNumber` | `baseIndex` (-1–31), `escalationIntervalSeconds` (30–600s), `maxWaveNumber` (1–50), `orderAssaultOnWave` (bool) | `base: -1`, `interval: 120s`, `maxWave: 10`, `orderAssault: true` |
+| `sample:squad-formation` | Binds follower units to an anchor captain | `baseIndex` (-1–31), `formationType` (`Wedge`, `Line`, `Column`), `spacingCells` (1–10), `maxFollowers` (1–8) | `base: -1`, `formation: Wedge`, `spacing: 2`, `maxFollowers: 4` |
+| `sample:tactical-skill-activation` | Triggers active skills on enemy detection or health drops (`AiActivationTrigger`) | `baseIndex` (-1–31), `checkIntervalSeconds` (0.5–10s), `enemyTriggerRadiusCells` (2–40) | `base: -1`, `check: 1.5s`, `radius: 15` |
+| `sample:focus-fire` | Concentrates squad firepower onto high-priority targets | `baseIndex` (-1–31), `evalIntervalSeconds` (0.5–15s), `selectionMode` (`LowestHealth`, `HighestThreat`, `HighestDps`) | `base: -1`, `eval: 2.0s`, `mode: LowestHealth` |
+| `sample:construction-expansion` | Expands base perimeter with defensive buildings | `baseIndex` (0–31), `expansionIntervalSeconds` (10–300s), `maxExpansions` (1–10) | `interval: 45s`, `maxExpansions: 3` |
+| `sample:tactical-regroup` | Pulls combatants back to rally point upon heavy losses | `baseIndex` (-1–31), `healthRatioThreshold` (0.1–0.7), `regroupRadiusCells` (5–50) | `base: -1`, `threshold: 0.35`, `radius: 15` |
+| `sample:factory-reinforcement` | Routes newly produced factory units directly to the frontline | `baseIndex` (0–31), `rallyDistanceThreshold` (5.0–100.0) | `threshold: 25.0` |
+| `sample:flanking-strike` | Flanking assault groups maneuver around main battle lines | `baseIndex` (0–31), `flankAngleDegrees` (30–90), `squadSize` (2–6) | `angle: 60`, `squadSize: 3` |
+| `sample:retreat-and-regroup` | Pulls critically damaged units back to base repair zones | `baseIndex` (0–31), `retreatHealthRatio` (0.1–0.5), `cooldownSeconds` (5–120s) | `ratio: 0.25`, `cooldown: 20s` |
+| `sample:harvester-escort` | Assigns dedicated combat escorts to shadow harvesters | `baseIndex` (0–31), `escortsPerHarvester` (1–3), `leashDistance` (3.0–20.0) | `escorts: 1`, `leashDistance: 8.0` |
+| `sample:patrol-and-intercept` | Perimeter patrol; requires `CurrentPlayerCommandName == DoNothing` and empty `_commandChain` queue | None (fails closed on non-empty queue) | None |
+| `sample:adaptive-commander` | Promotes commander, pulses command auras, modulates tactical stances & doctrine | None (binds to profile defaults) | Dynamic |
+| `sample:tactical-director` | **HUB-D 2.0 Macro Director**: 8-ray safe retreat, base defense, flanking, focus fire with status/affix scoring | `baseIndex` (-1–31), `evalIntervalSeconds` (0.1–10.0), `engagementRadius` (5–120), `defenseRadius` (5–60), `retreatHealthRatio` (0.05–0.80), `maxProposalsPerUnit` (1–4), `enableSurvivalKiting` (bool), `enableBaseDefense` (bool), `enableFocusTargeting` (bool), `enableFlanking` (bool), `minFlankSpeed` (3.0–25.0) | `base: -1`, `eval: 0.5s`, `engagementRadius: 40`, `defenseRadius: 20`, `retreatRatio: 0.30`, `maxProposals: 2`, flags: `true`, `minFlankSpeed: 7.5` |
+| `sample:squad-operations-director` | **HUB-D 2.0 Specialist Director**: support/repair logistics (`ScoreSupportOrRepair`), fast counter-battery (`MoveSpeed >= 9.0`), hazard evasion, specialist skills | `baseIndex` (-1–31), `evalIntervalSeconds` (0.20–10.0), `supportRadius` (5.0–80.0), `counterBatteryMinRangeThreshold` (8.0–50.0), `enableSupportLogistics` (bool), `enableCounterBattery` (bool), `enableTacticalSkills` (bool) | `base: -1`, `eval: 0.75s`, `supportRadius: 30.0`, `counterBatteryMinRange: 14.0`, flags: `true` |
+
+---
+
+## 4. HUB-D 2.0 Coordinated Tactical Architecture
+
+The Hierarchical Utility-Blackboard Director coordinates macro strategy and micro tactics across `sample:tactical-director` and `sample:squad-operations-director`:
+
+### 1. Dynamic Tactical Regroup Geometry (`AiSafeVectorPolicy.ComputeTacticalRetreatDestination`)
+- Evaluates an 8-ray candidate fan ($0^\circ, 45^\circ, 90^\circ, 135^\circ, 180^\circ, 225^\circ, 270^\circ, 315^\circ$) opposing the threat vector.
+- Avoids hazard zones and artillery dead-zones; biases retreat toward friendly defenses, support units, and group centroid.
+- Modulates retreat distance based on `AlliedDispersionRadius` to maintain squad cohesion without clumping.
+
+### 2. Spatial Blackboard Telemetry (`AiBattlefieldBlackboard`)
+- `AlliedDispersionRadius`: Root-mean-square distance of combatants from group centroid.
+- `FriendlyCentroid` & `HostileCentroid`: Center-of-mass positions driving dual-wing flanking vectors.
+- `HazardZones`: Active trigger hazard zones (Firestorm, AcidPool, EmpField, CryoMist, NaniteField) that retreat/kite paths strictly avoid.
+
+### 3. Bitmask Telemetry (`AiUnitSnapshot`, zero-heap projection)
+- **Status Flags** (`AiCombatStatusFlags`): `Stunned = 1 << 0`, `Vulnerable = 1 << 1`, `Slowed = 1 << 2`, `Burning = 1 << 3`, `Overclocked = 1 << 4`.
+- **Affix Flags** (`AiAffixFlags`): `Overcharged = 1 << 0`, `Vampiric = 1 << 1`, `Volatile = 1 << 2`, `Bulwark = 1 << 3`, `Juggernaut = 1 << 4`, `Swift = 1 << 5`.
+
+### 4. Dynamic Combat Target Utility Scoring (`TacticalUtilityScorer.ScoreCombatTarget`)
+- **Status Vulnerabilities**: `Stunned` (+40% score), `Vulnerable` (+50% score), `Slowed` (+20% score), `Burning` (+15% score).
+- **Elite Affix Synergies**: Prioritizes high-burst offensive traits (`Overcharged`, `Vampiric`, `Volatile`); dampens priority against high-HP defensive tanks (`Bulwark`, `Juggernaut`) while healthy.
+- **Anti-Overkill Damping (`ScoreCombatTargetWithOverkill`)**: Dampens target utility when incoming allied DPS exceeds effective target HP + shields.
+
+### 5. Closed-Loop Command Loop & Arbiter Synchronization
+- **Priority Tiers**: `SurvivalKite` (50) > `TacticalSkill` (40) > `BaseAndHarvesterDefense` (30) > `CombatTargeting` (20) > `FlankingManeuver` (15) > `SiegeAndFormation` (10).
+- **Reactive Lease Invalidation**: When native `ResetCurrentCommand` or `DeleteCommandChain` executes, Harmony hooks call `CompositeAiRuntimeBehaviour.NotifyUnitLeaseInvalidated(unitId)`, releasing the lease in `AiCommandArbiterState` instantly.
+- **Command Tag Mismatch Release**: If an external command with a different tag executes on a unit, `NotifyUnitCommandExecuted(unitId, tag)` releases the lease (`ReleaseLeaseIfTagDiffers`).
+- **Perception Tag Reflection**: `RuntimeAiBattlefieldCollector` queries `GetLastUnitCommandTag(entityKey)` to populate `AiUnitSnapshot.CurrentCommandTag`.
+- **Battlefield Reset**: On match start/restart, `ExistingControllers.Init` invokes `NotifyBattlefieldRegistryReset()`, clearing all leases across active composites.
+
+---
+
+## 5. Role-Profile Specialization & Runtime Mechanics
+
+- **`ThreatPrioritizationRoleProfile`** (pure `readonly struct` in `ThreatPrioritizationRoleProfile.cs`):
+  - Resolvers: `Resolve(UnitRole role)` (bitwise, pure) and `ResolveFor(EntityController unit)` (uses `unit.HasRole()`).
+  - Snipers extend engagement range; melee units close distance; supporters (`Supporter`/`Heal`) have `EngagesCombat == false` and are never retargeted onto enemies.
+- **`UnitRuntimeMechanicsProfile.AiActivationTrigger`**:
+  - Configured via `unit.activeSkills[0].aiActivationTrigger` (`"EnemiesInRange"` [default] vs `"LowHealth"`).
+  - `"LowHealth"` triggers when `CurrentHealth / MaxHealth <= 0.5`. For `TargetOrigin.Self` skills, enemy proximity check is bypassed.
+
+---
+
+## 6. Implementation Checklist & Critical Pitfalls
+
+1. **Parameters Class**: Create `Modules/<Name>Parameters.cs` validating types, ranges, duplicates, and defaults.
+2. **Offline Tests First**: Write parser and boundary tests in `ValidationTests/Program.cs` before module logic.
+3. **Module Class**: Implement `IRogueCommandAiModule` in `Modules/<Name>AiModule.cs`; keep runtime behavior private and timer-gated.
+4. **Compile Links**: Add `<Compile Include="...">` in `RogueCommandExpansionLoader.ValidationTests.csproj`.
+5. **Registry Binding**: Register in `AiModuleRegistry.CreateDefault()`.
+6. **Schema Documentation**: Document parameters in `content/schema/README.md`.
+7. **Verification**: Run `dotnet build -c Release` and C# / Python test suites before committing.
+
+### Critical Pitfalls
+- **Combat Eligibility**: Require `IsControlledByAi`, `IsUnit`, `IsCombatUnit`, `CanAttackAndIsAttackEnabled`, and `CanMoveAndMovementIsEnabled`.
+- **Enemy Filtering**: Always wrap candidate evaluation in null-safe `unit.IsEnemy(candidate)`; treat reflected delegates defensively.
+- **Command Tags**: Tag every issued command (`cmd.tag`); skip units already executing that tag to prevent stacking orders.
+- **ExistingControllers**: Always read `ExistingControllers.Instance` each tick; never cache entity collections across frames.
+- **Budgets Before Dispatch**: Consume retargeting and command budgets before native dispatch so failures cannot cause infinite retries.
+- **Counter-Battery**: Artillery detection requires `minAttackRange >= ThreatTriggerDistance`, not just a positive range.
+- **Squad Formation**: Only track mod-created captain links; never invoke `ReleaseAllCaptains` over native links.

@@ -1,86 +1,78 @@
 ---
 name: rogue-command-pack-validation
 description: "Validate Rogue Command content manifests, AssetBundles, loader builds, and install packages before delivery."
+version: 1.2.0
+license: MIT
+author: Hermes Agent
+metadata:
+  hermes:
+    tags: [Rogue Command, pack validation, schema, AssetBundles, harness, testing, deployment]
+    related_skills: [rogue-command-clean-room-diagnostics, rogue-command-harmony-policy, rogue-command-unit-authoring]
 ---
 
 # Rogue Command Pack Validation
 
-Use this skill when validating or packaging a Rogue Command loader/content change. Read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `README.md`, and `content/schema/README.md` for current commands and constraints.
+Authoritative protocol for validating content manifests, AssetBundles, loader builds, and distributable packages.
 
-## Validate the source and content
+---
 
-- Parse `content/schema/content.schema.json` and validate each changed `content.json` against Draft 2020-12 schema rules.
-- Run both validation test suites when tests are part of the accepted task:
-  - C# loader harness: `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` (report a skipped symlink check as skipped, not passed; current baseline: 556 passing / 1 skipped out of 557 checks).
-  - The C# harness compiles a **curated `Compile` file list against a minimal `UnityEngine` stub**, not the whole loader. Grep the test csproj `Compile` list before adding a type to a file the harness compiles: a `MonoBehaviour` or any type referencing live Unity authoring/runtime types (`RuntimeOverlayUi`, `RangeDisplayRuntime`, `GUILayout`, `LineRenderer`, ...) fails to compile there. Keep agent-readable/pure logic (JSON formatters, color policies, snapshot DTOs) in a dependency-free file the csproj registers, and keep the Unity-coupled bridge `MonoBehaviour` in a separate file the plugin compiles but the harness does not. A hand-rolled JSON writer beats a Newtonsoft dependency when the formatter must also live in the stub-only test project.
-  - Python registry & balance test suite: `python -B -m unittest discover -s tests -v` (current baseline: 479 passing / 1 skipped out of 480 checks).
-- **Core Engine Harmony & Command Loop Synchronization Validation**:
-  - Validates all 53 installed hooks and the 12 core simulation hooks (unit creation, pool reuse, placement ghost, factory produce, entity registry reset, entity register/unregister, command executed/step/reset/delete).
-  - Validates `AiCommandArbiterState` lease invalidation on order reset/delete and tag divergence (`ReleaseLease`, `ReleaseLeaseIfTagDiffers`), command tag projection into `AiUnitSnapshot.CurrentCommandTag`, factory produce tracking by both key and `EntityId` (`GetFactoryProducedCountByEntityId`), and dynamic command aura unlinking and cleanup on entity destruction.
-- **Unit Variant Schema Validation**:
-  - `units[].variants` permits up to 8 loadout variants.
-  - Each variant allows up to 64 `balanceOverrides`.
-  - Variant IDs must be valid identifiers and strictly reject line terminators (`\r`, `\n`, CRLF, U+2028, U+2029).
-  - Loader diagnostics report them under `Variantes declaradas (solo metadatos): N`.
-- **Numeric Bounds & Precedence Validation**:
+## 1. Validation Commands & Baselines
+
+| Test Suite / Tool | Command | Scope & Success Baseline |
+|---|---|---|
+| **C# Loader Harness** | `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` | **556 passed / 1 skipped** (symlink). Compiles against minimal `UnityEngine` stub; keep pure logic separate from Unity `MonoBehaviour` |
+| **Python Registry & Balance** | `python -B -m unittest discover -s tests -v` | **479 passed / 1 skipped** out of 480 checks |
+| **AssetBundle Audit** | `python tools/audit_unity_bundle.py <bundle>` | Inspects object counts, texture formats, shaders, dependencies, and byte size |
+| **Pack Manifest Validator** | `python tools/validate_content_pack.py <pack_dir>` | Validates `content.json` against schema, checks referenced assets & duplicate IDs |
+| **Packaging Runner** | `powershell -File tools/Package-Loader.ps1` | Creates release ZIP without test assemblies, PDBs, or editor caches |
+
+---
+
+## 2. Manifest Schema & Parameter Rules
+
+- **Schema Compliance:** Validate `content.json` against Draft 2020-12 rules in `content/schema/content.schema.json`.
+- **Unit Variants (`units[].variants`):** Up to 8 loadout variants per unit; max 64 `balanceOverrides` per variant. Variant IDs must reject line terminators (`\r`, `\n`, CRLF, U+2028, U+2029).
+- **Numeric Bounds & Precedence:**
   - Integer overrides capped at `16,777,216`; float overrides capped at `Single.MaxValue`.
-  - Balance precedence: `customBalance` > raw `balanceOverrides` > positive finite `movement.moveSpeed`.
-  - 25 verified per-unit `ChangeableValue` keys mapped directly to row fields, excluding global `ManaRechargePerSecond`.
-- **Structured Parameter Type Safety**:
-  - When applying structured unit parameters, inspect the destination row field type before assignment. Passing a `float` to an `int`-backed row field (for example `EntityBalancingParameters.skillRange`) throws an unhandled `ArgumentException` that aborts pack loading. Detect the target type and round/convert explicitly.
-- **Skill Description Inheritance Guards**:
-  - `SkillDescriptionPrefix` and `TryResolveUnitLocalization` can throw on namespaced mod IDs because native `Loca` keys do not contain namespace prefixes. Guard these lookups so a missing native translation degrades to the mod's own description or a safe default instead of aborting initialization.
-- **Upgrade & Synergy Graph Analysis**:
-  - Validates upgrade and synergy graphs iteratively with a 5-edge traversal limit, cycle detection, forward references, and convergent DAG handling.
-  - Production queue feasibility mismatches are reported as warnings without invalidating otherwise valid packs.
-- **Stage Parameter & Node Interval Validation**:
-  - `StageParameterBindingContract` binds only `blueprintPoolList`, `fillFirstLevelWithCardRewards`, and `putDefaultCardRewardInCenter`. `cardReward` is a value type, not `OpenReward` (reject `cardReward.count/weight`).
-  - `startCountRange` must be an ordered invariant-culture integer pair 1–64, bounded by final stage `maxWidth`.
-- **Relic CardChange Side Mapping**:
-  - Content validation accepts only native `CardChange.side` labels: `False`, `True`, `Irrelevant`.
-  - Runtime registration maps readable content labels (`Friendly`/`Player`/`Allies`, `Enemy`/`AI`/`Hostile`, `All`/`Any`/`Neutral`) to the native enum in both `RuntimeCardChangeApplier` and `RelicContentRuntimeRegistrar.SetEnumField`. Keep both mappings aligned; validation remains native-label only.
-- **AssetBundle Registry Concurrency**:
-  - `GlobalBundleRegistry` must validate IDs/paths, unload duplicate path/stream bundles with `Unload(false)`, and keep stream and path overloads behaviorally aligned.
-- **Registry Hardening**:
-  - Rejects duplicate unit, factory, and pool IDs both intra-pack and cross-pack.
-  - Excludes ambiguous cross-pack mappings and safely reports invalid UTF-8 manifests without crashing.
-- **Global Blueprint Reward Injection & Stage Factory Scope**:
-  - `AllEntityIdsAllowedAsBlueprintsPostfix` injects eligible modded factories into stage reward pools via `IGlobalBlueprintCandidateProvider`. Modded unit factories should declare `Common` rarity to ensure natural reward card offers.
-  - `BlueprintRewardFactoryScope.IsStageFactory` accurately identifies stage factories, preventing reward pool contamination.
-- **Standalone Building Definitions (`ContentBuildingDefinition` / `buildings[]`)**:
-  - First-class standalone buildings follow schema DTO, null-safe deep cloning, and range validation without requiring unit production bindings.
-- **Pre-Spawning Anti-Hitch Pool Quotas (`ApplyModPrespawnQuotas`)**:
-  - Warm pre-allocation of modded unit entity pools in `RuntimeHooks.cs` prevents GC hitches and micro-stutters during heavy combat spawns.
-- **Prefab and AssetBundle Manifest Parity**:
-  - Every unit and building declared in `content.json` must exist inside the compiled `.bundle`. Mismatches cause silent runtime instantiation failures.
-- Schema enum and C# allowlist must agree: if `content.schema.json` advertises an `activeSkill.skillType` (or other enum) that `ContentPackValidation.cs` rejects (or the runtime does not handle), content authors can pass schema validation but fail at load. When adding or renaming a skill type, update both the schema enum and the C# allowlist in the same change, and confirm the runtime actually dispatches the new type. Conversely, when a type is in the schema but unsupported at runtime, remove it from the schema enum rather than widening the allowlist without runtime support.
-- Schema and offline harness validation do not prove that a `blueprintPoolEntries` pool ID exists in the native stage template. A missing native pool disables the whole pack during runtime registration, so verify pool IDs with generated stage references or a live BepInEx MCP registration probe before delivery.
-- Native stage templates differ in available pools: `StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit` supports `BP_CheaperVehicles`, `BP_CheaperRobos`, and `BP_CheaperMechs`, while the tested `StageParameters_Pools_Level3` template supports only `BP_CheaperMechs`. Treat any pool ID as invalid until a runtime registration probe or generated stage reference confirms it.
-- Build the loader in Release. For Unity assets, use the repository's Unity 2021.3.45f2 authoring project and builder, then reopen the generated AssetBundle in Unity. Verify that bundles embed their own compiled shaders (`VehiclePBR_VertexWear` or `Standard`) for URP execution, since native game assets do not provide built-in shaders. UnityPy can independently list serialized objects offline, but cannot establish runtime compatibility.
-- Before assigning card or visual asset names, enumerate the bundle with UnityPy (`env.container.keys()`) and confirm each name exists; validate `productionBuilding` card/visual pairs against the schema and run `tools/validate_native_visual_roots.py` for every unit visual root. Report visual-root checks as local static evidence, not rendering proof.
-- Use `tools/audit_unity_bundle.py <bundle>` to audit a bundle offline: object counts by type, textures (format, dimensions, mipmaps), shaders, dependencies, and total size. Returns JSON to stdout or `--output file.json`.
-- Use `tools/validate_content_pack.py <pack_dir>` to validate a content pack: schema compliance, referenced file existence (manifest, bundles, icon/prefab paths), and duplicate ID detection. Returns exit code 0 on success, 1 on errors with details to stderr.
-- Temporary Unity Editor probe scripts used to verify AssetBundle addresses or asset resolution are validation aids, not permanent authoring artifacts. Remove both the `.cs` and `.meta` files from `Assets/Editor/` after verification; do not ship them in source control or leave them in the authoring project.
-- In diagnostic trace and telemetry formatting, ensure bounded outputs (e.g. `MaxTraceCharacters = 4096`) place omission/loss counters before unbounded-detail collections (`offeredProducts`, candidates, pools) so tail truncation never hides lost observations.
-- When editing `content.json` programmatically, preserve the file's original line endings and indentation and use targeted text insertion; full JSON re-serialization can rewrite the whole manifest, change every line, and create huge noisy diffs. Verify with `git diff --stat` before committing.
-- Rebuild the install archive with `tools/Package-Loader.ps1`. Inspect its actual entries: confirm the intended plugin, manifests, bundles, and readmes are present, and that game assemblies, BepInEx, Harmony, PDBs, and Unity editor output are absent.
+  - Stat precedence: `customBalance` > raw `balanceOverrides` > positive finite `movement.moveSpeed`.
+  - 25 verified `ChangeableValue` keys mapped directly to row fields (excludes global `ManaRechargePerSecond`).
+- **Structured Type Safety:** Inspect destination row field types before assigning parameters (e.g. `EntityBalancingParameters.skillRange` is `int`, passing a `float` throws `ArgumentException`). Round or convert explicitly.
+- **Relic `CardChange` Side Mapping:** Schema accepts only native `False`, `True`, `Irrelevant`. Runtime maps friendly/player $\rightarrow$ `True`, enemy/hostile $\rightarrow$ `False`, all/neutral $\rightarrow$ `Irrelevant`.
+- **Stage Parameters:** `StageParameterBindingContract` binds only `blueprintPoolList`, `fillFirstLevelWithCardRewards`, and `putDefaultCardRewardInCenter`. `cardReward` is a value type (reject `cardReward.count/weight`). `startCountRange` must be an ordered pair (1–64).
 
-## Deploy a built package to a local game installation
+---
 
-- Confirm no game process is running before writing into `BepInEx/`.
-- Back up the existing plugin DLL and content directory before overwriting them.
-- Deploy the package by extracting it into the game root, preserving `BepInEx/plugins/...`.
-- The plugin DLL must end at `BepInEx/plugins/RogueCommandExpansionLoader.dll`; do not leave a stale duplicate under `BepInEx/plugins/RogueCommandExpansionLoader/RogueCommandExpansionLoader.dll`.
-- `tools/Package-Loader.ps1` packages only `sample-native-expansion` and `sample-reactive-ai`. Compare its entries with the intended tracked packs; if an intended pack such as `tactical-operations` is omitted, deploy that pack explicitly from the repository and verify its files or hashes.
-- Record profile-file hashes before and after deployment and verify they are unchanged.
-- Deployment verification (ZIP integrity, plugin hash, content files, unchanged profiles) is local installation evidence only. It is not proof of runtime registration, gameplay, or a fix for profile persistence.
+## 3. Core Engine Harmony & Simulation Invariants
 
-## Protect the repository and runtime
+- **53 Installed Hooks:** Validates all registered hooks across Unit Creation, Pool Reuse, Placement Ghost, Factory Produce, Registry Init, Entity Register/Unregister, and Command Loop (`ExecuteCommand`, `ExecuteNextCommand`, `ResetCurrentCommand`, `DeleteCommandChain`).
+- **Arbiter Lease Invalidation:** Order cancellation/deletion and tag divergence must trigger `ReleaseLease` or `ReleaseLeaseIfTagDiffers` on `AiCommandArbiterState`.
+- **Factory Tracking:** Factory completions tracked by key and by product `EntityId` (`GetFactoryProducedCountByEntityId`).
+- **Pre-Spawn Anti-Hitch Quotas:** Modded unit entity pools pre-warmed via `ApplyModPrespawnQuotas` in `RuntimeHooks.cs` to eliminate runtime GC hitching.
+- **Standalone Buildings (`buildings[]`):** Supported via `ContentBuildingDefinition` with null-safe deep cloning without requiring unit production bindings.
 
-- Keep generated build output under ignored `artifacts/`. Inspect `.gitignore` and `git status`; stage only task-owned source, documentation, and distributable bundle inputs. Do not stage Unity `Library/`, generated editor caches, local game assemblies, or user workspace metadata.
-- Do not install the package into the game as part of offline validation. When runtime validation is explicitly part of the task, use Steam and a reversible test profile, then restore temporary deployment changes.
-- For a requested commit/push, review the staged names and diff, fetch and compare the current tracking remote branch (`codex/rogue-unit-balance-20261018`) immediately before pushing, and verify the remote SHA afterward. Do not create a pull request unless requested.
+---
 
-## Report what each check proves
+## 4. AssetBundle & Prefab Contracts
 
-Separate static inspection, local build/validation, and in-game evidence. Schema validity, unit tests, bundle reopening, and ZIP inspection are local evidence; they do not prove content registration or playability in Rogue Command.
+- **Self-Contained Shaders:** AssetBundles must embed compiled shaders (`VehiclePBR_VertexWear` or `Standard`) for URP execution; base game assets do not provide built-in shaders.
+- **Address & Name Verification:** Enumerate bundle container keys (`env.container.keys()`) with UnityPy; every unit model, icon sprite, and building mesh must resolve to a valid asset.
+- **Script-Free Prefabs:** Visual prefabs must contain zero custom `MonoBehaviour` scripts.
+- **Diagnostic Trace Formatting:** In bounded outputs (e.g. `MaxTraceCharacters = 4096`), place omission/loss counters at the head of the trace so tail truncation never masks dropped observations.
+
+---
+
+## 5. Deployment & Repository Protection
+
+- **Deployment Destination:** Plugin DLL must install to `BepInEx/plugins/RogueCommandExpansionLoader.dll` (never nested in a subfolder).
+- **Process Closed Check:** Verify `Rogue Command.exe` is completely terminated before modifying `BepInEx/` or profile directories.
+- **Manifest Restoration:** Pre-record deployed hashes and restore only task-owned targets; verify profile file hashes remain unchanged.
+- **Staging Boundaries:** Never stage `artifacts/`, `Library/`, editor caches, or game assemblies. Stage only task-owned code, docs, and assets.
+
+---
+
+## 6. References
+
+- [Clean-Room Diagnostics Skill](../rogue-command-clean-room-diagnostics/SKILL.md) — Telemetry queries and live MCP bridge.
+- [Harmony Policy Skill](../rogue-command-harmony-policy/SKILL.md) — Installed hook contracts and safety rules.
+- [Unit Authoring Skill](../rogue-command-unit-authoring/SKILL.md) — Balance archetypes and production building templates.
+- `content/schema/content.schema.json` & `README.md` — Authoritative schema definitions.
