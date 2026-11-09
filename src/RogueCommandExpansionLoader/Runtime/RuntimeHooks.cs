@@ -52,6 +52,13 @@ namespace RogueCommandExpansionLoader.Runtime
         private static int _entityReuseOnInstantiatedTranspilerCount;
         private static int _factoryProduceTranspilerCount;
         private static int _entityRegistryResetTranspilerCount;
+        private static int _placementGhostTranspilerCount;
+        private static int _entityInitTranspilerCount;
+        private static int _entityDestroyTranspilerCount;
+        private static int _commandExecutedTranspilerCount;
+        private static int _commandNextStepTranspilerCount;
+        private static int _commandResetTranspilerCount;
+        private static int _commandChainDeletedTranspilerCount;
         private static string _lastExecutedCommandKind = string.Empty;
         private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
         private static FieldInfo _cachedCommandKindField;
@@ -77,6 +84,13 @@ namespace RogueCommandExpansionLoader.Runtime
         public static int EntityReuseOnInstantiatedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityReuseOnInstantiatedTranspilerCount, 0, 0);
         public static int FactoryProduceTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _factoryProduceTranspilerCount, 0, 0);
         public static int EntityRegistryResetTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityRegistryResetTranspilerCount, 0, 0);
+        public static int PlacementGhostTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _placementGhostTranspilerCount, 0, 0);
+        public static int EntityInitTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityInitTranspilerCount, 0, 0);
+        public static int EntityDestroyTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityDestroyTranspilerCount, 0, 0);
+        public static int CommandExecutedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandExecutedTranspilerCount, 0, 0);
+        public static int CommandNextStepTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandNextStepTranspilerCount, 0, 0);
+        public static int CommandResetTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandResetTranspilerCount, 0, 0);
+        public static int CommandChainDeletedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandChainDeletedTranspilerCount, 0, 0);
 
         public static string LastExecutedCommandKind
         {
@@ -141,6 +155,13 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Exchange(ref _entityReuseOnInstantiatedTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _factoryProduceTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _entityRegistryResetTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _placementGhostTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityInitTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityDestroyTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandExecutedTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandNextStepTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandResetTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandChainDeletedTranspilerCount, 0);
             lock (Gate)
             {
                 _lastExecutedCommandKind = string.Empty;
@@ -1796,6 +1817,111 @@ namespace RogueCommandExpansionLoader.Runtime
             });
         }
 
+        public static void OnCreateBuildingPlacementGhostTranspiler(object ghostObj, string entityId, bool returnInactive)
+        {
+            System.Threading.Interlocked.Increment(ref _placementGhostTranspilerCount);
+            if (ghostObj == null)
+            {
+                return;
+            }
+
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(ghostObj);
+            });
+        }
+
+        public static void OnEntityInitTranspiler(object entityObj, object originEntityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityInitTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityDestroyTranspiler(object entityObj, bool withoutTriggeringActions, object originatorObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityDestroyTranspilerCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDestroyed(entityObj);
+            });
+        }
+
+        public static void OnEntityExecuteCommandTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandExecutedTranspilerCount);
+        }
+
+        public static void OnEntityExecuteNextCommandTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandNextStepTranspilerCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandChainStep(entityObj);
+            });
+        }
+
+        public static void OnEntityResetCurrentCommandTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandResetTranspilerCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandReset(entityObj);
+            });
+        }
+
+        public static void OnEntityDeleteCommandChainTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandChainDeletedTranspilerCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandChainDeleted(entityObj);
+            });
+        }
+
         public static void AfterEntityReused(object entityObj)
         {
             if (entityObj == null)
@@ -2437,6 +2563,41 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void OnEntityRegistryResetTranspilerHook(object existingControllers)
         {
             RuntimeHooks.OnEntityRegistryResetTranspiler(existingControllers);
+        }
+
+        public static void OnCreateBuildingPlacementGhostTranspilerHook(object ghost, string entityId, bool returnInactive)
+        {
+            RuntimeHooks.OnCreateBuildingPlacementGhostTranspiler(ghost, entityId, returnInactive);
+        }
+
+        public static void OnEntityInitTranspilerHook(object entity, object originEntity)
+        {
+            RuntimeHooks.OnEntityInitTranspiler(entity, originEntity);
+        }
+
+        public static void OnEntityDestroyTranspilerHook(object entity, bool withoutTriggeringActions, object originator)
+        {
+            RuntimeHooks.OnEntityDestroyTranspiler(entity, withoutTriggeringActions, originator);
+        }
+
+        public static void OnEntityExecuteCommandTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityExecuteCommandTranspiler(entity);
+        }
+
+        public static void OnEntityExecuteNextCommandTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityExecuteNextCommandTranspiler(entity);
+        }
+
+        public static void OnEntityResetCurrentCommandTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityResetCurrentCommandTranspiler(entity);
+        }
+
+        public static void OnEntityDeleteCommandChainTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityDeleteCommandChainTranspiler(entity);
         }
     }
 

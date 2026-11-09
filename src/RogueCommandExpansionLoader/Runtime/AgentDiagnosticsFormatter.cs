@@ -314,6 +314,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["entityReuseOnInstantiatedTranspilerCount"] = RuntimeHooks.EntityReuseOnInstantiatedTranspilerCount,
                 ["factoryProduceTranspilerCount"] = RuntimeHooks.FactoryProduceTranspilerCount,
                 ["entityRegistryResetTranspilerCount"] = RuntimeHooks.EntityRegistryResetTranspilerCount,
+                ["placementGhostTranspilerCount"] = RuntimeHooks.PlacementGhostTranspilerCount,
+                ["entityInitTranspilerCount"] = RuntimeHooks.EntityInitTranspilerCount,
+                ["entityDestroyTranspilerCount"] = RuntimeHooks.EntityDestroyTranspilerCount,
+                ["commandExecutedTranspilerCount"] = RuntimeHooks.CommandExecutedTranspilerCount,
+                ["commandNextStepTranspilerCount"] = RuntimeHooks.CommandNextStepTranspilerCount,
+                ["commandResetTranspilerCount"] = RuntimeHooks.CommandResetTranspilerCount,
+                ["commandChainDeletedTranspilerCount"] = RuntimeHooks.CommandChainDeletedTranspilerCount,
             };
             return Serialize(view);
         }

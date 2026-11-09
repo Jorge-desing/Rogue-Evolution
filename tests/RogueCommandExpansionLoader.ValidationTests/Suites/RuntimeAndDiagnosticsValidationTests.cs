@@ -10586,7 +10586,14 @@ internal static partial class ValidationTestRunner
                     RuntimeHooks.EntityOnInstantiatedTranspilerCount != 0 ||
                     RuntimeHooks.EntityReuseOnInstantiatedTranspilerCount != 0 ||
                     RuntimeHooks.FactoryProduceTranspilerCount != 0 ||
-                    RuntimeHooks.EntityRegistryResetTranspilerCount != 0)
+                    RuntimeHooks.EntityRegistryResetTranspilerCount != 0 ||
+                    RuntimeHooks.PlacementGhostTranspilerCount != 0 ||
+                    RuntimeHooks.EntityInitTranspilerCount != 0 ||
+                    RuntimeHooks.EntityDestroyTranspilerCount != 0 ||
+                    RuntimeHooks.CommandExecutedTranspilerCount != 0 ||
+                    RuntimeHooks.CommandNextStepTranspilerCount != 0 ||
+                    RuntimeHooks.CommandResetTranspilerCount != 0 ||
+                    RuntimeHooks.CommandChainDeletedTranspilerCount != 0)
                 {
                     throw new InvalidOperationException("Initial transpiler telemetry counters must be 0 after reset.");
                 }
@@ -10675,9 +10682,59 @@ internal static partial class ValidationTestRunner
                     throw new InvalidOperationException("OnEntityRegistryResetTranspilerHook must increment EntityRegistryResetTranspilerCount.");
                 }
 
-                // 10. Diagnostics JSON serialization verification
+                // 10. Placement Ghost Transpiler Hook (EntityFactory.CreateBuildingPlacementGhost)
+                var ghostObj = new GameObject();
+                RuntimeHarmonyPatches.OnCreateBuildingPlacementGhostTranspilerHook(ghostObj, "building:barracks", false);
+                if (RuntimeHooks.PlacementGhostTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnCreateBuildingPlacementGhostTranspilerHook must increment PlacementGhostTranspilerCount.");
+                }
+
+                // 11. Entity Init Transpiler Hook (EntityController.Init)
+                RuntimeHarmonyPatches.OnEntityInitTranspilerHook(unit, null);
+                if (RuntimeHooks.EntityInitTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityInitTranspilerHook must increment EntityInitTranspilerCount.");
+                }
+
+                // 12. Entity Destroy Transpiler Hook (EntityController.Destroy)
+                RuntimeHarmonyPatches.OnEntityDestroyTranspilerHook(unit, false, null);
+                if (RuntimeHooks.EntityDestroyTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityDestroyTranspilerHook must increment EntityDestroyTranspilerCount.");
+                }
+
+                // 13. Entity Execute Command Transpiler Hook (EntityController.ExecuteCommand)
+                RuntimeHarmonyPatches.OnEntityExecuteCommandTranspilerHook(unit);
+                if (RuntimeHooks.CommandExecutedTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityExecuteCommandTranspilerHook must increment CommandExecutedTranspilerCount.");
+                }
+
+                // 14. Entity Execute Next Command Transpiler Hook (EntityController.ExecuteNextCommand)
+                RuntimeHarmonyPatches.OnEntityExecuteNextCommandTranspilerHook(unit);
+                if (RuntimeHooks.CommandNextStepTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityExecuteNextCommandTranspilerHook must increment CommandNextStepTranspilerCount.");
+                }
+
+                // 15. Entity Reset Current Command Transpiler Hook (EntityController.ResetCurrentCommand)
+                RuntimeHarmonyPatches.OnEntityResetCurrentCommandTranspilerHook(unit);
+                if (RuntimeHooks.CommandResetTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityResetCurrentCommandTranspilerHook must increment CommandResetTranspilerCount.");
+                }
+
+                // 16. Entity Delete Command Chain Transpiler Hook (EntityController.DeleteCommandChain)
+                RuntimeHarmonyPatches.OnEntityDeleteCommandChainTranspilerHook(unit);
+                if (RuntimeHooks.CommandChainDeletedTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityDeleteCommandChainTranspilerHook must increment CommandChainDeletedTranspilerCount.");
+                }
+
+                // 17. Diagnostics JSON serialization verification
                 string json = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(
-                    true, 58, "RogueCommand.ExpansionLoader.Runtime", 0);
+                    true, 65, "RogueCommand.ExpansionLoader.Runtime", 0);
                 using (JsonDocument doc = JsonDocument.Parse(json))
                 {
                     JsonElement root = doc.RootElement;
@@ -10689,13 +10746,20 @@ internal static partial class ValidationTestRunner
                         root.GetProperty("entityOnInstantiatedTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("entityReuseOnInstantiatedTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("factoryProduceTranspilerCount").GetInt32() != 1 ||
-                        root.GetProperty("entityRegistryResetTranspilerCount").GetInt32() != 1)
+                        root.GetProperty("entityRegistryResetTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("placementGhostTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("entityInitTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("entityDestroyTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("commandExecutedTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("commandNextStepTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("commandResetTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("commandChainDeletedTranspilerCount").GetInt32() != 1)
                     {
-                        throw new InvalidOperationException("SerializeRuntimeHooksState must serialize all transpiler counters correctly: " + json);
+                        throw new InvalidOperationException("SerializeRuntimeHooksState must serialize all 16 transpiler counters correctly: " + json);
                     }
                 }
 
-                // 11. Reset telemetry verification
+                // 18. Reset telemetry verification
                 RuntimeHooks.ResetCoreHookTelemetry();
                 if (RuntimeHooks.UnitCreationTranspilerCount != 0 ||
                     RuntimeHooks.EntityRegisteredTranspilerCount != 0 ||
@@ -10705,7 +10769,14 @@ internal static partial class ValidationTestRunner
                     RuntimeHooks.EntityOnInstantiatedTranspilerCount != 0 ||
                     RuntimeHooks.EntityReuseOnInstantiatedTranspilerCount != 0 ||
                     RuntimeHooks.FactoryProduceTranspilerCount != 0 ||
-                    RuntimeHooks.EntityRegistryResetTranspilerCount != 0)
+                    RuntimeHooks.EntityRegistryResetTranspilerCount != 0 ||
+                    RuntimeHooks.PlacementGhostTranspilerCount != 0 ||
+                    RuntimeHooks.EntityInitTranspilerCount != 0 ||
+                    RuntimeHooks.EntityDestroyTranspilerCount != 0 ||
+                    RuntimeHooks.CommandExecutedTranspilerCount != 0 ||
+                    RuntimeHooks.CommandNextStepTranspilerCount != 0 ||
+                    RuntimeHooks.CommandResetTranspilerCount != 0 ||
+                    RuntimeHooks.CommandChainDeletedTranspilerCount != 0)
                 {
                     throw new InvalidOperationException("ResetCoreHookTelemetry must reset all transpiler counters to 0.");
                 }

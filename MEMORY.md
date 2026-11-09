@@ -1775,3 +1775,19 @@ This is a compact, durable orientation for agents. For the changing checkout sta
   - **Testing & Deployment:** C# harness 558/559 passing (1 Windows symlink skip, 0 failures), Python suite 479/479 passing, Release build 0 warnings/0 errors. Release DLL deployed to `BepInEx/plugins/RogueCommandExpansionLoader.dll` with verified SHA-256 `01D03118CCF2E67C81A4657F4D1FACCBEECBF3147FABCE231C6EBE97429EF962`.
 - Working tree preserved: nested worktree gitlinks `.worktrees/cargador` (`11e9968`, dirty) and `.worktrees/task-graph-validation` (`d1f9045`, dirty).
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `c3f12c1`.
+
+## Refresh (2026-11-08, Phase 2 Core Transpilers, 16 Transpilers Total, 65 Hooks)
+
+- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
+- New scope (7 new CIL transpilers, 16 total CIL transpilers, 65 total Harmony hooks, 28 simulation counters):
+  - `EntityFactory.CreateBuildingPlacementGhost`: stack duplication `Dup` before `Ret`, arguments `ldarg.0`, `ldarg.1` to `OnCreateBuildingPlacementGhostTranspilerHook` (`placementGhostTranspilerCount`).
+  - `EntityController.Init`: controller initialization hook before each `Ret` with `TransferLabels`, passing `ldarg.0`, `ldarg.1` to `OnEntityInitTranspilerHook` (`entityInitTranspilerCount`).
+  - `EntityController.Destroy`: destruction hook at method entry (index 0) with `TransferLabels`, passing `ldarg.0..2` to `OnEntityDestroyTranspilerHook` (`entityDestroyTranspilerCount`).
+  - `EntityController.ExecuteCommand`: command dispatch hook at method entry (index 0) with `TransferLabels`, passing `ldarg.0` to `OnEntityExecuteCommandTranspilerHook` (`commandExecutedTranspilerCount`).
+  - `EntityController.ExecuteNextCommand`: command loop step advancement before `Ret` with `TransferLabels`, calling `OnEntityExecuteNextCommandTranspilerHook` (`commandNextStepTranspilerCount`).
+  - `EntityController.ResetCurrentCommand`: command reset hook before `Ret` with `TransferLabels`, calling `OnEntityResetCurrentCommandTranspilerHook` (`commandResetTranspilerCount`).
+  - `EntityController.DeleteCommandChain`: command chain purge hook before `Ret` with `TransferLabels`, calling `OnEntityDeleteCommandChainTranspilerHook` (`commandChainDeletedTranspilerCount`).
+- CIL Mono/netstandard2.1 safety: reflection-based label transfer (`TransferLabels`) and clearing (`ClearLabels`) on non-generic `IList` avoid `CS7069`. Fail-safe `try/catch` per transpiler.
+- Telemetry & MCP Bridge: 65 total Harmony hooks, 28 simulation counters in `RuntimeHooks.cs` and `AgentDiagnosticsFormatter.cs`, queryable via `diagnostics_get_runtime_hooks`.
+- Testing & Deployment: Release build 0 warnings/0 errors. C# harness 558/559 (1 skip symlink, 0 failures), Python suite 479/479 OK, registry 4/4 clean. Release DLL deployed to `BepInEx/plugins/RogueCommandExpansionLoader.dll` with verified SHA-256 `3DF709EBCAF940789E5BD6A6E9E817D611AB634C240E27BDBA4C727DF768D54A`.
+- Working tree preserved: nested worktree gitlinks `.worktrees/cargador` (`11e9968`, dirty) and `.worktrees/task-graph-validation` (`d1f9045`, dirty).

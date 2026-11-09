@@ -7,6 +7,24 @@
 
 ---
 
+## 2026-11-08 Phase 2 Core Harmony CIL Transpilers (16 Transpilers Total, 65 Hooks)
+
+- **Implementation commit:** local Release build verified, DLL deployed to Steam with SHA-256 `3DF709EBCAF940789E5BD6A6E9E817D611AB634C240E27BDBA4C727DF768D54A`.
+- **Core CIL Transpiler Suite Expansion (7 new transpilers, 16 total):**
+  - `EntityFactory.CreateBuildingPlacementGhost`: value-returning (`GameObject`) method. Stack duplication pattern via `OpCodes.Dup` before `Ret`, followed by `ldarg.0`, `ldarg.1`, calling `OnCreateBuildingPlacementGhostTranspilerHook`. Telemetry counter: `placementGhostTranspilerCount`.
+  - `EntityController.Init`: intercepts unit controller initialization in `EntityController.Init`. Injects `ldarg.0`, `ldarg.1` before every `Ret` exit with `TransferLabels`, calling `OnEntityInitTranspilerHook`. Telemetry counter: `entityInitTranspilerCount`.
+  - `EntityController.Destroy`: entry-point interception (index 0) with `TransferLabels`, passing `ldarg.0..2` to `OnEntityDestroyTranspilerHook`. Telemetry counter: `entityDestroyTranspilerCount`.
+  - `EntityController.ExecuteCommand`: entry-point interception (index 0) with `TransferLabels`, passing `ldarg.0` to `OnEntityExecuteCommandTranspilerHook`. Telemetry counter: `commandExecutedTranspilerCount`.
+  - `EntityController.ExecuteNextCommand`: step advancement in command execution loop before `Ret` with `TransferLabels`, calling `OnEntityExecuteNextCommandTranspilerHook`. Telemetry counter: `commandNextStepTranspilerCount`.
+  - `EntityController.ResetCurrentCommand`: command reset callback before `Ret` with `TransferLabels`, calling `OnEntityResetCurrentCommandTranspilerHook`. Telemetry counter: `commandResetTranspilerCount`.
+  - `EntityController.DeleteCommandChain`: command queue purge callback before `Ret` with `TransferLabels`, calling `OnEntityDeleteCommandChainTranspilerHook`. Telemetry counter: `commandChainDeletedTranspilerCount`.
+- **CIL Mono/netstandard2.1 Compatibility (CS7069 Prevention):** Zero direct references to `[mscorlib]Label` or `ILGenerator` in netstandard2.1 plugins. Fail-safe `try/catch` wrapping around each individual transpiler.
+- **Telemetry & MCP Bridge:** 65 total installed Harmony patches; 28 atomic simulation counters in `RuntimeHooks.cs` (including 16 transpiler counters), fully serialized in `AgentDiagnosticsFormatter.SerializeRuntimeHooksState` and queryable via `diagnostics_get_runtime_hooks`.
+- **Local Validation:** Release plugin and test builds: 0 warnings, 0 errors. C# validation harness: 558/559 passing (1 Windows symlink skip, 0 failures). Python suite: 479/479 passing (1 skip). Registry validator: 4/4 manifests clean.
+- **Deployed Plugin DLL:** SHA-256 `3DF709EBCAF940789E5BD6A6E9E817D611AB634C240E27BDBA4C727DF768D54A` in `C:\Program Files (x86)\Steam\steamapps\common\Rogue Command\BepInEx\plugins\RogueCommandExpansionLoader.dll`.
+
+---
+
 ## 2026-11-08 HUB-D 2.0 Dynamic Tactical Regroup Geometry & Status-Affix Utility Scoring
 
 - **Implementation commit:** `56bc4b5a7f8eaa33b70eb8b0e067c837cf7848ea`, pushed to origin/codex/rogue-unit-balance-20261018.
@@ -1209,3 +1227,18 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
     - `Start Run Button` (911830, activo, interactable): clic por coordenadas fail-closed fuera de pantalla (38219,1598). `InvokeOnClick()` nativo vía `component/call_method` → `null` sin cambio de estado (el handler exige dificultad/cartas previas). Botones de dificultad (EASY 912570) `isActiveAndEnabled=false` → HTTP 500 al invocar.
     - Cierre limpio por `Application.Quit()` (GO −77530, RunSetup); proceso ausente. Checkpoint exacto (`profileFilesExactMatch=true`, 0 deltas, `safe_to_finalize=true`). Evidencia: `runtime-evidence.json`.
     - **Límite de evidencia:** la vía `InvokeOnClick` no desbloquea la partida fresca vía bridge: el shell de dificultad está inactivo y las cartas no están ofrecidas. Entrada a Game y los otros 8 contadores de transpilers en combate siguen BLOCKED/UNKNOWN.
+
+65. **Fase 2 de Parches Harmony CIL Transpiler en el núcleo (16 Transpilers Totales, 65 Hooks; 2026-11-08; local Release + despliegue verificado):**
+    - Suite expandida a 16 CIL Transpilers instalados y verificados en el bucle nuclear de simulación (7 nuevos transpilers en Fase 2):
+      * `EntityFactory.CreateBuildingPlacementGhost`: intercepta colocación de hologramas/fantasmas de edificios en `EntityFactory`. Manejo CIL no-void con preservación de pila mediante `OpCodes.Dup` antes de `Ret`, cargando `ldarg.0` y `ldarg.1` para invocar `OnCreateBuildingPlacementGhostTranspilerHook` (`placementGhostTranspilerCount`).
+      * `EntityController.Init`: intercepta inicialización nuclear de controladores de unidades en `EntityController.Init`, inyectando `ldarg.0` y `ldarg.1` antes de cada `Ret` con `TransferLabels` para `OnEntityInitTranspilerHook` (`entityInitTranspilerCount`).
+      * `EntityController.Destroy`: intercepta destrucción de entidades en índice 0 (entrada) con `ldarg.0..2` para `OnEntityDestroyTranspilerHook` (`entityDestroyTranspilerCount`).
+      * `EntityController.ExecuteCommand`: intercepta despacho de comandos en índice 0 con `ldarg.0` para `OnEntityExecuteCommandTranspilerHook` (`commandExecutedTranspilerCount`).
+      * `EntityController.ExecuteNextCommand`: intercepta avance de pasos de comandos antes de cada `Ret` con `TransferLabels` para `OnEntityExecuteNextCommandTranspilerHook` (`commandNextStepTranspilerCount`).
+      * `EntityController.ResetCurrentCommand`: intercepta reset de comando actual antes de `Ret` con `TransferLabels` para `OnEntityResetCurrentCommandTranspilerHook` (`commandResetTranspilerCount`).
+      * `EntityController.DeleteCommandChain`: intercepta purga de cadena de comandos antes de `Ret` con `TransferLabels` para `OnEntityDeleteCommandChainTranspilerHook` (`commandChainDeletedTranspilerCount`).
+    - Robustez CIL en Mono/netstandard2.1: manipulación directa sobre `List<CodeInstruction>` usando reflexión no genérica para transferir etiquetas (`TransferLabels`) y vaciar etiquetas (`ClearLabels`), previniendo `CS7069` e `InvalidProgramException`. Aislamiento fail-safe `try/catch` envolvente por transpiler.
+    - Integración de 65 parches Harmony totales y 28 contadores de simulación atómicos expuestos en el puente MCP (`diagnostics_get_runtime_hooks`).
+    - Validación local: Release build 0 warnings/0 errors; C# validation harness 558/559 (1 skip symlink, 0 fallos); Python test suite 479/479 OK; registry validation 4/4 manifiestos OK.
+    - Despliegue verificado: proceso `Rogue Command` cerrado limpiamente, DLL Release copiada a `BepInEx/plugins/RogueCommandExpansionLoader.dll` con hash SHA-256 verificado `3DF709EBCAF940789E5BD6A6E9E817D611AB634C240E27BDBA4C727DF768D54A`.
+    - **Límite de evidencia:** los 16 transpilers están verificados estáticamente, en harness C# y desplegados en BepInEx; su ejecución en vivo durante combate real en Steam se observará cuando se supere la puerta RunSetup o en partidas continuadas.

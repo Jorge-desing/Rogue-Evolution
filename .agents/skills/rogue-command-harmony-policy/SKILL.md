@@ -1,7 +1,7 @@
 ---
 name: rogue-command-harmony-policy
 description: "BepInEx 5 + Harmony 2 patching policy for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). When creating or auditing Unity game plugins, Harmony patches, assembly identity checks, or IL2CPP/back-end decisions. [Política de BepInEx 5 + Harmony 2 para Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). Uso: plugins Unity, patches Harmony, verificación de identidad de ensamblados, decisiones backend IL2CPP]"
-version: 1.3.0
+version: 1.4.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -61,15 +61,16 @@ Patches use a programmatic registration plan rather than static attributes:
 
 ---
 
-## Core Engine Harmony Patches (58 Installed Hooks)
+## Core Engine Harmony Patches (65 Installed Hooks & 16 CIL Transpilers)
 
-The loader registers 58 verified hooks across core game simulation systems:
+The loader registers 65 verified hooks across core game simulation systems, including 16 in-place CIL Transpilers:
 
 | Category / Pillar | Target Method | Hook Type | Purpose & Telemetry Counter |
 |---|---|---|---|
-| **Pillar 1: Production** | `BuildingPlacement.CreateBuildingPlacementGhost` | Postfix | Track placement holograms; populate `GetLastPlacementGhostEntityId()` (`placementGhostHookCount`) |
+| **Pillar 1: Production** | `EntityFactory.CreateBuildingPlacementGhost` | Pre/Post + Transpiler | Placement hologram instantiations; stacks `Dup` on return (`placementGhostHookCount`, `placementGhostTranspilerCount`) |
 | **Pillar 1: Production** | `EntityFactory.InstantiateEntity` | Postfix + Transpiler | Intercept unit creation, attach directors (`unitCreationHookCount`, `unitCreationTranspilerCount`) |
 | **Pillar 1: Production** | `EntityFactory.InitEntityController` | Pre/Post + Transpiler | Prefab/GameObject unit instantiation; stacks `Dup` on return (`initEntityControllerTranspilerCount`) |
+| **Pillar 1: Production** | `EntityController.Init` | Transpiler | Full native unit stat/role/grid/visual initialization callback (`entityInitTranspilerCount`) |
 | **Pillar 1: Production** | `EntityController.OnHasBeenInstantiated` | Transpiler | Universal unit instantiation callback; attaches directors (`entityOnInstantiatedTranspilerCount`) |
 | **Pillar 1: Production** | `EntityController.ResetAndInitForReuse` | Prefix + Transpiler | Object pool recycling; clears stale XP/effects (`unitReuseHookCount`, `unitReuseTranspilerCount`) |
 | **Pillar 1: Production** | `EntityController.OnHasBeenInstantiatedForReuse` | Postfix + Transpiler | Universal pooled unit revival callback (`entityReuseOnInstantiatedTranspilerCount`) |
@@ -77,11 +78,12 @@ The loader registers 58 verified hooks across core game simulation systems:
 | **Pillar 2: Registry** | `ExistingControllers.Init` | Postfix + Transpiler | Reset battlefield registry on scene start (`entityRegistryResetCount`, `entityRegistryResetTranspilerCount`) |
 | **Pillar 2: Registry** | `ExistingControllers.OnEntityCreated` | Postfix + Transpiler | Register unit into rosters (`entityRegisteredCount`, `activeRegisteredEntityCount`, `entityRegisteredTranspilerCount`) |
 | **Pillar 2: Registry** | `ExistingControllers.OnEntityWillBeDestroyed` | Postfix + Transpiler | Intercept death; unlink aura followers, release leases (`entityUnregisteredCount`, `entityUnregisteredTranspilerCount`) |
+| **Pillar 2: Registry** | `EntityController.Destroy` | Postfix + Transpiler | Core unit destruction/death dispatch; unlinks auras, updates tracking (`entityDestroyTranspilerCount`) |
 | **Pillar 2: Registry** | `RuntimeUnitMechanicsDirector` Invariants | Internal | Deterministic cleanup of dynamic auras, followers, and status effects upon entity death |
-| **Pillar 3: Command Loop** | `EntityController.ExecuteCommand` | Postfix | Intercept orders; store `command.tag` in `GetLastUnitCommandTag()`; notify AI (`commandExecutedCount`) |
-| **Pillar 3: Command Loop** | `EntityController.ExecuteNextCommand` | Postfix | Step through unit command chain (`commandNextStepCount`) |
-| **Pillar 3: Command Loop** | `EntityController.ResetCurrentCommand` | Postfix | Order cancellation; clear unit command tag; invalidate active AI arbiter lease (`commandResetCount`) |
-| **Pillar 3: Command Loop** | `EntityController.DeleteCommandChain` | Postfix | Clear command queue; release AI arbiter leases (`commandChainDeletedCount`) |
+| **Pillar 3: Command Loop** | `EntityController.ExecuteCommand` | Postfix + Transpiler | Intercept orders; store `command.tag` in `GetLastUnitCommandTag()`; notify AI (`commandExecutedCount`, `commandExecutedTranspilerCount`) |
+| **Pillar 3: Command Loop** | `EntityController.ExecuteNextCommand` | Postfix + Transpiler | Step through unit command chain (`commandNextStepCount`, `commandNextStepTranspilerCount`) |
+| **Pillar 3: Command Loop** | `EntityController.ResetCurrentCommand` | Postfix + Transpiler | Order cancellation; clear unit command tag; invalidate active AI arbiter lease (`commandResetCount`, `commandResetTranspilerCount`) |
+| **Pillar 3: Command Loop** | `EntityController.DeleteCommandChain` | Postfix + Transpiler | Clear command queue; release AI arbiter leases (`commandChainDeletedCount`, `commandChainDeletedTranspilerCount`) |
 | **Balancing & Stages** | `StageParameters.Initialize` / `StageMap.*` | Pre/Post | Reward pool injection, stage generation parameters, blueprint filters |
 | **Combat & Mechanics** | `EntityController.ChangeArmor` / `Die` / `Heal` | Pre/Post | Status effects, damage reduction, armor repairs, veterancy XP grants |
 
@@ -100,9 +102,16 @@ The loader registers 58 verified hooks across core game simulation systems:
 
 ### 3. Transpiler
 - **Use:** Modifying CIL instruction streams in-place at exact bytecode injection points.
-- **Implemented Core Transpilers (`RuntimeTranspilerPatches.cs`):**
+- **Implemented Core Transpilers (`RuntimeTranspilerPatches.cs`, 16 Total):**
   - `EntityFactory.InstantiateEntity`: Clones dynamic entity/arg loads and injects `OnEntityInstantiatedTranspilerHook` right after `callvirt OnHasBeenInstantiated`.
   - `EntityFactory.InitEntityController`: Value-returning method (`EntityController`). Injects `OpCodes.Dup` + `call OnInitEntityControllerTranspilerHook` before each `OpCodes.Ret`, preserving the returned instance on the stack.
+  - `EntityFactory.CreateBuildingPlacementGhost`: Value-returning method (`GameObject`). Injects `OpCodes.Dup` + `ldarg.0` + `ldarg.1` + `call OnCreateBuildingPlacementGhostTranspilerHook` before each `OpCodes.Ret`.
+  - `EntityController.Init`: Injects `ldarg.0` + `ldarg.1` + `call OnEntityInitTranspilerHook` before all `OpCodes.Ret` exit points with label transfer.
+  - `EntityController.Destroy`: Injects `ldarg.0..2` + `call OnEntityDestroyTranspilerHook` at method entry (index 0) with label transfer.
+  - `EntityController.ExecuteCommand`: Injects `ldarg.0` + `call OnEntityExecuteCommandTranspilerHook` at method entry (index 0) with label transfer.
+  - `EntityController.ExecuteNextCommand`: Injects `ldarg.0` + `call OnEntityExecuteNextCommandTranspilerHook` before all `OpCodes.Ret` exits.
+  - `EntityController.ResetCurrentCommand`: Injects `ldarg.0` + `call OnEntityResetCurrentCommandTranspilerHook` before each `OpCodes.Ret` exit.
+  - `EntityController.DeleteCommandChain`: Injects `ldarg.0` + `call OnEntityDeleteCommandChainTranspilerHook` before each `OpCodes.Ret` exit.
   - `EntityController.OnHasBeenInstantiated`: Injects `ldarg.0`, `ldarg.1`, and `call OnEntityHasBeenInstantiatedTranspilerHook` before all `OpCodes.Ret` exits.
   - `EntityController.OnHasBeenInstantiatedForReuse`: Injects `ldarg.0`, `ldarg.1`, and `call OnEntityHasBeenInstantiatedForReuseTranspilerHook` before all `OpCodes.Ret` exits.
   - `EntityController.Produce`: Injects `ldarg.0..3` and `call OnEntityProduceTranspilerHook` before all `OpCodes.Ret` exits.
