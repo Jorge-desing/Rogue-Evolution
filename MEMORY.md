@@ -1709,3 +1709,21 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Validation: not rerun in this memory sync. Last documented at `ab95b0c`: Release plugin build 0 warnings/0 errors; C# harness 540/541 (1 Windows symlink-privilege skip, 0 failures); Python 474 passed (1 skip); `validate_loader_registry.py` 4/4. No fresh Steam/Unity gameplay proof beyond recorded intermission evidence; natural offer->selection->placement->production/render/stat and tactical AI remain unverified.
 - QA/reflection safety: Profile2 dedicated QA without a tutorial; protect saves. Before reflection verify Rogue Command `1.0.9`, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, and MVID `db0e9462-128d-4296-9900-de18b4bd0c00` together.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `41917ca`.
+
+## Refresh (2026-11-08, HEAD 3699f1b)
+
+- Repository: `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Verified local/upstream/origin HEAD `3699f1b` (`fix(intermission): guard level entry flow against duplicate LoadNextLevel coroutines and verify core Harmony patches in live Steam gameplay`), after `d37c9d7` (`docs(memory): sync root MEMORY.md to HEAD 41917ca + agent memories/mem0`) and `41917ca` (`evolve(balance): enriched 25 per-unit ChangeableValue mappings...`).
+- New committed scope:
+  - `RuntimeIntermissionCensus.cs`: added `IsNextLevelLoading()` reflection seam querying native `LoadScene.NextLevelIsLoading_Static()`, used in transition verification.
+  - `RuntimeIntermissionDirector.cs`: guarded level-entry flow (`TryEnterLevelNodeFlow`) against duplicate `StartCoroutine("LoadNextLevel")` when `NextLevelIsLoading` is active. Fixes the duplicate additive scene loading and Unity Burst job memory corruption (`MovementManager:FixedUpdate () -> Unity.Jobs.JobHandle:ScheduleBatchedJobsAndComplete`).
+  - `tools/bepinex_mcp_server.py`: added stale `_DIAGNOSTICS_GO_ID` invalidation and retry on HTTP 500 / `HTTP Error` / `Internal Server Error`, ensuring robust auto-rediscovery across scene transitions.
+  - `.agents/skills/rogue-command-clean-room-diagnostics/SKILL.md`: documented intermission idempotency, frontier semantics, and deep-read contracts.
+- In-Game Live Steam Verification (Profile2 QA, Session `core-harmony-patches-live-20261108`, PASS):
+  - Transition flow: MainMenu -> Continue Run -> IntermissionScreen (stage 0 / level 3 -> boss level 4) -> Game (live tactical battle, 13 entities, 3 factories, 1 active player Engineer).
+  - All 3 core Harmony patch pillars verified executing with live memory telemetry:
+    * Pilar 1 (Unit Creation & Factory Production): `unitCreationHookCount: 77`, `factoryProduceHookCount: 1`.
+    * Pilar 2 (Unit Registry & Lifecycle): `entityRegistryResetCount: 3`, `entityRegisteredCount: 76`, `activeRegisteredEntityCount: 75`.
+    * Pilar 3 (Command Loop): `commandExecutedCount: 2`, `commandNextStepCount: 1`, `commandChainDeletedCount: 1`, `lastExecutedCommandKind: "Stop"`.
+  - Profile isolation: `runtime_profile_checkpoint.py verify` reported `safe_to_finalize: true`, selector preserved at `2`, only designated `Profile2/metaSavegame.dat` modified. Deployed DLL hash verified: `e66a73a8...`.
+- Fresh validation: Release build 0 warnings / 0 errors; C# harness 555/556 passed (1 Windows symlink skip, 0 failures); Python test suite 479/479 passed (1 skip).
+- Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD `3699f1b`.

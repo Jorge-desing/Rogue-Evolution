@@ -77,6 +77,29 @@ This project uses a centralized installer rather than attribute-based patches. F
 4. **Register the plan** with `plan.Add(new PatchPlan(targetMethod, prefix, postfix, finalizer))`.
 5. **Build and run validation tests**; the test project links `RuntimeHooks.cs` directly.
 
+## Core Engine Harmony Patches (52 Installed Hooks)
+
+The loader installs 52 verified Harmony hooks covering engine balancing, blueprint pools, procedural landscapes, cards, combat, and three core pillars of native simulation:
+
+### Pillar 1: Unit Creation & Factory Production
+- `BuildingPlacement.CreateBuildingPlacementGhost`: Postfix tracking placement ghosts (`placementGhostHookCount`).
+- `EntityFactory.InstantiateEntity`: Postfix intercepting dynamically created units (`unitCreationHookCount`).
+- `EntityController.ResetAndInitForReuse`: Prefix/Postfix handling unit recycling from the pool (`unitReuseHookCount`).
+- `EntityController.Produce`: Postfix tracking factory production (`factoryProduceHookCount`).
+
+### Pillar 2: Unit Registry & Lifecycle
+- `ExistingControllers.Init`: Postfix resetting the active registry on scene start (`entityRegistryResetCount`).
+- `ExistingControllers.OnEntityCreated`: Postfix registering spawned units (`entityRegisteredCount`, `activeRegisteredEntityCount`).
+- `ExistingControllers.OnEntityWillBeDestroyed`: Postfix tracking entity destruction (`entityUnregisteredCount`).
+
+### Pillar 3: Command Loop
+- `EntityController.ExecuteCommand`: Postfix intercepting dispatched orders (`commandExecutedCount`, `lastExecutedCommandKind`).
+- `EntityController.ExecuteNextCommand`: Postfix tracking sequence steps (`commandNextStepCount`).
+- `EntityController.ResetCurrentCommand`: Postfix tracking order cancellation (`commandResetCount`).
+- `EntityController.DeleteCommandChain`: Postfix tracking command chain clearing (`commandChainDeletedCount`).
+
+All 12 core patch methods and their live execution counts are queryable in real-time via the MCP tool `diagnostics_get_runtime_hooks`.
+
 ## Harmony Patching Patterns
 
 Reference: claude-mod-skills `harmony-patch-review` checklist. Patch only the verified target; assert the original method is still present in the pinned assembly.

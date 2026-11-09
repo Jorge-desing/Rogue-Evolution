@@ -1151,3 +1151,13 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
     - Director fail-closed en vivo con motivos exactos (stop point: node pick). Pausa nativa (timeScale=0), `Application.Quit()` fail-soft, proceso cerrado, `safe_to_finalize=true`, perfiles exact match. Harness 540/541, Python 463 OK, build 0/0, registry 215 (2 herramientas nuevas).
     - Evidencia: runtime-evidence-deep-reads-live-2.json (UNKNOWN según escala de afirmaciones).
     - **Límite de evidencia:** la transición selección→entrada sigue pendiente (requiere mapa con frontera elegible; el save Profile2 está en `isLastLevelBeforeBoss` y el boss no es nodo). La gate de RunSetup (dificultad + 4 cards) no se ha superado para run fresca.
+
+61. **Verificación en partida en vivo de los 3 pilares de Parches Harmony en el núcleo (2026-11-08; runtime Steam, Profile2 en combate):**
+    - Sesión `artifacts/runtime-smoke/core-harmony-patches-live-20261108/` (PID 24192, checkpoint completo de perfiles antes de lanzar, selector `2`, identidad completa `1.0.9` / `d2da384...` / `db0e946...`; DLL Release `e66a73a8...` desplegada y verificada pre/post):
+    - Transición completa y exitosa: MainMenu -> Continue Run -> IntermissionScreen (stage 0, level 3 -> boss level 4) -> Game (combate en vivo).
+    - Descubrimiento e inmunización de estabilidad: se detectó que `OverWorldMapEnemy/Boss.OnMouseDown` ya invoca `loadSceneScript.LoadLevel()`. Se corrigió `RuntimeIntermissionDirector.cs` para consultar `RuntimeIntermissionCensus.IsNextLevelLoading()` (vía `LoadScene.NextLevelIsLoading_Static()`) evitando la invocación duplicada concurrente de `StartCoroutine("LoadNextLevel")`, previniendo la corrupción de memoria en jobs Burst (`MovementManager:FixedUpdate()`).
+    - Los 3 pilares de los parches Harmony nucleares fueron observados y verificados en vivo en memoria:
+      * Pilar 1 (Creación y Producción): `unitCreationHookCount: 77`, `factoryProduceHookCount: 1`.
+      * Pilar 2 (Registro y Ciclo de Vida): `entityRegistryResetCount: 3` (reinicio en cada cambio de escena), `entityRegisteredCount: 76`, `activeRegisteredEntityCount: 75`.
+      * Pilar 3 (Bucle de Órdenes): `commandExecutedCount: 2`, `commandNextStepCount: 1`, `commandChainDeletedCount: 1`, `lastExecutedCommandKind: "Stop"`.
+    - Proceso cerrado limpiamente. Checkpoint verificado con `safe_to_finalize: true`, selector preservado en `2`, 0 perfiles de usuario alterados. Evidencia: `artifacts/runtime-smoke/core-harmony-patches-live-20261108/runtime-evidence.json` (PASS).
