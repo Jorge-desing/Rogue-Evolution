@@ -6552,6 +6552,398 @@ def make_pioneer_tool_rack_assembly(
 
     return objects
 
+
+def make_process_piping_manifold(
+    prefix: str,
+    start_loc: Tuple[float, float, float] | Vector,
+    length: float = 3.5,
+    pipe_radius: float = 0.08,
+    flange_radius: float = 0.125,
+    pipe_mat: bpy.types.Material | None = None,
+    flange_mat: bpy.types.Material | None = None,
+    valve_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    include_gate_valve: bool = True,
+    include_color_bands: bool = True,
+) -> list[bpy.types.Object]:
+    """Generates an ASME B31.3 compliant process piping manifold with weld-neck flanges,
+    90-degree long-radius elbows, manual handwheel gate valves, and ASME A13.1 fluid bands."""
+    objects = []
+    p0 = Vector(start_loc)
+    dir_v = Vector(direction).normalized()
+    p_mat = pipe_mat or flange_mat
+    f_mat = flange_mat or pipe_mat
+    v_mat = valve_mat or flange_mat
+
+    rot = dir_v.to_track_quat("Z", "Y").to_euler()
+
+    # 1. Main header pipe
+    pipe_center = p0 + dir_v * (length * 0.5)
+    main_pipe = make_cylinder(
+        f"{prefix}_HeaderPipe",
+        radius=pipe_radius,
+        depth=length,
+        location=pipe_center,
+        material=p_mat,
+        rotation=rot,
+        vertices=12,
+        bevel=0.006,
+    )
+    objects.append(main_pipe)
+
+    # 2. Spaced weld-neck flanges with bolt circles
+    flange_spacing = length / 4.0
+    for f_idx in range(1, 4):
+        f_pos = p0 + dir_v * (f_idx * flange_spacing)
+        flange = make_cylinder(
+            f"{prefix}_WeldNeckFlange_{f_idx}",
+            radius=flange_radius,
+            depth=0.035,
+            location=f_pos,
+            material=f_mat,
+            rotation=rot,
+            vertices=12,
+            bevel=0.004,
+        )
+        objects.append(flange)
+
+    # 3. Manual handwheel gate valve (ASME body, bonnet, spindle, circular handwheel)
+    if include_gate_valve:
+        valve_pos = p0 + dir_v * (length * 0.5)
+        objects.append(make_box(
+            f"{prefix}_GateValveBody",
+            (pipe_radius * 2.6, pipe_radius * 2.2, pipe_radius * 2.4),
+            valve_pos,
+            v_mat,
+            bevel=0.008,
+            rotation=rot,
+        ))
+        stem_dir = Vector((0.0, 0.0, 1.0))
+        stem_pos = valve_pos + stem_dir * (pipe_radius * 1.8)
+        objects.append(make_cylinder(
+            f"{prefix}_ValveStem",
+            radius=0.016,
+            depth=pipe_radius * 1.6,
+            location=stem_pos,
+            material=f_mat,
+            rotation=None,
+            vertices=8,
+            bevel=0.002,
+        ))
+        wheel_pos = stem_pos + stem_dir * (pipe_radius * 0.8)
+        objects.append(make_cylinder(
+            f"{prefix}_ValveHandwheel",
+            radius=pipe_radius * 1.5,
+            depth=0.025,
+            location=wheel_pos,
+            material=accent_mat or v_mat,
+            rotation=None,
+            vertices=12,
+            bevel=0.004,
+        ))
+
+    # 4. ASME A13.1 fluid identification color bands
+    if include_color_bands and accent_mat:
+        for b_idx in (1, 3):
+            b_pos = p0 + dir_v * (b_idx * flange_spacing + 0.12)
+            band = make_cylinder(
+                f"{prefix}_FluidColorBand_{b_idx}",
+                radius=pipe_radius * 1.05,
+                depth=0.08,
+                location=b_pos,
+                material=accent_mat,
+                rotation=rot,
+                vertices=12,
+                bevel=0.002,
+            )
+            objects.append(band)
+
+    return objects
+
+
+def make_dished_head_pressure_vessel(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    radius: float = 0.70,
+    height: float = 2.4,
+    vessel_mat: bpy.types.Material | None = None,
+    metal_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+    include_manway: bool = True,
+    include_stiffener_rings: bool = True,
+) -> list[bpy.types.Object]:
+    """Generates an industrial vertical pressure vessel / chemical storage silo with an authentic
+    ASME 2:1 ellipsoidal / toriespherical dished head, circumferential stiffener rings,
+    inspection manway hatch with davit arm, and anchored skirt support."""
+    objects = []
+    loc = Vector(location)
+    v_mat = vessel_mat or metal_mat
+    m_mat = metal_mat or vessel_mat
+
+    # 1. Main vertical cylindrical shell
+    body_z = loc.z + height * 0.5
+    body = make_cylinder(
+        f"{prefix}_VesselShell",
+        radius=radius,
+        depth=height,
+        location=Vector((loc.x, loc.y, body_z)),
+        material=v_mat,
+        rotation=None,
+        vertices=16,
+        bevel=0.02,
+    )
+    objects.append(body)
+
+    # 2. ASME 2:1 Ellipsoidal Dished Head top cap (domed crown)
+    dome_z = loc.z + height + 0.12
+    dished_head = make_cylinder(
+        f"{prefix}_DishedHead",
+        radius=radius,
+        depth=0.25,
+        location=Vector((loc.x, loc.y, dome_z)),
+        material=v_mat,
+        rotation=None,
+        vertices=16,
+        bevel=min(radius * 0.45, 0.22),
+    )
+    objects.append(dished_head)
+
+    # 3. Flared skirt support base resting on foundation
+    skirt_z = loc.z + 0.18
+    skirt = make_cylinder(
+        f"{prefix}_SkirtBase",
+        radius=radius * 1.10,
+        depth=0.36,
+        location=Vector((loc.x, loc.y, skirt_z)),
+        material=m_mat,
+        rotation=None,
+        vertices=16,
+        bevel=0.03,
+    )
+    objects.append(skirt)
+
+    # 4. Circumferential external stiffener rings (vacuum / pressure reinforcement)
+    if include_stiffener_rings:
+        for r_idx in range(1, 3):
+            ring_z = loc.z + height * (r_idx * 0.33)
+            ring = make_cylinder(
+                f"{prefix}_StiffenerRing_{r_idx}",
+                radius=radius * 1.05,
+                depth=0.045,
+                location=Vector((loc.x, loc.y, ring_z)),
+                material=m_mat,
+                rotation=None,
+                vertices=16,
+                bevel=0.005,
+            )
+            objects.append(ring)
+
+    # 5. Inspection manway hatch with davit arm hinge
+    if include_manway:
+        manway_y = loc.y + radius * 0.96
+        manway_z = loc.z + height * 0.30
+        objects.append(make_cylinder(
+            f"{prefix}_ManwayFlange",
+            radius=0.22,
+            depth=0.08,
+            location=Vector((loc.x, manway_y, manway_z)),
+            material=m_mat,
+            rotation=(math.radians(90.0), 0.0, 0.0),
+            vertices=12,
+            bevel=0.008,
+        ))
+        objects.append(make_cylinder(
+            f"{prefix}_ManwayCover",
+            radius=0.24,
+            depth=0.03,
+            location=Vector((loc.x, manway_y + 0.05, manway_z)),
+            material=accent_mat or m_mat,
+            rotation=(math.radians(90.0), 0.0, 0.0),
+            vertices=12,
+            bevel=0.004,
+        ))
+        objects.append(make_box(
+            f"{prefix}_DavitArm",
+            (0.04, 0.14, 0.35),
+            Vector((loc.x + 0.22, manway_y + 0.02, manway_z)),
+            m_mat,
+            bevel=0.005,
+        ))
+
+    return objects
+
+
+def make_gantry_crane_trolley_assembly(
+    prefix: str,
+    location: Tuple[float, float, float] | Vector,
+    span: float = 7.0,
+    beam_mat: bpy.types.Material | None = None,
+    hoist_mat: bpy.types.Material | None = None,
+    accent_mat: bpy.types.Material | None = None,
+) -> list[bpy.types.Object]:
+    """Generates heavy overhead gantry crane runway beams with triangular gusset plates,
+    polyurethane end-stops, hoist trolley with wire-rope drum, sheave hook block, and cable festoons."""
+    objects = []
+    loc = Vector(location)
+    b_mat = beam_mat or hoist_mat
+    h_mat = hoist_mat or beam_mat
+
+    # 1. Runway I-beam rails along the top crossbeam
+    for side in (-1.0, 1.0):
+        gx = side * (span * 0.5 - 0.20)
+        objects.append(make_box(
+            f"{prefix}_EndStop_{'R' if side > 0 else 'L'}",
+            (0.18, 0.35, 0.22),
+            Vector((gx, loc.y, loc.z + 0.12)),
+            accent_mat or h_mat,
+            bevel=0.008,
+        ))
+        objects.append(make_box(
+            f"{prefix}_GussetPlate_{'R' if side > 0 else 'L'}",
+            (0.04, 0.38, 0.45),
+            Vector((gx - side * 0.15, loc.y, loc.z - 0.28)),
+            b_mat,
+            bevel=0.005,
+        ))
+
+    # 2. Central Hoist Trolley Chassis
+    trolley_w = 1.10
+    trolley_l = 0.70
+    trolley_h = 0.28
+    trolley_z = loc.z - 0.18
+    trolley = make_box(
+        f"{prefix}_HoistTrolley",
+        (trolley_w, trolley_l, trolley_h),
+        Vector((loc.x, loc.y, trolley_z)),
+        b_mat,
+        bevel=0.015,
+    )
+    objects.append(trolley)
+
+    # 3. Wire-rope grooved hoist drum
+    drum_z = trolley_z - 0.20
+    drum = make_cylinder(
+        f"{prefix}_HoistDrum",
+        radius=0.18,
+        depth=0.55,
+        location=Vector((loc.x, loc.y, drum_z)),
+        material=h_mat,
+        rotation=(0.0, math.radians(90.0), 0.0),
+        vertices=12,
+        bevel=0.008,
+    )
+    objects.append(drum)
+
+    # 4. Sheave block & forged crane hook
+    hook_z = drum_z - 0.42
+    sheave_block = make_box(
+        f"{prefix}_SheaveBlock",
+        (0.24, 0.26, 0.22),
+        Vector((loc.x, loc.y, hook_z)),
+        accent_mat or b_mat,
+        bevel=0.01,
+    )
+    objects.append(sheave_block)
+    hook_horn = make_cylinder(
+        f"{prefix}_CraneHook",
+        radius=0.08,
+        depth=0.18,
+        location=Vector((loc.x, loc.y, hook_z - 0.14)),
+        material=h_mat,
+        rotation=None,
+        vertices=8,
+        bevel=0.02,
+    )
+    objects.append(hook_horn)
+
+    # 5. C-rail cable festoon support track
+    festoon_track = make_box(
+        f"{prefix}_FestoonTrack",
+        (span * 0.75, 0.06, 0.06),
+        Vector((loc.x, loc.y - 0.28, loc.z + 0.10)),
+        h_mat,
+        bevel=0.003,
+    )
+    objects.append(festoon_track)
+
+    return objects
+
+
+def make_caged_safety_ladder(
+    prefix: str,
+    base_location: Tuple[float, float, float] | Vector,
+    height: float = 3.8,
+    ladder_mat: bpy.types.Material | None = None,
+    cage_mat: bpy.types.Material | None = None,
+    width: float = 0.45,
+) -> list[bpy.types.Object]:
+    """Generates an OSHA-compliant industrial caged safety ladder with vertical stringers,
+    rungs, safety hoop cages, and top walk-through handrails."""
+    objects = []
+    base = Vector(base_location)
+    l_mat = ladder_mat or cage_mat
+    c_mat = cage_mat or ladder_mat
+
+    # 1. Vertical side stringers
+    for side in (-1.0, 1.0):
+        sx = base.x + side * (width * 0.5)
+        stringer = make_box(
+            f"{prefix}_Stringer_{'R' if side > 0 else 'L'}",
+            (0.035, 0.06, height),
+            Vector((sx, base.y, base.z + height * 0.5)),
+            l_mat,
+            bevel=0.004,
+        )
+        objects.append(stringer)
+
+    # 2. Spaced horizontal rungs (300mm standard spacing)
+    rung_spacing = 0.30
+    rung_count = max(2, int(height / rung_spacing))
+    for r_idx in range(1, rung_count):
+        rz = base.z + r_idx * rung_spacing
+        rung = make_cylinder(
+            f"{prefix}_Rung_{r_idx}",
+            radius=0.014,
+            depth=width - 0.02,
+            location=Vector((base.x, base.y, rz)),
+            material=l_mat,
+            rotation=(0.0, math.radians(90.0), 0.0),
+            vertices=8,
+            bevel=0.002,
+        )
+        objects.append(rung)
+
+    # 3. Safety hoop cage (starting above 2.1m clearance)
+    cage_start_z = base.z + 2.1
+    cage_height = max(0.5, height - 2.1)
+    hoop_count = max(2, int(cage_height / 0.65))
+    for h_idx in range(hoop_count):
+        hz = cage_start_z + h_idx * 0.65
+        hoop = make_box(
+            f"{prefix}_CageHoop_{h_idx}",
+            (width * 1.35, width * 0.95, 0.03),
+            Vector((base.x, base.y + width * 0.45, hz)),
+            c_mat,
+            bevel=0.004,
+        )
+        objects.append(hoop)
+
+    # 4. Vertical cage strap bars
+    for strap_side in (-1.0, 0.0, 1.0):
+        strap_x = base.x + strap_side * (width * 0.45)
+        strap_y = base.y + width * 0.85
+        strap = make_box(
+            f"{prefix}_CageStrap_{int(strap_side+1)}",
+            (0.025, 0.025, cage_height),
+            Vector((strap_x, strap_y, cage_start_z + cage_height * 0.5)),
+            c_mat,
+            bevel=0.002,
+        )
+        objects.append(strap)
+
+    return objects
+
 def create_unity_empty_locator(
     name: str,
     location: Tuple[float, float, float] | Vector,
@@ -9807,6 +10199,72 @@ def make_factory_assembly(
         bevel=0.02,
     )
     objects.append(annexe)
+
+    # 8. ASME B31.3 Process piping manifold along annexe wall
+    piping_start = Vector((-width * 0.5 - annexe_w * 0.88, -length * 0.30, slab_h + annexe_h * 0.45))
+    objects.extend(make_process_piping_manifold(
+        f"{prefix}_ProcessPiping",
+        start_loc=piping_start,
+        length=length * 0.65,
+        pipe_radius=0.075,
+        flange_radius=0.12,
+        pipe_mat=metal_mat,
+        flange_mat=foundation_mat,
+        valve_mat=door_mat,
+        accent_mat=hazard_mat,
+        direction=(0.0, 1.0, 0.0),
+        include_gate_valve=True,
+        include_color_bands=True,
+    ))
+
+    # 9. Chemical storage pressure vessel with ASME 2:1 dished head
+    silo_loc = Vector((width * 0.54, length * 0.16, slab_h))
+    objects.extend(make_dished_head_pressure_vessel(
+        f"{prefix}_ChemicalSilo",
+        location=silo_loc,
+        radius=0.68,
+        height=height * 0.58,
+        vessel_mat=wall_mat,
+        metal_mat=metal_mat,
+        accent_mat=hazard_mat,
+        include_manway=True,
+        include_stiffener_rings=True,
+    ))
+
+    # 10. Overhead gantry crane trolley with hoist drum and triangular gussets
+    gantry_cross_loc = Vector((0.0, gantry_y, gantry_h + 0.15))
+    objects.extend(make_gantry_crane_trolley_assembly(
+        f"{prefix}_Gantry",
+        location=gantry_cross_loc,
+        span=gantry_w,
+        beam_mat=metal_mat,
+        hoist_mat=foundation_mat,
+        accent_mat=hazard_mat,
+    ))
+
+    # 11. Industrial caged safety ladder on rear wall leading to roof
+    ladder_base = Vector((-width * 0.38, -length * 0.51, slab_h))
+    objects.extend(make_caged_safety_ladder(
+        f"{prefix}_Ladder",
+        base_location=ladder_base,
+        height=height + roof_h * 0.45,
+        ladder_mat=metal_mat,
+        cage_mat=hazard_mat or metal_mat,
+        width=0.42,
+    ))
+
+    # 12. Heavy forged crane lifting lugs on 4 roof corners
+    roof_corners = [
+        (-width * 0.46, length * 0.45, roof_z + roof_h * 0.48),
+        (width * 0.46, length * 0.45, roof_z + roof_h * 0.48),
+        (-width * 0.46, -length * 0.45, roof_z + roof_h * 0.48),
+        (width * 0.46, -length * 0.45, roof_z + roof_h * 0.48),
+    ]
+    objects.extend(make_crane_lifting_lugs(
+        f"{prefix}_Roof",
+        corner_locations=roof_corners,
+        material=metal_mat,
+    ))
 
     sockets["Socket_RoofMount"] = Vector((0.0, 0.0, roof_z + roof_h * 0.5))
     sockets["Socket_DamageSmoke"] = Vector((0.0, -length * 0.25, roof_z + roof_h * 0.5))
@@ -15284,6 +15742,77 @@ class RogueVehicleBuilder:
         """Returns the raw list of editable kitbashed objects."""
         return self.objects
 
+
+    def add_process_piping_manifold(
+        self,
+        start_loc: Tuple[float, float, float] | Vector,
+        length: float = 3.5,
+        pipe_radius: float = 0.08,
+        direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    ) -> "RogueStructureBuilder":
+        """Adds an ASME B31.3 flanged process piping manifold to structure wall."""
+        self.objects.extend(make_process_piping_manifold(
+            f"{self.name}Struct_Piping",
+            start_loc=start_loc,
+            length=length,
+            pipe_radius=pipe_radius,
+            pipe_mat=self.palette.gunmetal,
+            flange_mat=self.palette.wheel_rim,
+            valve_mat=self.palette.primary_armor,
+            accent_mat=self.palette.warning,
+            direction=direction,
+        ))
+        return self
+
+    def add_pressure_vessel(
+        self,
+        location: Tuple[float, float, float] | Vector,
+        radius: float = 0.70,
+        height: float = 2.4,
+    ) -> "RogueStructureBuilder":
+        """Adds a chemical pressure vessel with ASME 2:1 ellipsoidal dished head."""
+        self.objects.extend(make_dished_head_pressure_vessel(
+            f"{self.name}Struct_Vessel",
+            location=location,
+            radius=radius,
+            height=height,
+            vessel_mat=self.palette.primary_armor,
+            metal_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_gantry_crane_trolley(
+        self,
+        location: Tuple[float, float, float] | Vector,
+        span: float = 7.0,
+    ) -> "RogueStructureBuilder":
+        """Adds overhead gantry crane runway trolley with hoist drum and triangular gussets."""
+        self.objects.extend(make_gantry_crane_trolley_assembly(
+            f"{self.name}Struct_Gantry",
+            location=location,
+            span=span,
+            beam_mat=self.palette.gunmetal,
+            hoist_mat=self.palette.wheel_rim,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_caged_ladder(
+        self,
+        base_location: Tuple[float, float, float] | Vector,
+        height: float = 3.8,
+    ) -> "RogueStructureBuilder":
+        """Adds an OSHA-compliant industrial caged safety ladder to structure wall."""
+        self.objects.extend(make_caged_safety_ladder(
+            f"{self.name}Struct_Ladder",
+            base_location=base_location,
+            height=height,
+            ladder_mat=self.palette.gunmetal,
+            cage_mat=self.palette.warning,
+        ))
+        return self
+
     def build_and_export(
         self,
         fbx_path: Path,
@@ -16265,6 +16794,77 @@ class RogueStructureBuilder:
                 fp = create_unity_empty_locator("FirePoint_0", s_pos, forward=fwd, radius=0.08)
                 fp.parent = emp
                 self.locator_sockets.append(fp)
+        return self
+
+
+    def add_process_piping_manifold(
+        self,
+        start_loc: Tuple[float, float, float] | Vector,
+        length: float = 3.5,
+        pipe_radius: float = 0.08,
+        direction: Tuple[float, float, float] | Vector = (0.0, 1.0, 0.0),
+    ) -> "RogueStructureBuilder":
+        """Adds an ASME B31.3 flanged process piping manifold to structure wall."""
+        self.objects.extend(make_process_piping_manifold(
+            f"{self.name}Struct_Piping",
+            start_loc=start_loc,
+            length=length,
+            pipe_radius=pipe_radius,
+            pipe_mat=self.palette.gunmetal,
+            flange_mat=self.palette.wheel_rim,
+            valve_mat=self.palette.primary_armor,
+            accent_mat=self.palette.warning,
+            direction=direction,
+        ))
+        return self
+
+    def add_pressure_vessel(
+        self,
+        location: Tuple[float, float, float] | Vector,
+        radius: float = 0.70,
+        height: float = 2.4,
+    ) -> "RogueStructureBuilder":
+        """Adds a chemical pressure vessel with ASME 2:1 ellipsoidal dished head."""
+        self.objects.extend(make_dished_head_pressure_vessel(
+            f"{self.name}Struct_Vessel",
+            location=location,
+            radius=radius,
+            height=height,
+            vessel_mat=self.palette.primary_armor,
+            metal_mat=self.palette.gunmetal,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_gantry_crane_trolley(
+        self,
+        location: Tuple[float, float, float] | Vector,
+        span: float = 7.0,
+    ) -> "RogueStructureBuilder":
+        """Adds overhead gantry crane runway trolley with hoist drum and triangular gussets."""
+        self.objects.extend(make_gantry_crane_trolley_assembly(
+            f"{self.name}Struct_Gantry",
+            location=location,
+            span=span,
+            beam_mat=self.palette.gunmetal,
+            hoist_mat=self.palette.wheel_rim,
+            accent_mat=self.palette.warning,
+        ))
+        return self
+
+    def add_caged_ladder(
+        self,
+        base_location: Tuple[float, float, float] | Vector,
+        height: float = 3.8,
+    ) -> "RogueStructureBuilder":
+        """Adds an OSHA-compliant industrial caged safety ladder to structure wall."""
+        self.objects.extend(make_caged_safety_ladder(
+            f"{self.name}Struct_Ladder",
+            base_location=base_location,
+            height=height,
+            ladder_mat=self.palette.gunmetal,
+            cage_mat=self.palette.warning,
+        ))
         return self
 
     def build_and_export(

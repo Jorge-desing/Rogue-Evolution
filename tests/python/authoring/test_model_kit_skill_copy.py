@@ -257,6 +257,40 @@ class TestModelKitSkillCopy(unittest.TestCase):
         for method in required_builder_methods:
             self.assertIn(method, vehicle_builder_methods, f"Method {method} missing from RogueVehicleBuilder")
 
+    def test_industrial_facility_realism_assemblies_and_methods(self) -> None:
+        """RogueModelKit.py must contain ASME process piping, dished pressure vessels, gantry crane, and caged ladder assemblies."""
+        rmk_text = TOOLS_RMK.read_text(encoding="utf-8")
+        parsed = ast.parse(rmk_text, filename=str(TOOLS_RMK))
+
+        func_names = set()
+        structure_builder_methods = set()
+
+        for stmt in parsed.body:
+            if isinstance(stmt, ast.FunctionDef):
+                func_names.add(stmt.name)
+            elif isinstance(stmt, ast.ClassDef) and stmt.name == "RogueStructureBuilder":
+                for item in stmt.body:
+                    if isinstance(item, ast.FunctionDef):
+                        structure_builder_methods.add(item.name)
+
+        required_industrial_assemblies = [
+            "make_process_piping_manifold",
+            "make_dished_head_pressure_vessel",
+            "make_gantry_crane_trolley_assembly",
+            "make_caged_safety_ladder",
+        ]
+        for assembly in required_industrial_assemblies:
+            self.assertIn(assembly, func_names, f"Industrial assembly {assembly} missing from RogueModelKit.py")
+
+        required_structure_methods = [
+            "add_process_piping_manifold",
+            "add_pressure_vessel",
+            "add_gantry_crane_trolley",
+            "add_caged_ladder",
+        ]
+        for method in required_structure_methods:
+            self.assertIn(method, structure_builder_methods, f"Method {method} missing from RogueStructureBuilder")
+
     def test_archetypes_use_hard_surface_realism_assemblies(self) -> None:
         """Archetypes must consume the new anti-primitive hard-surface realism assemblies."""
         generator_source = TOOLS_GUM.read_text(encoding="utf-8")
