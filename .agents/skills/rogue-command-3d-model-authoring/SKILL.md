@@ -342,7 +342,23 @@ Visuals bind dynamically to native units via canonical unprefixed sockets:
 
 ---
 
-## 13. References & Detailed Guides
+## 13. Rigged Armature & Facility Realism Lessons Learned
+
+### 13.1 Rigid Weight Rebinding on Authored Armatures
+When authoring or updating articulated walker/quad-mech sources with pre-existing armatures (e.g. `BastionSiegeMech` or `AtlasCraneMech`), adding detail geometry or wave passes (lifting lugs, coamings, or ERA brackets) introduces new mesh objects lacking vertex group bindings.
+- **Invariant:** Always call `rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad"|"biped")` explicitly before running `validate_rigid_weights(meshes, armature)`.
+- If new detail passes (`apply_wave2_details`, `apply_wave34_details`) are appended, re-run `assign_rigid_mesh_weights` so every appended object receives its rigid 1.0 weight on the appropriate bone (`Bone_Hull`, `Bone_Pelvis`, `Bone_TurretYaw`, etc.) before batching and export.
+
+### 13.2 Industrial Facility Realism Assemblies
+When generating or refining production facilities (e.g. `ArachnidHexapodFactory`, `OverlordCommandHQFactory`), leverage the high-realism functional engineering assemblies in `RogueModelKit`:
+- `add_process_piping_manifold`: ASME B31.3 flanged piping with long-radius elbows and gate valves.
+- `add_pressure_vessel`: Chemical storage pressure vessel with ASME 2:1 ellipsoidal dished heads and stiffener rings.
+- `add_gantry_crane_trolley`: Heavy overhead gantry crane with hoist drum, cable, forged hook, and end-stops.
+- `add_caged_ladder`: OSHA-compliant industrial caged safety ladder with safety hoops and platform landing.
+
+---
+
+## 14. References & Detailed Guides
 
 - [Art Style & Palette Guide](references/art-style-and-palette.md) — Proportions, silhouette tests, and faction palettes.
 - [Blender Procedural Techniques](references/blender-procedural-techniques.md) — In-depth `bpy` recipes for tracks, bevels, and hulls.

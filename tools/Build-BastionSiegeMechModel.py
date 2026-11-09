@@ -81,6 +81,7 @@ def build_model() -> None:
         fire_end_frame=15, death_end_frame=45,
     )
     _validate_root_motion(armature, actions["Walk"])
+    rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
     _validate_rigid_weights(meshes, armature)
 
     socket_positions = {
@@ -120,6 +121,7 @@ def build_model() -> None:
         objects=meshes,
         object_prefix="Bastion",
     ))
+    rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 

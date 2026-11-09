@@ -64,6 +64,7 @@ def build() -> None:
     gunmetal = make_material(f"{UNIT_NAME}_Gunmetal", (0.07, 0.09, 0.12), 0.75, 0.40)
     warning = make_material(f"{UNIT_NAME}_Warning", (0.90, 0.60, 0.10), 0.25, 0.60)
     sensor = make_material(f"{UNIT_NAME}_Sensor", (0.10, 0.85, 1.00), 0.20, 0.30, (0.15, 0.85, 1.00), 2.0)
+    tread = make_material(f"{UNIT_NAME}_Tread", (0.05, 0.05, 0.06), 0.20, 0.80)
 
     objects = []
     objects.append(rmk.make_box(f"{UNIT_NAME}_Hull", (1.6, 2.8, 0.7), (0.0, 0.0, 0.65), armor, bevel=0.09))
