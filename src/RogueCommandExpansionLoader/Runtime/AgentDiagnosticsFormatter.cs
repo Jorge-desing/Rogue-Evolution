@@ -3094,6 +3094,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["entityKeyId"] = result.EntityKeyId ?? string.Empty,
                 ["variantId"] = result.VariantId ?? string.Empty,
                 ["presetName"] = result.PresetName ?? string.Empty,
+                ["moduleCount"] = result.ModuleCount,
                 ["message"] = result.Message ?? string.Empty,
             };
             return Serialize(view);
@@ -3168,7 +3169,11 @@ namespace RogueCommandExpansionLoader.Runtime
                         ["scale"] = variant.Scale,
                         ["declaredVisualAssetName"] = variant.VisualAssetName ?? string.Empty,
                         ["declaredVisualRootPath"] = variant.VisualRootPath ?? string.Empty,
-                        ["runtimeEffect"] = "color tint and scale on the authored chassis"
+                        ["moduleCount"] = variant.Modules != null ? variant.Modules.Count : 0,
+                        ["modules"] = SerializeVisualVariantModules(variant.Modules),
+                        ["runtimeEffect"] = variant.IsPrimary
+                            ? "Level 1 authored chassis; Level 2 module slots use chassis defaults"
+                            : "visual-only mechanical hardpoint modules with optional tint and scale"
                     });
                 }
 
@@ -3190,10 +3195,27 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["totalUnits"] = totalUnits,
                 ["totalVariants"] = totalVariants,
                 ["systemTier"] = "Two-Level Canonical PBR System (Level 1: Primary Chassis, Level 2: Tactical Variants)",
-                ["formAuthority"] = "Authored chassis mesh and functional hierarchy; runtime variants apply color tint and scale only.",
+                ["formAuthority"] = "Level 1 owns chassis geometry, functional hierarchy, rig, pivots, sockets, LOD and PBR authority; Level 2 adds sparse visual-only mechanical modules at canonical hardpoints and may adjust tint or scale.",
                 ["units"] = unitRows
             };
             return Serialize(view);
+        }
+
+        private static object[] SerializeVisualVariantModules(IReadOnlyList<RuntimeUnitVisualModule> modules)
+        {
+            if (modules == null || modules.Count == 0) return Array.Empty<object>();
+            var rows = new List<object>(modules.Count);
+            for (int i = 0; i < modules.Count; i++)
+            {
+                RuntimeUnitVisualModule module = modules[i];
+                if (module == null) continue;
+                rows.Add(new Dictionary<string, object>
+                {
+                    ["slotId"] = module.SlotId ?? string.Empty,
+                    ["assetName"] = module.AssetName ?? string.Empty
+                });
+            }
+            return rows.ToArray();
         }
 
         public static string SerializePrespawnWarmResult(PrespawnWarmResult result)

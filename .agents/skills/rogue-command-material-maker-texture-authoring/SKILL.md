@@ -141,3 +141,9 @@ Run [Rogue Command PBR Texture Validation](../rogue-command-pbr-texture-validati
 - [Material Maker 1.7 Windows release](https://github.com/RodZill4/material-maker/releases/tag/1.7)
 - [3D paint project requirements](https://rodzill4.github.io/material-maker/doc/user_interface_paint_panel.html)
 - [Texture and material export documentation](https://rodzill4.github.io/material-maker/doc/export.html)
+
+## Canonical Level 2 Module Texture Set
+
+- `tools/Build-CanonicalVisualModuleTextures.ps1` bakes the 28 shared Material Maker 1.7 procedural presets used by the current 35 Level 2 modules. Run the pinned `tools/Run-MaterialMakerBake.ps1 -Workflow procedural` path with strict quality checks; each preset produces the four named 2048x2048 maps required by the module builder.
+- These are shared preset material sets, not 35 independent texture families. Keep the generated module FBXs authoritative, export images only, and leave working files/reports under ignored `artifacts/canonical-two-level/` until the Unity builder consumes them.
+- Successful strict reports establish map-generation evidence. `CanonicalVisualModuleBuilder` must still confirm imported maps, shader/material bindings, mesh vertex colors, and AssetBundle contents in Unity.

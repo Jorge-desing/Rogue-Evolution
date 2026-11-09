@@ -2741,6 +2741,35 @@
           "type": "number",
           "minimum": 0,
           "maximum": 10
+        },
+        "modules": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/unitVisualModule"
+          }
+        }
+      }
+    },
+    "unitVisualModule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slotId",
+        "assetName"
+      ],
+      "properties": {
+        "slotId": {
+          "type": "string",
+          "enum": [
+            "ERA",
+            "APS",
+            "Sponsons",
+            "FuelDrums"
+          ]
+        },
+        "assetName": {
+          "$ref": "#/$defs/assetName"
         }
       }
     },

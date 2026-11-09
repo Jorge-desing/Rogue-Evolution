@@ -89,6 +89,19 @@ def collect_references(pack: dict[str, Any]) -> list[tuple[str, str, str, str]]:
         add(owner, "prefabAssetName", unit.get("assetBundleId"), unit.get("prefabAssetName"), "GameObject prefab")
         add(owner, "cardImageAssetName", unit.get("assetBundleId"), unit.get("cardImageAssetName"), "Sprite card image")
         add(owner, "visualAssetName", unit.get("assetBundleId"), unit.get("visualAssetName"), "GameObject prefab")
+        for index, variant in enumerate(unit.get("visualVariants") or []):
+            if not isinstance(variant, dict):
+                continue
+            for module_index, module in enumerate(variant.get("modules") or []):
+                if not isinstance(module, dict):
+                    continue
+                add(
+                    owner,
+                    f"visualVariants[{index}].modules[{module_index}].assetName",
+                    unit.get("assetBundleId"),
+                    module.get("assetName"),
+                    "GameObject prefab",
+                )
 
         factory = unit.get("productionBuilding")
         if isinstance(factory, dict):

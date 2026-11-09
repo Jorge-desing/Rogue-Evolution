@@ -207,3 +207,9 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 - **Generic Avatar & Animator**: `hasAnimator == true`, `isAvatarValid == true`, standard parameters bound (`RCL_IsMoving`, `RCL_Fire`, `RCL_Death`).
 - **RuntimeVisualDirector**: Reflects dynamic state (`isDamagedActive` at $\le 50\%$ HP, `isCriticalActive` at $\le 25\%$ HP, `isTurretJammed`, `currentRecoilOffset`, `doorOpenProgress`).
 - **Vertex-Wear Channels**: R cavity/AO ($\le 0.4$), G edge wear ($\ge 0.7$), B soot/mud ($\ge 0.5$), A team mask.
+
+## Canonical Two-Level Variant Runtime Check
+
+- For a clean-room variant check, use the existing `diagnostics_order_apply_visual_variant` command on a known entity and a declared Level 2 variant. Capture the returned variant/module count and `diagnostics_get_visual_census` / `diagnostics_inspect_entity_visual` readback, then apply `ResetVisualVariant` and confirm the Level 1 appearance, original transform scale, tint property blocks, and hardpoint group active states are restored.
+- Confirm each mounted module sits under the corresponding canonical hardpoint group and that omitted slots remain empty. An apply/reset response without entity visual readback is not proof of the mounted appearance.
+- Runtime status includes `modules=<count>` and `RuntimeVisualDirector.ActiveVisualModuleCount`; use these as supporting telemetry alongside the visual census. Static registry and AssetBundle checks are not live runtime proof.

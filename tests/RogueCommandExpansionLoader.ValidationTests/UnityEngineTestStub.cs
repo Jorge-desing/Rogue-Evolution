@@ -291,7 +291,9 @@ namespace UnityEngine
         public Material sharedMaterial { get => sharedMaterials != null && sharedMaterials.Length > 0 ? sharedMaterials[0] : null; set => sharedMaterials = value != null ? new[] { value } : System.Array.Empty<Material>(); }
         public Material material { get => sharedMaterial; set => sharedMaterial = value; }
         public void SetPropertyBlock(MaterialPropertyBlock properties) { }
+        public void SetPropertyBlock(MaterialPropertyBlock properties, int materialIndex) { }
         public void GetPropertyBlock(MaterialPropertyBlock properties) { }
+        public void GetPropertyBlock(MaterialPropertyBlock properties, int materialIndex) { }
     }
 
     public class MeshRenderer : Renderer

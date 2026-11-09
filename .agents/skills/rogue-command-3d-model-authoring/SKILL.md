@@ -371,3 +371,10 @@ When generating or refining production facilities (e.g. `ArachnidHexapodFactory`
 - [Unity Material Pipeline](references/unity-material-pipeline.md) — URP shaders, keyword toggles, and prefab builders.
 - [Native Hierarchy & Pivots](references/native-hierarchy-and-pivots.md) — Transform hierarchy trees for native templates.
 - [PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md) & [Validation](../rogue-command-pbr-texture-validation/SKILL.md).
+
+## 15. Canonical Two-Level Visual System
+
+- Preserve the Level 1 primary chassis as the complete engineering form: major structure, armor hierarchy, articulated or serviceable assemblies, and authored functional details stay legible as one coherent unit silhouette. Level 2 tactical variants add separate equipment modules; do not flatten them into replacement chassis meshes or clone the gameplay unit.
+- Author module roots to mount at the canonical hardpoint origin and use the catalogued slots `ERA`, `APS`, `Sponsons`, or `FuelDrums`. Keep module geometry visually self-contained, with scale/offset inside its hierarchy; the existing hardpoint socket and attachment group own placement. Search for and reuse canonical sockets before creating transforms.
+- `content/source-art/canonical-visual-modules.blend` and its JSON manifest are the generated source set for the current 35 modules. Use `tools/Build-CanonicalVisualModules.py` with the pinned Blender 4.5.14 toolchain to regenerate; preserve the existing primary unit source blends and the RGBA vertex-wear attribute.
+- Inspect the labeled contact sheet for separation of silhouette, clearances, and attachment fit. A contact sheet is authoring review, not a live render check.

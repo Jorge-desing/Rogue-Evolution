@@ -51,3 +51,9 @@ The current `RogueCommand/VehiclePBR_VertexWear` shader samples metallic from `M
 ## Completion Report
 
 List the model and maps changed, the authoring application/version, channel packing, output paths, and checks performed. Label evidence as static inspection, local Unity import/build, or in-game runtime. A successful bake or bundle build does not prove the final in-game appearance.
+
+## Level 2 Module PBR Application
+
+- Reuse the canonical preset material set assigned to each module in `content/source-art/canonical-visual-modules.json`; 35 modules share 28 four-map 2048x2048 sets. Do not create duplicate texture sets unless the manifest maps a module to a genuinely new preset.
+- Module meshes keep the RGBA vertex-wear contract on the FBX `Color` attribute, separate from the four texture maps. Keep Albedo/Emission sRGB, MetallicGloss linear with metallic in R and smoothness in A, and Normal as a normal map; the module builder verifies the imported material and mesh data.
+- Use `tools/Build-CanonicalVisualModuleTextures.ps1` for the current procedural batch and keep Material Maker mesh/material exports out of Unity.

@@ -69,8 +69,19 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private string _activePresetName;
         private Color? _activeColorTint;
         private List<Renderer> _cachedRenderers;
+        private readonly Dictionary<Renderer, RendererTintBaseline> _rendererTintBaselines =
+            new Dictionary<Renderer, RendererTintBaseline>();
+        private readonly List<GameObject> _activeVisualModuleInstances = new List<GameObject>();
+        private Vector3 _intactMeshBaseLocalScale = Vector3.one;
+        private bool _hasIntactMeshBaseLocalScale;
         private bool? _turretJammedOverride;
         private float? _doorOpenOverride;
+
+        private sealed class RendererTintBaseline
+        {
+            public Material[] Materials;
+            public MaterialPropertyBlock[] Blocks;
+        }
 
         private static MethodInfo _hasActiveStatusEffectMethod;
         private static object _stunStatusEffect;
@@ -174,7 +185,16 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             _entity = entity;
             DiscoverSocketsAndMeshes(transform);
+            EnsureCanonicalHardpointGroups();
             CacheAnimatorParameters();
+
+            if (_intactMeshObject != null)
+            {
+                _intactMeshBaseLocalScale = _intactMeshObject.transform.localScale;
+                _hasIntactMeshBaseLocalScale = true;
+            }
+
+            CacheTintRenderers();
 
             if (_socketRecoilPrimary != null)
             {
@@ -414,6 +434,65 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
 
             binding.Add(candidate);
+        }
+
+        private void EnsureCanonicalHardpointGroups()
+        {
+            string[] hardpointTypes = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            for (int i = 0; i < hardpointTypes.Length; i++)
+            {
+                string type = hardpointTypes[i];
+                UniqueSocketRoleBinding<Transform> socketRole;
+                if (!_socketRoleBindings.TryGetValue("hardpoint:" + type, out socketRole) ||
+                    socketRole == null || socketRole.IsAmbiguous || socketRole.Value == null)
+                {
+                    continue;
+                }
+
+                UniqueSocketRoleBinding<Transform> groupRole;
+                _socketRoleBindings.TryGetValue("attachment_group:" + type, out groupRole);
+                if (groupRole != null && groupRole.IsAmbiguous) continue;
+
+                Transform group = groupRole != null ? groupRole.Value : null;
+                if (group == null)
+                {
+                    GameObject groupObject = new GameObject("RCL_AttachmentGroup_" + type);
+                    group = groupObject.transform;
+                    group.SetParent(socketRole.Value, false);
+                    group.localPosition = Vector3.zero;
+                    group.localRotation = Quaternion.identity;
+                    group.localScale = Vector3.one;
+                    AddSocketRoleCandidate("attachment_group:" + type, group);
+                }
+                else if (group.parent != socketRole.Value)
+                {
+                    ReparentAttachmentGroupPreservingChildren(group, socketRole.Value);
+                }
+
+                _attachmentGroups[type] = group;
+            }
+        }
+
+        private void ReparentAttachmentGroupPreservingChildren(Transform group, Transform socket)
+        {
+            if (group == null || socket == null) return;
+            var children = new List<Transform>();
+            while (group.childCount > 0)
+            {
+                Transform child = group.GetChild(0);
+                children.Add(child);
+                child.SetParent(transform, true);
+            }
+
+            group.SetParent(socket, false);
+            group.localPosition = Vector3.zero;
+            group.localRotation = Quaternion.identity;
+            group.localScale = Vector3.one;
+            for (int i = 0; i < children.Count; i++)
+            {
+                Transform child = children[i];
+                if (child != null) child.SetParent(group, true);
+            }
         }
 
         private Transform GetSocketRoleValue(string role)
@@ -1120,18 +1199,81 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 return true;
             }
 
+            var stagedModules = new List<KeyValuePair<GameObject, bool>>();
+            var stagedSlots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                IReadOnlyList<RuntimeUnitVisualModule> modules = variant.Modules;
+                if (modules != null)
+                {
+                    for (int i = 0; i < modules.Count; i++)
+                    {
+                        RuntimeUnitVisualModule module = modules[i];
+                        if (module == null || module.Prefab == null)
+                        {
+                            DestroyStagedVisualModules(stagedModules);
+                            return false;
+                        }
+
+                        string hardpointType;
+                        Transform mount;
+                        if (!RogueCommandSocketCatalog.TryResolveHardpointType(module.SlotId, out hardpointType) ||
+                            !stagedSlots.Add(hardpointType) ||
+                            !TryGetVisualModuleMount(hardpointType, out mount))
+                        {
+                            DestroyStagedVisualModules(stagedModules);
+                            return false;
+                        }
+
+                        bool shouldBeActive = module.Prefab.activeSelf;
+                        GameObject instance = UnityEngine.Object.Instantiate(module.Prefab) as GameObject;
+                        if (instance == null)
+                        {
+                            DestroyStagedVisualModules(stagedModules);
+                            return false;
+                        }
+
+                        instance.SetActive(false);
+                        instance.name = "RCL_RuntimeModule_" + hardpointType + "_" +
+                            SanitizeVisualVariantName(variant.VariantId);
+                        instance.transform.SetParent(mount, false);
+                        stagedModules.Add(new KeyValuePair<GameObject, bool>(instance, shouldBeActive));
+                        ApplyColorTintToRenderers(
+                            instance.GetComponentsInChildren<Renderer>(true), variant.ColorTint);
+                    }
+                }
+            }
+            catch
+            {
+                DestroyStagedVisualModules(stagedModules);
+                return false;
+            }
+
+            // All module references and mounts have been resolved. Commit by retiring only
+            // instances owned by the previous visual variant, preserving group active state.
+            RemoveActiveVisualModules();
+            for (int i = 0; i < stagedModules.Count; i++)
+            {
+                GameObject instance = stagedModules[i].Key;
+                if (instance == null) continue;
+                _activeVisualModuleInstances.Add(instance);
+                instance.SetActive(stagedModules[i].Value);
+            }
+
             _activeVisualVariantId = variant.VariantId;
             _activePresetName = variant.PresetName;
             _activeColorTint = variant.ColorTint;
-
             ApplyColorTintToRenderers(variant.ColorTint);
 
-            if (variant.Scale > 0.01f && Math.Abs(variant.Scale - 1f) > 0.001f)
+            if (_intactMeshObject != null)
             {
-                if (_intactMeshObject != null)
+                if (!_hasIntactMeshBaseLocalScale)
                 {
-                    _intactMeshObject.transform.localScale = Vector3.one * variant.Scale;
+                    _intactMeshBaseLocalScale = _intactMeshObject.transform.localScale;
+                    _hasIntactMeshBaseLocalScale = true;
                 }
+                float scale = variant.Scale > 0.01f ? variant.Scale : 1f;
+                _intactMeshObject.transform.localScale = _intactMeshBaseLocalScale * scale;
             }
 
             return true;
@@ -1139,64 +1281,198 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         public void ResetVisualVariant()
         {
+            RemoveActiveVisualModules();
             _activeVisualVariantId = null;
             _activePresetName = null;
             _activeColorTint = null;
             ApplyColorTintToRenderers(new Color(1f, 1f, 1f, 1f));
-            if (_intactMeshObject != null)
+            if (_intactMeshObject != null && _hasIntactMeshBaseLocalScale)
             {
-                _intactMeshObject.transform.localScale = Vector3.one;
+                _intactMeshObject.transform.localScale = _intactMeshBaseLocalScale;
+            }
+        }
+
+        public int ActiveVisualModuleCount => _activeVisualModuleInstances.Count;
+
+        private bool TryGetVisualModuleMount(string hardpointType, out Transform mount)
+        {
+            mount = null;
+            UniqueSocketRoleBinding<Transform> groupRole;
+            if (_socketRoleBindings.TryGetValue("attachment_group:" + hardpointType, out groupRole) &&
+                groupRole != null && groupRole.IsAmbiguous)
+            {
+                return false;
+            }
+
+            Transform socket;
+            Transform group;
+            if (!_socketHardpoints.TryGetValue(hardpointType, out socket) || socket == null ||
+                !_attachmentGroups.TryGetValue(hardpointType, out group) || group == null)
+            {
+                return false;
+            }
+
+            mount = group;
+            return true;
+        }
+
+        private static string SanitizeVisualVariantName(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "variant";
+            return value.Replace(':', '_').Replace('/', '_').Replace('\\', '_');
+        }
+
+        private void DestroyStagedVisualModules(List<KeyValuePair<GameObject, bool>> stagedModules)
+        {
+            if (stagedModules == null) return;
+            for (int i = 0; i < stagedModules.Count; i++)
+            {
+                GameObject instance = stagedModules[i].Key;
+                if (instance != null)
+                {
+                    RestoreAndForgetTintRenderers(instance.GetComponentsInChildren<Renderer>(true));
+                    UnityEngine.Object.Destroy(instance);
+                }
+            }
+            stagedModules.Clear();
+        }
+
+        private void RemoveActiveVisualModules()
+        {
+            for (int i = 0; i < _activeVisualModuleInstances.Count; i++)
+            {
+                GameObject instance = _activeVisualModuleInstances[i];
+                if (instance == null) continue;
+                RestoreAndForgetTintRenderers(instance.GetComponentsInChildren<Renderer>(true));
+                instance.SetActive(false);
+                UnityEngine.Object.Destroy(instance);
+            }
+            _activeVisualModuleInstances.Clear();
+        }
+
+        private void CacheTintRenderers()
+        {
+            if (_cachedRenderers != null) return;
+            _cachedRenderers = new List<Renderer>();
+            Renderer[] allRenderers = GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < allRenderers.Length; i++)
+            {
+                Renderer renderer = allRenderers[i];
+                if (renderer == null || renderer is ParticleSystemRenderer) continue;
+                string rendererName = renderer.name ?? string.Empty;
+                if (rendererName.StartsWith("RCL_RuntimeModule_", StringComparison.OrdinalIgnoreCase) ||
+                    rendererName.EndsWith("_COLLIDER", StringComparison.OrdinalIgnoreCase) ||
+                    rendererName.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                _cachedRenderers.Add(renderer);
             }
         }
 
         private void ApplyColorTintToRenderers(Color tintColor)
         {
-            if (_cachedRenderers == null)
+            CacheTintRenderers();
+            ApplyColorTintToRenderers(_cachedRenderers, tintColor);
+        }
+
+        private void ApplyColorTintToRenderers(IReadOnlyList<Renderer> renderers, Color tintColor)
+        {
+            if (renderers == null) return;
+            for (int i = 0; i < renderers.Count; i++)
             {
-                _cachedRenderers = new List<Renderer>();
-                Renderer[] allRenderers = GetComponentsInChildren<Renderer>(true);
-                for (int i = 0; i < allRenderers.Length; i++)
+                ApplyColorTintToRenderer(renderers[i], tintColor);
+            }
+        }
+
+        private void ApplyColorTintToRenderer(Renderer renderer, Color tintColor)
+        {
+            if (renderer == null) return;
+            RendererTintBaseline baseline = GetOrCaptureTintBaseline(renderer);
+            bool restore = IsWhiteTint(tintColor);
+            for (int materialIndex = 0; materialIndex < baseline.Blocks.Length; materialIndex++)
+            {
+                MaterialPropertyBlock baselineBlock = baseline.Blocks[materialIndex];
+                if (baseline.Materials.Length == 0)
                 {
-                    Renderer r = allRenderers[i];
-                    if (r != null && !(r is ParticleSystemRenderer))
-                    {
-                        string rName = r.name ?? string.Empty;
-                        if (!rName.EndsWith("_COLLIDER", StringComparison.OrdinalIgnoreCase) &&
-                            !rName.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
-                        {
-                            _cachedRenderers.Add(r);
-                        }
-                    }
+                    renderer.SetPropertyBlock(baselineBlock);
+                    continue;
+                }
+
+                renderer.SetPropertyBlock(baselineBlock, materialIndex);
+                if (restore) continue;
+
+                Material material = baseline.Materials[materialIndex];
+                if (material == null) continue;
+                var workingBlock = new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(workingBlock, materialIndex);
+                bool usesTeamColorMask = material.HasProperty("_TeamColor");
+                if (usesTeamColorMask)
+                {
+                    workingBlock.SetColor("_TeamColor", tintColor);
+                }
+                else if (material.HasProperty("_BaseColor"))
+                {
+                    workingBlock.SetColor("_BaseColor", material.GetColor("_BaseColor") * tintColor);
+                }
+                else if (material.HasProperty("_Color"))
+                {
+                    workingBlock.SetColor("_Color", material.GetColor("_Color") * tintColor);
+                }
+                renderer.SetPropertyBlock(workingBlock, materialIndex);
+            }
+        }
+
+        private RendererTintBaseline GetOrCaptureTintBaseline(Renderer renderer)
+        {
+            RendererTintBaseline baseline;
+            if (_rendererTintBaselines.TryGetValue(renderer, out baseline)) return baseline;
+
+            Material[] materials = renderer.sharedMaterials ?? Array.Empty<Material>();
+            var blocks = new MaterialPropertyBlock[Math.Max(1, materials.Length)];
+            for (int i = 0; i < blocks.Length; i++)
+            {
+                blocks[i] = new MaterialPropertyBlock();
+                if (materials.Length == 0)
+                {
+                    renderer.GetPropertyBlock(blocks[i]);
+                }
+                else
+                {
+                    renderer.GetPropertyBlock(blocks[i], i);
                 }
             }
 
-            for (int i = 0; i < _cachedRenderers.Count; i++)
+            baseline = new RendererTintBaseline { Materials = materials, Blocks = blocks };
+            _rendererTintBaselines.Add(renderer, baseline);
+            return baseline;
+        }
+
+        private void RestoreAndForgetTintRenderers(IReadOnlyList<Renderer> renderers)
+        {
+            if (renderers == null) return;
+            for (int i = 0; i < renderers.Count; i++)
             {
-                Renderer renderer = _cachedRenderers[i];
+                Renderer renderer = renderers[i];
                 if (renderer == null) continue;
-
-                Material[] mats = renderer.materials;
-                if (mats == null) continue;
-
-                for (int m = 0; m < mats.Length; m++)
+                RendererTintBaseline baseline;
+                if (!_rendererTintBaselines.TryGetValue(renderer, out baseline)) continue;
+                for (int materialIndex = 0; materialIndex < baseline.Blocks.Length; materialIndex++)
                 {
-                    Material mat = mats[m];
-                    if (mat == null) continue;
-
-                    if (mat.HasProperty("_TeamColor"))
-                    {
-                        mat.SetColor("_TeamColor", tintColor);
-                    }
-                    if (mat.HasProperty("_BaseColor"))
-                    {
-                        mat.SetColor("_BaseColor", tintColor);
-                    }
-                    else if (mat.HasProperty("_Color"))
-                    {
-                        mat.SetColor("_Color", tintColor);
-                    }
+                    if (baseline.Materials.Length == 0) renderer.SetPropertyBlock(baseline.Blocks[materialIndex]);
+                    else renderer.SetPropertyBlock(baseline.Blocks[materialIndex], materialIndex);
                 }
+                _rendererTintBaselines.Remove(renderer);
             }
+        }
+
+        private static bool IsWhiteTint(Color tintColor)
+        {
+            return Math.Abs(tintColor.r - 1f) < 0.0001f &&
+                Math.Abs(tintColor.g - 1f) < 0.0001f &&
+                Math.Abs(tintColor.b - 1f) < 0.0001f &&
+                Math.Abs(tintColor.a - 1f) < 0.0001f;
         }
 
         public void SetTacticalStanceVisual(string stance)
@@ -1301,7 +1577,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             string variant = _activeVisualVariantId ?? "none";
             string preset = _activePresetName ?? "default";
-            return $"damaged={_isDamagedStateActive},critical={_isCriticalStateActive},jammed={IsTurretJammed},stunned={_isStunnedVisualActive},fire={_isOnFireVisualActive},boosted={_isBoostedVisualActive},stance={_activeTacticalStanceVisual},variant={variant},preset={preset},recoil={_currentRecoilOffset:F2},door={_doorOpenProgress:F2}";
+            return $"damaged={_isDamagedStateActive},critical={_isCriticalStateActive},jammed={IsTurretJammed},stunned={_isStunnedVisualActive},fire={_isOnFireVisualActive},boosted={_isBoostedVisualActive},stance={_activeTacticalStanceVisual},variant={variant},preset={preset},modules={ActiveVisualModuleCount},recoil={_currentRecoilOffset:F2},door={_doorOpenProgress:F2}";
         }
 
         public void TriggerWeaponFeedback(float recoilDistance = 0.22f)

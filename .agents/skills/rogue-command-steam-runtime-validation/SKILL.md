@@ -122,3 +122,9 @@ python tools/runtime_profile_checkpoint.py verify `
 - [ ] Process gracefully exited; verified process termination before restoring files.
 - [ ] Deployment restored and post-run profile checkpoint verified (`Profile2/metaSavegame.dat` only allowed delta).
 - [ ] `runtime-evidence.json` generated with explicit verdict (`PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`).
+
+## Two-Level Variant Acceptance
+
+- After confirming the installed Release DLL hash and pack registration, select a known unit through the existing diagnostics path and run `diagnostics_order_apply_visual_variant` for a declared Level 2 variant. Verify the target entity's visual census shows the selected variant and module count, and inspect the matching canonical hardpoint groups.
+- Apply the primary/reset state and verify module instances are removed while the original chassis, scale, tint blocks, and group active state return. Keep screenshots/logs and verdict under `artifacts/runtime-smoke/<session-id>/`; distinguish a successful command response from direct renderer/appearance evidence.
+- Use only the runbook's Steam launch and isolated QA-profile procedure. If the MCP bridge, profile isolation, or direct postconditions are unavailable, report runtime status as `BLOCKED` or `UNKNOWN` and retain the local-build/bundle evidence separately.

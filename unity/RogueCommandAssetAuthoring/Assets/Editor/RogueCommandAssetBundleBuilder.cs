@@ -143,6 +143,122 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
+        public static void BuildContentPacksByName(params string[] packNames)
+        {
+            if (!String.Equals(Application.unityVersion, RequiredUnityVersion, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("AssetBundle builds require Unity " + RequiredUnityVersion +
+                    "; current editor is " + Application.unityVersion + ".");
+            }
+            if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone,
+                BuildTarget.StandaloneWindows64))
+            {
+                throw new InvalidOperationException("Windows Build Support (Mono) is required for this Unity editor.");
+            }
+            if (packNames == null || packNames.Length == 0)
+            {
+                throw new ArgumentException("At least one content pack name is required.", nameof(packNames));
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
+            string artifactRoot = Path.GetFullPath(Path.Combine(repositoryRoot,
+                "artifacts", "canonical-two-level", "content-packs"));
+            Directory.CreateDirectory(artifactRoot);
+            string artifactDiagnostic;
+            if (!HasNoReparsePoints(artifactRoot, out artifactDiagnostic))
+            {
+                throw new IOException("Unsafe canonical visual module artifact directory: " + artifactDiagnostic);
+            }
+
+            for (int packIndex = 0; packIndex < packNames.Length; packIndex++)
+            {
+                string packName = packNames[packIndex];
+                if (String.IsNullOrWhiteSpace(packName) ||
+                    !String.Equals(packName, Path.GetFileName(packName), StringComparison.Ordinal) ||
+                    packName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                {
+                    throw new InvalidDataException("Invalid content pack directory name: " + packName);
+                }
+
+                string packRoot = Path.GetFullPath(Path.Combine(repositoryRoot, "content", "packs", packName));
+                string rootDiagnostic;
+                if (!TryValidatePackageDirectory(packRoot, out packRoot, out rootDiagnostic))
+                {
+                    throw new InvalidDataException("Unsafe content pack directory '" + packName + "': " + rootDiagnostic);
+                }
+
+                ContentPackMetadata pack = ReadPackMetadata(packRoot);
+                if (pack == null || pack.assetBundles == null || pack.assetBundles.Length == 0)
+                {
+                    throw new InvalidDataException("Content pack '" + packName + "' has no valid AssetBundle declarations.");
+                }
+
+                var bundleNames = new string[pack.assetBundles.Length];
+                for (int i = 0; i < pack.assetBundles.Length; i++)
+                {
+                    if (pack.assetBundles[i] == null || String.IsNullOrWhiteSpace(pack.assetBundles[i].path))
+                    {
+                        throw new InvalidDataException("Content pack '" + packName + "' has a null or empty bundle declaration.");
+                    }
+                    bundleNames[i] = Path.GetFileName(pack.assetBundles[i].path);
+                }
+                string validationError;
+                if (!ValidateBundleAssignments(bundleNames, pack, out validationError))
+                {
+                    throw new InvalidDataException("AssetBundle assignments for '" + packName + "' are invalid: " + validationError);
+                }
+
+                string outputPath = Path.GetFullPath(Path.Combine(artifactRoot, packName, "bundles"));
+                if (!IsStrictlyInside(artifactRoot, outputPath))
+                {
+                    throw new InvalidDataException("AssetBundle output folder escapes the canonical visual module artifacts directory.");
+                }
+                Directory.CreateDirectory(outputPath);
+
+                EnsureSafeArtifactTree(artifactRoot, outputPath);
+                var buildDefinitions = new AssetBundleBuild[bundleNames.Length];
+                for (int i = 0; i < bundleNames.Length; i++)
+                {
+                    buildDefinitions[i] = new AssetBundleBuild
+                    {
+                        assetBundleName = bundleNames[i],
+                        assetNames = AssetDatabase.GetAssetPathsFromAssetBundle(bundleNames[i])
+                    };
+                }
+
+                AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(outputPath, buildDefinitions,
+                    BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.ForceRebuildAssetBundle,
+                    BuildTarget.StandaloneWindows64);
+                if (manifest == null)
+                {
+                    throw new InvalidDataException("Unity did not return an AssetBundleManifest for '" + packName + "'.");
+                }
+
+                EnsureSafeArtifactTree(artifactRoot, outputPath);
+                string generatedManifestPath = Path.Combine(outputPath, new DirectoryInfo(outputPath).Name);
+                if (!File.Exists(generatedManifestPath))
+                {
+                    throw new FileNotFoundException("Unity did not write its generated AssetBundleManifest.", generatedManifestPath);
+                }
+                ValidateBuiltBundleSizes(outputPath, bundleNames, generatedManifestPath);
+                ValidateBuiltBundles(outputPath, bundleNames);
+
+                string manifestFileName = pack.assetBundleManifestPath.Substring("bundles/".Length);
+                string manifestDestination = Path.GetFullPath(Path.Combine(outputPath, manifestFileName));
+                if (!IsStrictlyInside(artifactRoot, manifestDestination) || !IsStrictlyInside(outputPath, manifestDestination))
+                {
+                    throw new InvalidDataException("Generated AssetBundleManifest destination escapes the canonical visual module artifacts directory.");
+                }
+                EnsureSafeArtifactTree(artifactRoot, outputPath);
+                File.Copy(generatedManifestPath, manifestDestination, true);
+                Debug.Log("[RogueCommandAssetBundleBuilder] Built and reopened " + bundleNames.Length +
+                    " bundle(s) for '" + pack.packId + "' at " + outputPath + " (artifact output).");
+            }
+
+            AssetDatabase.Refresh();
+        }
+
         private static bool TryValidatePackageDirectory(
             string selectedPath,
             out string packRoot,
@@ -232,6 +348,21 @@ namespace RogueCommandExpansion.Authoring
 
             string diagnostic;
             if (!HasNoReparsePoints(packRoot, out diagnostic))
+            {
+                throw new IOException(diagnostic);
+            }
+        }
+
+        private static void EnsureSafeArtifactTree(string artifactRoot, string outputPath)
+        {
+            string canonicalOutput = Path.GetFullPath(outputPath);
+            if (!IsStrictlyInside(artifactRoot, canonicalOutput))
+            {
+                throw new InvalidDataException("AssetBundle output is outside the canonical visual module artifacts directory.");
+            }
+
+            string diagnostic;
+            if (!HasNoReparsePoints(artifactRoot, out diagnostic))
             {
                 throw new IOException(diagnostic);
             }

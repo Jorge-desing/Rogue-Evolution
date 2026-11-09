@@ -32,3 +32,10 @@ Use this skill when preparing a unit model, native visual overlay, card Sprite, 
 ## Report evidence accurately
 
 An Editor build and successful AssetBundle import are local authoring evidence. They do not prove that Rogue Command resolves the asset, registers the unit, or renders it in a match. For those claims, use `rogue-command-steam-runtime-validation` and record the in-game observation separately. Do not replace a failed or missing asset with a placeholder bundle and call the pack complete.
+
+## Canonical Two-Level Module Bundles
+
+- Module prefabs are visual-only `GameObject`s: no `MonoBehaviour`, collider, joint, or gameplay component. The runtime accepts only `ERA`, `APS`, `Sponsons`, and `FuelDrums`, mounted beneath `RCL_AttachmentGroup_<Slot>` at the corresponding existing `Socket_Hardpoint_<Slot>`.
+- A module reference uses the owning unit's `assetBundleId` and the exact AssetBundle container key in `assetName`; there is no per-module bundle ID. This project's Unity builder emits lowercase container keys, so keep the generated manifest asset names aligned with the serialized keys and verify by reopening the bundle.
+- `CanonicalVisualModuleBuilder` labels the module prefabs and every asset referenced by selected pack `content.json` files before `RogueCommandAssetBundleBuilder.BuildContentPacksByName`. If a pack adds a reference to an existing unlabeled prefab/card, label it for the declared bundle before building; otherwise the bundle reference audit will fail.
+- Reopen both built packs and verify every module key, shader/material dependency, and script-free prefab. A successful Editor build remains local authoring evidence only.

@@ -1,0 +1,77 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: RCLModule_cyber_nanoweave__Accent
+  m_Shader: {fileID: 4800000, guid: e8f12a39bc544062a7810df345c829e1, type: 3}
+  m_ValidKeywords:
+  - _EMISSION
+  - _METALLICSPECGLOSSMAP
+  - _NORMALMAP
+  m_InvalidKeywords: []
+  m_LightmapFlags: 2
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 886b095002a20064da9b85b1631bf335, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 2800000, guid: 40e6b09b765e2c444942021109385aa5, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailBumpMap:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 2800000, guid: 184afa611a1a81e4d843eac63fe34707, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 2800000, guid: 96a35a07c9656634cb8aeead3b3799d3, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AeroSheenIntensity: 0.35
+    - _AlphaClip: 0
+    - _AoStrength: 1
+    - _BumpScale: 0.8
+    - _CreviceDustIntensity: 0.5
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DetailBumpScale: 0.5
+    - _DetailTiling: 16
+    - _GlossMapScale: 1
+    - _Metallic: 1
+    - _MudAmount: 0
+    - _MudHeight: 0.55
+    - _MudSmoothness: 0.2
+    - _Smoothness: 1
+    - _SootStrength: 1
+    - _Surface: 0
+    - _ThermalTemperingIntensity: 0.75
+    - _WearStrength: 0.55
+    - _WeldBeadScale: 24
+    - _WeldBeadStrength: 0.6
+    - _WeldBeadWidth: 0.12
+    - _ZenithBleach: 0.35
+    m_Colors:
+    - _AeroSheenTint: {r: 0.78, g: 0.88, b: 1, a: 1}
+    - _BaseColor: {r: 0.82, g: 0.78, b: 0.62, a: 1}
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _MudColor: {r: 0.28, g: 0.22, b: 0.16, a: 1}
+    - _TeamColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []

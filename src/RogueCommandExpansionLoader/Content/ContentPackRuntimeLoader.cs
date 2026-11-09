@@ -3672,7 +3672,7 @@ namespace RogueCommandExpansionLoader.Content
                             unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
                         ApplyEntityActiveSkills(nativePrefabClone, unit.activeSkills, unit.id);
                         ApplyEntityCombatEnhancements(nativePrefabClone, unit.onHitStatusEffects, unit.criticalHitChance, unit.id);
-                        RegisterEntityMechanicsProfile(unit);
+                        RegisterEntityMechanicsProfile(unit, temporaryBundles, packageName);
                         AssetBundle audioBundle = !String.IsNullOrWhiteSpace(unit.assetBundleId)
                             ? GetBundle(temporaryBundles, unit.assetBundleId, packageName)
                             : null;
@@ -3733,7 +3733,7 @@ namespace RogueCommandExpansionLoader.Content
                             unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
                         ApplyEntityActiveSkills(customPrefabClone, unit.activeSkills, unit.id);
                         ApplyEntityCombatEnhancements(customPrefabClone, unit.onHitStatusEffects, unit.criticalHitChance, unit.id);
-                        RegisterEntityMechanicsProfile(unit);
+                        RegisterEntityMechanicsProfile(unit, temporaryBundles, packageName);
                         ApplyEntityAudioBindings(customPrefabClone, bundle, unit.selectionSoundAssetName,
                             unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
                         EnsureMuzzleFlashHierarchy(customPrefabClone);
@@ -8664,7 +8664,10 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private static void RegisterEntityMechanicsProfile(ContentUnitDefinition unit)
+        private static void RegisterEntityMechanicsProfile(
+            ContentUnitDefinition unit,
+            Dictionary<string, AssetBundle> bundles,
+            string packageName)
         {
             if (unit == null || string.IsNullOrWhiteSpace(unit.id))
             {
@@ -8704,7 +8707,7 @@ namespace RogueCommandExpansionLoader.Content
             };
 
             RegisterUnitVariants(unit);
-            RegisterUnitVisualVariants(unit);
+            RegisterUnitVisualVariants(unit, bundles, packageName);
             if (profile.HasAnyMechanics)
             {
                 RuntimeUnitMechanicsDirector.RegisterProfile(unit.id, profile);
@@ -8751,7 +8754,10 @@ namespace RogueCommandExpansionLoader.Content
             RuntimeUnitVariantRegistry.Register(unit.id, variants);
         }
 
-        private static void RegisterUnitVisualVariants(ContentUnitDefinition unit)
+        private static void RegisterUnitVisualVariants(
+            ContentUnitDefinition unit,
+            Dictionary<string, AssetBundle> bundles,
+            string packageName)
         {
             if (unit == null || string.IsNullOrWhiteSpace(unit.id))
             {
@@ -8771,6 +8777,28 @@ namespace RogueCommandExpansionLoader.Content
 
                     bool isPrimary = (i == 0);
                     string presetName = ExtractPresetNameFromVariantId(source.id);
+                    var modules = new List<RuntimeUnitVisualModule>();
+                    if (source.modules != null)
+                    {
+                        for (int moduleIndex = 0; moduleIndex < source.modules.Length; moduleIndex++)
+                        {
+                            ContentUnitVisualModuleDefinition module = source.modules[moduleIndex];
+                            if (module == null) continue;
+
+                            AssetBundle moduleBundle = GetBundle(bundles, unit.assetBundleId, packageName);
+                            GameObject prefab = LoadRequiredAsset(moduleBundle, module.assetName,
+                                typeof(GameObject), "visual-only hardpoint module prefab", packageName) as GameObject;
+                            string hardpointType;
+                            if (!RogueCommandExpansionLoader.Runtime.Visual.RogueCommandSocketCatalog.TryResolveHardpointType(
+                                module.slotId, out hardpointType))
+                            {
+                                throw new InvalidDataException("Unidad " + unit.id + ", variante " + source.id +
+                                    ": slot de módulo no canónico: " + module.slotId + ".");
+                            }
+
+                            modules.Add(new RuntimeUnitVisualModule(hardpointType, module.assetName, prefab));
+                        }
+                    }
 
                     visualVariants.Add(new RuntimeUnitVisualVariant(
                         source.id,
@@ -8780,7 +8808,8 @@ namespace RogueCommandExpansionLoader.Content
                         source.scale,
                         source.visualAssetName,
                         source.visualRootPath,
-                        isPrimary));
+                        isPrimary,
+                        modules));
                 }
             }
 

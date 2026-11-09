@@ -980,13 +980,20 @@ namespace RogueCommandExpansionLoader.Runtime
     /// </summary>
     public readonly struct UnitVisualVariantResult
     {
-        public UnitVisualVariantResult(bool success, string entityKeyId, string variantId, string presetName, string message)
+        public UnitVisualVariantResult(
+            bool success,
+            string entityKeyId,
+            string variantId,
+            string presetName,
+            string message,
+            int moduleCount = 0)
         {
             Success = success;
             EntityKeyId = entityKeyId ?? string.Empty;
             VariantId = variantId ?? string.Empty;
             PresetName = presetName ?? string.Empty;
             Message = message ?? string.Empty;
+            ModuleCount = Math.Max(0, moduleCount);
         }
 
         public bool Success { get; }
@@ -994,6 +1001,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public string VariantId { get; }
         public string PresetName { get; }
         public string Message { get; }
+        public int ModuleCount { get; }
     }
 
     /// <summary>
@@ -5624,13 +5632,21 @@ namespace RogueCommandExpansionLoader.Runtime
                         "Unit '" + unitId + "' does not possess an active RuntimeVisualDirector.");
                 }
 
-                director.TryApplyVisualVariant(targetVariant);
+                if (!director.TryApplyVisualVariant(targetVariant))
+                {
+                    return new UnitVisualVariantResult(false, key, variantId,
+                        targetVariant != null ? targetVariant.PresetName : string.Empty,
+                        "Visual variant could not be applied because a declared module or canonical hardpoint is unavailable.",
+                        director.ActiveVisualModuleCount);
+                }
                 string appliedId = targetVariant != null ? targetVariant.VariantId : "default";
                 string preset = targetVariant != null ? targetVariant.PresetName : "default";
                 string levelLabel = targetVariant != null && targetVariant.IsPrimary ? "Level 1 Primary Chassis" : "Level 2 Tactical Variant";
 
                 return new UnitVisualVariantResult(true, key, appliedId, preset,
-                    "Applied " + levelLabel + " [" + preset + "] to '" + key + "'.");
+                    "Applied " + levelLabel + " [" + preset + "] to '" + key + "' with " +
+                    director.ActiveVisualModuleCount + " mechanical module(s).",
+                    director.ActiveVisualModuleCount);
             }
             catch (Exception ex)
             {

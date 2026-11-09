@@ -223,7 +223,7 @@ try {
         $mmArguments = "--export-material --target $profileName -o `"$rawDir`" `"$template`""
         $mmLog = Join-Path $outDir "material-maker.log"
         $mmErrorLog = Join-Path $outDir "material-maker-error.log"
-        $materialMakerProcess = Start-Process -FilePath $mmExe -ArgumentList $mmArguments -WorkingDirectory $mmDir -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -Wait -PassThru
+        $materialMakerProcess = Start-Process -FilePath $mmExe -ArgumentList $mmArguments -WorkingDirectory $mmDir -WindowStyle Hidden -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -Wait -PassThru
         $materialMakerExitCode = $materialMakerProcess.ExitCode
         if ($null -ne $materialMakerExitCode -and $materialMakerExitCode -ne 0) {
             throw "Material Maker export failed with exit code $materialMakerExitCode"

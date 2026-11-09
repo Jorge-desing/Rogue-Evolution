@@ -439,13 +439,14 @@ namespace RogueCommandExpansionLoader.Content
                     bool hasAudioAsset = !String.IsNullOrWhiteSpace(unit.selectionSoundAssetName) ||
                                          !String.IsNullOrWhiteSpace(unit.engineSoundAssetName) ||
                                          !String.IsNullOrWhiteSpace(unit.weaponSoundAssetName);
+                    bool hasVisualModules = HasUnitVisualModules(unit.visualVariants);
                     if (hasAudioAsset && String.IsNullOrWhiteSpace(unit.assetBundleId))
                     {
                         Add(diagnostics, "unit.audio-bundle-missing", itemPath,
                             "Specifying audio assets requires declaring an assetBundleId.");
                     }
 
-                    if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName) || hasVisualAsset || hasAudioAsset)
+                    if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName) || hasVisualAsset || hasAudioAsset || hasVisualModules)
                     {
                         ValidateBundleReference(unit.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
                         if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName))
@@ -468,7 +469,7 @@ namespace RogueCommandExpansionLoader.Content
                     else if (!String.IsNullOrWhiteSpace(unit.assetBundleId))
                     {
                         Add(diagnostics, "unit.bundle-unused", itemPath + ".assetBundleId",
-                            "A native-template unit only declares a bundle when it supplies cardImageAssetName, a visual overlay, or audio assets.");
+                            "A native-template unit only declares a bundle when it supplies cardImageAssetName, a visual overlay, audio assets, or visual modules.");
                     }
                 }
                 else
@@ -497,7 +498,8 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", unitIds, registrySnapshot, diagnostics);
                 ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
                 ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", unitIds, registrySnapshot, diagnostics);
-                ValidateUnitVisualVariants(unit.visualVariants, itemPath + ".visualVariants", bundleIds, diagnostics);
+                ValidateUnitVisualVariants(unit.visualVariants, unit.assetBundleId,
+                    itemPath + ".visualVariants", bundleIds, diagnostics);
                 ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
                 ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
                 ValidateUnitProductionQueue(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
@@ -2500,6 +2502,7 @@ namespace RogueCommandExpansionLoader.Content
 
         private static void ValidateUnitVisualVariants(
             ContentUnitVisualVariantDefinition[] variants,
+            string assetBundleId,
             string path,
             HashSet<string> bundleIds,
             List<ContentDiagnostic> diagnostics)
@@ -2515,6 +2518,11 @@ namespace RogueCommandExpansionLoader.Content
                     continue;
                 }
                 ValidateNamespacedId(variant.id, itemPath + ".id", diagnostics);
+                if (i == 0 && variant.modules != null && variant.modules.Length > 0)
+                {
+                    Add(diagnostics, "unit.visual-module-primary", itemPath + ".modules",
+                        "The first visual variant is the Level 1 primary chassis and cannot replace Level 2 hardpoint modules.");
+                }
                 if (!String.IsNullOrWhiteSpace(variant.visualAssetName))
                 {
                     ValidateAssetName(variant.visualAssetName, itemPath + ".visualAssetName", diagnostics);
@@ -2524,7 +2532,59 @@ namespace RogueCommandExpansionLoader.Content
                     ValidateVisualRootPath(variant.visualRootPath, itemPath + ".visualRootPath", diagnostics);
                 }
                 ValidateVisualVariantScale(variant, itemPath, diagnostics);
+
+                if (variant.modules == null) continue;
+                if (variant.modules.Length > 4)
+                {
+                    Add(diagnostics, "unit.visual-module-count-invalid", itemPath + ".modules",
+                        "A visual variant can declare at most one module for each of the four canonical hardpoints.");
+                }
+                var seenSlots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int moduleIndex = 0; moduleIndex < variant.modules.Length; moduleIndex++)
+                {
+                    ContentUnitVisualModuleDefinition module = variant.modules[moduleIndex];
+                    string modulePath = itemPath + ".modules[" + moduleIndex + "]";
+                    if (module == null)
+                    {
+                        Add(diagnostics, "entry.null", modulePath, "Visual module entries cannot be null.");
+                        continue;
+                    }
+
+                    string hardpointType;
+                    if (!RogueCommandExpansionLoader.Runtime.Visual.RogueCommandSocketCatalog.TryResolveHardpointType(
+                        module.slotId, out hardpointType))
+                    {
+                        Add(diagnostics, "unit.visual-module-slot-invalid", modulePath + ".slotId",
+                            "Visual modules must use a canonical hardpoint type: ERA, APS, Sponsons, or FuelDrums.");
+                    }
+                    else if (!seenSlots.Add(hardpointType))
+                    {
+                        Add(diagnostics, "unit.visual-module-slot-duplicate", modulePath + ".slotId",
+                            "A visual variant can declare at most one module per canonical hardpoint.");
+                    }
+
+                    ValidateAssetName(module.assetName, modulePath + ".assetName", diagnostics);
+                }
+
+                if (variant.modules.Length > 0)
+                {
+                    ValidateBundleReference(assetBundleId, itemPath + ".modules", bundleIds, diagnostics);
+                }
             }
+        }
+
+        private static bool HasUnitVisualModules(ContentUnitVisualVariantDefinition[] variants)
+        {
+            if (variants == null) return false;
+            for (int i = 0; i < variants.Length; i++)
+            {
+                if (variants[i] != null && variants[i].modules != null && variants[i].modules.Length > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ValidateUnitSpawn(

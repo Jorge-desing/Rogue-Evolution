@@ -290,12 +290,14 @@ namespace RogueCommandExpansion.Authoring
                 // duplicate transforms and ambiguous runtime role bindings.
                 EnsureCanonicalVfxSockets(root, modelInstance);
                 EnsureTurretAndRadarSockets(root, modelInstance);
+                EnsureCanonicalHardpointSockets(root, modelInstance);
 
                 // Scaffold muzzle-flash particles (FirePoint_0 child 0) and calibrated 3D mono AudioSources.
                 // Damage sockets stay clean: RuntimeVisualDirector spawns smoke/fire dynamically.
                 EnsureCanonicalVfxAndAudioComponents(root);
 
                 // 5. Mount Detached Modular Attachments (ERA, APS, Sponson, FuelDrums) if present
+                EnsureCanonicalHardpointGroups(root);
                 MountModularAttachmentsIfAvailable(root, unitName);
 
                 // 6. Mount Damaged Variant Model (<Name>_Damaged.fbx) if present
@@ -489,13 +491,19 @@ namespace RogueCommandExpansion.Authoring
                 if (attAsset != null)
                 {
                     Transform socket = FindTransformRecursive(root.transform, "Socket_Hardpoint_" + socketType);
-                    Transform parentTransform = socket != null
-                        ? GetOrCreateAttachmentGroup(root, socketType)
-                        : root.transform;
                     if (socket == null)
                     {
                         Debug.LogWarning("[VehiclePrefabBuilder] No Socket_Hardpoint_" + socketType +
-                            " found for " + attFileName + "; mounting it at the visual root.");
+                            " found for " + attFileName + "; the attachment was skipped.");
+                        continue;
+                    }
+
+                    Transform parentTransform = GetOrCreateAttachmentGroup(root, socket, socketType);
+                    if (parentTransform == null)
+                    {
+                        Debug.LogWarning("[VehiclePrefabBuilder] Could not resolve a unique RCL_AttachmentGroup_" +
+                            socketType + " under Socket_Hardpoint_" + socketType + "; the attachment was skipped.");
+                        continue;
                     }
 
                     GameObject attInstance = PrefabUtility.InstantiatePrefab(attAsset) as GameObject;
@@ -508,6 +516,140 @@ namespace RogueCommandExpansion.Authoring
                     }
                 }
             }
+        }
+
+        private static void EnsureCanonicalHardpointGroups(GameObject root)
+        {
+            if (root == null) return;
+            string[] socketTypes = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            for (int i = 0; i < socketTypes.Length; i++)
+            {
+                string socketName = "Socket_Hardpoint_" + socketTypes[i];
+                Transform socket = FindTransformRecursive(root.transform, socketName);
+                if (socket == null) continue;
+
+                int socketCount = 0;
+                Transform[] all = root.GetComponentsInChildren<Transform>(true);
+                for (int j = 0; j < all.Length; j++)
+                {
+                    if (string.Equals(all[j].name, socketName, StringComparison.OrdinalIgnoreCase)) socketCount++;
+                }
+                if (socketCount != 1)
+                {
+                    Debug.LogWarning("[VehiclePrefabBuilder] Expected one " + socketName +
+                        " but found " + socketCount + "; no attachment group was created.");
+                    continue;
+                }
+
+                GetOrCreateAttachmentGroup(root, socket, socketTypes[i]);
+            }
+        }
+
+        private static void EnsureCanonicalHardpointSockets(GameObject root, GameObject model)
+        {
+            if (root == null || model == null) return;
+            string[] socketTypes = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            Bounds modelBounds = CalculateModelBounds(root, model);
+            Vector3 center = modelBounds.center;
+            Vector3 extents = modelBounds.extents;
+            Transform turret = FindTransformRecursive(root.transform, "Socket_TurretPivot");
+
+            for (int i = 0; i < socketTypes.Length; i++)
+            {
+                string socketName = "Socket_Hardpoint_" + socketTypes[i];
+                Transform existing = FindCanonicalHardpointSocket(root.transform, socketName, out int count);
+                if (count > 1)
+                {
+                    Debug.LogWarning("[VehiclePrefabBuilder] Found " + count + " transforms for " + socketName +
+                        "; preserving the authored hierarchy and leaving this hardpoint unavailable.");
+                    continue;
+                }
+                if (existing != null) continue;
+
+                Vector3 localPosition;
+                switch (socketTypes[i])
+                {
+                    case "ERA":
+                        localPosition = turret != null
+                            ? turret.localPosition + new Vector3(0f, 0.40f, 0.10f)
+                            : center + new Vector3(0f, extents.y * 0.55f, extents.z * 0.28f);
+                        break;
+                    case "APS":
+                        localPosition = turret != null
+                            ? turret.localPosition + new Vector3(0.35f, -0.35f, 0.40f)
+                            : center + new Vector3(extents.x * 0.38f, extents.y * 0.55f, 0f);
+                        break;
+                    case "Sponsons":
+                        localPosition = center + new Vector3(extents.x * 0.48f, 0f, 0f);
+                        break;
+                    default:
+                        localPosition = center + new Vector3(0f, -extents.y * 0.30f, -extents.z * 0.45f);
+                        break;
+                }
+
+                GameObject socketObject = new GameObject(socketName);
+                socketObject.transform.SetParent(root.transform, false);
+                socketObject.transform.localPosition = localPosition;
+                socketObject.transform.localRotation = Quaternion.identity;
+                socketObject.transform.localScale = Vector3.one;
+            }
+        }
+
+        private static Transform FindCanonicalHardpointSocket(Transform root, string socketName, out int count)
+        {
+            count = 0;
+            Transform match = null;
+            if (root == null) return null;
+            Transform[] all = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                string currentName = all[i].name ?? string.Empty;
+                if (!string.Equals(currentName, socketName, StringComparison.OrdinalIgnoreCase) &&
+                    !currentName.EndsWith("_" + socketName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                count++;
+                match = all[i];
+            }
+
+            if (count == 1 && match != null && !string.Equals(match.name, socketName, StringComparison.Ordinal))
+            {
+                match.name = socketName;
+            }
+            return count == 1 ? match : null;
+        }
+
+        private static Bounds CalculateModelBounds(GameObject root, GameObject model)
+        {
+            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+            bool hasBounds = false;
+            Bounds bounds = new Bounds(root.transform.position, Vector3.one);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null || !renderer.enabled ||
+                    renderer.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    renderer is ParticleSystemRenderer)
+                {
+                    continue;
+                }
+
+                Bounds rendererBounds = renderer.bounds;
+                Vector3 localCenter = root.transform.InverseTransformPoint(rendererBounds.center);
+                Vector3 localSize = rendererBounds.size;
+                if (!hasBounds)
+                {
+                    bounds = new Bounds(localCenter, localSize);
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(new Bounds(localCenter, localSize));
+                }
+            }
+            return bounds;
         }
 
         private static Transform FindTransformRecursive(Transform parent, string name)
@@ -801,18 +943,54 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static Transform GetOrCreateAttachmentGroup(GameObject root, string socketType)
+        private static Transform GetOrCreateAttachmentGroup(GameObject root, Transform socket, string socketType)
         {
+            if (root == null || socket == null) return null;
             string groupName = "RCL_AttachmentGroup_" + socketType;
-            Transform group = root.transform.Find(groupName);
-            if (group != null) return group;
+            Transform group = null;
+            Transform[] all = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (!string.Equals(all[i].name, groupName, StringComparison.OrdinalIgnoreCase)) continue;
+                if (group != null && group != all[i]) return null;
+                group = all[i];
+            }
+
+            if (group != null)
+            {
+                if (group.parent != socket) ReparentAttachmentGroupPreservingChildren(root.transform, group, socket);
+                return group;
+            }
 
             GameObject groupObject = new GameObject(groupName);
-            groupObject.transform.SetParent(root.transform, false);
+            groupObject.transform.SetParent(socket, false);
             groupObject.transform.localPosition = Vector3.zero;
             groupObject.transform.localRotation = Quaternion.identity;
             groupObject.transform.localScale = Vector3.one;
             return groupObject.transform;
+        }
+
+        private static void ReparentAttachmentGroupPreservingChildren(
+            Transform visualRoot,
+            Transform group,
+            Transform socket)
+        {
+            var children = new List<Transform>();
+            while (group.childCount > 0)
+            {
+                Transform child = group.GetChild(0);
+                children.Add(child);
+                child.SetParent(visualRoot, true);
+            }
+
+            group.SetParent(socket, false);
+            group.localPosition = Vector3.zero;
+            group.localRotation = Quaternion.identity;
+            group.localScale = Vector3.one;
+            for (int i = 0; i < children.Count; i++)
+            {
+                if (children[i] != null) children[i].SetParent(group, true);
+            }
         }
 
         private static void MountDamagedVariantIfAvailable(GameObject root, string unitName, Material atlasMaterial)

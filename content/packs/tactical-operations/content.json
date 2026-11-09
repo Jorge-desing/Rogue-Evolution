@@ -196,12 +196,24 @@
         {
           "id": "tactical-operations:tidebreaker-skirmisher-tachyon-warp-radiator",
           "colorTint": "#1f334a",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_tachyon_warp_radiator.prefab"
+            }
+          ]
         },
         {
           "id": "tactical-operations:tidebreaker-skirmisher-cryo-glacier-camo",
           "colorTint": "#6c8899",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_cryo_glacier_camo.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2
@@ -395,12 +407,24 @@
         {
           "id": "tactical-operations:salvage-hauler-hazard-industrial",
           "colorTint": "#c28e2b",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_hazard_industrial.prefab"
+            }
+          ]
         },
         {
           "id": "tactical-operations:salvage-hauler-minefield-ordnance-carrier",
           "colorTint": "#424b3e",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "FuelDrums",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_minefield_ordnance_carrier.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -582,12 +606,24 @@
         {
           "id": "tactical-operations:skyguard-sam-solar-flare-radiation-shield",
           "colorTint": "#6b5832",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_solar_flare_radiation_shield.prefab"
+            }
+          ]
         },
         {
           "id": "tactical-operations:skyguard-sam-longshot-sniper-camo",
           "colorTint": "#36453b",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_longshot_sniper_camo.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -791,12 +827,24 @@
         {
           "id": "tactical-operations:bulwark-siege-tank-battleship-tungsten",
           "colorTint": "#464a4f",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bulwark_siege_tank_battleship_tungsten.prefab"
+            }
+          ]
         },
         {
           "id": "tactical-operations:bulwark-siege-tank-minefield-ordnance-carrier",
           "colorTint": "#3f473c",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "FuelDrums",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bulwark_siege_tank_minefield_ordnance_carrier.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -990,7 +1038,13 @@
         {
           "id": "tactical-operations:arc-lance-walker-plasma-arc-containment",
           "colorTint": "#1c222b",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arc_lance_walker_plasma_arc_containment.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -1208,7 +1262,13 @@
         {
           "id": "tactical-operations:field-medic-rover-nanite-repair-chitin",
           "colorTint": "#385247",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_field_medic_rover_nanite_repair_chitin.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -1426,12 +1486,24 @@
         {
           "id": "tactical-operations:sentinel-relay-stealth-void-composite",
           "colorTint": "#1b1d21",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_sentinel_relay_stealth_void_composite.prefab"
+            }
+          ]
         },
         {
           "id": "tactical-operations:sentinel-relay-beryllium-mirror-hull",
           "colorTint": "#848d94",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_sentinel_relay_beryllium_mirror_hull.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2
@@ -1687,12 +1759,24 @@
         {
           "id": "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy",
           "colorTint": "#1c3848",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_gravitas_breaker_quantum_hyperdrive_alloy.prefab"
+            }
+          ]
         },
         {
           "id": "tactical-operations:gravitas-breaker-cryogenic-fuel-shroud",
           "colorTint": "#2b4b5e",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "FuelDrums",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_gravitas_breaker_cryogenic_fuel_shroud.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -1943,12 +2027,24 @@
         {
           "id": "tactical-operations:command-relay-beryllium-mirror-hull",
           "colorTint": "#828b92",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_beryllium_mirror_hull.prefab"
+            }
+          ]
         },
         {
           "id": "tactical-operations:command-relay-cyber-nanoweave",
           "colorTint": "#1b2129",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_cyber_nanoweave.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2

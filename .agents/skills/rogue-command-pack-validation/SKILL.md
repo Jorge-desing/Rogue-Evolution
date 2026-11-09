@@ -76,3 +76,9 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 - [Harmony Policy Skill](../rogue-command-harmony-policy/SKILL.md) — Installed hook contracts and safety rules.
 - [Unit Authoring Skill](../rogue-command-unit-authoring/SKILL.md) — Balance archetypes and production building templates.
 - `content/schema/content.schema.json` & `README.md` — Authoritative schema definitions.
+
+## Canonical Visual Module Validation
+
+- `visualVariants[0]` is Level 1 and must not declare modules. Later variants may declare up to four module references, one each for `ERA`, `APS`, `Sponsons`, and `FuelDrums`; a module has `slotId` plus `assetName`, and resolves through the owning unit's `assetBundleId`.
+- Run the schema/content validator and `tools/validate_content_bundle_references.py` for both the prefab references and every `visualVariants[].modules[].assetName`. Confirm the AssetBundle's serialized container keys with UnityPy or the Unity reopen check; do not infer them from source filenames alone.
+- `tools/Bind-CanonicalVisualModules.py --check` enforces the current authored matrix (18 Level 1 primaries and 35 Level 2 modules). This matrix check is project content validation, not runtime behavior evidence.

@@ -92,3 +92,10 @@ When adding or altering runtime mechanics, update all 4 layers simultaneously: S
 - [3D Model Authoring Skill](../rogue-command-3d-model-authoring/SKILL.md) — Visual geometry, sockets, and materials.
 - [Clean-Room Diagnostics Skill](../rogue-command-clean-room-diagnostics/SKILL.md) — In-game inspection and command director.
 - [Balance Simulation Skill](../rogue-command-balance-simulation/SKILL.md) — Lanchester combat calibration.
+
+## 7. Canonical Two-Level Visual Variants
+
+- Keep `visualVariants[0]` as the Level 1 primary chassis. Level 2 entries are same-unit tactical visual variants; put optional visual-only modules on those entries. The first variant may not declare modules.
+- A module entry contains only `slotId` and `assetName`. Valid slots are `ERA`, `APS`, `Sponsons`, and `FuelDrums`; allow at most one module per slot and four per variant. The unit's `assetBundleId` owns every module asset, so do not add a per-module bundle field.
+- Modules change silhouette and equipment appearance only. Preserve unit IDs, balance, factory/product links, cards, and native gameplay controller. An omitted module leaves the primary chassis visible at that hardpoint.
+- Keep the engineering hierarchy explicit: the primary chassis carries its functional form language; a tactical variant adds discrete equipment at canonical hardpoints instead of replacing the chassis or duplicating a unit definition. Check `tools/Bind-CanonicalVisualModules.py --check` after editing the canonical matrix.

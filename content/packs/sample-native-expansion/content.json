@@ -269,17 +269,35 @@
         {
           "id": "sample-native-expansion:scout-tank-gunmetal-chassis",
           "colorTint": "#4c555d",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_gunmetal_chassis.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:scout-tank-desert-camo",
           "colorTint": "#b89f76",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_desert_camo.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:scout-tank-longshot-sniper-camo",
           "colorTint": "#36453b",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_longshot_sniper_camo.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -521,22 +539,46 @@
         {
           "id": "sample-native-expansion:heavy-artillery-tungsten-heavy-flak-plating",
           "colorTint": "#464a4e",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_tungsten_heavy_flak_plating.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:heavy-artillery-subterranean-mole-borer",
           "colorTint": "#50443a",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_subterranean_mole_borer.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:heavy-artillery-martian-iron-rust",
           "colorTint": "#7a3e26",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_martian_iron_rust.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:heavy-artillery-battleship-tungsten",
           "colorTint": "#35393d",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_battleship_tungsten.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -777,12 +819,24 @@
         {
           "id": "sample-native-expansion:assault-walker-plasma-cinder-ablative",
           "colorTint": "#2d2826",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_plasma_cinder_ablative.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:assault-walker-orbital-drop-pod-cermet",
           "colorTint": "#41474e",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_orbital_drop_pod_cermet.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -1024,7 +1078,13 @@
         {
           "id": "sample-native-expansion:atlas-crane-mech-zero-g-docking-alloy",
           "colorTint": "#6c7784",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_atlas_crane_mech_zero_g_docking_alloy.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -1263,12 +1323,24 @@
         {
           "id": "sample-native-expansion:bastion-siege-mech-stealth-radar-absorbent-ferrite",
           "colorTint": "#1e2124",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_stealth_radar_absorbent_ferrite.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:bastion-siege-mech-cryo-glacier-camo",
           "colorTint": "#7292a6",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_cryo_glacier_camo.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -1516,12 +1588,24 @@
         {
           "id": "sample-native-expansion:arachnid-hexapod-pulsar-magnetic-shield",
           "colorTint": "#1c3247",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_pulsar_magnetic_shield.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:arachnid-hexapod-stealth-void-composite",
           "colorTint": "#181a1d",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_stealth_void_composite.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,
@@ -1772,7 +1856,13 @@
         {
           "id": "sample-native-expansion:overlord-command-hq-solar-gold-radiator",
           "colorTint": "#d19f32",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_overlord_command_hq_solar_gold_radiator.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 1,
@@ -2011,12 +2101,24 @@
         {
           "id": "sample-native-expansion:skirmish-bike-cyber-nanoweave",
           "colorTint": "#151e28",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skirmish_bike_cyber_nanoweave.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:skirmish-bike-cerberus-white-ceramic",
           "colorTint": "#e1e6eb",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skirmish_bike_cerberus_white_ceramic.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 3,
@@ -2267,12 +2369,24 @@
         {
           "id": "sample-native-expansion:surge-tank-ion-thruster-titanium-grate",
           "colorTint": "#425363",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_surge_tank_ion_thruster_titanium_grate.prefab"
+            }
+          ]
         },
         {
           "id": "sample-native-expansion:surge-tank-antimatter-containment-lattice",
           "colorTint": "#1f182c",
-          "scale": 1.0
+          "scale": 1.0,
+          "modules": [
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_surge_tank_antimatter_containment_lattice.prefab"
+            }
+          ]
         }
       ],
       "prespawnCount": 2,

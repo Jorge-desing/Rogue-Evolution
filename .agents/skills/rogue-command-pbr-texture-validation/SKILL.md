@@ -59,3 +59,9 @@ The builder may correct stale `.meta` settings during a rebuild. Report the post
 ## Acceptance Criteria
 
 A texture set passes the local authoring contract when all four files have expected names and compatible dimensions, metallic and smoothness occupy the expected channels, the Unity importer preserves linear data and alpha, the prefab material binds the maps to the intended shader, and the imported mesh retains RGBA vertex colors. Mark UV seam quality and final color appearance as visually reviewed only when inspected in Unity; mark in-game appearance only after an actual runtime check.
+
+## Canonical Module Import Checks
+
+- `CanonicalVisualModuleBuilder` checks all four maps are 2048x2048, verifies effective importer color-space/alpha/normal settings after reimport, builds the `RogueCommand/VehiclePBR_VertexWear` material variant, and confirms imported module meshes retain one RGBA vertex color per vertex.
+- It also rejects scripts/gameplay components in module prefabs and reopens the AssetBundles to verify their serialized `assetName` keys. Run `tools/validate_content_bundle_references.py` on each built pack so every `visualVariants[].modules[].assetName` resolves in the unit's declared bundle.
+- These are local Unity/import and serialized-bundle checks. A contact sheet or passing bundle audit does not establish that a live unit selected the expected variant or rendered it in a Steam match.

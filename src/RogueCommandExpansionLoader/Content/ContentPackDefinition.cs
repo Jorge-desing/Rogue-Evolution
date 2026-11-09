@@ -108,6 +108,13 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitVisualModuleDefinition
+    {
+        public string slotId;
+        public string assetName;
+    }
+
+    [Serializable]
     public sealed class ContentUnitVisualVariantDefinition
     {
         public string id;
@@ -115,6 +122,7 @@ namespace RogueCommandExpansionLoader.Content
         public string visualRootPath;
         public string colorTint;
         public float scale;
+        public ContentUnitVisualModuleDefinition[] modules;
     }
 
     [Serializable]
@@ -1376,7 +1384,17 @@ namespace RogueCommandExpansionLoader.Content
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
                 colorTint = source.colorTint,
-                scale = source.scale
+                scale = source.scale,
+                modules = CloneArray(source.modules, CloneUnitVisualModule)
+            };
+        }
+
+        private static ContentUnitVisualModuleDefinition CloneUnitVisualModule(ContentUnitVisualModuleDefinition source)
+        {
+            return source == null ? null : new ContentUnitVisualModuleDefinition
+            {
+                slotId = source.slotId,
+                assetName = source.assetName
             };
         }
 

@@ -5,6 +5,27 @@ using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
+    public sealed class RuntimeUnitVisualModule
+    {
+        public RuntimeUnitVisualModule(string slotId, string assetName, GameObject prefab)
+        {
+            string canonicalType;
+            if (!RogueCommandExpansionLoader.Runtime.Visual.RogueCommandSocketCatalog.TryResolveHardpointType(
+                slotId, out canonicalType))
+            {
+                throw new ArgumentException("Visual module slot is not a canonical hardpoint: " + slotId, nameof(slotId));
+            }
+
+            SlotId = canonicalType;
+            AssetName = assetName == null ? string.Empty : assetName.Trim();
+            Prefab = prefab;
+        }
+
+        public string SlotId { get; }
+        public string AssetName { get; }
+        public GameObject Prefab { get; }
+    }
+
     /// <summary>
     /// Immutable runtime representation of a declarative ContentUnitDefinition.visualVariants entry,
     /// establishing the two-level visual system: Level 1 Primary Chassis and Level 2 Tactical Variants.
@@ -19,7 +40,8 @@ namespace RogueCommandExpansionLoader.Runtime
             float scale,
             string visualAssetName,
             string visualRootPath,
-            bool isPrimary)
+            bool isPrimary,
+            IEnumerable<RuntimeUnitVisualModule> modules = null)
         {
             VariantId = variantId == null ? string.Empty : variantId.Trim();
             UnitId = unitId == null ? string.Empty : unitId.Trim();
@@ -29,6 +51,19 @@ namespace RogueCommandExpansionLoader.Runtime
             VisualAssetName = visualAssetName == null ? string.Empty : visualAssetName.Trim();
             VisualRootPath = visualRootPath == null ? string.Empty : visualRootPath.Trim();
             IsPrimary = isPrimary;
+
+            var moduleCopy = new List<RuntimeUnitVisualModule>();
+            if (modules != null)
+            {
+                foreach (RuntimeUnitVisualModule module in modules)
+                {
+                    if (module != null)
+                    {
+                        moduleCopy.Add(module);
+                    }
+                }
+            }
+            Modules = moduleCopy.AsReadOnly();
 
             Color parsed;
             if (TryParseHexColor(ColorTintHex, out parsed))
@@ -50,6 +85,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public string VisualAssetName { get; }
         public string VisualRootPath { get; }
         public bool IsPrimary { get; }
+        public IReadOnlyList<RuntimeUnitVisualModule> Modules { get; }
 
         public static bool TryParseHexColor(string hex, out Color color)
         {
