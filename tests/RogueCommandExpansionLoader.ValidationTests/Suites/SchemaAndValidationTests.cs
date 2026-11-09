@@ -54,7 +54,9 @@ internal static partial class ValidationTestRunner
             ("shieldRegeneration", "unitShieldRegen", typeof(ContentUnitShieldRegenDefinition), false),
             ("vampiricLeech", "unitVampiricLeech", typeof(ContentUnitVampiricLeechDefinition), false),
             ("tauntPulse", "unitTauntPulse", typeof(ContentUnitTauntDefinition), false),
-            ("shieldOverloadNova", "unitShieldOverloadNova", typeof(ContentUnitShieldOverloadNovaDefinition), false)
+            ("shieldOverloadNova", "unitShieldOverloadNova", typeof(ContentUnitShieldOverloadNovaDefinition), false),
+            ("damageReflect", "unitDamageReflect", typeof(ContentUnitDamageReflectDefinition), false),
+            ("deathNova", "unitDeathNova", typeof(ContentUnitDeathNovaDefinition), false)
         };
 
         foreach (var entry in subDefinitions)
@@ -928,7 +930,14 @@ internal static partial class ValidationTestRunner
             (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { novaRadius = Single.NaN }, "unit-shield-nova.radius-invalid"),
             (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { damage = Single.PositiveInfinity }, "unit-shield-nova.damage-invalid"),
             (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { stunDuration = Single.NaN }, "unit-shield-nova.stun-invalid"),
-            (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { cooldown = Single.PositiveInfinity }, "unit-shield-nova.cooldown-invalid")
+            (pack => pack.units[0].shieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { cooldown = Single.PositiveInfinity }, "unit-shield-nova.cooldown-invalid"),
+            (pack => pack.units[0].damageReflect = new ContentUnitDamageReflectDefinition { reflectRatio = Single.NaN }, "unit-damage-reflect.ratio-invalid"),
+            (pack => pack.units[0].damageReflect = new ContentUnitDamageReflectDefinition { reflectRatio = 0.3f, maxReflectPerHit = Single.PositiveInfinity }, "unit-damage-reflect.max-invalid"),
+            (pack => pack.units[0].deathNova = new ContentUnitDeathNovaDefinition { novaRadius = Single.NaN }, "unit-death-nova.radius-invalid"),
+            (pack => pack.units[0].deathNova = new ContentUnitDeathNovaDefinition { novaRadius = 5f, damage = Single.PositiveInfinity }, "unit-death-nova.damage-invalid"),
+            (pack => pack.units[0].deathNova = new ContentUnitDeathNovaDefinition { novaRadius = 5f, stunDuration = Single.NaN }, "unit-death-nova.stun-invalid"),
+            (pack => pack.units[0].deathNova = new ContentUnitDeathNovaDefinition { novaRadius = 5f, slowDuration = Single.PositiveInfinity }, "unit-death-nova.slow-invalid"),
+            (pack => pack.units[0].deathNova = new ContentUnitDeathNovaDefinition { novaRadius = 5f, maxTargets = 33 }, "unit-death-nova.max-targets-invalid")
         };
         var failures = new System.Collections.Generic.List<string>();
         foreach (var testCase in cases)

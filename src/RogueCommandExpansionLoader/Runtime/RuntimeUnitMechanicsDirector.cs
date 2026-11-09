@@ -29,6 +29,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public ContentUnitVampiricLeechDefinition VampiricLeech { get; set; }
         public ContentUnitTauntDefinition Taunt { get; set; }
         public ContentUnitShieldOverloadNovaDefinition ShieldOverloadNova { get; set; }
+        public ContentUnitDamageReflectDefinition DamageReflect { get; set; }
+        public ContentUnitDeathNovaDefinition DeathNova { get; set; }
         public string DefaultTacticalStance { get; set; }
         public string[] StartingAffixes { get; set; }
         public string DefaultLoadout { get; set; }
@@ -64,10 +66,19 @@ namespace RogueCommandExpansionLoader.Runtime
             (ExperienceReward != null && ExperienceReward.experienceAmount > 0) ||
             (VampiricLeech != null && VampiricLeech.siphonRatio > 0f);
 
+        public bool HasOnDamageTakenMechanics =>
+            (DamageReflect != null && DamageReflect.reflectRatio > 0f);
+
+        public bool HasOnDeathMechanics =>
+            (DeathNova != null && DeathNova.novaRadius > 0f &&
+             (DeathNova.damage > 0f || DeathNova.stunDuration > 0f || DeathNova.slowDuration > 0f));
+
         public bool HasAnyMechanics =>
             HasRuntimeComponentMechanics ||
             HasAiBehaviorMechanics ||
             HasOnDamageDealtMechanics ||
+            HasOnDamageTakenMechanics ||
+            HasOnDeathMechanics ||
             (!string.IsNullOrWhiteSpace(AiActivationTrigger) &&
                 !string.Equals(AiActivationTrigger, "EnemiesInRange", StringComparison.OrdinalIgnoreCase)) ||
             (MinAttackRange.HasValue && MinAttackRange.Value > 0f) ||
@@ -84,6 +95,9 @@ namespace RogueCommandExpansionLoader.Runtime
     /// <c>baselineStatusEffects</c>, <c>statusEffects</c>, <c>combatBoosts</c>, <c>experience</c>, <c>synergies</c>,
     /// <c>stealth</c>, <c>command</c>, and <c>experienceReward</c> in <c>content.json</c>,
     /// plus bounded tactical pulses dispatched by the runtime command director.
+    /// Reactive defense mechanics (<c>damageReflect</c>, <c>deathNova</c>) use the verified
+    /// <c>TakeDamage</c>/<c>Die</c> postfix seams via <c>InvokeTakeDamage</c> and
+    /// <c>SetActiveStatusEffect</c>; reflected damage never re-triggers reflect.
     /// </summary>
     public sealed class RuntimeUnitMechanicsDirector : MonoBehaviour
     {
@@ -114,6 +128,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static readonly Dictionary<string, DynamicCommandAuraState> _activeDynamicCommandAuras =
             new Dictionary<string, DynamicCommandAuraState>(StringComparer.Ordinal);
+
+        [ThreadStatic] private static int _reflectDepth;
 
         private static bool _reflectionResolved;
         private static PropertyInfo _entityIdProperty;
@@ -1242,6 +1258,15 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 parts.Add("Nova EMP: " + profile.ShieldOverloadNova.damage.ToString("0") + " dmg (" + profile.ShieldOverloadNova.novaRadius.ToString("0.#") + "m)");
             }
+            if (profile.DamageReflect != null && profile.DamageReflect.reflectRatio > 0f)
+            {
+                parts.Add("Reflejo: " + (profile.DamageReflect.reflectRatio * 100f).ToString("0") + "% (" +
+                    profile.DamageReflect.maxReflectPerHit.ToString("0") + " máx/golpe)");
+            }
+            if (profile.DeathNova != null && profile.DeathNova.novaRadius > 0f)
+            {
+                parts.Add("Nova Mortal: " + profile.DeathNova.damage.ToString("0") + " dmg (" + profile.DeathNova.novaRadius.ToString("0.#") + "m)");
+            }
             if (!string.IsNullOrWhiteSpace(profile.DefaultTacticalStance))
             {
                 parts.Add("Postura: " + profile.DefaultTacticalStance);
@@ -1415,6 +1440,8 @@ namespace RogueCommandExpansionLoader.Runtime
         /// Invoked when an entity dies (Harmony postfix on EntityController.Die).
         /// Cleans up runtime mechanics state and combat experience tracking so
         /// a dying unit does not retain stale buffs/auras or reward duplicates.
+        /// Pooled reuse paths also call this method; they must NOT trigger deathNova.
+        /// Use <see cref="OnEntityKilled"/> for the real death path (Die postfix only).
         /// </summary>
         public static void OnEntityDied(object entityObj)
         {
@@ -1438,6 +1465,37 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 // Death cleanup must never interfere with native destruction.
             }
+        }
+
+        /// <summary>
+        /// Invoked on the real death path (Die postfix only, never pooled reuse).
+        /// Triggers the dying unit's <c>deathNova</c> before <see cref="OnEntityDied"/>
+        /// cleans up state, so position/enemy checks still resolve against the live entity.
+        /// </summary>
+        public static void OnEntityKilled(object entityObj)
+        {
+            if (entityObj != null)
+            {
+                try
+                {
+                    string killedId = ReadEntityId(entityObj);
+                    UnitRuntimeMechanicsProfile killedProfile;
+                    if (!string.IsNullOrWhiteSpace(killedId) &&
+                        TryGetProfile(killedId, out killedProfile) &&
+                        killedProfile != null &&
+                        killedProfile.HasOnDeathMechanics)
+                    {
+                        Vector3 killedPosition = ReadVector3Property(_positionProperty, entityObj);
+                        ExecuteDeathNova(entityObj, killedProfile.DeathNova, killedPosition);
+                    }
+                }
+                catch
+                {
+                    // Death nova must never interfere with native destruction.
+                }
+            }
+
+            OnEntityDied(entityObj);
         }
 
         /// <summary>
@@ -2199,6 +2257,41 @@ namespace RogueCommandExpansionLoader.Runtime
                         float mult = targetProfile.ExperienceReward.bonusMultiplier > 0f ? targetProfile.ExperienceReward.bonusMultiplier : 1f;
                         float bounty = Mathf.Max(1f, (float)Math.Round(targetProfile.ExperienceReward.experienceAmount * mult));
                         InvokeBankDeposit("Player", bounty);
+                    }
+                }
+
+                // 6. Damage reflect (thorns): the victim reflects part of the damage taken.
+                // Runs after attacker-side mechanics. Never re-enters reflect (depth guard),
+                // so mutual thorns cannot loop. Reflected damage respects native shield/armor
+                // via InvokeTakeDamage and only fires against hostile attackers.
+                if (_reflectDepth == 0 && IsEntityAlive(targetObj) && IsEnemy(targetObj, originatorObj))
+                {
+                    string reflectTargetId = ReadEntityId(targetObj);
+                    UnitRuntimeMechanicsProfile reflectProfile;
+                    if (!string.IsNullOrWhiteSpace(reflectTargetId) &&
+                        TryGetProfile(reflectTargetId, out reflectProfile) &&
+                        reflectProfile != null &&
+                        reflectProfile.HasOnDamageTakenMechanics)
+                    {
+                        float reflected = amount * reflectProfile.DamageReflect.reflectRatio;
+                        if (reflectProfile.DamageReflect.maxReflectPerHit > 0f &&
+                            reflected > reflectProfile.DamageReflect.maxReflectPerHit)
+                        {
+                            reflected = reflectProfile.DamageReflect.maxReflectPerHit;
+                        }
+
+                        if (reflected > 0.05f && IsEntityAlive(originatorObj))
+                        {
+                            _reflectDepth++;
+                            try
+                            {
+                                InvokeTakeDamage(originatorObj, reflected, targetObj);
+                            }
+                            finally
+                            {
+                                _reflectDepth--;
+                            }
+                        }
                     }
                 }
             }
@@ -3168,6 +3261,69 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (nova.damage > 0f)
                 {
                     InvokeTakeDamage(candidate, nova.damage, self);
+                }
+            }
+        }
+
+        private static void ExecuteDeathNova(object self, ContentUnitDeathNovaDefinition nova, Vector3 deathPosition)
+        {
+            if (nova == null || nova.novaRadius <= 0f)
+            {
+                return;
+            }
+
+            TriggerVisualFeedback(self, 0.35f);
+
+            IEnumerable entities = GetActiveEntities();
+            if (entities == null)
+            {
+                return;
+            }
+
+            float worldRadius = nova.novaRadius <= 25f ? nova.novaRadius * 10f : nova.novaRadius;
+            float radiusSq = worldRadius * worldRadius;
+            int maxTargets = nova.maxTargets > 0 ? nova.maxTargets : 32;
+            int hitCount = 0;
+
+            foreach (object candidate in entities)
+            {
+                if (candidate == null || ReferenceEquals(candidate, self) || !IsEntityAlive(candidate))
+                {
+                    continue;
+                }
+
+                if (self != null && !IsEnemy(self, candidate))
+                {
+                    continue;
+                }
+
+                Vector3 pos = ReadVector3Property(_positionProperty, candidate);
+                float dx = pos.x - deathPosition.x;
+                float dz = pos.z - deathPosition.z;
+                if ((dx * dx + dz * dz) > radiusSq)
+                {
+                    continue;
+                }
+
+                if (nova.stunDuration > 0f)
+                {
+                    ApplyTimedStatusEffect(candidate, "Stun", nova.stunDuration);
+                }
+
+                if (nova.slowDuration > 0f)
+                {
+                    ApplyTimedStatusEffect(candidate, "SlowedDown", nova.slowDuration);
+                }
+
+                if (nova.damage > 0f)
+                {
+                    InvokeTakeDamage(candidate, nova.damage, self);
+                }
+
+                hitCount++;
+                if (hitCount >= maxTargets)
+                {
+                    break;
                 }
             }
         }

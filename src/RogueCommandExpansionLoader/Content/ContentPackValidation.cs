@@ -518,6 +518,8 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateVampiricLeech(unit.vampiricLeech, itemPath + ".vampiricLeech", diagnostics);
                 ValidateTaunt(unit.tauntPulse, itemPath + ".tauntPulse", diagnostics);
                 ValidateShieldOverloadNova(unit.shieldOverloadNova, itemPath + ".shieldOverloadNova", diagnostics);
+                ValidateDamageReflect(unit.damageReflect, itemPath + ".damageReflect", diagnostics);
+                ValidateDeathNova(unit.deathNova, itemPath + ".deathNova", diagnostics);
                 ValidateUnitBalancingParameters(unit, itemPath, diagnostics);
                 ValidateUnitTacticalStanceAndAffixes(unit, itemPath, diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
@@ -3102,6 +3104,57 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Add(diagnostics, "unit-shield-nova.cooldown-invalid", path + ".cooldown",
                     "Shield overload nova cooldown must be finite and between 1.0 and 120 seconds.");
+            }
+        }
+
+        private static void ValidateDamageReflect(
+            ContentUnitDamageReflectDefinition reflect,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (reflect == null) return;
+            if (!IsFiniteSingle(reflect.reflectRatio) || reflect.reflectRatio <= 0f || reflect.reflectRatio > 1.0f)
+            {
+                Add(diagnostics, "unit-damage-reflect.ratio-invalid", path + ".reflectRatio",
+                    "Damage reflect ratio must be finite and between 0 (exclusive) and 1.0 (100%).");
+            }
+            if (!IsFiniteSingle(reflect.maxReflectPerHit) || reflect.maxReflectPerHit < 0f)
+            {
+                Add(diagnostics, "unit-damage-reflect.max-invalid", path + ".maxReflectPerHit",
+                    "Damage reflect max per hit must be finite and non-negative.");
+            }
+        }
+
+        private static void ValidateDeathNova(
+            ContentUnitDeathNovaDefinition nova,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (nova == null) return;
+            if (!IsFiniteSingle(nova.novaRadius) || nova.novaRadius < 1.0f || nova.novaRadius > 50f)
+            {
+                Add(diagnostics, "unit-death-nova.radius-invalid", path + ".novaRadius",
+                    "Death nova radius must be finite and between 1.0 and 50 meters.");
+            }
+            if (!IsFiniteSingle(nova.damage) || nova.damage < 0f || nova.damage > 500f)
+            {
+                Add(diagnostics, "unit-death-nova.damage-invalid", path + ".damage",
+                    "Death nova damage must be finite and between 0 and 500.");
+            }
+            if (!IsFiniteSingle(nova.stunDuration) || nova.stunDuration < 0f || nova.stunDuration > 15f)
+            {
+                Add(diagnostics, "unit-death-nova.stun-invalid", path + ".stunDuration",
+                    "Death nova stun duration must be finite and between 0 and 15 seconds.");
+            }
+            if (!IsFiniteSingle(nova.slowDuration) || nova.slowDuration < 0f || nova.slowDuration > 15f)
+            {
+                Add(diagnostics, "unit-death-nova.slow-invalid", path + ".slowDuration",
+                    "Death nova slow duration must be finite and between 0 and 15 seconds.");
+            }
+            if (nova.maxTargets < 0 || nova.maxTargets > 32)
+            {
+                Add(diagnostics, "unit-death-nova.max-targets-invalid", path + ".maxTargets",
+                    "Death nova max targets must be between 0 and 32.");
             }
         }
 

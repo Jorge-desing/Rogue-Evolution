@@ -1,7 +1,7 @@
 ---
 name: rogue-command-harmony-policy
 description: "BepInEx 5 + Harmony 2 patching policy for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). When creating or auditing Unity game plugins, Harmony patches, assembly identity checks, or IL2CPP/back-end decisions. [Política de BepInEx 5 + Harmony 2 para Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). Uso: plugins Unity, patches Harmony, verificación de identidad de ensamblados, decisiones backend IL2CPP]"
-version: 1.2.0
+version: 1.3.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -61,19 +61,22 @@ Patches use a programmatic registration plan rather than static attributes:
 
 ---
 
-## Core Engine Harmony Patches (53 Installed Hooks)
+## Core Engine Harmony Patches (58 Installed Hooks)
 
-The loader registers 53 verified hooks across core game simulation systems:
+The loader registers 58 verified hooks across core game simulation systems:
 
 | Category / Pillar | Target Method | Hook Type | Purpose & Telemetry Counter |
 |---|---|---|---|
 | **Pillar 1: Production** | `BuildingPlacement.CreateBuildingPlacementGhost` | Postfix | Track placement holograms; populate `GetLastPlacementGhostEntityId()` (`placementGhostHookCount`) |
 | **Pillar 1: Production** | `EntityFactory.InstantiateEntity` | Postfix + Transpiler | Intercept unit creation, attach directors (`unitCreationHookCount`, `unitCreationTranspilerCount`) |
-| **Pillar 1: Production** | `EntityController.ResetAndInitForReuse` | Prefix/Post + Transpiler | Handle object pool recycling; clear registered effects/XP (`unitReuseHookCount`, `unitReuseTranspilerCount`) |
-| **Pillar 1: Production** | `EntityController.Produce` | Postfix | Track factory production completion by factory and entityId (`factoryProduceHookCount`) |
-| **Pillar 2: Registry** | `ExistingControllers.Init` | Postfix | Reset battlefield registry on scene start; notify AI behaviour (`entityRegistryResetCount`) |
-| **Pillar 2: Registry** | `ExistingControllers.OnEntityCreated` | Postfix + Transpiler | Register unit into player/AI rosters (`entityRegisteredCount`, `activeRegisteredEntityCount`, `entityRegisteredTranspilerCount`) |
-| **Pillar 2: Registry** | `ExistingControllers.OnEntityWillBeDestroyed` | Postfix + Transpiler | Intercept death; unlink aura followers, release AI arbiter leases (`entityUnregisteredCount`, `entityUnregisteredTranspilerCount`) |
+| **Pillar 1: Production** | `EntityFactory.InitEntityController` | Pre/Post + Transpiler | Prefab/GameObject unit instantiation; stacks `Dup` on return (`initEntityControllerTranspilerCount`) |
+| **Pillar 1: Production** | `EntityController.OnHasBeenInstantiated` | Transpiler | Universal unit instantiation callback; attaches directors (`entityOnInstantiatedTranspilerCount`) |
+| **Pillar 1: Production** | `EntityController.ResetAndInitForReuse` | Prefix + Transpiler | Object pool recycling; clears stale XP/effects (`unitReuseHookCount`, `unitReuseTranspilerCount`) |
+| **Pillar 1: Production** | `EntityController.OnHasBeenInstantiatedForReuse` | Postfix + Transpiler | Universal pooled unit revival callback (`entityReuseOnInstantiatedTranspilerCount`) |
+| **Pillar 1: Production** | `EntityController.Produce` | Pre/Post + Transpiler | Factory production dispatch; passes args to director (`factoryProduceHookCount`, `factoryProduceTranspilerCount`) |
+| **Pillar 2: Registry** | `ExistingControllers.Init` | Postfix + Transpiler | Reset battlefield registry on scene start (`entityRegistryResetCount`, `entityRegistryResetTranspilerCount`) |
+| **Pillar 2: Registry** | `ExistingControllers.OnEntityCreated` | Postfix + Transpiler | Register unit into rosters (`entityRegisteredCount`, `activeRegisteredEntityCount`, `entityRegisteredTranspilerCount`) |
+| **Pillar 2: Registry** | `ExistingControllers.OnEntityWillBeDestroyed` | Postfix + Transpiler | Intercept death; unlink aura followers, release leases (`entityUnregisteredCount`, `entityUnregisteredTranspilerCount`) |
 | **Pillar 2: Registry** | `RuntimeUnitMechanicsDirector` Invariants | Internal | Deterministic cleanup of dynamic auras, followers, and status effects upon entity death |
 | **Pillar 3: Command Loop** | `EntityController.ExecuteCommand` | Postfix | Intercept orders; store `command.tag` in `GetLastUnitCommandTag()`; notify AI (`commandExecutedCount`) |
 | **Pillar 3: Command Loop** | `EntityController.ExecuteNextCommand` | Postfix | Step through unit command chain (`commandNextStepCount`) |
@@ -99,9 +102,14 @@ The loader registers 53 verified hooks across core game simulation systems:
 - **Use:** Modifying CIL instruction streams in-place at exact bytecode injection points.
 - **Implemented Core Transpilers (`RuntimeTranspilerPatches.cs`):**
   - `EntityFactory.InstantiateEntity`: Clones dynamic entity/arg loads and injects `OnEntityInstantiatedTranspilerHook` right after `callvirt OnHasBeenInstantiated`.
+  - `EntityFactory.InitEntityController`: Value-returning method (`EntityController`). Injects `OpCodes.Dup` + `call OnInitEntityControllerTranspilerHook` before each `OpCodes.Ret`, preserving the returned instance on the stack.
+  - `EntityController.OnHasBeenInstantiated`: Injects `ldarg.0`, `ldarg.1`, and `call OnEntityHasBeenInstantiatedTranspilerHook` before all `OpCodes.Ret` exits.
+  - `EntityController.OnHasBeenInstantiatedForReuse`: Injects `ldarg.0`, `ldarg.1`, and `call OnEntityHasBeenInstantiatedForReuseTranspilerHook` before all `OpCodes.Ret` exits.
+  - `EntityController.Produce`: Injects `ldarg.0..3` and `call OnEntityProduceTranspilerHook` before all `OpCodes.Ret` exits.
+  - `EntityController.ResetAndInitForReuse`: Injects `OnEntityResetForReuseTranspilerHook` before all `OpCodes.Ret` exit points.
+  - `ExistingControllers.Init`: Injects `ldarg.0` and `call OnEntityRegistryResetTranspilerHook` before all `OpCodes.Ret` exit points.
   - `ExistingControllers.OnEntityHasBeenCreated`: Injects `OnEntityRegisteredTranspilerHook` before each `OpCodes.Ret`, transferring return labels to the start of the injected sequence.
   - `ExistingControllers.OnEntityWillBeDestroyed`: Injects `OnEntityWillBeDestroyedTranspilerHook` at method entry (index 0).
-  - `EntityController.ResetAndInitForReuse`: Injects `OnEntityResetForReuseTranspilerHook` before all `OpCodes.Ret` exit points.
 - **`netstandard2.1` / Mono Type Invariant (CS7069 Fix):** In `netstandard2.1` plugins referencing .NET Framework `0Harmony.dll`, accessing `instruction.labels` or `new CodeMatcher(instructions, generator)` directly triggers `error CS7069` (`Label` or `ILGenerator` in `mscorlib` not found). Manipulate `List<CodeInstruction>` directly using reflection-based `TransferLabels(src, dst)` and `ClearLabels(inst)` via `System.Collections.IList` on the `labels` field. Never transpile `async`, `ref`, or `out` generic methods.
 
 ### 4. Optional Target Resolution (Cross-Version Robustness)

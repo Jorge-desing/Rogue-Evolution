@@ -47,6 +47,11 @@ namespace RogueCommandExpansionLoader.Runtime
         private static int _entityRegisteredTranspilerCount;
         private static int _entityUnregisteredTranspilerCount;
         private static int _unitReuseTranspilerCount;
+        private static int _initEntityControllerTranspilerCount;
+        private static int _entityOnInstantiatedTranspilerCount;
+        private static int _entityReuseOnInstantiatedTranspilerCount;
+        private static int _factoryProduceTranspilerCount;
+        private static int _entityRegistryResetTranspilerCount;
         private static string _lastExecutedCommandKind = string.Empty;
         private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
         private static FieldInfo _cachedCommandKindField;
@@ -67,6 +72,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static int EntityRegisteredTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityRegisteredTranspilerCount, 0, 0);
         public static int EntityUnregisteredTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityUnregisteredTranspilerCount, 0, 0);
         public static int UnitReuseTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _unitReuseTranspilerCount, 0, 0);
+        public static int InitEntityControllerTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _initEntityControllerTranspilerCount, 0, 0);
+        public static int EntityOnInstantiatedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityOnInstantiatedTranspilerCount, 0, 0);
+        public static int EntityReuseOnInstantiatedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityReuseOnInstantiatedTranspilerCount, 0, 0);
+        public static int FactoryProduceTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _factoryProduceTranspilerCount, 0, 0);
+        public static int EntityRegistryResetTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityRegistryResetTranspilerCount, 0, 0);
 
         public static string LastExecutedCommandKind
         {
@@ -126,6 +136,11 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Exchange(ref _entityRegisteredTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _entityUnregisteredTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _unitReuseTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _initEntityControllerTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityOnInstantiatedTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityReuseOnInstantiatedTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _factoryProduceTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityRegistryResetTranspilerCount, 0);
             lock (Gate)
             {
                 _lastExecutedCommandKind = string.Empty;
@@ -1505,7 +1520,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
-                RuntimeUnitMechanicsDirector.OnEntityDied(__instance);
+                RuntimeUnitMechanicsDirector.OnEntityKilled(__instance);
             }
             catch (Exception exception)
             {
@@ -1702,6 +1717,82 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 RuntimeUnitMechanicsDirector.OnEntityDied(entityObj);
+            });
+        }
+        public static void OnInitEntityControllerTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _initEntityControllerTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityHasBeenInstantiatedTranspiler(object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityOnInstantiatedTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityHasBeenInstantiatedForReuseTranspiler(object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityReuseOnInstantiatedTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityProduceTranspiler(object factoryObj, bool instantProduction, bool forFree, bool doNotTriggerEvent)
+        {
+            if (factoryObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _factoryProduceTranspilerCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnFactoryProduced(factoryObj, instantProduction, forFree, doNotTriggerEvent);
+            });
+        }
+
+        public static void OnEntityRegistryResetTranspiler(object existingControllersObj)
+        {
+            System.Threading.Interlocked.Increment(ref _entityRegistryResetTranspilerCount);
+            lock (_activeRegisteredEntities)
+            {
+                _activeRegisteredEntities.Clear();
+            }
+
+            SafeCall(delegate
+            {
+                RuntimeUnitMechanicsDirector.OnBattlefieldRegistryReset();
+                RuntimeGameplayCommandDirector.OnBattlefieldRegistryReset();
             });
         }
 
@@ -2322,6 +2413,30 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void OnEntityResetForReuseTranspilerHook(object entity)
         {
             RuntimeHooks.OnEntityResetForReuseTranspiler(entity);
+        }
+        public static void OnInitEntityControllerTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnInitEntityControllerTranspiler(entity);
+        }
+
+        public static void OnEntityHasBeenInstantiatedTranspilerHook(object entity, bool hasBeenCalledFromAbove)
+        {
+            RuntimeHooks.OnEntityHasBeenInstantiatedTranspiler(entity, hasBeenCalledFromAbove);
+        }
+
+        public static void OnEntityHasBeenInstantiatedForReuseTranspilerHook(object entity, bool hasBeenCalledFromAbove)
+        {
+            RuntimeHooks.OnEntityHasBeenInstantiatedForReuseTranspiler(entity, hasBeenCalledFromAbove);
+        }
+
+        public static void OnEntityProduceTranspilerHook(object factory, bool instantProduction, bool forFree, bool doNotTriggerEvent)
+        {
+            RuntimeHooks.OnEntityProduceTranspiler(factory, instantProduction, forFree, doNotTriggerEvent);
+        }
+
+        public static void OnEntityRegistryResetTranspilerHook(object existingControllers)
+        {
+            RuntimeHooks.OnEntityRegistryResetTranspiler(existingControllers);
         }
     }
 

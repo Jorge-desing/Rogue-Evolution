@@ -1012,6 +1012,33 @@ internal static partial class ValidationTestRunner
             unit.shieldOverloadNova.damage = 25f;
             unit.shieldOverloadNova.cooldown = 10f;
 
+            // 5. Damage Reflect bounds
+            unit.damageReflect = new ContentUnitDamageReflectDefinition { reflectRatio = 0f };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-damage-reflect.ratio-invalid");
+            unit.damageReflect.reflectRatio = 1.2f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-damage-reflect.ratio-invalid");
+            unit.damageReflect.reflectRatio = 0.25f;
+            unit.damageReflect.maxReflectPerHit = 40f;
+
+            // 6. Death Nova bounds
+            unit.deathNova = new ContentUnitDeathNovaDefinition { novaRadius = 0.5f };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-death-nova.radius-invalid");
+            unit.deathNova.novaRadius = 60f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-death-nova.radius-invalid");
+            unit.deathNova.novaRadius = 5f;
+            unit.deathNova.damage = 600f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-death-nova.damage-invalid");
+            unit.deathNova.damage = 30f;
+            unit.deathNova.stunDuration = 20f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-death-nova.stun-invalid");
+            unit.deathNova.stunDuration = 1.5f;
+            unit.deathNova.slowDuration = 20f;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-death-nova.slow-invalid");
+            unit.deathNova.slowDuration = 2.0f;
+            unit.deathNova.maxTargets = 33;
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(), "unit-death-nova.max-targets-invalid");
+            unit.deathNova.maxTargets = 6;
+
             // Deep clone verification
             ContentPackDefinition clonedPack = ContentPackCopy.DeepClone(pack);
             ContentUnitDefinition clonedUnit = clonedPack.units[0];
@@ -1043,6 +1070,21 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("ShieldOverloadNova was not deep cloned properly.");
             }
+            if (clonedUnit.damageReflect == null ||
+                Math.Abs(clonedUnit.damageReflect.reflectRatio - 0.25f) > 0.001f ||
+                Math.Abs(clonedUnit.damageReflect.maxReflectPerHit - 40.0f) > 0.001f)
+            {
+                throw new InvalidOperationException("DamageReflect was not deep cloned properly.");
+            }
+            if (clonedUnit.deathNova == null ||
+                Math.Abs(clonedUnit.deathNova.novaRadius - 5.0f) > 0.001f ||
+                Math.Abs(clonedUnit.deathNova.damage - 30.0f) > 0.001f ||
+                Math.Abs(clonedUnit.deathNova.stunDuration - 1.5f) > 0.001f ||
+                Math.Abs(clonedUnit.deathNova.slowDuration - 2.0f) > 0.001f ||
+                clonedUnit.deathNova.maxTargets != 6)
+            {
+                throw new InvalidOperationException("DeathNova was not deep cloned properly.");
+            }
 
             // Profile and summary verification
             var profile = new UnitRuntimeMechanicsProfile
@@ -1051,9 +1093,12 @@ internal static partial class ValidationTestRunner
                 ShieldRegen = unit.shieldRegeneration,
                 VampiricLeech = unit.vampiricLeech,
                 Taunt = unit.tauntPulse,
-                ShieldOverloadNova = unit.shieldOverloadNova
+                ShieldOverloadNova = unit.shieldOverloadNova,
+                DamageReflect = unit.damageReflect,
+                DeathNova = unit.deathNova
             };
-            if (!profile.HasRuntimeComponentMechanics || !profile.HasOnDamageDealtMechanics || !profile.HasAnyMechanics)
+            if (!profile.HasRuntimeComponentMechanics || !profile.HasOnDamageDealtMechanics || !profile.HasAnyMechanics ||
+                !profile.HasOnDamageTakenMechanics || !profile.HasOnDeathMechanics)
             {
                 throw new InvalidOperationException("Profile does not detect new mechanics.");
             }
@@ -1063,7 +1108,9 @@ internal static partial class ValidationTestRunner
                 !summary.Contains("Regen Escudo") ||
                 !summary.Contains("Drenaje Vampírico") ||
                 !summary.Contains("Provocación") ||
-                !summary.Contains("Nova EMP"))
+                !summary.Contains("Nova EMP") ||
+                !summary.Contains("Reflejo") ||
+                !summary.Contains("Nova Mortal"))
             {
                 throw new InvalidOperationException("FormatMechanicsSummary does not describe the new mechanics: " + summary);
             }

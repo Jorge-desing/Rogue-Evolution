@@ -806,7 +806,11 @@
           "duration": 2.5,
           "chance": 0.3
         }
-      ]
+      ],
+      "damageReflect": {
+        "reflectRatio": 0.2,
+        "maxReflectPerHit": 25.0
+      }
     },
     {
       "id": "tactical-operations:arc-lance-walker",
@@ -1691,7 +1695,14 @@
           "scale": 1.0
         }
       ],
-      "prespawnCount": 2
+      "prespawnCount": 2,
+      "deathNova": {
+        "novaRadius": 4.0,
+        "damage": 22.0,
+        "stunDuration": 2.0,
+        "slowDuration": 2.0,
+        "maxTargets": 6
+      }
     },
     {
       "id": "tactical-operations:command-relay",

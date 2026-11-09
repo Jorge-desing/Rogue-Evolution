@@ -64,6 +64,8 @@ When adding or altering runtime mechanics, update all 4 layers simultaneously: S
 | `vampiricLeech` | `siphonRatio` (float), `maxSiphonPerHit` (float) | $0.0 < \text{ratio} \le 1.0$ (exclusive 0). Use `null` if disabled | Heals on hit $\rightarrow$ maps to `Damage1` |
 | `tauntPulse` | `radius` (float), `duration` (float) | Positive floats | Draws enemy aggro |
 | `shieldOverloadNova`| `radius` (float), `damage` (float) | Positive floats | AoE explosion when shield breaks |
+| `damageReflect` | `reflectRatio` (float), `maxReflectPerHit` (float) | $0.0 < \text{ratio} \le 1.0$ (exclusive 0); max $\ge 0$ (`0` = uncapped) | Thorns: reflects fraction of damage taken to hostile attacker via native `TakeDamage`; thread-static depth guard prevents mutual-reflect loops |
+| `deathNova` | `novaRadius` (float), `damage` (float), `stunDuration` (float), `slowDuration` (float), `maxTargets` (int) | Radius 1–50; damage 0–500; stun/slow 0–15; targets 0–32 | Deathrattle AoE on `Die` postfix only (`OnEntityKilled`); pooled reuse via `OnEntityDied` never triggers |
 | `experienceReward` | `experienceAmount` (int) | Positive integer (floats reject!) | Bounty XP grant $\rightarrow$ maps to `Damage1` |
 | `combatBoosts[]` | `statName` (string), `multiplier` (float), `duration` (float) | Finite positive | Timed buff + persistent card modifier; role-aware |
 

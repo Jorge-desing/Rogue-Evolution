@@ -335,3 +335,18 @@ Packs can declare advanced, native-grounded runtime mechanics on units (`units[]
   - `enableCounterBattery` (boolean; default `true`)
   - `enableTacticalSkills` (boolean; default `true`)
 - **Runtime behavior:** Directs support/engineer units out of harmful hazard zones and toward damaged friendly harvesters, buildings, and frontline units (`ScoreSupportOrRepair`), dispatches fast interceptors (`MoveSpeed >= 9.0`) against long-range enemy artillery, and triggers specialist tactical skills through the shared `AiCommandArbiterPolicy`.
+
+### 8. Damage Reflect / Thorns (`damageReflect`)
+- **Schema:**
+  - `reflectRatio` (number, 0 exclusive–1.0): Fraction of damage taken reflected back to the hostile attacker.
+  - `maxReflectPerHit` (number, ≥0): Maximum reflected damage per hit (`0` = uncapped, mirroring `vampiricLeech.maxSiphonPerHit`).
+- **Runtime behavior:** Runs inside `RuntimeUnitMechanicsDirector.OnEntityDealtDamage` (victim side) after attacker-side mechanics. It only fires when the victim is alive, the attacker is its enemy (`IsEnemy`), and the victim's profile carries an active reflect. Reflected damage is delivered through native `EntityController.TakeDamage` and therefore respects native shield/armor. A thread-static depth guard (`_reflectDepth`) guarantees reflected damage never triggers another reflect, so mutual thorns cannot loop. Pooled reuse is unaffected (reflect is stateless).
+
+### 9. Death Nova / Deathrattle (`deathNova`)
+- **Schema:**
+  - `novaRadius` (number, 1.0–50m): Blast radius around the death position (same bounds/scaling as `shieldOverloadNova`).
+  - `damage` (number, 0–500): Area damage to hostile units.
+  - `stunDuration` (number, 0–15s): `StatusEffect.Stun` applied to hostile units (`0` = none).
+  - `slowDuration` (number, 0–15s): `StatusEffect.SlowedDown` applied to hostile units (`0` = none).
+  - `maxTargets` (integer, 0–32): Maximum hostile targets hit (`0` = bounded default 32).
+- **Runtime behavior:** Triggered exclusively from `RuntimeUnitMechanicsDirector.OnEntityKilled`, which is called only by the `EntityController.Die` postfix. `OnEntityDied` remains the cleanup/reuse path and never emits a nova, so pooled reuse cannot trigger it. The nova excludes the dying unit itself, allies, and out-of-radius units, and delivers damage via native `TakeDamage`.

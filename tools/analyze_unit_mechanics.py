@@ -26,6 +26,7 @@ MECHANIC_FIELDS = (
     "detection", "weapons", "armor", "healing", "stealth", "command",
     "experienceReward", "aura", "resourceGathering", "aiBehavior",
     "shieldRegeneration", "vampiricLeech", "tauntPulse", "shieldOverloadNova",
+    "damageReflect", "deathNova",
     "baselineStatusEffects", "onHitStatusEffects",
 )
 

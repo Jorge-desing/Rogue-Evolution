@@ -2638,6 +2638,145 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("runtime unit mechanics director reflects damage once and emits death nova only on kill path", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        UnityEngine.Time.time = 30f;
+
+        try
+        {
+            var tankProfile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:reflect-tank",
+                DamageReflect = new ContentUnitDamageReflectDefinition { reflectRatio = 0.5f, maxReflectPerHit = 20f },
+                DeathNova = new ContentUnitDeathNovaDefinition
+                {
+                    novaRadius = 4f,
+                    damage = 30f,
+                    stunDuration = 1.5f,
+                    slowDuration = 2.0f,
+                    maxTargets = 6
+                }
+            };
+            var attackerProfile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:enemy-attacker",
+                DamageReflect = new ContentUnitDamageReflectDefinition { reflectRatio = 0.5f, maxReflectPerHit = 20f }
+            };
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:reflect-tank", tankProfile);
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:enemy-attacker", attackerProfile);
+
+            var tank = new EntityController
+            {
+                entityId = "test:reflect-tank",
+                UniqueEntityId = 501,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(0f, 0f, 0f)
+            };
+            var attacker = new EntityController
+            {
+                entityId = "test:enemy-attacker",
+                UniqueEntityId = 502,
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(10f, 0f, 0f)
+            };
+            var farEnemy = new EntityController
+            {
+                entityId = "test:far-enemy",
+                UniqueEntityId = 503,
+                IsControlledByAi = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(80f, 0f, 0f)
+            };
+            var ally = new EntityController
+            {
+                entityId = "test:ally",
+                UniqueEntityId = 504,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(5f, 0f, 0f)
+            };
+
+            ExistingControllers.Instance.PlayerUnits().Add(tank);
+            ExistingControllers.Instance.PlayerUnits().Add(ally);
+            ExistingControllers.Instance.AiUnits().Add(attacker);
+            ExistingControllers.Instance.AiUnits().Add(farEnemy);
+
+            // OnEntityDealtDamage(target=tank, amount=20, originator=attacker):
+            // tank reflects 20*0.5=10 to attacker; mutual reflect must not loop back.
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(tank, 20f, attacker);
+
+            if (Math.Abs(attacker.CurrentHealth - 90f) > 0.01f)
+            {
+                throw new InvalidOperationException($"Expected attacker HP=90 after reflect, got {attacker.CurrentHealth}");
+            }
+
+            if (Math.Abs(tank.CurrentHealth - 100f) > 0.01f)
+            {
+                throw new InvalidOperationException($"Expected tank HP=100 after mutual reflect guard, got {tank.CurrentHealth}");
+            }
+
+            // Death nova on kill path: nearby enemy takes 30 + stun/slow; far/ally untouched.
+            RuntimeUnitMechanicsDirector.OnEntityKilled(tank);
+
+            if (Math.Abs(attacker.CurrentHealth - 60f) > 0.01f)
+            {
+                throw new InvalidOperationException($"Expected attacker HP=60 after death nova, got {attacker.CurrentHealth}");
+            }
+
+            if (!attacker.HasActiveStatusEffect(StatusEffect.Stun) ||
+                !attacker.HasActiveStatusEffect(StatusEffect.SlowedDown))
+            {
+                throw new InvalidOperationException("Expected death nova to apply Stun and SlowedDown to nearby enemy.");
+            }
+
+            if (Math.Abs(farEnemy.CurrentHealth - 100f) > 0.01f)
+            {
+                throw new InvalidOperationException($"Expected far enemy HP=100 outside nova, got {farEnemy.CurrentHealth}");
+            }
+
+            if (Math.Abs(ally.CurrentHealth - 100f) > 0.01f)
+            {
+                throw new InvalidOperationException($"Expected ally HP=100 (allies unaffected), got {ally.CurrentHealth}");
+            }
+
+            // Pooled reuse path (OnEntityDied) must not trigger death nova for a fresh tank.
+            var freshTank = new EntityController
+            {
+                entityId = "test:reflect-tank",
+                UniqueEntityId = 505,
+                IsControlledByPlayer = true,
+                IsUnit = true,
+                CurrentHealth = 100f,
+                MaxHealth = 100f,
+                Position = new UnityEngine.Vector3(0f, 0f, 0f)
+            };
+            RuntimeUnitMechanicsDirector.OnEntityDied(freshTank);
+
+            if (Math.Abs(attacker.CurrentHealth - 60f) > 0.01f)
+            {
+                throw new InvalidOperationException($"Expected attacker HP=60 after reuse path (no nova), got {attacker.CurrentHealth}");
+            }
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            Bank.Reset();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
     ("runtime unit mechanics director executes synergies, autonomous stealth, command aura, and kill experience rewards", () =>
     {
         ExistingControllers.Instance.Reset();
@@ -10442,7 +10581,12 @@ internal static partial class ValidationTestRunner
                 if (RuntimeHooks.UnitCreationTranspilerCount != 0 ||
                     RuntimeHooks.EntityRegisteredTranspilerCount != 0 ||
                     RuntimeHooks.EntityUnregisteredTranspilerCount != 0 ||
-                    RuntimeHooks.UnitReuseTranspilerCount != 0)
+                    RuntimeHooks.UnitReuseTranspilerCount != 0 ||
+                    RuntimeHooks.InitEntityControllerTranspilerCount != 0 ||
+                    RuntimeHooks.EntityOnInstantiatedTranspilerCount != 0 ||
+                    RuntimeHooks.EntityReuseOnInstantiatedTranspilerCount != 0 ||
+                    RuntimeHooks.FactoryProduceTranspilerCount != 0 ||
+                    RuntimeHooks.EntityRegistryResetTranspilerCount != 0)
                 {
                     throw new InvalidOperationException("Initial transpiler telemetry counters must be 0 after reset.");
                 }
@@ -10456,14 +10600,36 @@ internal static partial class ValidationTestRunner
                     MaxHealth = 150f
                 };
 
-                // 1. Unit Creation Transpiler Hook
+                var factoryUnit = new EntityController
+                {
+                    entityId = "test:transpiler-factory",
+                    UniqueEntityId = 9902,
+                    IsControlledByPlayer = true,
+                    ProductionInfo = new ProductionInfo { entityId = "unit:produced-tank" }
+                };
+
+                // 1. Unit Creation Transpiler Hook (EntityFactory.InstantiateEntity)
                 RuntimeHarmonyPatches.OnEntityInstantiatedTranspilerHook(unit, false);
                 if (RuntimeHooks.UnitCreationTranspilerCount != 1)
                 {
                     throw new InvalidOperationException("OnEntityInstantiatedTranspilerHook must increment UnitCreationTranspilerCount.");
                 }
 
-                // 2. Entity Registered Transpiler Hook
+                // 2. Init Entity Controller Transpiler Hook (EntityFactory.InitEntityController)
+                RuntimeHarmonyPatches.OnInitEntityControllerTranspilerHook(unit);
+                if (RuntimeHooks.InitEntityControllerTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnInitEntityControllerTranspilerHook must increment InitEntityControllerTranspilerCount.");
+                }
+
+                // 3. Entity OnInstantiated Transpiler Hook (EntityController.OnHasBeenInstantiated)
+                RuntimeHarmonyPatches.OnEntityHasBeenInstantiatedTranspilerHook(unit, false);
+                if (RuntimeHooks.EntityOnInstantiatedTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityHasBeenInstantiatedTranspilerHook must increment EntityOnInstantiatedTranspilerCount.");
+                }
+
+                // 4. Entity Registered Transpiler Hook (ExistingControllers.OnEntityHasBeenCreated)
                 ExistingControllers.Instance.PlayerUnits().Add(unit);
                 RuntimeHarmonyPatches.OnEntityRegisteredTranspilerHook(ExistingControllers.Instance, unit, false);
                 if (RuntimeHooks.EntityRegisteredTranspilerCount != 1 ||
@@ -10472,7 +10638,7 @@ internal static partial class ValidationTestRunner
                     throw new InvalidOperationException("OnEntityRegisteredTranspilerHook must increment EntityRegisteredTranspilerCount and track active entity.");
                 }
 
-                // 3. Entity Reset For Reuse Transpiler Hook
+                // 5. Entity Reset For Reuse Transpiler Hook (EntityController.ResetAndInitForReuse)
                 RuntimeHarmonyPatches.OnEntityResetForReuseTranspilerHook(unit);
                 if (RuntimeHooks.UnitReuseTranspilerCount != 1 ||
                     RuntimeHooks.IsEntityRegisteredInBattlefield(unit))
@@ -10480,34 +10646,66 @@ internal static partial class ValidationTestRunner
                     throw new InvalidOperationException("OnEntityResetForReuseTranspilerHook must increment UnitReuseTranspilerCount and remove entity from tracking.");
                 }
 
-                // 4. Entity Will Be Destroyed Transpiler Hook
+                // 6. Entity OnInstantiated For Reuse Transpiler Hook (EntityController.OnHasBeenInstantiatedForReuse)
+                RuntimeHarmonyPatches.OnEntityHasBeenInstantiatedForReuseTranspilerHook(unit, false);
+                if (RuntimeHooks.EntityReuseOnInstantiatedTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityHasBeenInstantiatedForReuseTranspilerHook must increment EntityReuseOnInstantiatedTranspilerCount.");
+                }
+
+                // 7. Factory Produce Transpiler Hook (EntityController.Produce)
+                RuntimeHarmonyPatches.OnEntityProduceTranspilerHook(factoryUnit, false, true, false);
+                if (RuntimeHooks.FactoryProduceTranspilerCount != 1 ||
+                    RuntimeGameplayCommandDirector.GetFactoryProducedCount("9902") != 1)
+                {
+                    throw new InvalidOperationException("OnEntityProduceTranspilerHook must increment FactoryProduceTranspilerCount and record production.");
+                }
+
+                // 8. Entity Will Be Destroyed Transpiler Hook (ExistingControllers.OnEntityWillBeDestroyed)
                 RuntimeHarmonyPatches.OnEntityWillBeDestroyedTranspilerHook(ExistingControllers.Instance, unit, null);
                 if (RuntimeHooks.EntityUnregisteredTranspilerCount != 1)
                 {
                     throw new InvalidOperationException("OnEntityWillBeDestroyedTranspilerHook must increment EntityUnregisteredTranspilerCount.");
                 }
 
-                // 5. Diagnostics JSON serialization verification
+                // 9. Registry Reset Transpiler Hook (ExistingControllers.Init)
+                RuntimeHarmonyPatches.OnEntityRegistryResetTranspilerHook(ExistingControllers.Instance);
+                if (RuntimeHooks.EntityRegistryResetTranspilerCount != 1)
+                {
+                    throw new InvalidOperationException("OnEntityRegistryResetTranspilerHook must increment EntityRegistryResetTranspilerCount.");
+                }
+
+                // 10. Diagnostics JSON serialization verification
                 string json = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(
-                    true, 53, "RogueCommand.ExpansionLoader.Runtime", 0);
+                    true, 58, "RogueCommand.ExpansionLoader.Runtime", 0);
                 using (JsonDocument doc = JsonDocument.Parse(json))
                 {
                     JsonElement root = doc.RootElement;
                     if (root.GetProperty("unitCreationTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("entityRegisteredTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("entityUnregisteredTranspilerCount").GetInt32() != 1 ||
-                        root.GetProperty("unitReuseTranspilerCount").GetInt32() != 1)
+                        root.GetProperty("unitReuseTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("initEntityControllerTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("entityOnInstantiatedTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("entityReuseOnInstantiatedTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("factoryProduceTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("entityRegistryResetTranspilerCount").GetInt32() != 1)
                     {
-                        throw new InvalidOperationException("SerializeRuntimeHooksState must serialize transpiler counters correctly: " + json);
+                        throw new InvalidOperationException("SerializeRuntimeHooksState must serialize all transpiler counters correctly: " + json);
                     }
                 }
 
-                // 6. Reset telemetry verification
+                // 11. Reset telemetry verification
                 RuntimeHooks.ResetCoreHookTelemetry();
                 if (RuntimeHooks.UnitCreationTranspilerCount != 0 ||
                     RuntimeHooks.EntityRegisteredTranspilerCount != 0 ||
                     RuntimeHooks.EntityUnregisteredTranspilerCount != 0 ||
-                    RuntimeHooks.UnitReuseTranspilerCount != 0)
+                    RuntimeHooks.UnitReuseTranspilerCount != 0 ||
+                    RuntimeHooks.InitEntityControllerTranspilerCount != 0 ||
+                    RuntimeHooks.EntityOnInstantiatedTranspilerCount != 0 ||
+                    RuntimeHooks.EntityReuseOnInstantiatedTranspilerCount != 0 ||
+                    RuntimeHooks.FactoryProduceTranspilerCount != 0 ||
+                    RuntimeHooks.EntityRegistryResetTranspilerCount != 0)
                 {
                     throw new InvalidOperationException("ResetCoreHookTelemetry must reset all transpiler counters to 0.");
                 }

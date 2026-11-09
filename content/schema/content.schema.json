@@ -561,6 +561,12 @@
         "shieldOverloadNova": {
           "$ref": "#/$defs/unitShieldOverloadNova"
         },
+        "damageReflect": {
+          "$ref": "#/$defs/unitDamageReflect"
+        },
+        "deathNova": {
+          "$ref": "#/$defs/unitDeathNova"
+        },
         "copyUpgradesToEntityId": {
           "type": "string",
           "pattern": "^[a-zA-Z0-9_:-]+$",
@@ -3184,6 +3190,46 @@
         },
         "cooldown": {
           "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "unitDamageReflect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reflectRatio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxReflectPerHit": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "unitDeathNova": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "novaRadius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "damage": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stunDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "slowDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxTargets": {
+          "type": "integer",
           "minimum": 0
         }
       }

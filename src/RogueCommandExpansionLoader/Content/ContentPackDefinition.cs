@@ -289,6 +289,23 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitDamageReflectDefinition
+    {
+        public float reflectRatio;
+        public float maxReflectPerHit;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitDeathNovaDefinition
+    {
+        public float novaRadius;
+        public float damage;
+        public float stunDuration;
+        public float slowDuration;
+        public int maxTargets;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -333,6 +350,8 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitVampiricLeechDefinition vampiricLeech;
         public ContentUnitTauntDefinition tauntPulse;
         public ContentUnitShieldOverloadNovaDefinition shieldOverloadNova;
+        public ContentUnitDamageReflectDefinition damageReflect;
+        public ContentUnitDeathNovaDefinition deathNova;
         public int? combatValue;
         public int? gridSize;
         public int? maxCapacity;
@@ -1251,6 +1270,8 @@ namespace RogueCommandExpansionLoader.Content
                 vampiricLeech = CloneVampiricLeech(source.vampiricLeech),
                 tauntPulse = CloneTaunt(source.tauntPulse),
                 shieldOverloadNova = CloneShieldOverloadNova(source.shieldOverloadNova),
+                damageReflect = CloneDamageReflect(source.damageReflect),
+                deathNova = CloneDeathNova(source.deathNova),
                 combatValue = source.combatValue,
                 gridSize = source.gridSize,
                 maxCapacity = source.maxCapacity,
@@ -1567,6 +1588,27 @@ namespace RogueCommandExpansionLoader.Content
                 damage = source.damage,
                 stunDuration = source.stunDuration,
                 cooldown = source.cooldown
+            };
+        }
+
+        private static ContentUnitDamageReflectDefinition CloneDamageReflect(ContentUnitDamageReflectDefinition source)
+        {
+            return source == null ? null : new ContentUnitDamageReflectDefinition
+            {
+                reflectRatio = source.reflectRatio,
+                maxReflectPerHit = source.maxReflectPerHit
+            };
+        }
+
+        private static ContentUnitDeathNovaDefinition CloneDeathNova(ContentUnitDeathNovaDefinition source)
+        {
+            return source == null ? null : new ContentUnitDeathNovaDefinition
+            {
+                novaRadius = source.novaRadius,
+                damage = source.damage,
+                stunDuration = source.stunDuration,
+                slowDuration = source.slowDuration,
+                maxTargets = source.maxTargets
             };
         }
 

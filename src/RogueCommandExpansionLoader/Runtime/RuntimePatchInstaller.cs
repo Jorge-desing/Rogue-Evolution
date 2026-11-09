@@ -468,6 +468,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 });
             MethodInfo entityResetAndInitForReusePrefix = entityResetAndInitForReuse == null ? null : Hook("EntityControllerResetAndInitForReusePrefix");
 
+            MethodInfo entityOnInstantiated = TryFindUniqueMethod(entityController, "OnHasBeenInstantiated",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 1 &&
+                        parameters[0].ParameterType == typeof(bool);
+                });
             MethodInfo entityOnInstantiatedForReuse = TryFindUniqueMethod(entityController, "OnHasBeenInstantiatedForReuse",
                 delegate(MethodInfo method)
                 {
@@ -562,7 +569,12 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             MethodInfo instantiateTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.EntityFactoryInstantiateEntityTranspiler));
+            MethodInfo initEntityControllerTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.EntityFactoryInitEntityControllerTranspiler));
+            MethodInfo entityOnInstantiatedTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.EntityControllerOnHasBeenInstantiatedTranspiler));
             MethodInfo entityResetTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.EntityControllerResetAndInitForReuseTranspiler));
+            MethodInfo entityOnInstantiatedForReuseTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.EntityControllerOnHasBeenInstantiatedForReuseTranspiler));
+            MethodInfo entityProduceTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.EntityControllerProduceTranspiler));
+            MethodInfo existingControllersInitTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.ExistingControllersInitTranspiler));
             MethodInfo existingControllersCreatedTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.ExistingControllersOnEntityHasBeenCreatedTranspiler));
             MethodInfo existingControllersDestroyedTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.ExistingControllersOnEntityWillBeDestroyedTranspiler));
 
@@ -627,25 +639,29 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 plan.Add(new PatchPlan(createBuildingPlacementGhost, createBuildingPlacementGhostPrefix, createBuildingPlacementGhostPostfix));
             }
-            if (initEntityController != null && (initEntityControllerPrefix != null || initEntityControllerPostfix != null))
+            if (initEntityController != null && (initEntityControllerPrefix != null || initEntityControllerPostfix != null || initEntityControllerTranspiler != null))
             {
-                plan.Add(new PatchPlan(initEntityController, initEntityControllerPrefix, initEntityControllerPostfix));
+                plan.Add(new PatchPlan(initEntityController, initEntityControllerPrefix, initEntityControllerPostfix, initEntityControllerTranspiler, null));
+            }
+            if (entityOnInstantiated != null && entityOnInstantiatedTranspiler != null)
+            {
+                plan.Add(new PatchPlan(entityOnInstantiated, null, null, entityOnInstantiatedTranspiler, null));
             }
             if (entityResetAndInitForReuse != null && entityResetAndInitForReusePrefix != null)
             {
                 plan.Add(new PatchPlan(entityResetAndInitForReuse, entityResetAndInitForReusePrefix, null, entityResetTranspiler, null));
             }
-            if (entityOnInstantiatedForReuse != null && entityOnInstantiatedForReusePostfix != null)
+            if (entityOnInstantiatedForReuse != null && (entityOnInstantiatedForReusePostfix != null || entityOnInstantiatedForReuseTranspiler != null))
             {
-                plan.Add(new PatchPlan(entityOnInstantiatedForReuse, null, entityOnInstantiatedForReusePostfix));
+                plan.Add(new PatchPlan(entityOnInstantiatedForReuse, null, entityOnInstantiatedForReusePostfix, entityOnInstantiatedForReuseTranspiler, null));
             }
-            if (entityProduce != null && (entityProducePrefix != null || entityProducePostfix != null))
+            if (entityProduce != null && (entityProducePrefix != null || entityProducePostfix != null || entityProduceTranspiler != null))
             {
-                plan.Add(new PatchPlan(entityProduce, entityProducePrefix, entityProducePostfix));
+                plan.Add(new PatchPlan(entityProduce, entityProducePrefix, entityProducePostfix, entityProduceTranspiler, null));
             }
-            if (existingControllersInit != null && existingControllersInitPostfix != null)
+            if (existingControllersInit != null && (existingControllersInitPostfix != null || existingControllersInitTranspiler != null))
             {
-                plan.Add(new PatchPlan(existingControllersInit, null, existingControllersInitPostfix));
+                plan.Add(new PatchPlan(existingControllersInit, null, existingControllersInitPostfix, existingControllersInitTranspiler, null));
             }
             if (existingControllersOnEntityCreated != null && existingControllersOnEntityCreatedPostfix != null)
             {
@@ -1150,6 +1166,206 @@ namespace RogueCommandExpansionLoader.Runtime
                 list.Insert(1, ldarg1);
                 list.Insert(2, ldarg2);
                 list.Insert(3, callHook);
+
+                return list;
+            }
+            catch
+            {
+                return instructions;
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> EntityFactoryInitEntityControllerTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            try
+            {
+                var list = new List<CodeInstruction>(instructions);
+                MethodInfo hookMethod = typeof(RuntimeHarmonyPatches).GetMethod(
+                    nameof(RuntimeHarmonyPatches.OnInitEntityControllerTranspilerHook),
+                    BindingFlags.Public | BindingFlags.Static);
+
+                if (hookMethod == null)
+                {
+                    return list;
+                }
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (list[i].opcode == OpCodes.Ret)
+                    {
+                        var dup = new CodeInstruction(OpCodes.Dup);
+                        var callHook = new CodeInstruction(OpCodes.Call, hookMethod);
+
+                        TransferLabels(list[i], dup);
+
+                        list.Insert(i, dup);
+                        list.Insert(i + 1, callHook);
+
+                        i += 2;
+                    }
+                }
+
+                return list;
+            }
+            catch
+            {
+                return instructions;
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> EntityControllerOnHasBeenInstantiatedTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            try
+            {
+                var list = new List<CodeInstruction>(instructions);
+                MethodInfo hookMethod = typeof(RuntimeHarmonyPatches).GetMethod(
+                    nameof(RuntimeHarmonyPatches.OnEntityHasBeenInstantiatedTranspilerHook),
+                    BindingFlags.Public | BindingFlags.Static);
+
+                if (hookMethod == null)
+                {
+                    return list;
+                }
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (list[i].opcode == OpCodes.Ret)
+                    {
+                        var ldarg0 = new CodeInstruction(OpCodes.Ldarg_0);
+                        var ldarg1 = new CodeInstruction(OpCodes.Ldarg_1);
+                        var callHook = new CodeInstruction(OpCodes.Call, hookMethod);
+
+                        TransferLabels(list[i], ldarg0);
+
+                        list.Insert(i, ldarg0);
+                        list.Insert(i + 1, ldarg1);
+                        list.Insert(i + 2, callHook);
+
+                        i += 3;
+                    }
+                }
+
+                return list;
+            }
+            catch
+            {
+                return instructions;
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> EntityControllerOnHasBeenInstantiatedForReuseTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            try
+            {
+                var list = new List<CodeInstruction>(instructions);
+                MethodInfo hookMethod = typeof(RuntimeHarmonyPatches).GetMethod(
+                    nameof(RuntimeHarmonyPatches.OnEntityHasBeenInstantiatedForReuseTranspilerHook),
+                    BindingFlags.Public | BindingFlags.Static);
+
+                if (hookMethod == null)
+                {
+                    return list;
+                }
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (list[i].opcode == OpCodes.Ret)
+                    {
+                        var ldarg0 = new CodeInstruction(OpCodes.Ldarg_0);
+                        var ldarg1 = new CodeInstruction(OpCodes.Ldarg_1);
+                        var callHook = new CodeInstruction(OpCodes.Call, hookMethod);
+
+                        TransferLabels(list[i], ldarg0);
+
+                        list.Insert(i, ldarg0);
+                        list.Insert(i + 1, ldarg1);
+                        list.Insert(i + 2, callHook);
+
+                        i += 3;
+                    }
+                }
+
+                return list;
+            }
+            catch
+            {
+                return instructions;
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> EntityControllerProduceTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            try
+            {
+                var list = new List<CodeInstruction>(instructions);
+                MethodInfo hookMethod = typeof(RuntimeHarmonyPatches).GetMethod(
+                    nameof(RuntimeHarmonyPatches.OnEntityProduceTranspilerHook),
+                    BindingFlags.Public | BindingFlags.Static);
+
+                if (hookMethod == null)
+                {
+                    return list;
+                }
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (list[i].opcode == OpCodes.Ret)
+                    {
+                        var ldarg0 = new CodeInstruction(OpCodes.Ldarg_0);
+                        var ldarg1 = new CodeInstruction(OpCodes.Ldarg_1);
+                        var ldarg2 = new CodeInstruction(OpCodes.Ldarg_2);
+                        var ldarg3 = new CodeInstruction(OpCodes.Ldarg_3);
+                        var callHook = new CodeInstruction(OpCodes.Call, hookMethod);
+
+                        TransferLabels(list[i], ldarg0);
+
+                        list.Insert(i, ldarg0);
+                        list.Insert(i + 1, ldarg1);
+                        list.Insert(i + 2, ldarg2);
+                        list.Insert(i + 3, ldarg3);
+                        list.Insert(i + 4, callHook);
+
+                        i += 5;
+                    }
+                }
+
+                return list;
+            }
+            catch
+            {
+                return instructions;
+            }
+        }
+
+        public static IEnumerable<CodeInstruction> ExistingControllersInitTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            try
+            {
+                var list = new List<CodeInstruction>(instructions);
+                MethodInfo hookMethod = typeof(RuntimeHarmonyPatches).GetMethod(
+                    nameof(RuntimeHarmonyPatches.OnEntityRegistryResetTranspilerHook),
+                    BindingFlags.Public | BindingFlags.Static);
+
+                if (hookMethod == null)
+                {
+                    return list;
+                }
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (list[i].opcode == OpCodes.Ret)
+                    {
+                        var ldarg0 = new CodeInstruction(OpCodes.Ldarg_0);
+                        var callHook = new CodeInstruction(OpCodes.Call, hookMethod);
+
+                        TransferLabels(list[i], ldarg0);
+
+                        list.Insert(i, ldarg0);
+                        list.Insert(i + 1, callHook);
+
+                        i += 2;
+                    }
+                }
 
                 return list;
             }

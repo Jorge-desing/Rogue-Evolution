@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.10.0
+version: 1.11.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -52,7 +52,7 @@ All censuses query live singletons through fail-closed reflection, format primit
 | Census Category | MCP Tool | Scope & Key Output Fields |
 |---|---|---|
 | **System Health** | `diagnostics_get_system_health` | Registry readiness, pack status, registered unit/AI counts, player/AI credits. |
-| **Core Harmony Hooks** | `diagnostics_get_runtime_hooks` | Status of 53 installed patches (with CIL Transpilers on core creation and lifecycle methods) and 16 simulation hooks/counters (`unitCreation`, `unitReuse`, `placementGhost`, `factoryProduce`, `entityRegistryReset`, `entityRegistered`, `entityUnregistered`, `commandExecuted`, `commandNextStep`, `commandReset`, `commandChainDeleted`, `lastExecutedCommandKind`, plus transpiler counters: `unitCreationTranspiler`, `entityRegisteredTranspiler`, `entityUnregisteredTranspiler`, `unitReuseTranspiler`). |
+| **Core Harmony Hooks** | `diagnostics_get_runtime_hooks` | Status of 58 installed patches (with 9 CIL Transpilers across core creation, pooling, factory production, and lifecycle) and 21 simulation hooks/counters (`unitCreation`, `unitReuse`, `placementGhost`, `factoryProduce`, `entityRegistryReset`, `entityRegistered`, `entityUnregistered`, `commandExecuted`, `commandNextStep`, `commandReset`, `commandChainDeleted`, `lastExecutedCommandKind`, plus 9 transpiler counters: `unitCreationTranspiler`, `initEntityControllerTranspiler`, `entityOnInstantiatedTranspiler`, `entityRegisteredTranspiler`, `entityUnregisteredTranspiler`, `unitReuseTranspiler`, `entityReuseOnInstantiatedTranspiler`, `factoryProduceTranspiler`, `entityRegistryResetTranspiler`). |
 | **Battlefield & Rosters** | `diagnostics_get_battlefield_census`<br>`diagnostics_get_player_roster`<br>`diagnostics_get_ai_roster` | Living units, roles, positions, health ratios, orders, and threat scores split by alignment. Omission counters first. |
 | **Combat & Match Summary** | `diagnostics_get_match_summary`<br>`diagnostics_get_base_integrity`<br>`diagnostics_get_threat_prioritization` | Unified combat/economy state, HQ health ratio, enemy structure counts, evaluated hostile threat scores. |
 | **Production & Factories** | `diagnostics_get_production_census` | Living factories, production queues, build durations, progress ratios. |

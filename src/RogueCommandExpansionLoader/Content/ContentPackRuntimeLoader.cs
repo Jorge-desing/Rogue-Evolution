@@ -8695,6 +8695,8 @@ namespace RogueCommandExpansionLoader.Content
                 VampiricLeech = unit.vampiricLeech,
                 Taunt = unit.tauntPulse,
                 ShieldOverloadNova = unit.shieldOverloadNova,
+                DamageReflect = unit.damageReflect,
+                DeathNova = unit.deathNova,
                 DefaultTacticalStance = unit.defaultTacticalStance,
                 StartingAffixes = unit.startingAffixes,
                 DefaultLoadout = unit.defaultLoadout,
