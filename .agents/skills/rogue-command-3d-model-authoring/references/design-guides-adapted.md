@@ -14,6 +14,8 @@ The studio interviews below describe other games and their constraints. Blender 
 | Blender's Bevel modifier adds geometry according to its width, segment count, and edge limit. Weighted normals affect shading; they do not alter the outline. | Spend bevel segments on a visible rolled radius or a silhouette transition. Use a narrow one-segment chamfer for a cut plate edge. Keep flat armor faces broad, and do not use weighted normals as a substitute for a shaped cross-section. |
 | Unity 2021.3 supports importing authored mesh normals and tangents; its single Smoothing Angle can smooth some edges incorrectly. Its LOD system reduces rendered triangles as camera distance increases. | Author hard and smooth edges in Blender and inspect the FBX import. Keep tangents available for the normal-mapped shader. Treat 7,500 faces as the current Rogue Command profiling target for LOD0, not a Unity limit or a target to fill; track exported triangles separately and simplify by LOD/screen size. |
 | Blender baking can transfer high-detail normal information to a lower-detail mesh with a UV margin. | If close-up surface relief is needed, bake it into the existing Normal atlas after the shape and UVs are stable. Do not add a new AO map or move the mesh's RGBA vertex-wear channels into a texture. |
+| Vitaly Bulgarov / Neil Blevins form hierarchy establishes a 70/20/10 distribution with 70/30 rest balance. | Allocate 70% of visual mass to primary silhouette, 20% to functional mechanisms (turrets, engines, sponsons), 10% to scale-defining greebles. Preserve 70% clean resting surfaces and concentrate 30% mechanical complexity into functional bays. Avoid uniform random greebling. |
+| Real-world military & industrial engineering requires all hardware to be physically operable. | Apply the 4 Engineering Questions: verify power/fluid conveyance (hydraulic catenary slack), thermal dissipation (radiators/louvers), human maintenance (hoist shackles/D-rings/latches), and structural stress load transfer (gusset plates/trusses). |
 
 ## Adapted authoring sequence
 
@@ -29,6 +31,8 @@ The studio interviews below describe other games and their constraints. Blender 
 ## Review checklist
 
 - Does the unit read from silhouette alone at the gameplay camera and remain distinct from nearby archetypes?
+- Does the model observe the 70/30 rest rule with 70% clean planar armor/casting and 30% concentrated functional mechanics?
+- Does every added detail answer one of the 4 Engineering Questions (power/fluids, heat dissipation, maintenance/lifting, or structural load transfer)?
 - Are the primary forms shaped as coherent shells, with visible parts attached and mechanical joints where needed?
 - Do soft and hard transitions follow the material and fabrication logic instead of sharing one bevel or smoothing treatment?
 - Does every small feature still read at gameplay scale, or should it be removed or transferred to the existing texture atlas?
@@ -38,6 +42,7 @@ The studio interviews below describe other games and their constraints. Blender 
 ## Sources
 
 - [Blender Studio Artist Guide: Modeling](https://studio.blender.org/tools/artist-guide/asset-creation/modeling) — reference-led modeling, blockout, refinement, and delivery review.
+- [Vitaly Bulgarov / Neil Blevins: Functional Concept Design](https://www.neilblevins.com/art_assets/art_assets.htm) — form hierarchy, the 70/30 rule of visual balance, and functional hard-surface engineering.
 - [PlaySide interview: *Age of Darkness* art direction](https://www.unrealengine.com/developer-interviews/age-of-darkness-is-an-rts-that-throws-thousands-of-undead-monsters-at-you) — RTS camera, silhouette-first unit readability, and reduction of noisy micro-detail.
 - [Blizzard: *StarCraft* development retrospective](https://news.blizzard.com/en-us/article/20719767/rock-and-roll-days-of-starcraft-a-development-retrospective) — evaluating tiny in-game renders and selectively thickening features that failed to translate.
 - [Blender 4.5 Bevel Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/generate/bevel.html), [Weighted Normal Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/normals/weighted_normal.html), [Mesh Structure and Normals](https://docs.blender.org/manual/en/4.5/modeling/meshes/structure.html), and [Cycles Baking](https://docs.blender.org/manual/en/4.5/render/cycles/baking.html) — geometry, shading, and bake behavior.
