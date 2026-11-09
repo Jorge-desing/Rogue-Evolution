@@ -119,6 +119,12 @@ Before approving any modeled component, verify it answers all four engineering c
 - **Human Maintenance Access:** Can human technicians service the unit via visible access latches, hoist points, drain plugs, and inspection hatches?
 - **Structural Load Distribution:** Do cantilevered arms, masts, and weapon mounts feature gussets, corner reinforcement fillets, and heavy pin hinges designed to transfer mechanical loads?
 
+### 3.5 Canonical Two-Level Visual Variant Boundary
+- **Level 1 — Primary Chassis:** The Blender-authored mesh, silhouette, functional assemblies, rig, pivots, canonical sockets, and baked PBR maps remain the geometry authority for the unit.
+- **Level 2 — Tactical Variants:** Current `visualVariants` apply a preset label, color tint, and optional whole-root scale to that same authored chassis. They do not replace the functional form hierarchy or switch to another mesh at runtime.
+- Treat `visualAssetName` and `visualRootPath` on a variant as declarations only unless the runtime has explicit, verified mesh/root switching support. Diagnostics report these declarations separately from the current tint-and-scale effect.
+- A requested silhouette or mechanical-assembly change needs a separately authored visual asset and explicit runtime integration that preserves sockets, rig, collision, LOD, and PBR contracts. Do not imply a new engine, suspension, armor module, or weapon assembly from a palette tint.
+
 ---
 
 ## 4. Native Bevel Modifier + Weighted Normal Modifier Pipeline

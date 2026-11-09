@@ -3101,21 +3101,97 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static string SerializeVisualVariantCensus(int maxUnits = 64)
         {
-            int totalUnits = RuntimeUnitVisualVariantRegistry.GetRegisteredUnitCount();
-            int totalVariants = RuntimeUnitVisualVariantRegistry.GetTotalVariantCount();
-            int omittedUnits = 0;
-            if (maxUnits > 0 && totalUnits > maxUnits)
+            IReadOnlyList<KeyValuePair<string, IReadOnlyList<RuntimeUnitVisualVariant>>> registeredUnits =
+                RuntimeUnitVisualVariantRegistry.GetAllUnitsSnapshot();
+            int totalUnits = registeredUnits.Count;
+            int includedUnitCount = maxUnits > 0 ? Math.Min(totalUnits, maxUnits) : totalUnits;
+            int omittedUnits = totalUnits - includedUnitCount;
+            var allVariantIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var includedVariantIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < registeredUnits.Count; i++)
             {
-                omittedUnits = totalUnits - maxUnits;
+                IReadOnlyList<RuntimeUnitVisualVariant> variants = registeredUnits[i].Value;
+                if (variants != null)
+                {
+                    for (int variantIndex = 0; variantIndex < variants.Count; variantIndex++)
+                    {
+                        RuntimeUnitVisualVariant variant = variants[variantIndex];
+                        if (variant == null || string.IsNullOrWhiteSpace(variant.VariantId))
+                        {
+                            continue;
+                        }
+
+                        allVariantIds.Add(variant.VariantId);
+                        if (i < includedUnitCount)
+                        {
+                            includedVariantIds.Add(variant.VariantId);
+                        }
+                    }
+                }
+            }
+            int totalVariants = allVariantIds.Count;
+            int omittedVariants = totalVariants - includedVariantIds.Count;
+
+            var unitRows = new List<Dictionary<string, object>>(includedUnitCount);
+            for (int unitIndex = 0; unitIndex < includedUnitCount; unitIndex++)
+            {
+                KeyValuePair<string, IReadOnlyList<RuntimeUnitVisualVariant>> unit = registeredUnits[unitIndex];
+                IReadOnlyList<RuntimeUnitVisualVariant> variants = unit.Value ?? Array.Empty<RuntimeUnitVisualVariant>();
+                var variantRows = new List<Dictionary<string, object>>(variants.Count);
+                RuntimeUnitVisualVariant primaryVariant = null;
+                int tacticalVariantCount = 0;
+
+                for (int variantIndex = 0; variantIndex < variants.Count; variantIndex++)
+                {
+                    RuntimeUnitVisualVariant variant = variants[variantIndex];
+                    if (variant == null)
+                    {
+                        continue;
+                    }
+
+                    if (variant.IsPrimary)
+                    {
+                        primaryVariant = primaryVariant ?? variant;
+                    }
+                    else
+                    {
+                        tacticalVariantCount++;
+                    }
+
+                    variantRows.Add(new Dictionary<string, object>
+                    {
+                        ["variantId"] = variant.VariantId ?? string.Empty,
+                        ["tier"] = variant.IsPrimary ? "Level 1 Primary Chassis" : "Level 2 Tactical Variant",
+                        ["presetName"] = variant.PresetName ?? string.Empty,
+                        ["colorTintHex"] = variant.ColorTintHex ?? string.Empty,
+                        ["scale"] = variant.Scale,
+                        ["declaredVisualAssetName"] = variant.VisualAssetName ?? string.Empty,
+                        ["declaredVisualRootPath"] = variant.VisualRootPath ?? string.Empty,
+                        ["runtimeEffect"] = "color tint and scale on the authored chassis"
+                    });
+                }
+
+                unitRows.Add(new Dictionary<string, object>
+                {
+                    ["unitId"] = unit.Key ?? string.Empty,
+                    ["primaryVariantId"] = primaryVariant != null ? primaryVariant.VariantId : string.Empty,
+                    ["primaryPresetName"] = primaryVariant != null ? primaryVariant.PresetName : string.Empty,
+                    ["tacticalVariantCount"] = tacticalVariantCount,
+                    ["variants"] = variantRows
+                });
             }
 
             var view = new Dictionary<string, object>
             {
                 ["kind"] = "visualVariantCensus",
                 ["omittedUnitCount"] = omittedUnits,
+                ["omittedVariantCount"] = omittedVariants,
                 ["totalUnits"] = totalUnits,
                 ["totalVariants"] = totalVariants,
                 ["systemTier"] = "Two-Level Canonical PBR System (Level 1: Primary Chassis, Level 2: Tactical Variants)",
+                ["formAuthority"] = "Authored chassis mesh and functional hierarchy; runtime variants apply color tint and scale only.",
+                ["units"] = unitRows
             };
             return Serialize(view);
         }

@@ -279,6 +279,62 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            result.Sort((left, right) =>
+            {
+                if (left.IsPrimary != right.IsPrimary)
+                {
+                    return left.IsPrimary ? -1 : 1;
+                }
+
+                return string.Compare(left.VariantId, right.VariantId, StringComparison.OrdinalIgnoreCase);
+            });
+            return result.AsReadOnly();
+        }
+
+        public static IReadOnlyList<KeyValuePair<string, IReadOnlyList<RuntimeUnitVisualVariant>>> GetAllUnitsSnapshot()
+        {
+            var result = new List<KeyValuePair<string, IReadOnlyList<RuntimeUnitVisualVariant>>>();
+
+            lock (Gate)
+            {
+                var unitIds = new List<string>(VariantsByUnit.Keys);
+                unitIds.Sort(StringComparer.OrdinalIgnoreCase);
+
+                for (int unitIndex = 0; unitIndex < unitIds.Count; unitIndex++)
+                {
+                    string unitId = unitIds[unitIndex];
+                    Dictionary<string, RuntimeUnitVisualVariant> registeredVariants;
+                    if (!VariantsByUnit.TryGetValue(unitId, out registeredVariants) || registeredVariants == null)
+                    {
+                        continue;
+                    }
+
+                    var variants = new List<RuntimeUnitVisualVariant>(registeredVariants.Count);
+                    var seenVariantIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (RuntimeUnitVisualVariant variant in registeredVariants.Values)
+                    {
+                        if (variant != null && !string.IsNullOrWhiteSpace(variant.VariantId) && seenVariantIds.Add(variant.VariantId))
+                        {
+                            variants.Add(variant);
+                        }
+                    }
+
+                    variants.Sort((left, right) =>
+                    {
+                        if (left.IsPrimary != right.IsPrimary)
+                        {
+                            return left.IsPrimary ? -1 : 1;
+                        }
+
+                        return string.Compare(left.VariantId, right.VariantId, StringComparison.OrdinalIgnoreCase);
+                    });
+
+                    result.Add(new KeyValuePair<string, IReadOnlyList<RuntimeUnitVisualVariant>>(
+                        unitId,
+                        variants.AsReadOnly()));
+                }
+            }
+
             return result.AsReadOnly();
         }
 
