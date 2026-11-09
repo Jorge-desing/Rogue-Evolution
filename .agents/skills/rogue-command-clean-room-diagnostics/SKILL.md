@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.12.0
+version: 1.13.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -16,13 +16,19 @@ Use this skill to inspect in-game state, read telemetry censuses, dispatch gamep
 
 ---
 
-## 1. Clean-Room Invariants
+## 1. Clean-Room Invariants & C# Zero-Allocation Guidelines
 
 1. **Independent Authoring**: Never copy proprietary structures or external mod code. Use FNV-1a hashing and calibrated data.
 2. **Zero External JSON Libraries in Runtime**: Do NOT use `Newtonsoft.Json` or `System.Text.Json` in the plugin runtime (`src/RogueCommandExpansionLoader/`). Use the manual string-escaped writer in `AgentDiagnosticsFormatter.cs`.
 3. **Decoupled Primitive DTOs**: DTOs and command results must contain only primitive CLR types (`string`, `int`, `long`, `float`, `double`, `bool`, `IReadOnlyList<T>`). Never expose `UnityEngine.Color`, `Vector3`, `GameObject`, or `Component`.
 4. **Omission & Loss Counters First**: In bounded diagnostic collections, place loss/omission counters (`omittedCount`, `lossFraction`, `omittedSessionCount`, `omittedLockCount`) at the start of the serialized JSON and DTO.
 5. **Fail-Closed Reflection**: Null-check reflected members, catch exceptions, and return explicit failure DTOs (`success: false`).
+6. **Direct Type Fast-Paths**: Test `if (target is EntityController ec)` before reflection. Directly access compiled properties (`ec.Position`, `ec.CurrentHealth`, `ec.MaxHealth`, `ec.CurrentArmor`, `ec.CurrentShield`, `ec.UniqueEntityId`, `ec.EntityId`, `ec.IsDestroyed`, `ec.DestroyHasBeenStarted`, `ec.IsEnemy`) to bypass reflection invocation overhead and avoid `Vector3`/`int` heap boxing.
+7. **Dead-Entity Frame Short-Circuiting**: Evaluate death status once per frame in `RuntimeVisualDirector.Update()` (`IsEntityDead()`); when dead, update health transitions and immediately return, skipping redundant calls to audio, locomotion, animator, turret aiming, and antenna wobble.
+8. **Thread-Static Argument Buffers**: For reflection fallback paths called frequently, reuse thread-static 1-element argument buffers (e.g. `_singleArgStatusEffect`, `_isEnemyArgs`) instead of allocating `new object[]` per call.
+9. **Static Enum & Reflection Caching**: Statically cache array values like `(StatusEffect[])Enum.GetValues(typeof(StatusEffect))`, method parameter counts (`_healParamCount`), and parsed enum dictionary lookups to eliminate per-call heap churn.
+10. **Amortized Hazard Tick Guard**: In `RuntimeHazardManager.UpdateTick()`, verify `anyReady` before gathering entities, avoiding candidate list allocations on ~98% of frames where tick intervals are active.
+11. **Pre-Sized Collections & List Indexing**: Pre-size `List<T>` capacities from known entity set counts; pre-size `StringBuilder` in `AgentDiagnosticsFormatter.Serialize` and format `IList` via index-based `for` loops to eliminate `IEnumerator` allocations.
 
 ---
 

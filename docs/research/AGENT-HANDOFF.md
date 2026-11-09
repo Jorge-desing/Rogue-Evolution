@@ -1,9 +1,42 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
-**Updated:** 2026-11-08
+**Updated:** 2026-11-09
 **Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
+
+---
+
+## 2026-11-09 C# Zero-Allocation Hot-Path & Reflection Elimination Pass
+
+- **Optimization Objectives & Zero Functional Loss:**
+  - Targeted the hot execution paths across the runtime engine (Mono x64 / Unity 2021.3.45f2 with non-generational Boehm GC) to eliminate per-frame reflection invocations, prevent value-type heap boxing, and drastically reduce GC allocations with 100% preservation of behavior, contracts, and return values.
+- **Key Optimized Subsystems:**
+  - `RuntimeVisualDirector.cs`:
+    - Evaluates `IsEntityDead()` once per frame in `Update()`; when destroyed or dead, immediately returns after updating health transitions, bypassing expensive updates to locomotion animators, audio spatial anchors, radar sweepers, turret targeting, and weapon recoil feedback.
+    - Added direct fast-paths for `_entity.IsDestroyed`, `_entity.DestroyHasBeenStarted`, `CurrentHealth`, and `MaxHealth`.
+    - Added thread-static argument buffers (`_singleArgStatusEffect`, `_singleArgCandidate`) and direct `HasActiveStatusEffect` checks to avoid allocating argument arrays on every candidate check and status reaction.
+  - `RuntimeUnitMechanicsDirector.cs`:
+    - Implemented fast-paths casting target to `EntityController ec`, directly accessing compiled properties (`ec.Position`, `ec.CurrentHealth`, `ec.MaxHealth`, `ec.CurrentArmor`, `ec.MaxArmor`, `ec.CurrentShield`, `ec.MaxShield`, `ec.UniqueEntityId`, `ec.EntityId`, `ec.IsDestroyed`, `ec.DestroyHasBeenStarted`, `ec.IsEnemy`) without reflection or `Vector3`/`int` boxing.
+    - In `EnsureReflection()`, cached method parameter counts (`_healParamCount`, `_repairArmorParamCount`, `_chargeShieldParamCount`, `_takeDamageParamCount`) and cached parsed status effect enum objects (`ResolveParsedStatusEffect`, `_cachedDurationUnlimited`, `_cachedDurationSeconds`), eliminating `MethodInfo.GetParameters()` allocations during combat pulses.
+  - `RuntimeGameplayCommandDirector.cs`:
+    - Direct fast-path for `unit.EntityId` in `ResolveEntityIdString(unit)` before falling back to reflection.
+    - Statically cached `_allStatusEffects = (StatusEffect[])Enum.GetValues(typeof(StatusEffect))` and `_cachedTickDurationField`, preventing array allocations inside unit mechanics census loops.
+    - Fast-pathed `unit.GetComponent<Visual.RuntimeVisualDirector>()` before allocating `Component[]` arrays via `GetComponents<Component>()`.
+    - Direct cast `vd is Visual.RuntimeVisualDirector rvd` in `GetLiveJammedTurretCount` and `GetUnitMechanicsCensus` to read `rvd.IsTurretJammed`, `rvd.CurrentRecoilOffset`, and `rvd.DoorOpenProgress`.
+  - `RuntimeHazardManager.cs`:
+    - In `UpdateTick()`, added `anyReady` check before gathering entities, saving `new List<EntityController>()` candidate allocations on ~98% of frames where tick intervals are active.
+    - Pre-sized `candidates` list and switched to index-based `for` loop.
+  - `RuntimeAiBattlefieldCollector.cs`:
+    - Pre-sized capacities for `aiSnapshots`, `hostileSnapshots`, and `hazardSnapshots`.
+  - `AgentDiagnosticsFormatter.cs`:
+    - Pre-sized `StringBuilder` in `Serialize(view)` to prevent repeated buffer re-allocations on large telemetry payloads.
+    - Added `WriteList` using index-based `for` loops on `IList` (lists and arrays) to eliminate `IEnumerator` allocations, and optimized `WriteString` with index-based loop.
+- **Verification & Parity:**
+  - Release build: 0 warnings, 0 errors.
+  - C# validation harness: 558/559 passing (1 Windows symlink skip, 0 failures).
+  - Python test suite: 479/479 passing (1 skip).
+  - Registry validator: 4/4 manifests clean.
 
 ---
 

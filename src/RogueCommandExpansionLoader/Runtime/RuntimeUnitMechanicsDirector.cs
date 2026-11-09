@@ -130,6 +130,15 @@ namespace RogueCommandExpansionLoader.Runtime
             new Dictionary<string, DynamicCommandAuraState>(StringComparer.Ordinal);
 
         [ThreadStatic] private static int _reflectDepth;
+        [ThreadStatic] private static object[] _isEnemyArgs;
+        private static int _healParamCount = -1;
+        private static int _repairArmorParamCount = -1;
+        private static int _chargeShieldParamCount = -1;
+        private static int _takeDamageParamCount = -1;
+        private static object _cachedDurationUnlimited;
+        private static object _cachedDurationSeconds;
+        private static readonly Dictionary<string, object> _cachedParsedStatusEffects =
+            new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
         private static bool _reflectionResolved;
         private static PropertyInfo _entityIdProperty;
@@ -1334,6 +1343,11 @@ namespace RogueCommandExpansionLoader.Runtime
             if (entityObj == null)
             {
                 return 0;
+            }
+
+            if (entityObj is EntityController ec)
+            {
+                return ec.UniqueEntityId >= 0 ? ec.UniqueEntityId : ec.GetHashCode();
             }
 
             EnsureReflection(entityObj.GetType());
@@ -3616,6 +3630,31 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static object ResolveParsedStatusEffect(string effectName)
+        {
+            if (string.IsNullOrWhiteSpace(effectName) || _statusEffectEnumType == null) return null;
+            lock (_cachedParsedStatusEffects)
+            {
+                if (_cachedParsedStatusEffects.TryGetValue(effectName, out object cached))
+                {
+                    return cached;
+                }
+            }
+            try
+            {
+                object parsed = Enum.Parse(_statusEffectEnumType, effectName, true);
+                lock (_cachedParsedStatusEffects)
+                {
+                    _cachedParsedStatusEffects[effectName] = parsed;
+                }
+                return parsed;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private static void ApplyUnlimitedStatusEffect(object entityObj, string effectName)
         {
             if (_setActiveStatusEffectMethod == null || _statusEffectEnumType == null || _durationTypeEnumType == null)
@@ -3625,8 +3664,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
-                object parsedEffect = Enum.Parse(_statusEffectEnumType, effectName, true);
-                object durationUnlimited = Enum.ToObject(_durationTypeEnumType, 0);
+                object parsedEffect = ResolveParsedStatusEffect(effectName);
+                if (parsedEffect == null) return;
+                object durationUnlimited = _cachedDurationUnlimited ?? Enum.ToObject(_durationTypeEnumType, 0);
                 _setActiveStatusEffectMethod.Invoke(entityObj, new object[] { parsedEffect, durationUnlimited, 0f });
             }
             catch
@@ -3644,8 +3684,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
-                object parsedEffect = Enum.Parse(_statusEffectEnumType, effectName, true);
-                object durationSecondsEnum = Enum.ToObject(_durationTypeEnumType, 1);
+                object parsedEffect = ResolveParsedStatusEffect(effectName);
+                if (parsedEffect == null) return false;
+                object durationSecondsEnum = _cachedDurationSeconds ?? Enum.ToObject(_durationTypeEnumType, 1);
                 _setActiveStatusEffectMethod.Invoke(entityObj, new object[] { parsedEffect, durationSecondsEnum, durationSeconds });
                 return true;
             }
@@ -3664,12 +3705,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
-                ParameterInfo[] parameters = _healMethod.GetParameters();
-                if (parameters.Length == 4)
+                int paramCount = _healParamCount >= 0 ? _healParamCount : _healMethod.GetParameters().Length;
+                if (paramCount == 4)
                 {
                     _healMethod.Invoke(target, new object[] { amount, originator, false, false });
                 }
-                else if (parameters.Length == 2)
+                else if (paramCount == 2)
                 {
                     _healMethod.Invoke(target, new object[] { amount, originator });
                 }
@@ -3688,12 +3729,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
-                ParameterInfo[] parameters = _repairArmorMethod.GetParameters();
-                if (parameters.Length == 3)
+                int paramCount = _repairArmorParamCount >= 0 ? _repairArmorParamCount : _repairArmorMethod.GetParameters().Length;
+                if (paramCount == 3)
                 {
                     _repairArmorMethod.Invoke(target, new object[] { amount, originator, false });
                 }
-                else if (parameters.Length == 2)
+                else if (paramCount == 2)
                 {
                     _repairArmorMethod.Invoke(target, new object[] { amount, originator });
                 }
@@ -3712,12 +3753,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
-                ParameterInfo[] parameters = _chargeShieldMethod.GetParameters();
-                if (parameters.Length == 2)
+                int paramCount = _chargeShieldParamCount >= 0 ? _chargeShieldParamCount : _chargeShieldMethod.GetParameters().Length;
+                if (paramCount == 2)
                 {
                     _chargeShieldMethod.Invoke(target, new object[] { amount, true });
                 }
-                else if (parameters.Length == 1)
+                else if (paramCount == 1)
                 {
                     _chargeShieldMethod.Invoke(target, new object[] { amount });
                 }
@@ -3736,12 +3777,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
-                ParameterInfo[] parameters = _takeDamageMethod.GetParameters();
-                if (parameters.Length == 4)
+                int paramCount = _takeDamageParamCount >= 0 ? _takeDamageParamCount : _takeDamageMethod.GetParameters().Length;
+                if (paramCount == 4)
                 {
                     _takeDamageMethod.Invoke(target, new object[] { amount, originator, true, false });
                 }
-                else if (parameters.Length == 2)
+                else if (paramCount == 2)
                 {
                     _takeDamageMethod.Invoke(target, new object[] { amount, originator });
                 }
@@ -3887,6 +3928,17 @@ namespace RogueCommandExpansionLoader.Runtime
                 _entitiesMethod = _existingControllersType.GetMethod("Entities", flags, null, Type.EmptyTypes, null);
             }
 
+            if (_healMethod != null) _healParamCount = _healMethod.GetParameters().Length;
+            if (_repairArmorMethod != null) _repairArmorParamCount = _repairArmorMethod.GetParameters().Length;
+            if (_chargeShieldMethod != null) _chargeShieldParamCount = _chargeShieldMethod.GetParameters().Length;
+            if (_takeDamageMethod != null) _takeDamageParamCount = _takeDamageMethod.GetParameters().Length;
+
+            if (_durationTypeEnumType != null)
+            {
+                try { _cachedDurationUnlimited = Enum.ToObject(_durationTypeEnumType, 0); } catch { }
+                try { _cachedDurationSeconds = Enum.ToObject(_durationTypeEnumType, 1); } catch { }
+            }
+
             _reflectionResolved = true;
         }
 
@@ -3895,6 +3947,12 @@ namespace RogueCommandExpansionLoader.Runtime
             if (entityObj == null)
             {
                 return null;
+            }
+
+            if (entityObj is EntityController ec)
+            {
+                string id = ec.EntityId;
+                if (!string.IsNullOrEmpty(id)) return id;
             }
 
             if (_entityIdProperty != null && _entityIdProperty.DeclaringType != null &&
@@ -3926,6 +3984,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 return false;
             }
 
+            if (entityObj is EntityController ec)
+            {
+                if (ec.IsDestroyed || ec.DestroyHasBeenStarted) return false;
+                if (ec.gameObject == null || !ec.gameObject.activeInHierarchy) return false;
+                return true;
+            }
+
             if (ReadBoolProperty(_isDestroyedProperty, entityObj) ||
                 ReadBoolProperty(_destroyStartedProperty, entityObj))
             {
@@ -3950,6 +4015,10 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
+                if (attacker is EntityController ecA && target is EntityController ecT && ecA.IsEnemy != null)
+                {
+                    return ecA.IsEnemy(ecT);
+                }
                 EnsureReflection(attacker.GetType());
                 return IsEnemy(attacker, target);
             }
@@ -3966,16 +4035,33 @@ namespace RogueCommandExpansionLoader.Runtime
                 return false;
             }
 
+            if (self is EntityController ecSelf && other is EntityController ecOther)
+            {
+                try
+                {
+                    if (ecSelf.IsEnemy != null)
+                    {
+                        return ecSelf.IsEnemy(ecOther);
+                    }
+                }
+                catch { }
+            }
+
             if (_isEnemyMethod != null &&
                 _isEnemyMethod.DeclaringType != null &&
                 _isEnemyMethod.DeclaringType.IsInstanceOfType(self))
             {
                 try
                 {
-                    return (bool)_isEnemyMethod.Invoke(self, new[] { other });
+                    if (_isEnemyArgs == null) _isEnemyArgs = new object[1];
+                    _isEnemyArgs[0] = other;
+                    bool result = (bool)_isEnemyMethod.Invoke(self, _isEnemyArgs);
+                    _isEnemyArgs[0] = null;
+                    return result;
                 }
                 catch
                 {
+                    if (_isEnemyArgs != null) _isEnemyArgs[0] = null;
                 }
             }
 
@@ -3991,7 +4077,21 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static bool ReadBoolProperty(PropertyInfo prop, object target)
         {
-            if (prop == null || target == null)
+            if (target == null)
+            {
+                return false;
+            }
+            if (target is EntityController ec)
+            {
+                if (prop == _isDestroyedProperty) return ec.IsDestroyed;
+                if (prop == _destroyStartedProperty) return ec.DestroyHasBeenStarted;
+                if (prop == _isControlledByPlayerProperty) return ec.IsControlledByPlayer;
+                if (prop == _isControlledByAiProperty) return ec.IsControlledByAi;
+                if (prop == _isUnitProperty) return ec.IsUnit;
+                if (prop == _isCombatUnitProperty) return ec.IsCombatUnit;
+                if (prop == _hasShieldProperty) return ec.HasShield;
+            }
+            if (prop == null)
             {
                 return false;
             }
@@ -4010,7 +4110,17 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static int ReadIntProperty(PropertyInfo prop, object target, int fallback)
         {
-            if (prop == null || target == null)
+            if (target == null)
+            {
+                return fallback;
+            }
+            if (target is EntityController ec)
+            {
+                if (prop == _uniqueEntityIdProperty) return ec.UniqueEntityId;
+                if (prop == _currentRankProperty) return ec.CurrentRank;
+                if (prop == _maxRankProperty) return ec.MaxRank;
+            }
+            if (prop == null)
             {
                 return fallback;
             }
@@ -4029,7 +4139,20 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static float ReadFloatProperty(PropertyInfo prop, object target, float fallback)
         {
-            if (prop == null || target == null)
+            if (target == null)
+            {
+                return fallback;
+            }
+            if (target is EntityController ec)
+            {
+                if (prop == _currentHealthProperty) return ec.CurrentHealth;
+                if (prop == _maxHealthProperty) return ec.MaxHealth;
+                if (prop == _currentArmorProperty) return ec.CurrentArmor;
+                if (prop == _maxArmorProperty) return ec.MaxArmor;
+                if (prop == _currentShieldProperty) return ec.CurrentShield;
+                if (prop == _maxShieldProperty) return ec.MaxShield;
+            }
+            if (prop == null)
             {
                 return fallback;
             }
@@ -4048,6 +4171,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static Vector3 ReadVector3Property(PropertyInfo prop, object target)
         {
+            if (target is EntityController ec)
+            {
+                return ec.Position;
+            }
+
             if (prop != null && target != null)
             {
                 try
@@ -4062,8 +4190,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
-            Component comp = target as Component;
-            return comp != null && comp.transform != null ? comp.transform.position : Vector3.zero;
+            if (target is Component comp && comp.transform != null)
+            {
+                return comp.transform.position;
+            }
+
+            return Vector3.zero;
         }
     }
 }

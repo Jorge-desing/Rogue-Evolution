@@ -87,10 +87,11 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                     return _lastSnapshot;
                 }
 
-                var aiSnapshots = new List<AiUnitSnapshot>();
+                HashSet<EntityController> aiUnits = existing.AiUnits();
+                int estimatedAi = (aiUnits != null ? aiUnits.Count : 16) + 8;
+                var aiSnapshots = new List<AiUnitSnapshot>(estimatedAi);
                 EntityController referenceAiUnit = null;
 
-                HashSet<EntityController> aiUnits = existing.AiUnits();
                 if (aiUnits != null)
                 {
                     foreach (EntityController unit in aiUnits)
@@ -150,8 +151,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                     // Guard against optional AiBuildings registry failure
                 }
 
-                var hostileSnapshots = new List<AiUnitSnapshot>();
                 HashSet<EntityController> playerEntities = existing.PlayerEntities() ?? existing.PlayerUnits();
+                int estimatedHostile = playerEntities != null ? playerEntities.Count : 16;
+                var hostileSnapshots = new List<AiUnitSnapshot>(estimatedHostile);
                 if (playerEntities != null)
                 {
                     foreach (EntityController candidate in playerEntities)

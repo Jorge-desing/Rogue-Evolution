@@ -4008,7 +4008,8 @@ new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["desc
 
         private static string Serialize(Dictionary<string, object> view)
         {
-            var builder = new StringBuilder();
+            int estimatedCapacity = view != null ? Math.Max(512, view.Count * 64) : 256;
+            var builder = new StringBuilder(estimatedCapacity);
             WriteValue(builder, view);
             return builder.ToString();
         }
@@ -4028,6 +4029,9 @@ new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["desc
                     break;
                 case Dictionary<string, object> map:
                     WriteObject(builder, map);
+                    break;
+                case IList list:
+                    WriteList(builder, list);
                     break;
                 case IEnumerable sequence when !(value is string):
                     WriteArray(builder, sequence);
@@ -4086,6 +4090,20 @@ new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["desc
             builder.Append('}');
         }
 
+        private static void WriteList(StringBuilder builder, IList list)
+        {
+            builder.Append('[');
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (i > 0)
+                {
+                    builder.Append(',');
+                }
+                WriteValue(builder, list[i]);
+            }
+            builder.Append(']');
+        }
+
         private static void WriteArray(StringBuilder builder, IEnumerable sequence)
         {
             builder.Append('[');
@@ -4106,9 +4124,16 @@ new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["desc
 
         private static void WriteString(StringBuilder builder, string text)
         {
-            builder.Append('"');
-            foreach (char c in text)
+            if (text == null)
             {
+                builder.Append("\"\"");
+                return;
+            }
+
+            builder.Append('"');
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
                 switch (c)
                 {
                     case '"':

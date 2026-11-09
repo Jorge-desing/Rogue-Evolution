@@ -1333,10 +1333,20 @@ namespace RogueCommandExpansionLoader.Runtime
         private static readonly Dictionary<string, int> _factoryProductionCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private static string _lastPlacementGhostEntityId = string.Empty;
         private static readonly object _commandLoopGate = new object();
+        private static readonly StatusEffect[] _allStatusEffects = (StatusEffect[])Enum.GetValues(typeof(StatusEffect));
+        private static FieldInfo _cachedTickDurationField;
 
         private static string ResolveEntityIdString(EntityController unit)
         {
             if (unit == null) return string.Empty;
+            try
+            {
+                string id = unit.EntityId;
+                if (!string.IsNullOrEmpty(id)) return id;
+            }
+            catch
+            {
+            }
             PropertyInfo prop = unit.GetType().GetProperty("EntityId") ?? unit.GetType().GetProperty("entityId");
             if (prop != null)
             {
@@ -6098,7 +6108,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (manager != null)
                 {
                     Type mgrType = manager.GetType();
-                    FieldInfo tickField = mgrType.GetField("tickDuration", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    FieldInfo tickField = _cachedTickDurationField ?? (_cachedTickDurationField = mgrType.GetField("tickDuration", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
                     if (tickField != null && clampedMultiplier > 0f)
                     {
                         float baseTick = 1.0f;
@@ -8026,9 +8036,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 ExistingControllers existing = ExistingControllers.Instance;
                 if (existing != null)
                 {
-                    List<EntityController> units = new List<EntityController>();
-                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
-                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+                    HashSet<EntityController> pUnits = existing.PlayerUnits();
+                    HashSet<EntityController> aUnits = existing.AiUnits();
+                    int cap = (pUnits != null ? pUnits.Count : 0) + (aUnits != null ? aUnits.Count : 0);
+                    List<EntityController> units = new List<EntityController>(cap);
+                    if (pUnits != null) units.AddRange(pUnits);
+                    if (aUnits != null) units.AddRange(aUnits);
                     for (int i = 0; i < units.Count; i++)
                     {
                         if (units[i] != null && !units[i].IsDestroyed)
@@ -8036,8 +8049,15 @@ namespace RogueCommandExpansionLoader.Runtime
                             Component vd = FindRuntimeVisualDirector(units[i]);
                             if (vd != null)
                             {
-                                PropertyInfo p = vd.GetType().GetProperty("IsTurretJammed");
-                                if (p != null && (bool)p.GetValue(vd, null)) count++;
+                                if (vd is Visual.RuntimeVisualDirector rvd)
+                                {
+                                    if (rvd.IsTurretJammed) count++;
+                                }
+                                else
+                                {
+                                    PropertyInfo p = vd.GetType().GetProperty("IsTurretJammed");
+                                    if (p != null && (bool)p.GetValue(vd, null)) count++;
+                                }
                             }
                         }
                     }
@@ -8055,9 +8075,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 ExistingControllers existing = ExistingControllers.Instance;
                 if (existing != null)
                 {
-                    List<EntityController> units = new List<EntityController>();
-                    if (existing.PlayerUnits() != null) units.AddRange(existing.PlayerUnits());
-                    if (existing.AiUnits() != null) units.AddRange(existing.AiUnits());
+                    HashSet<EntityController> pUnits = existing.PlayerUnits();
+                    HashSet<EntityController> aUnits = existing.AiUnits();
+                    int cap = (pUnits != null ? pUnits.Count : 0) + (aUnits != null ? aUnits.Count : 0);
+                    List<EntityController> units = new List<EntityController>(cap);
+                    if (pUnits != null) units.AddRange(pUnits);
+                    if (aUnits != null) units.AddRange(aUnits);
                     for (int i = 0; i < units.Count; i++)
                     {
                         if (units[i] != null && !units[i].IsDestroyed && units[i].MaxShield > 0f && units[i].CurrentShield < units[i].MaxShield)
@@ -8090,9 +8113,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 ExistingControllers existing = ExistingControllers.Instance;
                 if (existing != null)
                 {
-                    List<EntityController> allUnits = new List<EntityController>();
-                    if (existing.PlayerUnits() != null) allUnits.AddRange(existing.PlayerUnits());
-                    if (existing.AiUnits() != null) allUnits.AddRange(existing.AiUnits());
+                    HashSet<EntityController> pUnits = existing.PlayerUnits();
+                    HashSet<EntityController> aUnits = existing.AiUnits();
+                    int capUnits = (pUnits != null ? pUnits.Count : 0) + (aUnits != null ? aUnits.Count : 0);
+                    List<EntityController> allUnits = new List<EntityController>(capUnits);
+                    if (pUnits != null) allUnits.AddRange(pUnits);
+                    if (aUnits != null) allUnits.AddRange(aUnits);
 
                     for (int i = 0; i < allUnits.Count; i++)
                     {
@@ -8140,7 +8166,7 @@ namespace RogueCommandExpansionLoader.Runtime
                             try
                             {
                                 var activeEffects = new List<string>();
-                                StatusEffect[] allEffects = (StatusEffect[])Enum.GetValues(typeof(StatusEffect));
+                                StatusEffect[] allEffects = _allStatusEffects;
                                 for (int s = 0; s < allEffects.Length; s++)
                                 {
                                     if (unit.HasActiveStatusEffect(allEffects[s]))
@@ -8168,13 +8194,22 @@ namespace RogueCommandExpansionLoader.Runtime
                             if (vd != null)
                             {
                                 hasVd = true;
-                                Type vt = vd.GetType();
-                                PropertyInfo pj = vt.GetProperty("IsTurretJammed");
-                                if (pj != null) isJammed = (bool)pj.GetValue(vd, null);
-                                PropertyInfo pr = vt.GetProperty("CurrentRecoilOffset");
-                                if (pr != null) recoil = (float)pr.GetValue(vd, null);
-                                PropertyInfo pd = vt.GetProperty("DoorOpenProgress");
-                                if (pd != null) door = (float)pd.GetValue(vd, null);
+                                if (vd is Visual.RuntimeVisualDirector rvd)
+                                {
+                                    isJammed = rvd.IsTurretJammed;
+                                    recoil = rvd.CurrentRecoilOffset;
+                                    door = rvd.DoorOpenProgress;
+                                }
+                                else
+                                {
+                                    Type vt = vd.GetType();
+                                    PropertyInfo pj = vt.GetProperty("IsTurretJammed");
+                                    if (pj != null) isJammed = (bool)pj.GetValue(vd, null);
+                                    PropertyInfo pr = vt.GetProperty("CurrentRecoilOffset");
+                                    if (pr != null) recoil = (float)pr.GetValue(vd, null);
+                                    PropertyInfo pd = vt.GetProperty("DoorOpenProgress");
+                                    if (pd != null) door = (float)pd.GetValue(vd, null);
+                                }
                             }
 
                             rows.Add(new UnitMechanicsCensusRow
@@ -8228,6 +8263,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
             try
             {
+                Visual.RuntimeVisualDirector direct = unit.GetComponent<Visual.RuntimeVisualDirector>();
+                if (direct != null) return direct;
+
+                direct = unit.gameObject.GetComponentInChildren<Visual.RuntimeVisualDirector>(true);
+                if (direct != null) return direct;
+
                 Component[] comps = unit.GetComponents<Component>();
                 for (int i = 0; i < comps.Length; i++)
                 {

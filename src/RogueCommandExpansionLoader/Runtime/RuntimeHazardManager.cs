@@ -192,6 +192,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 return;
             }
 
+            bool anyReady = false;
+            for (int i = 0; i < currentZones.Count; i++)
+            {
+                if (now >= currentZones[i].NextTickTime)
+                {
+                    anyReady = true;
+                    break;
+                }
+            }
+            if (!anyReady)
+            {
+                return;
+            }
+
             ExistingControllers existing = null;
             try
             {
@@ -206,15 +220,17 @@ namespace RogueCommandExpansionLoader.Runtime
                 return;
             }
 
-            var candidates = new List<EntityController>();
+            List<EntityController> candidates = null;
             try
             {
                 HashSet<EntityController> playerUnits = existing.PlayerUnits();
+                HashSet<EntityController> aiUnits = existing.AiUnits();
+                int estimatedCount = (playerUnits != null ? playerUnits.Count : 0) + (aiUnits != null ? aiUnits.Count : 0);
+                candidates = new List<EntityController>(estimatedCount);
                 if (playerUnits != null)
                 {
                     candidates.AddRange(playerUnits);
                 }
-                HashSet<EntityController> aiUnits = existing.AiUnits();
                 if (aiUnits != null)
                 {
                     candidates.AddRange(aiUnits);
@@ -224,8 +240,14 @@ namespace RogueCommandExpansionLoader.Runtime
             {
             }
 
-            foreach (ActiveHazardZone zone in currentZones)
+            if (candidates == null)
             {
+                return;
+            }
+
+            for (int z = 0; z < currentZones.Count; z++)
+            {
+                ActiveHazardZone zone = currentZones[z];
                 if (now < zone.NextTickTime)
                 {
                     continue;
@@ -235,8 +257,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 float radiusSq = zone.Radius * zone.Radius;
                 int affectedCount = 0;
 
-                foreach (EntityController entity in candidates)
+                for (int c = 0; c < candidates.Count; c++)
                 {
+                    EntityController entity = candidates[c];
                     if (entity == null || entity.IsDestroyed || entity.DestroyHasBeenStarted)
                     {
                         continue;

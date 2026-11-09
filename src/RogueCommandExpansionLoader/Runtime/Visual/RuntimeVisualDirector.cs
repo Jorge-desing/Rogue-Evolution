@@ -78,6 +78,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private static object _combatBoostStatusEffect;
         private static object _overclockedStatusEffect;
         private static object _turboStatusEffect;
+        [ThreadStatic] private static object[] _singleArgStatusEffect;
+        [ThreadStatic] private static object[] _singleArgCandidate;
         private bool _hasMovementAnimationParameter;
         private bool _hasFireAnimationParameter;
         private bool _hasDeathAnimationParameter;
@@ -603,11 +605,17 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_entity == null) return;
 
+            bool isDead = IsEntityDead();
+            UpdateHealthAndDamageTransitions(isDead);
+            if (isDead)
+            {
+                return;
+            }
+
             UpdateNativeAudioBindings();
             UpdateMotionSample(Time.deltaTime);
             UpdateLocomotionAnimation();
             UpdateStatusEffectAndStanceReactions();
-            UpdateHealthAndDamageTransitions();
             UpdateRadarSweep();
             UpdateTurretAiming();
             UpdateFactoryDeployAnimation();
@@ -668,8 +676,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void UpdateHealthAndDamageTransitions()
         {
+            UpdateHealthAndDamageTransitions(IsEntityDead());
+        }
+
+        private void UpdateHealthAndDamageTransitions(bool isDead)
+        {
             float ratio = GetHealthRatio();
-            bool isDead = IsEntityDead();
 
             // 1. Reactive Armor (ERA) Detonation on initial heavy impact (<= 75% HP)
             if (ratio <= 0.75f && !isDead)
@@ -904,22 +916,53 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             bool hasOnFire = false;
             bool hasBoost = false;
 
-            if (_hasActiveStatusEffectMethod != null)
+            try
             {
-                try
+                if (_entity.HasActiveStatusEffect(StatusEffect.Stun)) hasStun = true;
+                if (_entity.HasActiveStatusEffect(StatusEffect.OnFire)) hasOnFire = true;
+                if (_entity.HasActiveStatusEffect(StatusEffect.CombatBoost)) hasBoost = true;
+                if (!hasBoost && _entity.HasActiveStatusEffect(StatusEffect.Overclocked)) hasBoost = true;
+                if (!hasBoost && _entity.HasActiveStatusEffect(StatusEffect.Turbo)) hasBoost = true;
+            }
+            catch
+            {
+                if (_hasActiveStatusEffectMethod != null)
                 {
-                    if (_stunStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _stunStatusEffect }))
-                        hasStun = true;
-                    if (_onFireStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _onFireStatusEffect }))
-                        hasOnFire = true;
-                    if (_combatBoostStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _combatBoostStatusEffect }))
-                        hasBoost = true;
-                    if (!hasBoost && _overclockedStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _overclockedStatusEffect }))
-                        hasBoost = true;
-                    if (!hasBoost && _turboStatusEffect != null && (bool)_hasActiveStatusEffectMethod.Invoke(_entity, new[] { _turboStatusEffect }))
-                        hasBoost = true;
+                    try
+                    {
+                        if (_singleArgStatusEffect == null) _singleArgStatusEffect = new object[1];
+                        if (_stunStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _stunStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasStun = true;
+                        }
+                        if (_onFireStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _onFireStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasOnFire = true;
+                        }
+                        if (_combatBoostStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _combatBoostStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasBoost = true;
+                        }
+                        if (!hasBoost && _overclockedStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _overclockedStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasBoost = true;
+                        }
+                        if (!hasBoost && _turboStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _turboStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasBoost = true;
+                        }
+                        _singleArgStatusEffect[0] = null;
+                    }
+                    catch
+                    {
+                        if (_singleArgStatusEffect != null) _singleArgStatusEffect[0] = null;
+                    }
                 }
-                catch { }
             }
 
             _isStunnedVisualActive = hasStun;
@@ -1338,15 +1381,23 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (candidate == null || candidate.gameObject == null || !candidate.gameObject.activeInHierarchy) return false;
             try
             {
-                if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(candidate, null)) return false;
+                if (candidate.IsDestroyed || candidate.DestroyHasBeenStarted) return false;
                 if (_stillExistsProp != null && !(bool)_stillExistsProp.GetValue(candidate, null)) return false;
+                if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(candidate, null)) return false;
                 if (_destroyHasBeenStartedProp != null && (bool)_destroyHasBeenStartedProp.GetValue(candidate, null)) return false;
                 if (_isEnemyMethod != null)
                 {
-                    return (bool)_isEnemyMethod.Invoke(_entity, new object[] { candidate });
+                    if (_singleArgCandidate == null) _singleArgCandidate = new object[1];
+                    _singleArgCandidate[0] = candidate;
+                    bool result = (bool)_isEnemyMethod.Invoke(_entity, _singleArgCandidate);
+                    _singleArgCandidate[0] = null;
+                    return result;
                 }
             }
-            catch { }
+            catch
+            {
+                if (_singleArgCandidate != null) _singleArgCandidate[0] = null;
+            }
             return false; // Unknown hostility is not enough to authorize visual targeting.
         }
 
@@ -1452,6 +1503,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_entity == null) return 1f;
             try
             {
+                if (_entity.MaxHealth > 0.001f)
+                {
+                    return Mathf.Clamp01(_entity.CurrentHealth / _entity.MaxHealth);
+                }
                 if (_healthRatioProp != null)
                 {
                     return (float)_healthRatioProp.GetValue(_entity, null);
@@ -1466,18 +1521,26 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private float GetCurrentHealth()
         {
-            if (_currentHealthProp != null && _entity != null)
+            if (_entity != null)
             {
-                try { return (float)_currentHealthProp.GetValue(_entity, null); } catch { }
+                try { return _entity.CurrentHealth; } catch { }
+                if (_currentHealthProp != null)
+                {
+                    try { return (float)_currentHealthProp.GetValue(_entity, null); } catch { }
+                }
             }
             return 100f;
         }
 
         private float GetMaxHealth()
         {
-            if (_maxHealthProp != null && _entity != null)
+            if (_entity != null)
             {
-                try { return (float)_maxHealthProp.GetValue(_entity, null); } catch { }
+                try { return _entity.MaxHealth; } catch { }
+                if (_maxHealthProp != null)
+                {
+                    try { return (float)_maxHealthProp.GetValue(_entity, null); } catch { }
+                }
             }
             return 100f;
         }
@@ -1487,6 +1550,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_entity == null) return true;
             try
             {
+                if (_entity.IsDestroyed || _entity.DestroyHasBeenStarted) return true;
                 if (_stillExistsProp != null && !(bool)_stillExistsProp.GetValue(_entity, null)) return true;
                 if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(_entity, null)) return true;
                 if (_destroyHasBeenStartedProp != null && (bool)_destroyHasBeenStartedProp.GetValue(_entity, null)) return true;
