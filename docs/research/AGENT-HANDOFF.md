@@ -1161,9 +1161,37 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
       * Pilar 2 (Registro y Ciclo de Vida): `entityRegistryResetCount: 3` (reinicio en cada cambio de escena), `entityRegisteredCount: 76`, `activeRegisteredEntityCount: 75`.
       * Pilar 3 (Bucle de Órdenes): `commandExecutedCount: 2`, `commandNextStepCount: 1`, `commandChainDeletedCount: 1`, `lastExecutedCommandKind: "Stop"`.
     - Proceso cerrado limpiamente. Checkpoint verificado con `safe_to_finalize: true`, selector preservado en `2`, 0 perfiles de usuario alterados. Evidencia: `artifacts/runtime-smoke/core-harmony-patches-live-20261108/runtime-evidence.json` (PASS).
-62. **Defensa reactiva: damageReflect + deathNova (2026-11-08; validación local, sin runtime Steam aún):**
+
+62. **Lectores profundos del intermission en vivo + fix idempotente del director (2026-11-08; runtime Steam, mapa continuado Profile2 + freshrun Profile5):**
+    - Nuevos lectores (commit `0fca4fc`, DLL `f5aeb462`→`84527920`→`bf5207d0`, harness 548/549, Python 463): `diagnostics_get_level_map_state` (Game.StageMap.CurrentLevelMap por reflexión; nivel actual/campo, isCurrentLevelFinished, isLastLevelBeforeBoss, levelCount, choosableFieldCount con la regla nativa IsChoosable, boss prefab names) e `diagnostics_get_intermission_node` (found, isChoosable, rewards Rest/Shop/Card/Upgrade/Relic/Research/Coin/StartCrystal/ResearchPoints/Drop, BlueprintPoolId, conexiones in/out, fieldsInLevel).
+    - En vivo (Profile2, mapa levelCount=4, currentLevel=3): `isLastLevelBeforeBoss=true`, `currentField=1`, `choosableFieldCount=0`, `bossAiPrefabName='_01_Asc4 SmallSlime Enemy'`, `bossMapName='41Standard 4 Corner Bases'`; nodo (3,1) con `found=true`, `hasCoinReward=true`; director fail-closed con motivos exactos. Confirma la regla decompilada `LevelMap.IsChoosable`: choosable exige level==CurrentLevel+1 = boss (no es nodo de mapa) → frontera vacía legítima.
+    - Bug encontrado/corregido en vivo: `HasField` invocaba `Fields` con instancia null → `found=false` pre-fix; post-fix `found=true` con datos reales.
+    - Fix en RuntimeIntermissionDirector (commit `ab95b0c`, DLL `bf5207d0` desplegada + hash verificado): `IsAlreadySelected` puro + short-circuit en `TrySelectLevelNode` antes del click cuando el nodo ya es `IsCurrentNodeOfPath` (la proyección post-clic fallaba por cámara movida); tests de regresión puros (`first)` etc).
+    - RunSetup gate en freshrun Profile5: dificultad EASY inactiva, tarjetas de 4-cards requieren click físico (physics raycast miss) y `RunOpenerStoryCanvas` cubre la pantalla — no cruzable a ciegas; el proceso se cerró limpio externamente (sin cambios durables; savegame Profile5 respetado, selector restaurado Profile2, checkpoint exact match).
+    - Evidencia: runtime-evidence-deep-reads-fixed.json (UNKNOWN por escala de afirmaciones).
+    - **Límite de evidencia:** la transición selección→entrada con frontera poblada sigue pendiente (requiere mapa fresco superando RunSetup); el director y los deep reads están probados en vivo.
+
+63. **Defensa reactiva: damageReflect + deathNova (2026-11-08; validación local, sin runtime Steam aún):**
     - Nuevas mecánicas de unidad con patrón Schema→DTO→Clone→Validación→Runtime: `damageReflect` (`reflectRatio` 0 exclusive–1.0, `maxReflectPerHit` ≥0) y `deathNova` (`novaRadius` 1–50, `damage` 0–500, `stunDuration`/`slowDuration` 0–15, `maxTargets` 0–32).
     - Runtime: reflect en `RuntimeUnitMechanicsDirector.OnEntityDealtDamage` (lado víctima, solo enemigos, vía `TakeDamage` nativo, guard `_reflectDepth` anti-loop); deathNova solo en `OnEntityKilled` (postfix `Die`), `OnEntityDied` sigue siendo cleanup/reuse sin nova. `FormatMechanicsSummary` añade `Reflejo`/`Nova Mortal`; `ContentPackRuntimeLoader` registra ambos perfiles.
     - Demo en `tactical-operations`: Bulwark `damageReflect` 0.2/máx 25; Gravitas `deathNova` 4m/22 dmg/stun 2/slow 2/máx 6. `tools/analyze_unit_mechanics.py` los incluye.
     - Validación local: Release 0/0, DLL `01d03118ccf2e67c81a4657f4d1faccbeecbf3147fabce231c6ebe97429ef962`, harness 557/558 (1 skip symlink), Python 479 OK, registry 0 issues, schema 4/4. Tests: validación/schema/clone extendidos + runtime stub (reflect una vez, deathNova solo en kill, reuse sin nova).
     - **Límite de evidencia:** sin prueba Steam natural aún; reflect/deathNova pendientes de observación en partida (oferta, producción y decisión AI siguen como gaps de aceptación).
+
+64. **Integración completa de Parches Harmony CIL Transpiler en el núcleo + Defensa reactiva (commit `c3f12c1`, 2026-11-08; local Release + despliegue verificado):**
+    - Suite completa de 9 CIL Transpilers instalados y verificados en el bucle nuclear de simulación:
+      * `EntityFactory.InstantiateEntity`: intercepta creación e inicialización de unidades (`UnitCreationTranspilerCount`).
+      * `EntityFactory.InitEntityController`: intercepta instanciación por GameObject. Manejo CIL con preservación de pila de retorno no-void mediante `OpCodes.Dup` antes de cada `Ret` (`InitEntityControllerTranspilerCount`).
+      * `EntityController.OnHasBeenInstantiated`: callback universal de instanciación con paso de `ldarg.0` y `ldarg.1` antes de `Ret` (`EntityOnInstantiatedTranspilerCount`).
+      * `EntityController.ResetAndInitForReuse`: limpieza atómica en reciclaje de pool de objetos antes de `Ret` (`UnitReuseTranspilerCount`).
+      * `EntityController.OnHasBeenInstantiatedForReuse`: callback universal de reutilización desde pool antes de `Ret` (`EntityReuseOnInstantiatedTranspilerCount`).
+      * `EntityController.Produce`: intercepta disparo de producción de fábrica pasando `ldarg.0..3` antes de `Ret` (`FactoryProduceTranspilerCount`).
+      * `ExistingControllers.Init`: reinicio y vaciado del registro del campo de batalla antes de `Ret` (`EntityRegistryResetTranspilerCount`).
+      * `ExistingControllers.OnEntityCreated`: registro de unidades vivas en rosters antes de `Ret` con `TransferLabels` (`EntityRegisteredTranspilerCount`).
+      * `ExistingControllers.OnEntityWillBeDestroyed`: intercepción en índice 0 para desvinculación determinista de auras y leases AI (`EntityUnregisteredTranspilerCount`).
+    - Robustez CIL en Mono/netstandard2.1: eliminación de dependencias directas sobre `[mscorlib]Label` e `ILGenerator` (prevención de `CS7069`) manipulando listas de `CodeInstruction` y transfiriendo etiquetas vía reflexión no genérica (`TransferLabels` y `ClearLabels`).
+    - Integración de 58 parches Harmony totales y 21 contadores de simulación expuestos en el puente MCP (`diagnostics_get_runtime_hooks`).
+    - Defensa reactiva validada: `damageReflect` y `deathNova` en `tactical-operations` (Bulwark y Gravitas).
+    - Despliegue verificado: proceso `Rogue Command` cerrado limpiamente, DLL Release copiada a `BepInEx/plugins/RogueCommandExpansionLoader.dll` con hash SHA-256 verificado `01D03118CCF2E67C81A4657F4D1FACCBEECBF3147FABCE231C6EBE97429EF962`.
+    - Validación local: Release 0 warnings/0 errors; C# harness 558/559 (1 skip symlink, 0 fallos); Python suite 479/479 OK.
+    - **Límite de evidencia:** la ejecución en vivo de los 9 transpilers durante una partida natural de Steam se verificará en la próxima sesión en vivo.
