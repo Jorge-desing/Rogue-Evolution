@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.9.0
+version: 1.10.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -45,6 +45,7 @@ When monitoring match progression or running autonomous agent loops, avoid issui
 All censuses query live game singletons through fail-closed reflection and format primitive DTOs:
 
 - **System Health** (`diagnostics_get_system_health`): Readiness of native registry, active content packs, registered units and AI modules, player and AI credit balances.
+- **Core Harmony Hook Telemetry** (`diagnostics_get_runtime_hooks`): Live execution status and counters for the 53 installed Harmony patches and the 12 core simulation hooks: `hooksInstalled` (bool), `installedHookCount` (53), `harmonyOwnerId` (`RogueCommand.ExpansionLoader.Runtime`), `registeredCombatXpCount`, unit creation/reuse (`unitCreationHookCount`, `unitReuseHookCount`), placement ghosts (`placementGhostHookCount`, and `GetLastPlacementGhostEntityId()`), factory production (`factoryProduceHookCount`, with tracking by entity key and `GetFactoryProducedCountByEntityId`), battlefield registration/unregistration (`entityRegistryResetCount`, `entityRegisteredCount`, `entityUnregisteredCount`, `activeRegisteredEntityCount`), and command loop execution (`commandExecutedCount`, `commandNextStepCount`, `commandResetCount`, `commandChainDeletedCount`, `lastExecutedCommandKind`).
 - **Threat Prioritization** (`diagnostics_get_threat_prioritization`): Active threat-prioritization behaviors, evaluated enemy units, friendly targets, and dynamic retargeting counters. Each tick also censuses AI units (`AiUnits()`) and allied player units (`PlayerUnits()`), exposing `AutoControlledAlliedUnitCount` / `_lastProcessedAiUnitCount` for diagnostics only; it does **not** mutate control/faction identity (allied units stay `IsControlledByPlayer=true`). An earlier reflection-based control-flag reassignment was reverted in `5b88d65`.
 - **Production Queues** (`diagnostics_get_production_census`): Living factories, active production queues, build durations, and progress ratios.
 - **Base Integrity** (`diagnostics_get_base_integrity`): Engineering HQ existence, player HQ health ratio, enemy structure count, and average structure health.

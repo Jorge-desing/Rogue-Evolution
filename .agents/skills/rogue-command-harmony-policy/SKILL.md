@@ -1,7 +1,7 @@
 ---
 name: rogue-command-harmony-policy
 description: "BepInEx 5 + Harmony 2 patching policy for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). When creating or auditing Unity game plugins, Harmony patches, assembly identity checks, or IL2CPP/back-end decisions. [Política de BepInEx 5 + Harmony 2 para Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). Uso: plugins Unity, patches Harmony, verificación de identidad de ensamblados, decisiones backend IL2CPP]"
-version: 1.0.0
+version: 1.1.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -77,28 +77,29 @@ This project uses a centralized installer rather than attribute-based patches. F
 4. **Register the plan** with `plan.Add(new PatchPlan(targetMethod, prefix, postfix, finalizer))`.
 5. **Build and run validation tests**; the test project links `RuntimeHooks.cs` directly.
 
-## Core Engine Harmony Patches (52 Installed Hooks)
+## Core Engine Harmony Patches (53 Installed Hooks)
 
-The loader installs 52 verified Harmony hooks covering engine balancing, blueprint pools, procedural landscapes, cards, combat, and three core pillars of native simulation:
+The loader installs 53 verified Harmony hooks covering engine balancing, blueprint pools, procedural landscapes, cards, combat, and three core pillars of native simulation:
 
 ### Pillar 1: Unit Creation & Factory Production
-- `BuildingPlacement.CreateBuildingPlacementGhost`: Postfix tracking placement ghosts (`placementGhostHookCount`).
+- `BuildingPlacement.CreateBuildingPlacementGhost`: Postfix tracking placement ghosts (`placementGhostHookCount`) and populating `RuntimeGameplayCommandDirector.GetLastPlacementGhostEntityId()`.
 - `EntityFactory.InstantiateEntity`: Postfix intercepting dynamically created units (`unitCreationHookCount`).
-- `EntityController.ResetAndInitForReuse`: Prefix/Postfix handling unit recycling from the pool (`unitReuseHookCount`).
-- `EntityController.Produce`: Postfix tracking factory production (`factoryProduceHookCount`).
+- `EntityController.ResetAndInitForReuse`: Prefix/Postfix handling unit recycling from the pool (`unitReuseHookCount`), clearing stale registered tracking and resetting baseline effects and combat XP.
+- `EntityController.Produce`: Postfix tracking factory production (`factoryProduceHookCount`), tracking cumulative completions per factory key and per product `EntityId` (`GetFactoryProducedCount`, `GetFactoryProducedCountByEntityId`).
 
 ### Pillar 2: Unit Registry & Lifecycle
-- `ExistingControllers.Init`: Postfix resetting the active registry on scene start (`entityRegistryResetCount`).
+- `ExistingControllers.Init`: Postfix resetting the active registry on scene start (`entityRegistryResetCount`), resetting per-match counters, and notifying `CompositeAiRuntimeBehaviour.NotifyBattlefieldRegistryReset()`.
 - `ExistingControllers.OnEntityCreated`: Postfix registering spawned units (`entityRegisteredCount`, `activeRegisteredEntityCount`).
-- `ExistingControllers.OnEntityWillBeDestroyed`: Postfix tracking entity destruction (`entityUnregisteredCount`).
+- `ExistingControllers.OnEntityWillBeDestroyed`: Postfix tracking entity destruction (`entityUnregisteredCount`), removing entities from active registry, unlinking command aura followers, and releasing AI arbiter leases.
+- `RuntimeUnitMechanicsDirector` Lifecycle Invariants: `OnEntityDestroyed` and `OnEntityDied` deterministically release dynamic command aura follower links, remove entries from `_activeDynamicCommandAuras`, and clean up runtime components via `ClearRuntimeMechanicsByObject`.
 
-### Pillar 3: Command Loop
-- `EntityController.ExecuteCommand`: Postfix intercepting dispatched orders (`commandExecutedCount`, `lastExecutedCommandKind`).
-- `EntityController.ExecuteNextCommand`: Postfix tracking sequence steps (`commandNextStepCount`).
-- `EntityController.ResetCurrentCommand`: Postfix tracking order cancellation (`commandResetCount`).
-- `EntityController.DeleteCommandChain`: Postfix tracking command chain clearing (`commandChainDeletedCount`).
+### Pillar 3: Command Loop & AI Arbiter Synchronization
+- `EntityController.ExecuteCommand`: Postfix intercepting dispatched orders (`commandExecutedCount`, `lastExecutedCommandKind`), extracting native `command.tag`, storing it in `RuntimeGameplayCommandDirector.GetLastUnitCommandTag()`, and notifying `CompositeAiRuntimeBehaviour.NotifyUnitCommandExecuted(unitId, tag)`.
+- `EntityController.ExecuteNextCommand`: Postfix tracking sequence steps (`commandNextStepCount`) and unit command step counters.
+- `EntityController.ResetCurrentCommand`: Postfix tracking order cancellation (`commandResetCount`), clearing the last unit command tag, and notifying `CompositeAiRuntimeBehaviour.NotifyUnitLeaseInvalidated(unitId)` to immediately release active arbiter leases.
+- `EntityController.DeleteCommandChain`: Postfix tracking command chain clearing (`commandChainDeletedCount`), marking command processing cleared, and releasing arbiter leases.
 
-All 12 core patch methods and their live execution counts are queryable in real-time via the MCP tool `diagnostics_get_runtime_hooks`.
+All 12 core patch methods, their live execution counts, and command metrics are queryable in real-time via the MCP tool `diagnostics_get_runtime_hooks`.
 
 ## Harmony Patching Patterns
 

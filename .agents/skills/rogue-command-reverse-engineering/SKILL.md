@@ -99,6 +99,19 @@ When inspecting or reflecting native members, observe these reverse-engineered c
 - **Static Property Setters**: `AiBehaviourManager.CurrentAttackWaveNumber` has a public static getter (`0x06000084`) and a private static setter (`0x06000085`). Invocations must use `BindingFlags.Static | BindingFlags.NonPublic` with a `null` target instance.
 - **Private Instance Methods**: `Harvest.ClaimClosestCrystalAndMoveToIt` (token `0x060004ef`) and `Harvest.MoveToClosestRefinery` (token `0x060004f0`) are declared private in `Assembly-CSharp.dll` (`mdPrivate: True`, `mdPublic: False`). Invocations must resolve cached `MethodInfo` with `BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance`.
 - **Method Signature Parameter Ordering**: `AudioMixerHelper.SetMasterVolume`, `SetMusicVolume`, `SetGameplayVolume`, and `SetUiSelectionSoundsVolume` expect `(UnityEngine.Audio.AudioMixer mixer, float sliderValue)` in that exact order (AudioMixer first, float second).
+- **Core Command Loop & Lifecycle Signatures**:
+  - `EntityCommand`: Value type struct (token `0x020000a2`) declaring field `tag` (`string`, token `0x040005d5`), enum `command` (`Command`, token `0x020000a3`), `destination` (`Vector3`), and `target` (`EntityController`).
+  - `EntityController.ExecuteCommand(EntityCommand command, CommandProcessingType processingType)`: Token `0x06000755`. Postfix receives command and processing type enum (`0x020000bb`).
+  - `EntityController.ExecuteNextCommand()`: Token `0x06000756`. Steps through the private `LinkedList<EntityCommand> _commandChain`.
+  - `EntityController.ResetCurrentCommand()`: Token `0x06000757`. Resets the currently active command to `DoNothing` (0) without clearing the pending chain.
+  - `EntityController.DeleteCommandChain()`: Token `0x06000758`. Clears all queued commands on the unit.
+  - `EntityController.ResetAndInitForReuse()`: Token `0x06000760`. Invoked by the native object pool prior to recycling an entity.
+  - `EntityController.OnHasBeenInstantiatedForReuse()`: Token `0x06000761`. Invoked by the pool immediately after entity re-activation.
+  - `EntityController.Produce(bool instant, bool forFree, bool doNotTriggerEvent)`: Token `0x06000770`. Dispatches factory production cycles.
+  - `ExistingControllers.Init()`: Token `0x06000180`. Resets the active battlefield registry on scene start.
+  - `ExistingControllers.OnEntityCreated(EntityController controller, bool isRevive)`: Token `0x06000181`. Registers spawned units into player/AI rosters.
+  - `ExistingControllers.OnEntityWillBeDestroyed(EntityController controller, EntityController killer)`: Token `0x06000182`. Intercepts unit destruction before native removal.
+  - `BuildingPlacement.CreateBuildingPlacementGhost(string entityId, GameObject ghostPrefab)`: Token `0x06000320`. Instantiates the preview hologram for building placement.
 
 ### References
 

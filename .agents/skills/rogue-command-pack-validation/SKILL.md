@@ -11,9 +11,12 @@ Use this skill when validating or packaging a Rogue Command loader/content chang
 
 - Parse `content/schema/content.schema.json` and validate each changed `content.json` against Draft 2020-12 schema rules.
 - Run both validation test suites when tests are part of the accepted task:
-  - C# loader harness: `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` (report a skipped symlink check as skipped, not passed).
+  - C# loader harness: `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` (report a skipped symlink check as skipped, not passed; current baseline: 556 passing / 1 skipped out of 557 checks).
   - The C# harness compiles a **curated `Compile` file list against a minimal `UnityEngine` stub**, not the whole loader. Grep the test csproj `Compile` list before adding a type to a file the harness compiles: a `MonoBehaviour` or any type referencing live Unity authoring/runtime types (`RuntimeOverlayUi`, `RangeDisplayRuntime`, `GUILayout`, `LineRenderer`, ...) fails to compile there. Keep agent-readable/pure logic (JSON formatters, color policies, snapshot DTOs) in a dependency-free file the csproj registers, and keep the Unity-coupled bridge `MonoBehaviour` in a separate file the plugin compiles but the harness does not. A hand-rolled JSON writer beats a Newtonsoft dependency when the formatter must also live in the stub-only test project.
-  - Python registry & balance test suite: `python -B -m unittest discover -s tests -v`.
+  - Python registry & balance test suite: `python -B -m unittest discover -s tests -v` (current baseline: 479 passing / 1 skipped out of 480 checks).
+- **Core Engine Harmony & Command Loop Synchronization Validation**:
+  - Validates all 53 installed hooks and the 12 core simulation hooks (unit creation, pool reuse, placement ghost, factory produce, entity registry reset, entity register/unregister, command executed/step/reset/delete).
+  - Validates `AiCommandArbiterState` lease invalidation on order reset/delete and tag divergence (`ReleaseLease`, `ReleaseLeaseIfTagDiffers`), command tag projection into `AiUnitSnapshot.CurrentCommandTag`, factory produce tracking by both key and `EntityId` (`GetFactoryProducedCountByEntityId`), and dynamic command aura unlinking and cleanup on entity destruction.
 - **Unit Variant Schema Validation**:
   - `units[].variants` permits up to 8 loadout variants.
   - Each variant allows up to 64 `balanceOverrides`.
