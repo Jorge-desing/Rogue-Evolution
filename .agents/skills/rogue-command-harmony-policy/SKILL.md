@@ -68,12 +68,12 @@ The loader registers 53 verified hooks across core game simulation systems:
 | Category / Pillar | Target Method | Hook Type | Purpose & Telemetry Counter |
 |---|---|---|---|
 | **Pillar 1: Production** | `BuildingPlacement.CreateBuildingPlacementGhost` | Postfix | Track placement holograms; populate `GetLastPlacementGhostEntityId()` (`placementGhostHookCount`) |
-| **Pillar 1: Production** | `EntityFactory.InstantiateEntity` | Postfix | Intercept unit creation, attach directors (`unitCreationHookCount`) |
-| **Pillar 1: Production** | `EntityController.ResetAndInitForReuse` | Prefix/Postfix | Handle object pool recycling; clear registered effects/XP (`unitReuseHookCount`) |
+| **Pillar 1: Production** | `EntityFactory.InstantiateEntity` | Postfix + Transpiler | Intercept unit creation, attach directors (`unitCreationHookCount`, `unitCreationTranspilerCount`) |
+| **Pillar 1: Production** | `EntityController.ResetAndInitForReuse` | Prefix/Post + Transpiler | Handle object pool recycling; clear registered effects/XP (`unitReuseHookCount`, `unitReuseTranspilerCount`) |
 | **Pillar 1: Production** | `EntityController.Produce` | Postfix | Track factory production completion by factory and entityId (`factoryProduceHookCount`) |
 | **Pillar 2: Registry** | `ExistingControllers.Init` | Postfix | Reset battlefield registry on scene start; notify AI behaviour (`entityRegistryResetCount`) |
-| **Pillar 2: Registry** | `ExistingControllers.OnEntityCreated` | Postfix | Register unit into player/AI rosters (`entityRegisteredCount`, `activeRegisteredEntityCount`) |
-| **Pillar 2: Registry** | `ExistingControllers.OnEntityWillBeDestroyed` | Postfix | Intercept death; unlink aura followers, release AI arbiter leases (`entityUnregisteredCount`) |
+| **Pillar 2: Registry** | `ExistingControllers.OnEntityCreated` | Postfix + Transpiler | Register unit into player/AI rosters (`entityRegisteredCount`, `activeRegisteredEntityCount`, `entityRegisteredTranspilerCount`) |
+| **Pillar 2: Registry** | `ExistingControllers.OnEntityWillBeDestroyed` | Postfix + Transpiler | Intercept death; unlink aura followers, release AI arbiter leases (`entityUnregisteredCount`, `entityUnregisteredTranspilerCount`) |
 | **Pillar 2: Registry** | `RuntimeUnitMechanicsDirector` Invariants | Internal | Deterministic cleanup of dynamic auras, followers, and status effects upon entity death |
 | **Pillar 3: Command Loop** | `EntityController.ExecuteCommand` | Postfix | Intercept orders; store `command.tag` in `GetLastUnitCommandTag()`; notify AI (`commandExecutedCount`) |
 | **Pillar 3: Command Loop** | `EntityController.ExecuteNextCommand` | Postfix | Step through unit command chain (`commandNextStepCount`) |
@@ -96,8 +96,13 @@ The loader registers 53 verified hooks across core game simulation systems:
 - **Signature:** `public static void Postfix(MethodInfo __originalMethod, object __instance, object[] __args, ref ReturnType __result)`
 
 ### 3. Transpiler
-- **Use:** Modifying IL instruction streams in-place.
-- **Rule:** ALWAYS use `CodeMatcher` (never raw `ILGenerator`/`OpCodes`). Target the shortest unique label sequence. Never transpile `async`, `ref`, or `out` generic methods.
+- **Use:** Modifying CIL instruction streams in-place at exact bytecode injection points.
+- **Implemented Core Transpilers (`RuntimeTranspilerPatches.cs`):**
+  - `EntityFactory.InstantiateEntity`: Clones dynamic entity/arg loads and injects `OnEntityInstantiatedTranspilerHook` right after `callvirt OnHasBeenInstantiated`.
+  - `ExistingControllers.OnEntityHasBeenCreated`: Injects `OnEntityRegisteredTranspilerHook` before each `OpCodes.Ret`, transferring return labels to the start of the injected sequence.
+  - `ExistingControllers.OnEntityWillBeDestroyed`: Injects `OnEntityWillBeDestroyedTranspilerHook` at method entry (index 0).
+  - `EntityController.ResetAndInitForReuse`: Injects `OnEntityResetForReuseTranspilerHook` before all `OpCodes.Ret` exit points.
+- **`netstandard2.1` / Mono Type Invariant (CS7069 Fix):** In `netstandard2.1` plugins referencing .NET Framework `0Harmony.dll`, accessing `instruction.labels` or `new CodeMatcher(instructions, generator)` directly triggers `error CS7069` (`Label` or `ILGenerator` in `mscorlib` not found). Manipulate `List<CodeInstruction>` directly using reflection-based `TransferLabels(src, dst)` and `ClearLabels(inst)` via `System.Collections.IList` on the `labels` field. Never transpile `async`, `ref`, or `out` generic methods.
 
 ### 4. Optional Target Resolution (Cross-Version Robustness)
 - Use `TryFindUniqueMethod` defensive wrapper returning `null` on miss instead of throwing.
