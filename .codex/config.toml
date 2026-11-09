@@ -1,3 +1,9 @@
 [mcp_servers.mem0]
 url = "https://mcp.mem0.ai/mcp"
 bearer_token_env_var = "MEM0_API_KEY"
+
+[mcp_servers.hermes_mem0]
+command = "powershell.exe"
+args = ["-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".codex/hermes-mem0-mcp.ps1"]
+cwd = "."
+env_vars = ["MEM0_API_KEY"]
