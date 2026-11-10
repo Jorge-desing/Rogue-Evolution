@@ -98,6 +98,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private bool _hasFireAnimationParameter;
         private bool _hasDeathAnimationParameter;
         private bool _deathAnimationTriggered;
+        private bool _deathAnimationRequestedForDestruction;
+        private bool _deathVisualRetirementPending;
+        private bool _deathVisualRetirementUsesUnscaledTime;
+        private float _deathVisualRetirementRemainingSeconds;
         private bool _hasLastAnimationPosition;
         private Vector3 _lastAnimationPosition;
         private float _doorOpenProgress;
@@ -107,6 +111,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private const string FireAnimationParameter = "RCL_Fire";
         private const string DeathAnimationParameter = "RCL_Death";
         private const float AnimatorParameterCacheRetryInterval = 0.5f;
+        private const float DeathVisualRetirementTransitionPaddingSeconds = 0.15f;
+        private const float MaximumDeathVisualRetirementSeconds = 15f;
+
+        public bool DeathVisualRetirementPending => _deathVisualRetirementPending;
+        public float DeathVisualRetirementRemainingSeconds => _deathVisualRetirementRemainingSeconds;
 
         private static PropertyInfo _healthRatioProp;
         private static PropertyInfo _currentHealthProp;
@@ -245,6 +254,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _entity = entity;
             RefreshAnimatorParameterCacheIfNeeded();
             _deathAnimationTriggered = false;
+            _deathAnimationRequestedForDestruction = false;
+            _deathVisualRetirementPending = false;
+            _deathVisualRetirementUsesUnscaledTime = false;
+            _deathVisualRetirementRemainingSeconds = 0f;
             _isMoving = false;
             _lastShotTimestamp = -1f;
             _lastVelocity = Vector3.zero;
@@ -805,6 +818,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void Update()
         {
+            if (_deathVisualRetirementPending)
+            {
+                UpdateDeathVisualRetirement();
+                return;
+            }
+
             if (_entity == null) return;
 
             RefreshAnimatorParameterCacheIfNeeded();
@@ -1093,6 +1112,146 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public void TriggerDeathAnimationForDestruction()
         {
             TriggerDeathAnimation();
+            _deathAnimationRequestedForDestruction = _deathAnimationTriggered;
+        }
+
+        /// <summary>
+        /// Keeps the death pose alive after native destruction bookkeeping has completed. The
+        /// native entity is already marked destroyed; gameplay behaviours, colliders, and rigid
+        /// bodies are disabled while the authored Action_Death clip finishes.
+        /// </summary>
+        public bool TryBeginDeathVisualRetirementForDestruction()
+        {
+            if (_deathVisualRetirementPending || !_deathAnimationRequestedForDestruction ||
+                !_deathAnimationTriggered || !_hasDeathAnimationParameter ||
+                _entity == null || !IsEntityDead() || _animator == null || !_animator.enabled ||
+                !_animator.isActiveAndEnabled || _animator.runtimeAnimatorController == null)
+            {
+                return false;
+            }
+
+            float animatorSpeed = _animator.speed;
+            if (animatorSpeed <= 0.0001f || float.IsNaN(animatorSpeed) || float.IsInfinity(animatorSpeed))
+            {
+                return false;
+            }
+
+            AnimationClip deathClip = FindDeathAnimationClip(_animator.runtimeAnimatorController);
+            if (deathClip == null || deathClip.length <= 0f || float.IsNaN(deathClip.length) ||
+                float.IsInfinity(deathClip.length))
+            {
+                return false;
+            }
+
+            float retirementSeconds = (deathClip.length / animatorSpeed) +
+                DeathVisualRetirementTransitionPaddingSeconds;
+            if (retirementSeconds <= 0f || retirementSeconds > MaximumDeathVisualRetirementSeconds ||
+                float.IsNaN(retirementSeconds) || float.IsInfinity(retirementSeconds))
+            {
+                return false;
+            }
+
+            UpdateHealthAndDamageTransitions(true);
+            DisableGameplayForDeathVisualRetirement();
+            _deathVisualRetirementUsesUnscaledTime = _animator.updateMode == AnimatorUpdateMode.UnscaledTime;
+            _deathVisualRetirementRemainingSeconds = retirementSeconds;
+            _deathVisualRetirementPending = true;
+            return true;
+        }
+
+        private static AnimationClip FindDeathAnimationClip(RuntimeAnimatorController controller)
+        {
+            if (controller == null)
+            {
+                return null;
+            }
+
+            AnimationClip[] clips = controller.animationClips;
+            AnimationClip selected = null;
+            if (clips == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < clips.Length; i++)
+            {
+                AnimationClip candidate = clips[i];
+                if (candidate == null ||
+                    candidate.name.IndexOf("Action_Death", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                if (selected == null || candidate.length > selected.length)
+                {
+                    selected = candidate;
+                }
+            }
+
+            return selected;
+        }
+
+        private void DisableGameplayForDeathVisualRetirement()
+        {
+            MonoBehaviour[] scripts = gameObject.GetComponentsInChildren<MonoBehaviour>(true);
+            for (int i = 0; i < scripts.Length; i++)
+            {
+                MonoBehaviour script = scripts[i];
+                if (script != null && script != this)
+                {
+                    script.StopAllCoroutines();
+                    script.CancelInvoke();
+                }
+            }
+
+            Behaviour[] behaviours = gameObject.GetComponentsInChildren<Behaviour>(true);
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                Behaviour behaviour = behaviours[i];
+                if (behaviour != null && behaviour != this && behaviour != _animator)
+                {
+                    behaviour.enabled = false;
+                }
+            }
+
+            Collider[] colliders = gameObject.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                if (colliders[i] != null)
+                {
+                    colliders[i].enabled = false;
+                }
+            }
+
+            Rigidbody[] rigidbodies = gameObject.GetComponentsInChildren<Rigidbody>(true);
+            for (int i = 0; i < rigidbodies.Length; i++)
+            {
+                Rigidbody body = rigidbodies[i];
+                if (body != null)
+                {
+                    body.velocity = Vector3.zero;
+                    body.angularVelocity = Vector3.zero;
+                    body.detectCollisions = false;
+                    body.isKinematic = true;
+                }
+            }
+        }
+
+        private void UpdateDeathVisualRetirement()
+        {
+            float deltaTime = _deathVisualRetirementUsesUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+            if (deltaTime > 0f)
+            {
+                _deathVisualRetirementRemainingSeconds = Mathf.Max(
+                    0f,
+                    _deathVisualRetirementRemainingSeconds - deltaTime);
+            }
+
+            if (_deathVisualRetirementRemainingSeconds <= 0f)
+            {
+                _deathVisualRetirementPending = false;
+                UnityEngine.Object.Destroy(gameObject);
+            }
         }
 
         private void TriggerDeathAnimation()

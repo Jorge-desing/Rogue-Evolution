@@ -226,3 +226,8 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 - For a clean-room variant check, use the existing `diagnostics_order_apply_visual_variant` command on a known entity and a declared Level 2 variant. Capture the returned variant/module count and `diagnostics_get_visual_census` / `diagnostics_inspect_entity_visual` readback, then apply `ResetVisualVariant` and confirm the Level 1 appearance, original transform scale, tint property blocks, and hardpoint group active states are restored.
 - Confirm each mounted module sits under the corresponding canonical hardpoint group and that omitted slots remain empty. An apply/reset response without entity visual readback is not proof of the mounted appearance.
 - Runtime status includes `modules=<count>` and `RuntimeVisualDirector.ActiveVisualModuleCount`; use these as supporting telemetry alongside the visual census. Static registry and AssetBundle checks are not live runtime proof.
+
+### Death-visual retirement counters
+
+- `GetRuntimeHooksStateJson()` now exposes `entityDestroyGameObjectTranspilerCount` for terminal callback invocations and `deathVisualRetirementCount` for successful visual holds; `entityDestroyTranspilerCount` remains the Destroy-entry callback count. Reset all three with the diagnostic reset path.
+- A bounded event observer should capture direct-damage setup, trigger success, `DeathVisualRetirementPending`, clip name/length/time, target existence, and final destruction. Report telemetry separately from rendered pixels and natural combat. Include cleanup state for the observer, probe, Harmony patches, watchers, and `RuntimeVisualDirector` count. Example: `artifacts/runtime-smoke/retarget-death-visual-cloud-20261110170654/death-hold-runtime-result.json`.

@@ -97,3 +97,10 @@ python tools/validate_loader_registry.py --json
 - [PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md) & [VFX Authoring](../rogue-command-vfx-authoring/SKILL.md)
 - [Steam Runtime Validation](../rogue-command-steam-runtime-validation/SKILL.md) & [Reverse Engineering](../rogue-command-reverse-engineering/SKILL.md)
 - [Pack Validation](../rogue-command-pack-validation/SKILL.md)
+
+## BepInEx retarget death-hold probe
+
+- Continue a saved, tutorial-complete Profile2 run selected through the game's native profile flow. Keep the match frozen at `Time.timeScale=0`; use BepInEx MCP for scene state, diagnostic spawn/damage, observer setup, and cleanup.
+- To prove a death visual hold without advancing the saved match, set `Animator.updateMode=UnscaledTime` only on a disposable probe clone before lethal diagnostic damage. Capture the exact clip, clip duration, hold countdown, `DestroyHasBeenStarted`/`IsDestroyed`, and post-hold removal; then remove observer/helper state and verify no clone, patches, or watchers remain. State clearly that this is runtime telemetry, not natural combat or rendered-pixel evidence.
+- Cloud conflict handling is part of profile safety. If the user selects Steam Cloud and the run changes local `metaSavegame.dat`, preserve the Cloud-selected bytes and do not allow normal exit/sync to overwrite them until an explicitly approved sync-safe close/restore path is available. Check both the local checkpoint and Steam `remotecache.vdf`/`cloud_log.txt` hashes.
+- Evidence for this procedure: `artifacts/runtime-smoke/retarget-death-visual-cloud-20261110170654/death-hold-runtime-result.json`.

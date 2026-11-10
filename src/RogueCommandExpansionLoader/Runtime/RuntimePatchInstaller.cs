@@ -1569,6 +1569,63 @@ namespace RogueCommandExpansionLoader.Runtime
             list.Insert(2, ldarg2);
             list.Insert(3, callHook);
 
+            MethodInfo gameObjectDestroy = typeof(UnityEngine.Object).GetMethod(
+                "Destroy",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(UnityEngine.Object) },
+                null);
+            MethodInfo gameObjectDestroyHook = typeof(RuntimeHarmonyPatches).GetMethod(
+                nameof(RuntimeHarmonyPatches.OnEntityDestroyGameObjectTranspilerHook),
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(UnityEngine.Object) },
+                null);
+            if (gameObjectDestroy == null || gameObjectDestroyHook == null ||
+                gameObjectDestroyHook.ReturnType != typeof(void) ||
+                !gameObjectDestroyHook.IsStatic || gameObjectDestroyHook.ContainsGenericParameters)
+            {
+                throw new InvalidOperationException(
+                    "EntityController.Destroy transpiler could not resolve the exact GameObject destruction callback.");
+            }
+
+            ParameterInfo[] destroyHookParameters = gameObjectDestroyHook.GetParameters();
+            if (destroyHookParameters.Length != 1 ||
+                destroyHookParameters[0].ParameterType != typeof(UnityEngine.Object))
+            {
+                throw new InvalidOperationException(
+                    "EntityController.Destroy terminal callback must be void(UnityEngine.Object).");
+            }
+
+            int destroyCallIndex = -1;
+            int destroyCallCount = 0;
+            for (int i = 0; i < list.Count; i++)
+            {
+                MethodInfo calledMethod = list[i].operand as MethodInfo;
+                if (list[i].opcode == OpCodes.Call && calledMethod != null &&
+                    calledMethod.DeclaringType == gameObjectDestroy.DeclaringType &&
+                    calledMethod.Name == gameObjectDestroy.Name &&
+                    calledMethod.ReturnType == typeof(void))
+                {
+                    ParameterInfo[] calledParameters = calledMethod.GetParameters();
+                    if (calledParameters.Length == 1 &&
+                        calledParameters[0].ParameterType == typeof(UnityEngine.Object))
+                    {
+                        destroyCallIndex = i;
+                        destroyCallCount++;
+                    }
+                }
+            }
+
+            if (destroyCallCount != 1)
+            {
+                throw new InvalidOperationException(
+                    "EntityController.Destroy transpiler requires exactly one UnityEngine.Object.Destroy(Object) call; found " +
+                    destroyCallCount + ".");
+            }
+
+            list[destroyCallIndex].operand = gameObjectDestroyHook;
+
             return list;
         }
 

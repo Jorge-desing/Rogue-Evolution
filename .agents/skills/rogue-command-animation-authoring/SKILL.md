@@ -209,6 +209,11 @@ Do not rotate a model or change yaw correction based only on static evidence. Re
 
 - The `EntityController.Destroy` entry hook calls `RuntimeVisualDirector.TriggerDeathAnimationForDestruction()` before retarget suspension only when `withoutTriggeringActions == false`. The director clears `RCL_IsMoving`, issues `RCL_Death`, and records success only after `Animator.SetTrigger` returns. A Profile2 BepInEx event trace observed the trigger method before `SuspendForDeath`, with the death-trigger flag and 8/8-bound suspended profile present at the hook postfix. The actor was killed by direct diagnostic damage; this is not natural-combat or rendered-death evidence, and native destruction follows immediately. Trace: `artifacts/runtime-smoke/retarget-animation-restart-profile2-20261110T1605Z/destroy-hook-method-events.json`.
 
+### Timed death-visual retirement
+
+- Keep the death Animator and `RuntimeVisualDirector` enabled while the Harmony terminal-destroy callback holds the visual. Disable gameplay behaviours and colliders and freeze rigidbodies so the death pose cannot continue affecting combat. Use the valid `Action_Death` clip duration divided by effective Animator speed plus the configured grace interval, with bounded/fail-closed timing; honor scaled versus unscaled Animator update mode.
+- The 2026-11-10 saved-Profile2 BepInEx probe observed `IroncladWalker_Action_Death` (1.416667 s), a 1.566667 s hold, normalized time above 1, then GameObject removal while scaled `Time.time` stayed fixed. `UnscaledTime` was set only on the disposable probe clone to keep the saved match paused. This is direct-diagnostic runtime telemetry, not natural-combat or rendered-appearance evidence: `artifacts/runtime-smoke/retarget-death-visual-cloud-20261110170654/death-hold-runtime-result.json`.
+
 ## Completion report
 
 List edited source, clips, controllers, prefabs, and bundles; state tool/engine versions and commands; report observed diagnostics; and separate static, local Unity, and live-game evidence. Identify unverified state transitions or motion behavior explicitly.

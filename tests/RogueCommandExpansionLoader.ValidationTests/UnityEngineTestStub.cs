@@ -158,10 +158,21 @@ namespace UnityEngine
     {
         private static int _nextInstanceId = 1000;
         private int _instanceId = System.Threading.Interlocked.Increment(ref _nextInstanceId);
+        public static int DestroyCallCount { get; private set; }
+        public static Object LastDestroyedObject { get; private set; }
         public int GetInstanceID() => _instanceId;
         public static T FindObjectOfType<T>() where T : class => null;
-        public static void Destroy(Object obj) { }
-        public static void Destroy(Object obj, float t) { }
+        public static void Destroy(Object obj)
+        {
+            DestroyCallCount++;
+            LastDestroyedObject = obj;
+        }
+        public static void Destroy(Object obj, float t) => Destroy(obj);
+        public static void ResetDestroyTelemetry()
+        {
+            DestroyCallCount = 0;
+            LastDestroyedObject = null;
+        }
     }
 
     public class Sprite : Object
@@ -224,17 +235,28 @@ namespace UnityEngine
         public T[] GetComponentsInChildren<T>(bool includeInactive = false) where T : Component => gameObject?.GetComponentsInChildren<T>(includeInactive) ?? System.Array.Empty<T>();
     }
 
-    public class MonoBehaviour : Component
+    public class Behaviour : Component
     {
+        public bool enabled { get; set; } = true;
+    }
+
+    public class MonoBehaviour : Behaviour
+    {
+        public void StopAllCoroutines() { }
+        public void CancelInvoke() { }
     }
 
     public class Rigidbody : Component
     {
         public bool isKinematic { get; set; }
+        public bool detectCollisions { get; set; } = true;
+        public Vector3 velocity { get; set; }
+        public Vector3 angularVelocity { get; set; }
     }
 
     public class Collider : Component
     {
+        public bool enabled { get; set; } = true;
         public bool isTrigger { get; set; }
     }
 
@@ -432,6 +454,7 @@ namespace UnityEngine
     public class RuntimeAnimatorController : Object
     {
         public string name { get; set; } = string.Empty;
+        public AnimationClip[] animationClips { get; set; } = System.Array.Empty<AnimationClip>();
     }
 
     public class Avatar : Object
@@ -445,6 +468,14 @@ namespace UnityEngine
     {
         public string name { get; set; } = string.Empty;
         public float length { get; set; } = 1.0f;
+        public bool isLooping { get; set; }
+    }
+
+    public enum AnimatorUpdateMode
+    {
+        Normal = 0,
+        AnimatePhysics = 1,
+        UnscaledTime = 2
     }
 
     public struct AnimatorClipInfo
@@ -471,13 +502,14 @@ namespace UnityEngine
         public bool IsName(string name) => string.Equals(_stateName, name, System.StringComparison.OrdinalIgnoreCase);
     }
 
-    public class Animator : Component
+    public class Animator : Behaviour
     {
         public bool isInitialized { get; set; } = true;
         public bool isActiveAndEnabled { get; set; } = true;
         public RuntimeAnimatorController runtimeAnimatorController { get; set; }
         public Avatar avatar { get; set; }
         public float speed { get; set; } = 1.0f;
+        public AnimatorUpdateMode updateMode { get; set; } = AnimatorUpdateMode.Normal;
         public AnimatorControllerParameter[] parameters { get; set; } = System.Array.Empty<AnimatorControllerParameter>();
         public AnimationClip activeClip { get; set; }
         public AnimatorStateInfo activeStateInfo { get; set; } = new AnimatorStateInfo("Base", 0f, 1f);
@@ -653,6 +685,7 @@ namespace UnityEngine
     {
         public static float time { get; set; }
         public static float unscaledTime { get; set; }
+        public static float unscaledDeltaTime { get; set; }
         public static float realtimeSinceStartup => unscaledTime;
         public static float timeScale { get; set; } = 1.0f;
         public static float deltaTime { get; set; }

@@ -55,6 +55,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private static int _placementGhostTranspilerCount;
         private static int _entityInitTranspilerCount;
         private static int _entityDestroyTranspilerCount;
+        private static int _entityDestroyGameObjectTranspilerCount;
+        private static int _deathVisualRetirementCount;
         private static int _commandExecutedTranspilerCount;
         private static int _commandNextStepTranspilerCount;
         private static int _commandResetTranspilerCount;
@@ -87,6 +89,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public static int PlacementGhostTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _placementGhostTranspilerCount, 0, 0);
         public static int EntityInitTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityInitTranspilerCount, 0, 0);
         public static int EntityDestroyTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityDestroyTranspilerCount, 0, 0);
+        public static int EntityDestroyGameObjectTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityDestroyGameObjectTranspilerCount, 0, 0);
+        public static int DeathVisualRetirementCount => System.Threading.Interlocked.CompareExchange(ref _deathVisualRetirementCount, 0, 0);
         public static int CommandExecutedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandExecutedTranspilerCount, 0, 0);
         public static int CommandNextStepTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandNextStepTranspilerCount, 0, 0);
         public static int CommandResetTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandResetTranspilerCount, 0, 0);
@@ -158,6 +162,8 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Exchange(ref _placementGhostTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _entityInitTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _entityDestroyTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityDestroyGameObjectTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _deathVisualRetirementCount, 0);
             System.Threading.Interlocked.Exchange(ref _commandExecutedTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _commandNextStepTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _commandResetTranspilerCount, 0);
@@ -1899,6 +1905,38 @@ namespace RogueCommandExpansionLoader.Runtime
             });
         }
 
+        public static void OnEntityDestroyGameObjectTranspiler(UnityEngine.Object destroyedObject)
+        {
+            if (destroyedObject == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityDestroyGameObjectTranspilerCount);
+            GameObject gameObject = destroyedObject as GameObject;
+            if (gameObject != null)
+            {
+                try
+                {
+                    EntityController entity = gameObject.GetComponent<EntityController>();
+                    Visual.RuntimeVisualDirector visualDirector =
+                        gameObject.GetComponent<Visual.RuntimeVisualDirector>();
+                    if (entity != null && entity.DestroyHasBeenStarted && entity.IsDestroyed &&
+                        visualDirector != null && visualDirector.TryBeginDeathVisualRetirementForDestruction())
+                    {
+                        System.Threading.Interlocked.Increment(ref _deathVisualRetirementCount);
+                        return;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log("Entity destroy visual hold failed safely: " + exception.Message);
+                }
+            }
+
+            UnityEngine.Object.Destroy(destroyedObject);
+        }
+
         public static void OnEntityExecuteCommandTranspiler(object entityObj)
         {
             if (entityObj == null)
@@ -2610,6 +2648,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void OnEntityDestroyTranspilerHook(object entity, bool withoutTriggeringActions, object originator)
         {
             RuntimeHooks.OnEntityDestroyTranspiler(entity, withoutTriggeringActions, originator);
+        }
+
+        public static void OnEntityDestroyGameObjectTranspilerHook(UnityEngine.Object destroyedObject)
+        {
+            RuntimeHooks.OnEntityDestroyGameObjectTranspiler(destroyedObject);
         }
 
         public static void OnEntityExecuteCommandTranspilerHook(object entity)

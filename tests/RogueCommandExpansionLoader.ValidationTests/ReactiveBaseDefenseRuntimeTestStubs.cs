@@ -55,7 +55,7 @@ public static class SetStatusEffect
     }
 }
 
-public sealed class EntityController : Component
+public sealed class EntityController : MonoBehaviour
 {
     public enum ChangeableValue
     {
@@ -783,6 +783,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public bool IsOnFireVisualActive { get; set; }
         public bool IsBoostedVisualActive { get; set; }
         public bool DeathAnimationTriggeredForDestruction { get; private set; }
+        public bool CanBeginDeathVisualRetirement { get; set; }
+        public bool DeathVisualRetirementPending { get; private set; }
+        public int DeathVisualRetirementAttemptCount { get; private set; }
         public string ActiveTacticalStanceVisual { get; set; } = "Standard";
         public string ActiveVisualVariantId { get; set; }
         public string ActivePresetName { get; set; }
@@ -793,6 +796,18 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public void TriggerDeathAnimationForDestruction()
         {
             DeathAnimationTriggeredForDestruction = true;
+        }
+
+        public bool TryBeginDeathVisualRetirementForDestruction()
+        {
+            DeathVisualRetirementAttemptCount++;
+            if (!CanBeginDeathVisualRetirement || !DeathAnimationTriggeredForDestruction)
+            {
+                return false;
+            }
+
+            DeathVisualRetirementPending = true;
+            return true;
         }
 
         public bool TryApplyVisualVariant(RuntimeUnitVisualVariant variant)

@@ -11056,6 +11056,47 @@ internal static partial class ValidationTestRunner
                     throw new InvalidOperationException("Entity destruction must trigger the unit death animation before retarget suspension.");
                 }
 
+                // The terminal native destroy call may be held only after the entry hook issued
+                // the destruction death trigger; no-trigger destruction remains immediate.
+                UnityEngine.Object.ResetDestroyTelemetry();
+                var heldDestroyEntity = new EntityController
+                {
+                    IsDestroyed = true,
+                    DestroyHasBeenStarted = true
+                };
+                RuntimeVisualDirector heldDestroyDirector =
+                    heldDestroyEntity.gameObject.AddComponent<RuntimeVisualDirector>();
+                heldDestroyDirector.TriggerDeathAnimationForDestruction();
+                heldDestroyDirector.CanBeginDeathVisualRetirement = true;
+                RuntimeHarmonyPatches.OnEntityDestroyGameObjectTranspilerHook(
+                    heldDestroyEntity.gameObject);
+                if (!heldDestroyDirector.DeathVisualRetirementPending ||
+                    UnityEngine.Object.DestroyCallCount != 0 ||
+                    RuntimeHooks.EntityDestroyGameObjectTranspilerCount != 1 ||
+                    RuntimeHooks.DeathVisualRetirementCount != 1)
+                {
+                    throw new InvalidOperationException("The terminal destroy hook must defer destruction only after a death visual retirement is armed.");
+                }
+
+                var immediateDestroyEntity = new EntityController
+                {
+                    IsDestroyed = true,
+                    DestroyHasBeenStarted = true
+                };
+                RuntimeVisualDirector immediateDestroyDirector =
+                    immediateDestroyEntity.gameObject.AddComponent<RuntimeVisualDirector>();
+                immediateDestroyDirector.CanBeginDeathVisualRetirement = true;
+                RuntimeHarmonyPatches.OnEntityDestroyGameObjectTranspilerHook(
+                    immediateDestroyEntity.gameObject);
+                if (immediateDestroyDirector.DeathVisualRetirementPending ||
+                    UnityEngine.Object.DestroyCallCount != 1 ||
+                    UnityEngine.Object.LastDestroyedObject != immediateDestroyEntity.gameObject ||
+                    RuntimeHooks.EntityDestroyGameObjectTranspilerCount != 2 ||
+                    RuntimeHooks.DeathVisualRetirementCount != 1)
+                {
+                    throw new InvalidOperationException("The no-actions destroy path must preserve native immediate GameObject destruction.");
+                }
+
                 // 13. Entity Execute Command Transpiler Hook (EntityController.ExecuteCommand)
                 RuntimeHarmonyPatches.OnEntityExecuteCommandTranspilerHook(unit);
                 if (RuntimeHooks.CommandExecutedTranspilerCount != 1)
@@ -11102,12 +11143,14 @@ internal static partial class ValidationTestRunner
                         root.GetProperty("placementGhostTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("entityInitTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("entityDestroyTranspilerCount").GetInt32() != 1 ||
+                        root.GetProperty("entityDestroyGameObjectTranspilerCount").GetInt32() != 2 ||
+                        root.GetProperty("deathVisualRetirementCount").GetInt32() != 1 ||
                         root.GetProperty("commandExecutedTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("commandNextStepTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("commandResetTranspilerCount").GetInt32() != 1 ||
                         root.GetProperty("commandChainDeletedTranspilerCount").GetInt32() != 1)
                     {
-                        throw new InvalidOperationException("SerializeRuntimeHooksState must serialize all 16 transpiler counters correctly: " + json);
+                        throw new InvalidOperationException("SerializeRuntimeHooksState must serialize all 18 transpiler counters correctly: " + json);
                     }
                 }
 
@@ -11125,6 +11168,8 @@ internal static partial class ValidationTestRunner
                     RuntimeHooks.PlacementGhostTranspilerCount != 0 ||
                     RuntimeHooks.EntityInitTranspilerCount != 0 ||
                     RuntimeHooks.EntityDestroyTranspilerCount != 0 ||
+                    RuntimeHooks.EntityDestroyGameObjectTranspilerCount != 0 ||
+                    RuntimeHooks.DeathVisualRetirementCount != 0 ||
                     RuntimeHooks.CommandExecutedTranspilerCount != 0 ||
                     RuntimeHooks.CommandNextStepTranspilerCount != 0 ||
                     RuntimeHooks.CommandResetTranspilerCount != 0 ||

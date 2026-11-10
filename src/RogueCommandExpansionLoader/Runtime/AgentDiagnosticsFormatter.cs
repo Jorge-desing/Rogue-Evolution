@@ -317,6 +317,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["placementGhostTranspilerCount"] = RuntimeHooks.PlacementGhostTranspilerCount,
                 ["entityInitTranspilerCount"] = RuntimeHooks.EntityInitTranspilerCount,
                 ["entityDestroyTranspilerCount"] = RuntimeHooks.EntityDestroyTranspilerCount,
+                ["entityDestroyGameObjectTranspilerCount"] = RuntimeHooks.EntityDestroyGameObjectTranspilerCount,
+                ["deathVisualRetirementCount"] = RuntimeHooks.DeathVisualRetirementCount,
                 ["commandExecutedTranspilerCount"] = RuntimeHooks.CommandExecutedTranspilerCount,
                 ["commandNextStepTranspilerCount"] = RuntimeHooks.CommandNextStepTranspilerCount,
                 ["commandResetTranspilerCount"] = RuntimeHooks.CommandResetTranspilerCount,

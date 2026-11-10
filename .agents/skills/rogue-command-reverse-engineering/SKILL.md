@@ -85,3 +85,8 @@ Authoritative reflection contracts verified against pinned `Assembly-CSharp.dll`
 - [Clean-Room Diagnostics Skill](../rogue-command-clean-room-diagnostics/SKILL.md) — Telemetry queries and live MCP bridge.
 - `tools/Decompile-ManagedType.ps1` — Pinned ILSpy script.
 - `docs/research/BASELINE.md` & `AGENT-HANDOFF.md` — Verified environment and token registers.
+
+## Destroy terminal-call compatibility anchor (2026-11-10)
+
+- Recheck the full compatibility tuple before using metadata: Rogue Command `1.0.9`, Unity `2021.3.45f2`, `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
+- In this exact assembly, `EntityController.Destroy(bool, EntityController)` (`0x06000869`) has one terminal call to `UnityEngine.Object.Destroy(UnityEngine.Object)`. Harmony may redirect only that unique terminal call operand to a same-signature callback while preserving the instruction's opcode and metadata. Treat call count/signature drift as an installation failure. This static anchor does not prove runtime animation; see the separate BepInEx trace at `artifacts/runtime-smoke/retarget-death-visual-cloud-20261110170654/death-hold-runtime-result.json`.
