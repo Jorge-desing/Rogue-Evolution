@@ -75,7 +75,7 @@ python tools/validate_loader_registry.py --json
 - **Boss Node raycast:** Coordinate raycast `diagnostics_order_select_level_node(level=LevelCount, field=0)` on `OverWorldMapBoss`. Never click decorative `BossTriangle`.
 - **Synthetic Advancement (User-Authorized):** `diagnostics_jump_to_level` and `diagnostics_load_next_level` advance state when natural path is blocked; tagged with `synthetic=true`.
 - **MCP Quirks:** `component/call_method` requires full type names; `LoaderDiagnostics` ID is scene-dependent (re-resolve via `find_objects_with_component`).
-- **Retarget Readback:** `diagnostics_inspect_entity_visual` includes `animation.nativeRigRetarget` (`present`, `isBound`, `isSuspended`, configured/bound mapping counts). Equal counts confirm resolved mappings, not visible motion; compare hierarchy snapshots during movement and firing.
+- **Retarget Readback:** `diagnostics_inspect_entity_visual` includes `animation.nativeRigRetarget` state plus up to 16 rows with mapping paths, source/target availability, current local poses, and computed target pose. `omittedMappingCount` precedes `mappings`. Equal counts and a computed pose confirm mapping/math state only; live locomotion/fire still requires source/target pose changes in-game, with death suspension and pool reuse checked separately.
 
 ---
 

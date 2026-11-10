@@ -243,6 +243,63 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Scalar local transform sample used by native rig retarget diagnostics; no Unity objects are retained.
+    /// </summary>
+    public readonly struct VisualRetargetLocalPoseRow
+    {
+        public VisualRetargetLocalPoseRow(Vector3 position, Quaternion rotation)
+        {
+            PositionX = position.x;
+            PositionY = position.y;
+            PositionZ = position.z;
+            RotationX = rotation.x;
+            RotationY = rotation.y;
+            RotationZ = rotation.z;
+            RotationW = rotation.w;
+        }
+
+        public float PositionX { get; }
+        public float PositionY { get; }
+        public float PositionZ { get; }
+        public float RotationX { get; }
+        public float RotationY { get; }
+        public float RotationZ { get; }
+        public float RotationW { get; }
+    }
+
+    /// <summary>
+    /// Bounded source, target, and computed pose evidence for one mapped retarget transform.
+    /// </summary>
+    public readonly struct VisualNativeRigRetargetMappingRow
+    {
+        public VisualNativeRigRetargetMappingRow(
+            string sourcePath,
+            string targetPath,
+            bool sourceAvailable,
+            bool targetAvailable,
+            VisualRetargetLocalPoseRow sourcePose,
+            VisualRetargetLocalPoseRow targetPose,
+            VisualRetargetLocalPoseRow expectedTargetPose)
+        {
+            SourcePath = sourcePath ?? string.Empty;
+            TargetPath = targetPath ?? string.Empty;
+            SourceAvailable = sourceAvailable;
+            TargetAvailable = targetAvailable;
+            SourcePose = sourcePose;
+            TargetPose = targetPose;
+            ExpectedTargetPose = expectedTargetPose;
+        }
+
+        public string SourcePath { get; }
+        public string TargetPath { get; }
+        public bool SourceAvailable { get; }
+        public bool TargetAvailable { get; }
+        public VisualRetargetLocalPoseRow SourcePose { get; }
+        public VisualRetargetLocalPoseRow TargetPose { get; }
+        public VisualRetargetLocalPoseRow ExpectedTargetPose { get; }
+    }
+
+    /// <summary>
     /// Pure diagnostic DTO containing deep visual render, rig, and animation evidence for a specific entity.
     /// </summary>
     public sealed class DetailedEntityVisualDiagnostic
@@ -283,6 +340,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public float Speed { get; }
         public IReadOnlyList<VisualAnimationParameterRow> Parameters { get; }
         public VisualNativeRigRetargetState NativeRigRetarget { get; }
+        public int NativeRigRetargetOmittedMappingCount { get; }
+        public IReadOnlyList<VisualNativeRigRetargetMappingRow> NativeRigRetargetMappings { get; }
 
         // Visual Director Evidence
         public bool HasVisualDirector { get; }
@@ -328,7 +387,9 @@ namespace RogueCommandExpansionLoader.Runtime
             bool isTurretJammed,
             float recoilOffset,
             float doorOpenProgress,
-            VisualNativeRigRetargetState nativeRigRetarget = default(VisualNativeRigRetargetState))
+            VisualNativeRigRetargetState nativeRigRetarget = default(VisualNativeRigRetargetState),
+            int nativeRigRetargetOmittedMappingCount = 0,
+            IReadOnlyList<VisualNativeRigRetargetMappingRow> nativeRigRetargetMappings = null)
         {
             Success = success;
             EntityKeyId = entityKeyId ?? string.Empty;
@@ -360,6 +421,8 @@ namespace RogueCommandExpansionLoader.Runtime
             Speed = speed;
             Parameters = parameters ?? new List<VisualAnimationParameterRow>().AsReadOnly();
             NativeRigRetarget = nativeRigRetarget;
+            NativeRigRetargetOmittedMappingCount = Math.Max(0, nativeRigRetargetOmittedMappingCount);
+            NativeRigRetargetMappings = nativeRigRetargetMappings ?? new List<VisualNativeRigRetargetMappingRow>().AsReadOnly();
             HasVisualDirector = hasVisualDirector;
             IsDamagedVfxActive = isDamagedVfxActive;
             IsCriticalVfxActive = isCriticalVfxActive;
@@ -1168,6 +1231,27 @@ namespace RogueCommandExpansionLoader.Runtime
                         retargetProfile.IsSuspended,
                         retargetProfile.ConfiguredMappingCount,
                         retargetProfile.BoundMappingCount);
+                var nativeRetargetMappings = new List<VisualNativeRigRetargetMappingRow>();
+                int omittedNativeRetargetMappingCount = 0;
+                if (retargetProfile != null)
+                {
+                    var nativeMappingSamples = new List<NativeRigRetargetMappingSample>();
+                    omittedNativeRetargetMappingCount = retargetProfile.CopyDiagnosticMappingSamples(
+                        nativeMappingSamples,
+                        NativeRigRetargetProfile.MaxDiagnosticMappingSamples);
+                    for (int i = 0; i < nativeMappingSamples.Count; i++)
+                    {
+                        NativeRigRetargetMappingSample sample = nativeMappingSamples[i];
+                        nativeRetargetMappings.Add(new VisualNativeRigRetargetMappingRow(
+                            sample.SourcePath,
+                            sample.TargetPath,
+                            sample.SourceAvailable,
+                            sample.TargetAvailable,
+                            new VisualRetargetLocalPoseRow(sample.SourceLocalPosition, sample.SourceLocalRotation),
+                            new VisualRetargetLocalPoseRow(sample.TargetLocalPosition, sample.TargetLocalRotation),
+                            new VisualRetargetLocalPoseRow(sample.ExpectedTargetLocalPosition, sample.ExpectedTargetLocalRotation)));
+                    }
+                }
 
                 // 4. RuntimeVisualDirector Details
                 bool hasDirector;
@@ -1214,7 +1298,9 @@ namespace RogueCommandExpansionLoader.Runtime
                     isJammed,
                     recoil,
                     doorProgress,
-                    nativeRigRetargetState);
+                    nativeRigRetargetState,
+                    omittedNativeRetargetMappingCount,
+                    nativeRetargetMappings.AsReadOnly());
             }
             catch (Exception ex)
             {

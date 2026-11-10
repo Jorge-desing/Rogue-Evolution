@@ -1346,3 +1346,10 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
 - The immediately previous installed DLL was backed up and hash-verified before copying. The final deployment manifest is artifacts/deployment/native-retarget-diagnostics-final-20261109T203550/deployment-manifest.json.
 - Fresh runtime preflight: Rogue Command remained closed; Profile2 is selected and contains savegame.dat; all profile hashes and the selector matched the checkpoint after read-only checks. No game launch or profile/tutorial mutation occurred.
 - Runtime evidence is BLOCKED before Steam and records the current build at artifacts/runtime-smoke/animation-retarget-final-20261109T203754/runtime-evidence.json. Retarget binding and visible pose behavior remain unverified in-game.
+
+## 2026-11-09 Native Rig Retarget Pose Readback
+
+- `NativeRigRetargetProfile.CopyDiagnosticMappingSamples` exposes read-only local pose samples for at most 16 resolved mappings. `diagnostics_inspect_entity_visual` now returns source/target paths and availability, current source and target local poses, and the bind-relative computed target pose under `animation.nativeRigRetarget.mappings`; `omittedMappingCount` is placed before the rows.
+- The computed target pose is math evidence only. Visible locomotion, weapon aim/fire, death suspension, and pool reuse still require a live Steam observation. No game was launched and no profile, selector, or tutorial state was changed; the existing Profile2 run remains preserved.
+- The RuntimeAndDiagnostics Release suite passed `214/214`, including direct pose readback and the 16-row/4-omission case. The full Release validation harness passed `567/568` with one Windows symlink-privilege skip and no failures. The full log is `artifacts/validation-tests/retarget-full-harness-release.log`.
+- Release plugin build completed with 0 warnings and 0 errors. With Rogue Command closed, artifact and installed DLL both hash to `af01f65502beba59d6cc5b4b4006e27e49c33d3b270b071193e666e4a64e2998`. The pre-deploy backup and hash manifest are in `artifacts/deployment/native-retarget-pose-readback-20261109T210027/`.

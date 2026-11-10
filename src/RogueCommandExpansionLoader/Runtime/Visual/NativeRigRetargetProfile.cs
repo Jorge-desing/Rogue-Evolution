@@ -1,8 +1,47 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime.Visual
 {
+    internal readonly struct NativeRigRetargetMappingSample
+    {
+        public NativeRigRetargetMappingSample(
+            string sourcePath,
+            string targetPath,
+            bool sourceAvailable,
+            bool targetAvailable,
+            Vector3 sourceLocalPosition,
+            Quaternion sourceLocalRotation,
+            Vector3 targetLocalPosition,
+            Quaternion targetLocalRotation,
+            Vector3 expectedTargetLocalPosition,
+            Quaternion expectedTargetLocalRotation)
+        {
+            SourcePath = sourcePath ?? string.Empty;
+            TargetPath = targetPath ?? string.Empty;
+            SourceAvailable = sourceAvailable;
+            TargetAvailable = targetAvailable;
+            SourceLocalPosition = sourceLocalPosition;
+            SourceLocalRotation = sourceLocalRotation;
+            TargetLocalPosition = targetLocalPosition;
+            TargetLocalRotation = targetLocalRotation;
+            ExpectedTargetLocalPosition = expectedTargetLocalPosition;
+            ExpectedTargetLocalRotation = expectedTargetLocalRotation;
+        }
+
+        public string SourcePath { get; }
+        public string TargetPath { get; }
+        public bool SourceAvailable { get; }
+        public bool TargetAvailable { get; }
+        public Vector3 SourceLocalPosition { get; }
+        public Quaternion SourceLocalRotation { get; }
+        public Vector3 TargetLocalPosition { get; }
+        public Quaternion TargetLocalRotation { get; }
+        public Vector3 ExpectedTargetLocalPosition { get; }
+        public Quaternion ExpectedTargetLocalRotation { get; }
+    }
+
     /// <summary>
     /// Runtime-only retarget configuration attached to a loader-created native prefab clone.
     /// RuntimeVisualDirector binds it on a live entity; LateUpdate copies only mapped local pose
@@ -12,6 +51,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
     [DefaultExecutionOrder(10000)]
     public sealed class NativeRigRetargetProfile : MonoBehaviour
     {
+        internal const int MaxDiagnosticMappingSamples = 16;
+
         [SerializeField] private string _visualRootPath = string.Empty;
         [SerializeField] private string[] _sourcePaths = Array.Empty<string>();
         [SerializeField] private string[] _targetPaths = Array.Empty<string>();
@@ -176,6 +217,71 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
 
             _isSuspended = false;
+        }
+
+        /// <summary>
+        /// Copies a bounded read-only pose sample for diagnostics. The return value is the number
+        /// of configured/bound mappings omitted from the output list.
+        /// </summary>
+        internal int CopyDiagnosticMappingSamples(
+            List<NativeRigRetargetMappingSample> destination,
+            int maximumCount)
+        {
+            if (destination == null)
+            {
+                throw new ArgumentNullException(nameof(destination));
+            }
+
+            destination.Clear();
+            int limit = Math.Max(0, Math.Min(maximumCount, MaxDiagnosticMappingSamples));
+            if (!_isBound || _bindings == null)
+            {
+                return Math.Max(0, _configuredMappingCount);
+            }
+
+            int totalCount = Math.Max(_configuredMappingCount, _bindings.Length);
+            int sampleCount = Math.Min(limit, _bindings.Length);
+            for (int i = 0; i < sampleCount; i++)
+            {
+                BoundMapping binding = _bindings[i];
+                bool sourceAvailable = binding != null && binding.Source != null;
+                bool targetAvailable = binding != null && binding.Target != null;
+                Vector3 sourcePosition = sourceAvailable ? binding.Source.localPosition : Vector3.zero;
+                Quaternion sourceRotation = sourceAvailable
+                    ? binding.Source.localRotation
+                    : new Quaternion(0f, 0f, 0f, 1f);
+                Vector3 targetPosition = targetAvailable ? binding.Target.localPosition : Vector3.zero;
+                Quaternion targetRotation = targetAvailable
+                    ? binding.Target.localRotation
+                    : new Quaternion(0f, 0f, 0f, 1f);
+                Vector3 expectedTargetPosition = sourceAvailable
+                    ? NativeRigRetargetPoseMath.RetargetLocalPosition(
+                        binding.SourceRestPosition,
+                        sourcePosition,
+                        binding.TargetRestPosition,
+                        _sourceToTargetPositionScale)
+                    : Vector3.zero;
+                Quaternion expectedTargetRotation = sourceAvailable
+                    ? NativeRigRetargetPoseMath.RetargetLocalRotation(
+                        binding.SourceRestRotation,
+                        sourceRotation,
+                        binding.TargetRestRotation)
+                    : new Quaternion(0f, 0f, 0f, 1f);
+
+                destination.Add(new NativeRigRetargetMappingSample(
+                    i < _sourcePaths.Length ? _sourcePaths[i] : string.Empty,
+                    i < _targetPaths.Length ? _targetPaths[i] : string.Empty,
+                    sourceAvailable,
+                    targetAvailable,
+                    sourcePosition,
+                    sourceRotation,
+                    targetPosition,
+                    targetRotation,
+                    expectedTargetPosition,
+                    expectedTargetRotation));
+            }
+
+            return Math.Max(0, totalCount - destination.Count);
         }
 
         private void LateUpdate()

@@ -104,7 +104,7 @@ python tools/runtime_profile_checkpoint.py verify `
 | **Building Placement** | Live placed building entity with target `EntityId` and bounds | Spawn command response alone |
 | **Factory Production** | Queue tick, completion event, and produced unit linked to factory | Native factory placement alone |
 | **Unit Rendering** | Live instance with active renderer, non-zero bounds, valid materials | Inactive prefab or bundle audit |
-| **Native animation retarget** | `diagnostics_inspect_entity_visual` reports `present=true`, `isBound=true`, and equal configured/bound mapping counts; source/target Transform snapshots change during locomotion/fire, death suspends, and pooled reuse resumes | Static paths, profile presence, or equal counts without observed pose changes |
+| **Native animation retarget** | `diagnostics_inspect_entity_visual` reports bound/unsuspended state and matching mapping counts; inspect the bounded source/target/computed local pose rows during locomotion/fire, then observe death suspension and pool-reuse resume | Static paths, profile presence, equal counts, or computed pose values without observed in-game pose changes |
 | **Intermission Graph** | `diagnostics_get_intermission_graph` DAG showing nodes & paths | Static scene hierarchy search |
 | **Sub-screen Actions** | `diagnostics_get_intermission_reward_state` currency readback | Assuming default player balances |
 | **Level Transition** | Node selection + `LoadLevel()` + `LoadingHider` **INICIAR** click | Level count text change alone |

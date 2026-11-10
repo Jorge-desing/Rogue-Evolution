@@ -1928,6 +1928,25 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            var nativeRetargetMappingList = new List<Dictionary<string, object>>();
+            if (diag.NativeRigRetargetMappings != null)
+            {
+                for (int i = 0; i < diag.NativeRigRetargetMappings.Count; i++)
+                {
+                    VisualNativeRigRetargetMappingRow mapping = diag.NativeRigRetargetMappings[i];
+                    nativeRetargetMappingList.Add(new Dictionary<string, object>
+                    {
+                        ["sourcePath"] = mapping.SourcePath ?? string.Empty,
+                        ["targetPath"] = mapping.TargetPath ?? string.Empty,
+                        ["sourceAvailable"] = mapping.SourceAvailable,
+                        ["targetAvailable"] = mapping.TargetAvailable,
+                        ["sourceLocalPose"] = SerializeRetargetLocalPose(mapping.SourcePose),
+                        ["targetLocalPose"] = SerializeRetargetLocalPose(mapping.TargetPose),
+                        ["expectedTargetLocalPose"] = SerializeRetargetLocalPose(mapping.ExpectedTargetPose)
+                    });
+                }
+            }
+
             var renderSection = new Dictionary<string, object>
             {
                 ["rendererCount"] = diag.RendererCount,
@@ -1969,7 +1988,9 @@ namespace RogueCommandExpansionLoader.Runtime
                     ["isBound"] = diag.NativeRigRetarget.IsBound,
                     ["isSuspended"] = diag.NativeRigRetarget.IsSuspended,
                     ["configuredMappingCount"] = diag.NativeRigRetarget.ConfiguredMappingCount,
-                    ["boundMappingCount"] = diag.NativeRigRetarget.BoundMappingCount
+                    ["boundMappingCount"] = diag.NativeRigRetarget.BoundMappingCount,
+                    ["omittedMappingCount"] = diag.NativeRigRetargetOmittedMappingCount,
+                    ["mappings"] = nativeRetargetMappingList
                 }
             };
 
@@ -1997,6 +2018,26 @@ namespace RogueCommandExpansionLoader.Runtime
             };
 
             return Serialize(view);
+        }
+
+        private static Dictionary<string, object> SerializeRetargetLocalPose(VisualRetargetLocalPoseRow pose)
+        {
+            return new Dictionary<string, object>
+            {
+                ["position"] = new Dictionary<string, object>
+                {
+                    ["x"] = pose.PositionX,
+                    ["y"] = pose.PositionY,
+                    ["z"] = pose.PositionZ
+                },
+                ["rotation"] = new Dictionary<string, object>
+                {
+                    ["x"] = pose.RotationX,
+                    ["y"] = pose.RotationY,
+                    ["z"] = pose.RotationZ,
+                    ["w"] = pose.RotationW
+                }
+            };
         }
 
         /// <summary>

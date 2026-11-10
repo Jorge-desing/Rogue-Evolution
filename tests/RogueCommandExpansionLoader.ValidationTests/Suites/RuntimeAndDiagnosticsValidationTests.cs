@@ -7954,18 +7954,34 @@ internal static partial class ValidationTestRunner
 
         Transform nativeRoot = new GameObject("Native").transform;
         nativeRoot.parent = go.transform;
-        new GameObject("Bone").transform.parent = nativeRoot;
+        Transform sourceBone = new GameObject("Bone").transform;
+        sourceBone.parent = nativeRoot;
+        sourceBone.localPosition = new Vector3(1f, 2f, 3f);
         Transform visualRoot = new GameObject("Visual").transform;
         visualRoot.parent = go.transform;
         Transform rig = new GameObject("Rig").transform;
         rig.parent = visualRoot;
-        new GameObject("Bone").transform.parent = rig;
+        Transform targetBone = new GameObject("Bone").transform;
+        targetBone.parent = rig;
+        targetBone.localPosition = new Vector3(10f, 20f, 30f);
+        float retargetHalfSqrt = (float)Math.Sqrt(0.5f);
+        targetBone.localRotation = new Quaternion(0f, retargetHalfSqrt, 0f, retargetHalfSqrt);
         NativeRigRetargetProfile retargetProfile = go.AddComponent<NativeRigRetargetProfile>();
-        retargetProfile.Configure(new[] { "Native/Bone" }, new[] { "Rig/Bone" }, "Visual", 1f);
+        retargetProfile.Configure(new[] { "Native/Bone" }, new[] { "Rig/Bone" }, "Visual", 0.5f);
         if (!retargetProfile.Bind(unit))
         {
             throw new InvalidOperationException("The census fixture must bind its declared retarget mapping.");
         }
+        sourceBone.localPosition = new Vector3(3f, 4f, 7f);
+        sourceBone.localRotation = new Quaternion(0f, 0f, retargetHalfSqrt, retargetHalfSqrt);
+        MethodInfo? retargetLateUpdate = typeof(NativeRigRetargetProfile).GetMethod(
+            "LateUpdate",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (retargetLateUpdate == null)
+        {
+            throw new InvalidOperationException("The census fixture requires the retarget LateUpdate entry point.");
+        }
+        retargetLateUpdate.Invoke(retargetProfile, null);
 
         ExistingControllers.Instance.PlayerUnits().Add(unit);
 
@@ -7993,9 +8009,35 @@ internal static partial class ValidationTestRunner
         string inspectJson = AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(diag);
         if (!inspectJson.Contains("\"success\":true") || !inspectJson.Contains("MeshScalar") ||
             !inspectJson.Contains("\"nativeRigRetarget\":{\"present\":true,\"isBound\":true") ||
-            !inspectJson.Contains("\"configuredMappingCount\":1") || !inspectJson.Contains("\"boundMappingCount\":1"))
+            !inspectJson.Contains("\"configuredMappingCount\":1") || !inspectJson.Contains("\"boundMappingCount\":1") ||
+            !inspectJson.Contains("\"omittedMappingCount\":0") || !inspectJson.Contains("\"sourcePath\":\"Native/Bone\"") ||
+            !inspectJson.Contains("\"targetPath\":\"Rig/Bone\"") || !inspectJson.Contains("\"expectedTargetLocalPose\""))
         {
             throw new InvalidOperationException($"Inspect JSON missing expected content: {inspectJson}");
+        }
+        if (diag.NativeRigRetargetMappings.Count != 1)
+        {
+            throw new InvalidOperationException("Detailed inspection must contain the mapped retarget pose sample.");
+        }
+        VisualNativeRigRetargetMappingRow mappingRow = diag.NativeRigRetargetMappings[0];
+        if (!mappingRow.SourceAvailable || !mappingRow.TargetAvailable ||
+            Math.Abs(mappingRow.SourcePose.PositionX - 3f) > 0.0001f ||
+            Math.Abs(mappingRow.TargetPose.PositionX - 11f) > 0.0001f ||
+            Math.Abs(mappingRow.TargetPose.PositionY - 21f) > 0.0001f ||
+            Math.Abs(mappingRow.TargetPose.PositionZ - 32f) > 0.0001f ||
+            Math.Abs(mappingRow.ExpectedTargetPose.PositionX - 11f) > 0.0001f ||
+            Math.Abs(mappingRow.ExpectedTargetPose.PositionY - 21f) > 0.0001f ||
+            Math.Abs(mappingRow.ExpectedTargetPose.PositionZ - 32f) > 0.0001f ||
+            Math.Abs(mappingRow.TargetPose.RotationX - 0.5f) > 0.0001f ||
+            Math.Abs(mappingRow.TargetPose.RotationY - 0.5f) > 0.0001f ||
+            Math.Abs(mappingRow.TargetPose.RotationZ - 0.5f) > 0.0001f ||
+            Math.Abs(mappingRow.TargetPose.RotationW - 0.5f) > 0.0001f ||
+            Math.Abs(mappingRow.ExpectedTargetPose.RotationX - 0.5f) > 0.0001f ||
+            Math.Abs(mappingRow.ExpectedTargetPose.RotationY - 0.5f) > 0.0001f ||
+            Math.Abs(mappingRow.ExpectedTargetPose.RotationZ - 0.5f) > 0.0001f ||
+            Math.Abs(mappingRow.ExpectedTargetPose.RotationW - 0.5f) > 0.0001f)
+        {
+            throw new InvalidOperationException("The inspect DTO must report source, actual target, and computed target local poses.");
         }
 
         retargetProfile.SuspendForDeath();
@@ -8004,6 +8046,63 @@ internal static partial class ValidationTestRunner
         if (!suspendedJson.Contains("\"isSuspended\":true"))
         {
             throw new InvalidOperationException($"Inspect JSON must expose death-suspended retarget state: {suspendedJson}");
+        }
+
+        ExistingControllers.Instance.Reset();
+    }),
+    ("native rig retarget visual diagnostics cap mapping samples and report omissions", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        var go = new GameObject("RCL_RetargetSampleCap");
+        var unit = new EntityController
+        {
+            entityId = "RCL_RetargetSampleCap",
+            UniqueEntityId = 999,
+            IsControlledByPlayer = true,
+            IsUnit = true,
+            gameObject = go
+        };
+        Transform nativeRoot = new GameObject("Native").transform;
+        nativeRoot.parent = go.transform;
+        Transform visualRoot = new GameObject("Visual").transform;
+        visualRoot.parent = go.transform;
+        Transform rigRoot = new GameObject("Rig").transform;
+        rigRoot.parent = visualRoot;
+
+        var sourcePaths = new string[20];
+        var targetPaths = new string[20];
+        for (int i = 0; i < sourcePaths.Length; i++)
+        {
+            string suffix = i.ToString("D2", System.Globalization.CultureInfo.InvariantCulture);
+            Transform source = new GameObject("Source" + suffix).transform;
+            source.parent = nativeRoot;
+            Transform target = new GameObject("Target" + suffix).transform;
+            target.parent = rigRoot;
+            sourcePaths[i] = "Native/Source" + suffix;
+            targetPaths[i] = "Rig/Target" + suffix;
+        }
+
+        NativeRigRetargetProfile profile = go.AddComponent<NativeRigRetargetProfile>();
+        profile.Configure(sourcePaths, targetPaths, "Visual", 1f);
+        if (!profile.Bind(unit))
+        {
+            throw new InvalidOperationException("All unique retarget mapping paths should bind in the cap fixture.");
+        }
+        ExistingControllers.Instance.PlayerUnits().Add(unit);
+
+        DetailedEntityVisualDiagnostic diag = RuntimeVisualCensus.InspectEntity("999");
+        if (!diag.Success || diag.NativeRigRetargetMappings.Count != NativeRigRetargetProfile.MaxDiagnosticMappingSamples ||
+            diag.NativeRigRetargetOmittedMappingCount != 4)
+        {
+            throw new InvalidOperationException("Retarget diagnostics must cap samples at 16 and count all four omitted mappings.");
+        }
+        string json = AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(diag);
+        int omittedIndex = json.IndexOf("\"omittedMappingCount\":4", StringComparison.Ordinal);
+        int mappingsIndex = json.IndexOf("\"mappings\":[", StringComparison.Ordinal);
+        if (omittedIndex < 0 || mappingsIndex < 0 || omittedIndex > mappingsIndex ||
+            !json.Contains("\"targetPath\":\"Rig/Target15\""))
+        {
+            throw new InvalidOperationException("Serialized retarget diagnostics must put omission counts before the bounded mapping details.");
         }
 
         ExistingControllers.Instance.Reset();
