@@ -57,6 +57,9 @@ python tools/validate_content_bundle_references.py content/packs/sample-native-e
 # Validate native visual roots and renderer extent boundaries
 python tools/validate_native_visual_roots.py content/packs/sample-native-expansion
 
+# Resolve nativeRigRetarget source and bundle target paths against serialized hierarchies
+python -B -m unittest tests.python.authoring.test_native_visual_retarget_preflight
+
 # Validate mech rigging hierarchies and Generic Avatar bone structures
 python tools/validate_mech_rigging.py --pack content/packs/sample-native-expansion --json
 
@@ -76,6 +79,7 @@ python tools/validate_loader_registry.py --json
 - **Synthetic Advancement (User-Authorized):** `diagnostics_jump_to_level` and `diagnostics_load_next_level` advance state when natural path is blocked; tagged with `synthetic=true`.
 - **MCP Quirks:** `component/call_method` requires full type names; `LoaderDiagnostics` ID is scene-dependent (re-resolve via `find_objects_with_component`).
 - **Retarget Readback:** `diagnostics_inspect_entity_visual` includes `animation.nativeRigRetarget` state plus up to 16 rows with mapping paths, source/target availability, current local poses, and computed target pose. `omittedMappingCount` precedes `mappings`. Equal counts and a computed pose confirm mapping/math state only; live locomotion/fire still requires source/target pose changes in-game, with death suspension and pool reuse checked separately.
+- **Retarget Static Preflight:** `tools/validate_native_visual_roots.py <pack>` validates each exact native `sourcePath` and declared bundle-prefab `targetPath` after checking the game version/SHA/MVID tuple. The companion test also checks pack-relative bundle path containment. This is static hierarchy evidence only.
 
 ---
 

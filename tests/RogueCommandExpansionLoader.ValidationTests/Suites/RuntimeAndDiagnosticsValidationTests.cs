@@ -157,6 +157,46 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("An ambiguous target path must disable the whole retarget profile without partial bindings.");
         }
     }),
+    ("EntityController.Destroy Harmony transpiler suspends native rig retargeting before native destroy", () =>
+    {
+        var root = new GameObject("RCL_RetargetDeathHook");
+        EntityController entity = root.AddComponent<EntityController>();
+        Transform nativeRoot = new GameObject("Native").transform;
+        nativeRoot.parent = root.transform;
+        Transform source = new GameObject("Bone").transform;
+        source.parent = nativeRoot;
+        Transform visualRoot = new GameObject("RCL_Visual_RetargetDeathHook").transform;
+        visualRoot.parent = root.transform;
+        Transform target = new GameObject("Bone").transform;
+        target.parent = visualRoot;
+
+        NativeRigRetargetProfile profile = root.AddComponent<NativeRigRetargetProfile>();
+        profile.Configure(new[] { "Native/Bone" }, new[] { "Bone" }, "RCL_Visual_RetargetDeathHook", 1f);
+        if (!profile.Bind(entity) || profile.IsSuspended)
+        {
+            throw new InvalidOperationException("The death-hook fixture must begin with a bound, active retarget profile.");
+        }
+
+        RuntimeHarmonyPatches.OnEntityDestroyTranspilerHook(entity, false, null);
+        if (!profile.IsSuspended)
+        {
+            throw new InvalidOperationException("The EntityController.Destroy transpiler entry hook must suspend retargeting immediately.");
+        }
+
+        source.localPosition = new Vector3(5f, 0f, 0f);
+        MethodInfo? lateUpdate = typeof(NativeRigRetargetProfile).GetMethod(
+            "LateUpdate",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (lateUpdate == null)
+        {
+            throw new InvalidOperationException("The retarget LateUpdate entry point must remain available to verify suspension.");
+        }
+        lateUpdate.Invoke(profile, null);
+        if (Math.Abs(target.localPosition.x) > 0.0001f)
+        {
+            throw new InvalidOperationException("The destroy entry hook must prevent later native poses from replacing the visual death pose.");
+        }
+    }),
     ("localization language resolution falls back when the reflected getter throws", () =>
     {
         int logCount = 0;

@@ -1858,6 +1858,24 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Increment(ref _entityDestroyTranspilerCount);
             SafeCall(delegate
             {
+                try
+                {
+                    Component entityComponent = entityObj as Component;
+                    if (entityComponent != null)
+                    {
+                        Visual.NativeRigRetargetProfile profile =
+                            entityComponent.GetComponent<Visual.NativeRigRetargetProfile>();
+                        if (profile != null)
+                        {
+                            profile.SuspendForDeath();
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log("OnEntityDestroyTranspiler retarget suspension failed safely: " + exception.Message);
+                }
+
                 int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
                 if (key != 0)
                 {

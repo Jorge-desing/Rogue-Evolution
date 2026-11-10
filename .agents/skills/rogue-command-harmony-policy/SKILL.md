@@ -157,5 +157,6 @@ The loader registers 65 verified hooks across core game simulation systems, incl
 ### Existing pooled reuse route for native visual retargeting
 
 - Reuse the installed `EntityController.OnHasBeenInstantiatedForReuse` hook and its existing `RuntimeHooks.OnEntityHasBeenInstantiatedForReuseTranspiler` callback. Route the entity to `RuntimeVisualDirector.OnEntityReused`; do not add another Harmony target for retarget reset.
-- Resolve serialized source/target Transform paths and bind poses on the cloned unit instance. The retarget component performs local pose copying in `LateUpdate`; the existing lifecycle callback only resets animator state and mapped bind poses for the next pooled lifetime.
+- The installed `EntityController.Destroy` CIL transpiler invokes `OnEntityDestroyTranspiler` at method entry; suspend `NativeRigRetargetProfile` there before native destruction proceeds. On the pinned build, `EntityController.TakeDamage` calls this `Destroy` method. Keep `RuntimeVisualDirector.Update`'s dead-state check as a fallback, and recheck the complete game identity before relying on these members.
+- Resolve serialized source/target Transform paths and bind poses on the cloned unit instance. The retarget component performs local pose copying in `LateUpdate`; the existing reuse transpiler callback resets animator state and mapped bind poses for the next pooled lifetime.
 - Recheck the full game compatibility tuple before relying on reflected hooks. A local harness confirms dispatch wiring only; it does not prove pool behavior inside a Steam match.
