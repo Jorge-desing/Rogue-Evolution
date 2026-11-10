@@ -121,9 +121,10 @@ Before approving any modeled component, verify it answers all four engineering c
 
 ### 3.5 Canonical Two-Level Visual Variant Boundary
 - **Level 1 — Primary Chassis:** The Blender-authored mesh, silhouette, functional assemblies, rig, pivots, canonical sockets, and baked PBR maps remain the geometry authority for the unit.
-- **Level 2 — Tactical Variants:** Current `visualVariants` apply a preset label, color tint, and optional whole-root scale to that same authored chassis. They do not replace the functional form hierarchy or switch to another mesh at runtime.
-- Treat `visualAssetName` and `visualRootPath` on a variant as declarations only unless the runtime has explicit, verified mesh/root switching support. Diagnostics report these declarations separately from the current tint-and-scale effect.
-- A requested silhouette or mechanical-assembly change needs a separately authored visual asset and explicit runtime integration that preserves sockets, rig, collision, LOD, and PBR contracts. Do not imply a new engine, suspension, armor module, or weapon assembly from a palette tint.
+- **Level 2 — Tactical Variants:** `visualVariants` apply their preset label, tint, and optional whole-root scale to the Level 1 chassis. They may also mount declared visual-only hardpoint modules through the runtime module registry. Modules add localized equipment geometry while the primary chassis, gameplay controller, rig, and unit identity remain authoritative.
+- A Level 2 module is explicit only when the variant contains a `modules` entry with a supported `slotId` and resolvable `assetName`. Supported slots are `ERA`, `APS`, `Sponsons`, and `FuelDrums`; modules load from the owning unit's `assetBundleId` and mount at the existing canonical hardpoint group. A preset, tint, or scale alone never implies a new assembly.
+- Keep module prefabs script-free and do not use them to replace the primary chassis or its functional hierarchy. Treat `visualAssetName` and `visualRootPath` as declarations unless their separate overlay path is explicitly authored and validated. Diagnostics report module application separately from tint-and-scale effects.
+- A requested primary silhouette, rig, socket, collision, LOD, or functional-assembly change belongs in the authored Level 1 source and needs its full model/FBX/PBR/bundle validation. A Level 2 equipment change belongs in a separately authored module and must preserve the same chassis and controller.
 
 ---
 
@@ -374,7 +375,8 @@ When generating or refining production facilities (e.g. `ArachnidHexapodFactory`
 
 ## 15. Canonical Two-Level Visual System
 
-- Preserve the Level 1 primary chassis as the complete engineering form: major structure, armor hierarchy, articulated or serviceable assemblies, and authored functional details stay legible as one coherent unit silhouette. Level 2 tactical variants add separate equipment modules; do not flatten them into replacement chassis meshes or clone the gameplay unit.
+- Preserve the Level 1 primary chassis as the complete engineering form: major structure, armor hierarchy, articulated or serviceable assemblies, and authored functional details stay legible as one coherent unit silhouette. Level 2 keeps that chassis and may add separately declared equipment modules; do not flatten the modules into replacement chassis meshes or clone the gameplay unit.
 - Author module roots to mount at the canonical hardpoint origin and use the catalogued slots `ERA`, `APS`, `Sponsons`, or `FuelDrums`. Keep module geometry visually self-contained, with scale/offset inside its hierarchy; the existing hardpoint socket and attachment group own placement. Search for and reuse canonical sockets before creating transforms.
 - `content/source-art/canonical-visual-modules.blend` and its JSON manifest are the generated source set for the current 35 modules. Use `tools/Build-CanonicalVisualModules.py` with the pinned Blender 4.5.14 toolchain to regenerate; preserve the existing primary unit source blends and the RGBA vertex-wear attribute.
+- For a package-ready rebuild, run `tools/Build-CanonicalVisualModules.ps1`; it regenerates only the Level 2 module FBXs, the shared PBR maps, and the Unity bundle outputs. The Level 1 functional chassis remains the source authority and is not flattened into or replaced by these attachments.
 - Inspect the labeled contact sheet for separation of silhouette, clearances, and attachment fit. A contact sheet is authoring review, not a live render check.

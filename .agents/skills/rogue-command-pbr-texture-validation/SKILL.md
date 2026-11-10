@@ -64,4 +64,5 @@ A texture set passes the local authoring contract when all four files have expec
 
 - `CanonicalVisualModuleBuilder` checks all four maps are 2048x2048, verifies effective importer color-space/alpha/normal settings after reimport, builds the `RogueCommand/VehiclePBR_VertexWear` material variant, and confirms imported module meshes retain one RGBA vertex color per vertex.
 - It also rejects scripts/gameplay components in module prefabs and reopens the AssetBundles to verify their serialized `assetName` keys. Run `tools/validate_content_bundle_references.py` on each built pack so every `visualVariants[].modules[].assetName` resolves in the unit's declared bundle.
+- Rebuild through `tools/Build-CanonicalVisualModules.ps1` before import/reference acceptance. Run the reference validator against `artifacts/canonical-two-level/validation-packs/`; versioned bundles under `content/packs/*/bundles/` may be earlier snapshots.
 - These are local Unity/import and serialized-bundle checks. A contact sheet or passing bundle audit does not establish that a live unit selected the expected variant or rendered it in a Steam match.

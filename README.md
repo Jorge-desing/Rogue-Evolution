@@ -59,24 +59,32 @@ dotnet run --artifacts-path artifacts/validation-tests --project tests/RogueComm
 
 El ejecutable enlaza los DTO y validadores del plugin. `--artifacts-path` deja los binarios e intermediarios en `artifacts/` y ejecuta la salida que acaba de compilarse. Comprueba directamente ambos manifiestos de muestra, crea fixtures temporales para los casos de rutas, referencias, IDs y DLLs, y verifica el rechazo de versión de Rogue Command/Unity, SHA-256 y MVID incompatibles. Usa un stub local para `Application.unityVersion`; no carga el juego ni comprueba tipos Unity serializados, AssetBundles reales, Harmony o decisiones AI durante una partida.
 
-Para comprobar que los nombres de assets declarados existen en los bundles y que sus tipos serializados coinciden con lo esperado:
+Tras editar la matriz visual o las fuentes de arte, reconstruye la cadena canónica completa:
 
 ```powershell
-.\.venv\Scripts\python.exe .\tools\validate_content_bundle_references.py .\content\packs\sample-native-expansion
+.\tools\Build-CanonicalVisualModules.ps1
+```
+
+El comando regenera los FBX con Blender 4.5.14, hornea los 28 sets PBR con Material Maker 1.7 en modo estricto, importa y construye con Unity 2021.3.45f2, prepara el staging y ejecuta los validadores. También guarda una huella de las fuentes y hashes de cada bundle para que un cambio posterior en el proyecto Unity o en los manifiestos invalide el staging. Para repetir la auditoría de referencias en el staging recién creado:
+
+```powershell
+.\.venv\Scripts\python.exe .\tools\validate_content_bundle_references.py .\artifacts\canonical-two-level\validation-packs\sample-native-expansion
+.\.venv\Scripts\python.exe .\tools\validate_content_bundle_references.py .\artifacts\canonical-two-level\validation-packs\tactical-operations
 .\.venv\Scripts\python.exe .\tools\validate_native_visual_roots.py .\content\packs\sample-native-expansion
 ```
 
-Este chequeo lee los AssetBundles con UnityPy y no modifica el pack ni la instalación del juego. Revisa las entradas de bundle, no valida que el contenido funcione dentro de una partida.
+El chequeo de referencias lee los AssetBundles con UnityPy y no modifica el pack ni la instalación del juego. Revisa las entradas de bundle, no valida que el contenido funcione dentro de una partida. Los bundles versionados bajo `content/packs/` pueden ser snapshots anteriores; usa el staging de `artifacts/canonical-two-level/validation-packs/` después de reconstruirlos.
 
-El segundo comando requiere Python 3.11 o posterior y las dependencias fijadas en `requirements.txt`. Verifica versión, SHA-256 y MVID del juego, además del hash de `resources.assets`, y comprueba que cada ruta visual nativa sea única y contenga renderers. La selección del recurso y su aspecto dentro de una partida se comprueban por separado.
+El validador de rutas nativas requiere Python 3.11 o posterior y las dependencias fijadas en `requirements.txt`. Verifica versión, SHA-256 y MVID del juego, además del hash de `resources.assets`, y comprueba que cada ruta visual nativa sea única y contenga renderers. La selección del recurso y su aspecto dentro de una partida se comprueban por separado.
 
 Para crear un ZIP de instalación sin escribir en la carpeta del juego:
 
 ```powershell
+.\tools\Build-CanonicalVisualModules.ps1
 .\tools\Package-Loader.ps1
 ```
 
-El paquete aparece en `artifacts/packages/` y conserva la estructura `BepInEx/plugins/`. Incluye el plugin, el esquema, `sample-native-expansion` con un modelo visual sin scripts compilado como AssetBundle de Unity 2021.3.45f2 y `sample-reactive-ai`, un paquete de datos con una variante de etapa y un módulo táctico compilado. `sample-expansion` queda fuera porque todavía necesita sus propios assets completos de balance, etapa, AI y mapa. Se puede cambiar la instalación usada para compilar con `-GameRoot` y la ruta local de BepInEx con `-BepInExCorePath`.
+El primer comando reconstruye y valida los módulos visuales canónicos y prepara los packs actuales en `artifacts/canonical-two-level/validation-packs/`. El segundo comprueba la huella de fuentes, los hashes de los bundles y el `content.json` vigente antes de crear el ZIP en `artifacts/packages/`, con el plugin, el esquema, `sample-native-expansion` y `sample-reactive-ai`. `sample-expansion` queda fuera porque todavía necesita sus propios assets completos de balance, etapa, AI y mapa. Se puede cambiar la instalación usada para compilar con `-GameRoot` y la ruta local de BepInEx con `-BepInExCorePath`.
 
 ## Instalar
 

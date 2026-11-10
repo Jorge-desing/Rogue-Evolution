@@ -7,6 +7,9 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$canonicalArtifactRoot = Join-Path $repositoryRoot 'artifacts\canonical-two-level'
+$canonicalValidatedPackRoot = Join-Path $canonicalArtifactRoot 'validation-packs'
+. (Join-Path $PSScriptRoot 'CanonicalVisualBuildProvenance.ps1')
 $projectPath = Join-Path $repositoryRoot 'src\RogueCommandExpansionLoader\RogueCommandExpansionLoader.csproj'
 $pluginSourcePath = Join-Path $repositoryRoot 'src\RogueCommandExpansionLoader\RogueCommandExpansionPlugin.cs'
 $pluginAssemblyPath = Join-Path $repositoryRoot 'artifacts\plugin\RogueCommandExpansionLoader.dll'
@@ -63,15 +66,29 @@ if (-not (Test-Path -LiteralPath $reactiveAiSamplePath -PathType Leaf)) {
 }
 
 $nativeSampleRoot = Split-Path -Parent $nativeSamplePath
-$nativeSampleBundleDirectory = Join-Path $nativeSampleRoot 'bundles'
+$nativeSampleBuildRoot = Join-Path $canonicalValidatedPackRoot 'sample-native-expansion'
+$nativeSampleBuildContentPath = Join-Path $nativeSampleBuildRoot 'content.json'
+$nativeSampleBundleDirectory = Join-Path $nativeSampleBuildRoot 'bundles'
 $nativeSampleDefinition = Get-Content -LiteralPath $nativeSamplePath -Raw | ConvertFrom-Json
 if ($nativeSampleDefinition.packId -ne 'sample-native:expansion' -or
     @($nativeSampleDefinition.assetBundles).Count -lt 1 -or
     [string]::IsNullOrWhiteSpace($nativeSampleDefinition.assetBundleManifestPath)) {
     throw 'The native sample pack must declare its bundle and Unity bundle manifest.'
 }
+if (-not (Test-Path -LiteralPath $nativeSampleBuildContentPath -PathType Leaf)) {
+    throw "Fresh canonical pack output is missing. Run tools/Build-CanonicalVisualModules.ps1 first: $nativeSampleBuildContentPath"
+}
+Assert-CanonicalVisualBuildFreshness `
+    -RepositoryRoot $repositoryRoot `
+    -ArtifactRoot $canonicalArtifactRoot `
+    -ValidatedPackRoot $canonicalValidatedPackRoot `
+    -PackName 'sample-native-expansion'
+if ((Get-FileHash -LiteralPath $nativeSamplePath -Algorithm SHA256).Hash -ne
+    (Get-FileHash -LiteralPath $nativeSampleBuildContentPath -Algorithm SHA256).Hash) {
+    throw 'The staged native sample content.json is stale. Run tools/Build-CanonicalVisualModules.ps1 after content changes.'
+}
 
-foreach ($inputDirectory in @($nativeSampleRoot, $nativeSampleBundleDirectory)) {
+foreach ($inputDirectory in @($nativeSampleRoot, $nativeSampleBuildRoot, $nativeSampleBundleDirectory)) {
     if (-not (Test-Path -LiteralPath $inputDirectory -PathType Container)) {
         throw "A required native sample content directory is missing: $inputDirectory"
     }
@@ -98,7 +115,7 @@ $nativeSampleBundlePaths = @($nativeSampleDefinition.assetBundleManifestPath)
 $nativeSampleBundlePaths += @($nativeSampleDefinition.assetBundles | ForEach-Object { $_.path })
 $nativeSampleBundleSources = @()
 $nativeSampleBundlePathSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
-$nativeSampleRootPrefix = [System.IO.Path]::GetFullPath($nativeSampleRoot).TrimEnd(
+$nativeSampleBuildRootPrefix = [System.IO.Path]::GetFullPath($nativeSampleBuildRoot).TrimEnd(
     [System.IO.Path]::DirectorySeparatorChar,
     [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
 foreach ($relativeBundlePath in $nativeSampleBundlePaths) {
@@ -109,9 +126,9 @@ foreach ($relativeBundlePath in $nativeSampleBundlePaths) {
         throw "The native sample declares a bundle path more than once: $relativeBundlePath"
     }
 
-    $bundleSourcePath = [System.IO.Path]::GetFullPath((Join-Path $nativeSampleRoot ($relativeBundlePath.Replace('/', '\'))))
-    if (-not $bundleSourcePath.StartsWith($nativeSampleRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to package a native sample bundle outside the pack: $bundleSourcePath"
+    $bundleSourcePath = [System.IO.Path]::GetFullPath((Join-Path $nativeSampleBuildRoot ($relativeBundlePath.Replace('/', '\'))))
+    if (-not $bundleSourcePath.StartsWith($nativeSampleBuildRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to package a native sample bundle outside the canonical build output: $bundleSourcePath"
     }
     if (-not (Test-Path -LiteralPath $bundleSourcePath -PathType Leaf)) {
         throw "A bundle declared by the native sample is missing: $relativeBundlePath"
@@ -208,7 +225,7 @@ try {
     Copy-Item -LiteralPath $pluginAssemblyPath -Destination $pluginDirectory
     Copy-Item -LiteralPath $schemaPath -Destination $schemaDirectory
     Copy-Item -LiteralPath $schemaReadmePath -Destination $schemaDirectory
-    Copy-Item -LiteralPath $nativeSamplePath -Destination $samplePackDirectory
+    Copy-Item -LiteralPath $nativeSampleBuildContentPath -Destination $samplePackDirectory
     Copy-Item -LiteralPath $reactiveAiSamplePath -Destination $reactiveAiSampleDirectory
     foreach ($bundleSource in $nativeSampleBundleSources) {
         Copy-Item -LiteralPath $bundleSource.SourcePath -Destination (Join-Path $samplePackBundleDirectory $bundleSource.FileName)
@@ -226,12 +243,14 @@ Use the adjacent schema directory when authoring content.json.
 The native sample adds nine localized native-template units with script-free
 visual overlays: Sandlance Scout, Colossus Siege Platform, Ironclad Walker,
 Atlas Crane Mech, Bastion Siege Mech, Arachnid Hexapod, Overlord Command HQ,
-Skirmish Strike Bike, and Surge Arc Tank. Every unit declares its own new
-production building; random blueprint rewards offer that building to produce
-its unit. Seven units have custom card Sprites; the remaining unit cards keep
-their native artwork. All nine units keep native gameplay controllers, while
-the pack adds a stage variant, a seeded native landscape variant, and a
-scheduled-build AI module.
+Skirmish Strike Bike, and Surge Arc Tank. Its Level 2 variants preserve each
+Level 1 chassis and can mount explicit visual-only modules at the ERA, APS,
+Sponsons, and FuelDrums hardpoints; preset, tint, and scale alone do not add
+geometry. Every unit declares its own new production building; random blueprint
+rewards offer that building to produce its unit. Seven units have custom card
+Sprites; the remaining unit cards keep their native artwork. All nine units
+keep native gameplay controllers, while the pack adds a stage variant, a seeded
+native landscape variant, and a scheduled-build AI module.
 Each card's persistent profile-level requirement is configured on its unit and
 factory rows. Reaching that level makes the card eligible for randomized reward
 offers; it does not force the card into a particular offer.
@@ -249,8 +268,10 @@ Rogue Command Expansion Loader $pluginVersion
 Install:
 1. Install BepInEx 5.4.23.5 win-x64 Mono into the Rogue Command game folder.
 2. Extract this archive into the Rogue Command game folder, preserving its BepInEx directory.
-3. The included sample-native-expansion pack adds nine localized native-template units
-   with bundled model overlays: Sandlance Scout, Colossus Siege Platform, Ironclad
+   3. The included sample-native-expansion pack adds nine localized native-template units
+   with bundled model overlays and explicit Level 2 modules for the ERA, APS,
+   Sponsons, and FuelDrums hardpoints. The modules preserve the Level 1 chassis and
+   add visual equipment only: Sandlance Scout, Colossus Siege Platform, Ironclad
    Walker, Atlas Crane Mech, Bastion Siege Mech, Arachnid Hexapod, Overlord Command
    HQ, Skirmish Strike Bike, and Surge Arc Tank. Each unit has a separately registered
    production building with its own ID, native factory prefab, and localized name.
