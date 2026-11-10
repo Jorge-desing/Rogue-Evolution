@@ -223,3 +223,8 @@ Do not rotate a model or change yaw correction based only on static evidence. Re
 ## Completion report
 
 List edited source, clips, controllers, prefabs, and bundles; state tool/engine versions and commands; report observed diagnostics; and separate static, local Unity, and live-game evidence. Identify unverified state transitions or motion behavior explicitly.
+
+### Screenshot-free retarget frame telemetry
+
+- The renderer-frame probe reports active Animator clip/time, movement and death flags, native retarget bind/suspension counts, camera/frustum/layer state, and bounded `BakeMesh` vertex deltas. Focus the game camera on the disposable test entity before sampling; an offscreen renderer receives camera callbacks but no renderer samples.
+- When the match must stay paused, set `Animator.updateMode=UnscaledTime` only on the disposable clone. The 2026-11-10 Ironclad pass sampled `Action_Idle` with 8/8 mappings bound and positive vertex deltas. This is runtime mesh telemetry, not rendered-pixel proof; walking, fire, death, and reuse remain separate animation checks.

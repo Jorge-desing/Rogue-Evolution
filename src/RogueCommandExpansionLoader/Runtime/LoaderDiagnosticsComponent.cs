@@ -65,6 +65,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private void Update()
         {
+            RuntimeRendererFrameProbe.Tick(Time.unscaledTime);
             try
             {
                 RuntimeHazardManager.UpdateTick(Time.time);
@@ -2120,6 +2121,25 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(
                 RuntimeGameplayCommandDirector.InspectEntityVisual(entityKeyId));
+        }
+
+        /// <summary>
+        /// Starts a short, bounded camera-render callback probe for active skinned renderers.
+        /// The probe records Animator and sampled baked-mesh telemetry without pixel capture.
+        /// </summary>
+        public string StartRendererFrameProbeJson(string entityKeyId, string rendererNameContains = "", int sampleLimit = 12)
+        {
+            return RuntimeRendererFrameProbe.StartJson(entityKeyId, rendererNameContains, sampleLimit);
+        }
+
+        public string ReadRendererFrameProbeJson(string token)
+        {
+            return RuntimeRendererFrameProbe.ReadJson(token);
+        }
+
+        public string StopRendererFrameProbeJson(string token)
+        {
+            return RuntimeRendererFrameProbe.StopJson(token);
         }
 
         public int AuditedUnitPrefabCount => RuntimeVisualCensus.AuditedPrefabCount;

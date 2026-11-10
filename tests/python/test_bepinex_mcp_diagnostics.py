@@ -12,6 +12,56 @@ SERVER = load_tool_module("bepinex_mcp_server")
 
 
 class RuntimeDiagnosticsTests(unittest.TestCase):
+    def test_renderer_frame_probe_tools_dispatch_without_image_capture(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_diagnostics_method(method: str, args: list[object] | None = None) -> str:
+            calls.append((method, list(args or [])))
+            return json.dumps({"success": True, "kind": "rendererFrameProbe", "pixelCapture": False})
+
+        schemas = {tool["name"]: tool["inputSchema"] for tool in SERVER.TOOLS}
+        tools = {tool["name"]: tool for tool in SERVER.TOOLS}
+        self.assertIn("diagnostics_start_renderer_frame_probe", schemas)
+        self.assertIn("diagnostics_read_renderer_frame_probe", schemas)
+        self.assertIn("diagnostics_stop_renderer_frame_probe", schemas)
+        self.assertIn(
+            "RenderPipelineManager.endCameraRendering",
+            tools["diagnostics_start_renderer_frame_probe"]["description"],
+        )
+        self.assertEqual(
+            ["entityKeyId"],
+            schemas["diagnostics_start_renderer_frame_probe"]["required"],
+        )
+        self.assertEqual(
+            ["Player", "AI"],
+            schemas["diagnostics_spawn_entity"]["properties"]["side"]["enum"],
+        )
+
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method):
+            started = SERVER.execute_tool(
+                "diagnostics_start_renderer_frame_probe",
+                {"entityKeyId": "307", "rendererNameContains": "Body", "sampleLimit": 8},
+            )
+            read = SERVER.execute_tool("diagnostics_read_renderer_frame_probe", {"token": "probe-token"})
+            stopped = SERVER.execute_tool("diagnostics_stop_renderer_frame_probe", {"token": "probe-token"})
+            invalid = SERVER.execute_tool(
+                "diagnostics_start_renderer_frame_probe",
+                {"entityKeyId": "307", "sampleLimit": "eight"},
+            )
+
+        self.assertEqual(
+            [
+                ("StartRendererFrameProbeJson", ["307", "Body", 8]),
+                ("ReadRendererFrameProbeJson", ["probe-token"]),
+                ("StopRendererFrameProbeJson", ["probe-token"]),
+            ],
+            calls,
+        )
+        for response in (started, read, stopped):
+            self.assertFalse(response["isError"])
+            self.assertFalse(json.loads(response["content"][0]["text"])["pixelCapture"])
+        self.assertTrue(invalid["isError"])
+
     def test_runtime_scalars_read_properties_and_return_typed_values(self) -> None:
         property_values = {
             "LiveBattlefieldEntityCount": ("System.Int32", "13"),
@@ -598,12 +648,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(223, len(names))
+        self.assertEqual(236, len(names))
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(223, len(tools))
+        self.assertEqual(236, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -617,7 +667,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(len(names) >= 1)
         self.assertTrue(len(names) >= 1)
         resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
-        self.assertLess(len(resp2["result"]["tools"]), 205)
+        self.assertLess(len(resp2["result"]["tools"]), 220)
         self.assertNotIn("ping_unity_bridge", [t["name"] for t in resp2["result"]["tools"]])
         self.assertIn("system_ping", [t["name"] for t in resp2["result"]["tools"]])
 
@@ -1041,13 +1091,13 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(223, len(names))
+        self.assertEqual(236, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
-        self.assertEqual(203, len(specs) - len(aliases))
+        self.assertEqual(216, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
-        self.assertLess(compact, 82000, f"optimised schemas too large: {compact} bytes")
+        self.assertLess(compact, 90000, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
         for spec in specs:
             params = spec["parameters"]
@@ -1097,12 +1147,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(358, total_props)
+        self.assertEqual(383, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()
         empty = [s for s in specs if not s["parameters"].get("properties")]
-        self.assertEqual(76, len(empty))
+        self.assertEqual(79, len(empty))
         for spec in empty:
             self.assertEqual(
                 {"type": "object", "additionalProperties": False},
@@ -1192,9 +1242,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("Parent GameObject instance ID.", blob)
         resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = resp["result"]["tools"]
-        self.assertEqual(223, len(tools))
+        self.assertEqual(236, len(tools))
         payload = json.dumps(resp["result"], separators=(",", ":"))
-        self.assertLess(len(payload), 82500, f"tools/list payload too large: {len(payload)} bytes")
+        self.assertLess(len(payload), 91000, f"tools/list payload too large: {len(payload)} bytes")
 
 if __name__ == "__main__":
     unittest.main()

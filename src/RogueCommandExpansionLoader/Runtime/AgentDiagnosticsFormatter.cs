@@ -4164,6 +4164,11 @@ new Dictionary<string, object> { ["name"] = "GetVisualSurfaceCensusJson", ["desc
             return Serialize(root);
         }
 
+        internal static string SerializePrimitivePayload(Dictionary<string, object> view)
+        {
+            return Serialize(view);
+        }
+
         private static string Serialize(Dictionary<string, object> view)
         {
             int estimatedCapacity = view != null ? Math.Max(512, view.Count * 64) : 256;

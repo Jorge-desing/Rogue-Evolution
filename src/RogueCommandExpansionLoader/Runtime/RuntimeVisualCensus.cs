@@ -1608,7 +1608,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        private static EntityController FindEntityByKey(ExistingControllers existing, string key)
+        internal static EntityController FindEntityByKey(ExistingControllers existing, string key)
         {
             if (existing == null || string.IsNullOrWhiteSpace(key)) return null;
 

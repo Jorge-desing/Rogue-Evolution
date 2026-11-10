@@ -159,3 +159,9 @@ python tools/runtime_profile_checkpoint.py verify `
 ### Native pre-spawn stack versus death
 
 - Static CIL for the pinned build shows `EntityFactory.PrespawnEntity` pushes into `PrespawnedEntities`, `InstantiateEntity` pops and initializes the unit, and `EntityController.Destroy` decrements the prespawn count and calls `UnityEngine.Object.Destroy` without pushing the dead object back. Do not require a natural death-to-stack-return test for this native route; validate stack-pop reset independently from death suspension/animation. Evidence: `artifacts/runtime-smoke/native-retarget-natural-death-20261110T140359Z/native-prespawn-stack-static-evidence.json`.
+
+### Screenshot-free retarget renderer probe
+
+- Checkpoint all profiles and the selector, launch through Steam without changing the selector, select the existing saved profile through native UI, and verify the live run before sampling. Pause at `Time.timeScale=0`; focus the camera on a disposable entity and set `Animator.updateMode=UnscaledTime` only on that clone if animation must advance while paused.
+- Start/read/stop the bounded renderer-frame probe. It records direct Game-camera callbacks, frustum/layer gates, Animator and retarget state, and sampled `BakeMesh` deltas; it captures no pixels. Close with `diagnostics_request_graceful_exit(confirmExit=true)`, verify process exit, restore changed profile bytes from the checkpoint backup, then require exact all-profile and selector matches.
+- The 2026-11-10 pass used existing Profile2, kept the tutorial complete and selector `2`, restored `metaSavegame.dat` to SHA-256 `9047CD412770724B9736815D6B1CC6C1ABE1419E43DA686AD579B7CBD0965090`, and verified the full checkpoint. Steam Cloud was already disabled by the user; no remote Cloud state was changed or verified. Runtime trace: `artifacts/runtime-smoke/retarget-camera-render-probe-20261110/renderer-frame-probe-final.json`.

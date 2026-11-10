@@ -240,3 +240,8 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 
 - `GetRuntimeHooksStateJson()` now exposes `entityDestroyGameObjectTranspilerCount` for terminal callback invocations and `deathVisualRetirementCount` for successful visual holds; `entityDestroyTranspilerCount` remains the Destroy-entry callback count. Reset all three with the diagnostic reset path.
 - A bounded event observer should capture direct-damage setup, trigger success, `DeathVisualRetirementPending`, clip name/length/time, target existence, and final destruction. Report telemetry separately from rendered pixels and natural combat. Include cleanup state for the observer, probe, Harmony patches, watchers, and `RuntimeVisualDirector` count. Example: `artifacts/runtime-smoke/retarget-death-visual-cloud-20261110170654/death-hold-runtime-result.json`.
+
+### URP renderer frame probe
+
+- Use `diagnostics_start_renderer_frame_probe`, `diagnostics_read_renderer_frame_probe`, and `diagnostics_stop_renderer_frame_probe` for short, screenshot-free renderer telemetry. The observer samples at most four skinned renderers, for at most 20 seconds, on `RenderPipelineManager.endCameraRendering` callbacks from `CameraType.Game` cameras without a `targetTexture`; it reports camera, layer, and frustum gates plus sampled local vertices from `SkinnedMeshRenderer.BakeMesh` (up to 128 vertices per sample).
+- `boundsCenter` and `boundsSize` are JSON numeric arrays `[x,y,z]`. Parse each payload as strict JSON. A non-zero `maximumLocalVertexDelta` shows sampled mesh deformation only; callbacks, clip state, frustum inclusion, and `pixelCapture=false` do not prove rendered pixels or visible appearance. Always stop the probe and report omitted samples.

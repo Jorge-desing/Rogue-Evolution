@@ -24,7 +24,7 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.4.0"
+SERVER_VERSION = "1.4.2"
 GAME_PROCESS_NAME = "Rogue Command.exe"
 GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
@@ -1901,6 +1901,29 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         elif name == "diagnostics_inspect_entity_visual":
             entity_key_id = str(arguments.get("entityKeyId", "")).strip()
             res = _call_diagnostics_method("InspectEntityVisualJson", [entity_key_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_start_renderer_frame_probe":
+            entity_key_id = str(arguments.get("entityKeyId", "")).strip()
+            renderer_filter = str(arguments.get("rendererNameContains", ""))
+            try:
+                sample_limit = int(arguments.get("sampleLimit", 12))
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"success": False, "error": "sampleLimit must be an integer", "pixelCapture": False}), is_error=True)
+            res = _call_diagnostics_method(
+                "StartRendererFrameProbeJson",
+                [entity_key_id, renderer_filter, sample_limit],
+            )
+            return _tool_response(res)
+
+        elif name == "diagnostics_read_renderer_frame_probe":
+            token = str(arguments.get("token", "")).strip()
+            res = _call_diagnostics_method("ReadRendererFrameProbeJson", [token])
+            return _tool_response(res)
+
+        elif name == "diagnostics_stop_renderer_frame_probe":
+            token = str(arguments.get("token", "")).strip()
+            res = _call_diagnostics_method("StopRendererFrameProbeJson", [token])
             return _tool_response(res)
 
         elif name == "diagnostics_get_loaded_unit_visual_audit":
