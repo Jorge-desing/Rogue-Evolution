@@ -1525,13 +1525,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 : originalMethod.GetParameters();
             if (originalMethod == null || originalMethod.IsStatic ||
                 !String.Equals(originalMethod.Name, "Destroy", StringComparison.Ordinal) ||
-                declaringType == null || !String.Equals(declaringType.Name, "EntityController", StringComparison.Ordinal) ||
+                declaringType != typeof(EntityController) ||
                 originalMethod.ReturnType != typeof(void) || originalParameters.Length != 2 ||
                 originalParameters[0].ParameterType != typeof(bool) ||
-                originalParameters[1].ParameterType != declaringType)
+                originalParameters[1].ParameterType != typeof(EntityController))
             {
                 throw new InvalidOperationException(
-                    "EntityController.Destroy transpiler requires an instance void Destroy(bool, EntityController) target.");
+                    "EntityController.Destroy transpiler requires the game's exact instance void Destroy(bool, EntityController) target.");
             }
 
             MethodInfo hookMethod = typeof(RuntimeHarmonyPatches).GetMethod(
@@ -1540,7 +1540,9 @@ namespace RogueCommandExpansionLoader.Runtime
             ParameterInfo[] hookParameters = hookMethod == null
                 ? new ParameterInfo[0]
                 : hookMethod.GetParameters();
-            if (hookMethod == null || hookMethod.ReturnType != typeof(void) ||
+            if (hookMethod == null || hookMethod.DeclaringType != typeof(RuntimeHarmonyPatches) ||
+                !hookMethod.IsStatic || hookMethod.ContainsGenericParameters ||
+                hookMethod.ReturnType != typeof(void) ||
                 hookParameters.Length != 3 || hookParameters[0].ParameterType != typeof(object) ||
                 hookParameters[1].ParameterType != typeof(bool) ||
                 hookParameters[2].ParameterType != typeof(object))
