@@ -7,7 +7,13 @@
 
 ---
 
-## 2026-11-10 Screenshot-Free BepInEx MCP Automation
+## 2026-11-10 Retarget Locomotion Release Grace
+
+- **Runtime fix:** Live frame samples showed `RCL_IsMoving` alternating between true and false on idle frames between native movement updates. `LocomotionAnimationPolicy.EvaluateWithMovementGrace` now holds the moving state for 0.12 scaled seconds after positive movement evidence. It resets immediately at zero/invalid scaled delta time and on visual reuse, stun, or death. Position and velocity thresholds remain `positionDeltaSquared > 1e-8f` and `velocitySquared > 1e-6f`; the resulting state also gates turret aim.
+- **Local validation:** Release build passed with 0 warnings and 0 errors. The C# validation suite passed 568/569 checks; one Windows symlink fixture was skipped because this environment lacks the file-symlink privilege. The regression case checks intermittent movement frames, grace expiration, and paused zero-delta reset.
+- **Live BepInEx evidence:** Profile2 was selected through the native save-profile panel and its existing level-3/stage-0 run continued through the normal route to level 4/stage 0. The match stayed paused at `Time.timeScale=0` except for short bounded samples. A temporary self-removing transform-motion helper on a disposable `sample-native:assault-walker` produced 24/24 unique renderer-probe frames with `RCL_IsMoving=true`, `Action_Walk`, zero bool transitions, 8/8 retarget mappings, and maximum sampled local-vertex delta `0.182215`; after the helper ended, the Animator returned to `Action_Idle` with the bool false. This proves Animator/retarget behavior under synthetic transform motion only, not native pathfinding or natural combat. Telemetry JSON: `artifacts/runtime-smoke/retarget-walk-grace-live-20261110/renderer-frame-probe-post-fix-summary.json`; `pixelCapture=false`.
+- **Profile and cleanup:** The game exited through BepInEx MCP. The only changed profile file was `Profile2/metaSavegame.dat`; it was restored from the verified four-file pre-run backup at SHA-256 `9047CD412770724B9736815D6B1CC6C1ABE1419E43DA686AD579B7CBD0965090`. The all-profile checkpoint now reports exact file and selector matches, with `currentProfile.txt` still `2`. Steam Cloud was disabled by the user and was not changed. Both the motion helper and renderer probe behaviours were absent after the sample; the probe stop endpoint returned an expired-token response.
+- **Build and deployment:** Plugin version `1.20.4` Release artifact and installed DLL match SHA-256 `34CF0CD77BC2F83E1310B69F96F28824AC88418034602638E1727ED9DAAB4D52`. The pre-deploy backup/hash manifest is `artifacts/deployment-backups/retarget-locomotion-grace-20261110T215152Z/deployment-manifest.json` (`deployed_sha256_verified`).
 
 ## 2026-11-10 Screenshot-Free Retarget Renderer Frame Probe
 

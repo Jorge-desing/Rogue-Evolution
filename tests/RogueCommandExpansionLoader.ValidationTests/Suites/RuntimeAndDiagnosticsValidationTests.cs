@@ -7679,6 +7679,47 @@ internal static partial class ValidationTestRunner
         {
             throw new InvalidOperationException("A zero-delta-time sample must not activate locomotion.");
         }
+
+        float movementHoldRemainingSeconds = 0f;
+        if (!LocomotionAnimationPolicy.EvaluateWithMovementGrace(
+                0.0001f,
+                0.016f,
+                0f,
+                ref movementHoldRemainingSeconds))
+        {
+            throw new InvalidOperationException("A movement sample must immediately activate locomotion.");
+        }
+
+        for (int frame = 0; frame < 7; frame++)
+        {
+            if (!LocomotionAnimationPolicy.EvaluateWithMovementGrace(
+                    0f,
+                    0.016f,
+                    0f,
+                    ref movementHoldRemainingSeconds))
+            {
+                throw new InvalidOperationException("Intermittent movement samples must keep the locomotion clip active during the release grace window.");
+            }
+        }
+
+        if (LocomotionAnimationPolicy.EvaluateWithMovementGrace(
+                0f,
+                0.016f,
+                0f,
+                ref movementHoldRemainingSeconds))
+        {
+            throw new InvalidOperationException("The locomotion clip must return to idle after the release grace window expires.");
+        }
+
+        movementHoldRemainingSeconds = 0.08f;
+        if (LocomotionAnimationPolicy.EvaluateWithMovementGrace(
+                0f,
+                0f,
+                0f,
+                ref movementHoldRemainingSeconds) || movementHoldRemainingSeconds != 0f)
+        {
+            throw new InvalidOperationException("A paused zero-delta-time sample must clear the movement hold and allow idle.");
+        }
     }),
     ("turret aim policy only allows enemies within weapon range", () =>
     {

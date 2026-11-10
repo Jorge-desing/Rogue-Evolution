@@ -104,6 +104,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private float _deathVisualRetirementRemainingSeconds;
         private bool _hasLastAnimationPosition;
         private Vector3 _lastAnimationPosition;
+        private float _movementAnimationHoldRemainingSeconds;
         private float _doorOpenProgress;
         private Vector3 _doorClosedLocalPos;
 
@@ -259,6 +260,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _deathVisualRetirementUsesUnscaledTime = false;
             _deathVisualRetirementRemainingSeconds = 0f;
             _isMoving = false;
+            _movementAnimationHoldRemainingSeconds = 0f;
             _lastShotTimestamp = -1f;
             _lastVelocity = Vector3.zero;
             _lastAcceleration = Vector3.zero;
@@ -863,10 +865,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 ? (currentPosition - _lastAnimationPosition).sqrMagnitude
                 : 0f;
             float velocitySquared = _hasLastPosition ? _lastVelocity.sqrMagnitude : 0f;
-            bool isMoving = LocomotionAnimationPolicy.IsMoving(
+            bool isMoving = LocomotionAnimationPolicy.EvaluateWithMovementGrace(
                 positionDeltaSquared,
                 deltaTime,
-                velocitySquared);
+                velocitySquared,
+                ref _movementAnimationHoldRemainingSeconds);
 
             _isMoving = isMoving;
             _animator.SetBool(MovementAnimationParameter, isMoving);
@@ -1256,6 +1259,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void TriggerDeathAnimation()
         {
+            _isMoving = false;
+            _movementAnimationHoldRemainingSeconds = 0f;
+
             if (_deathAnimationTriggered || _animator == null || !_hasDeathAnimationParameter)
             {
                 return;
@@ -1370,6 +1376,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (hasStun)
             {
                 _isTurretJammed = true;
+                _isMoving = false;
+                _movementAnimationHoldRemainingSeconds = 0f;
                 if (_animator != null && _hasMovementAnimationParameter)
                 {
                     _animator.SetBool(MovementAnimationParameter, false);

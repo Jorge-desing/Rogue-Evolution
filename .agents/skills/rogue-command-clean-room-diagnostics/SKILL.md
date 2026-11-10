@@ -220,7 +220,8 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 
 ## Frame-Coherent Retarget Sampling
 
-- Use one `run_bridge_batch` for `Animator.GetBool("RCL_IsMoving")`, the current clip, and mapped poses when possible. Calls issued separately may sample different Unity frames. At `Time.timeScale = 0`, `Time.deltaTime` is zero and locomotion policy intentionally reports not moving; briefly unpause for a movement sample, then restore the prior pause state. A paused false readback is not proof of a retarget defect.
+- Use one `run_bridge_batch` for `Animator.GetBool("RCL_IsMoving")`, the current clip, and mapped poses when possible. Calls issued separately may sample different Unity frames. The movement policy holds a positive state for 0.12 scaled seconds to bridge intermittent ticks; `Time.timeScale = 0` makes `Time.deltaTime` zero and clears the hold, so a paused false readback is not proof of a retarget defect. Briefly unpause only for a bounded sample, then restore the prior pause state.
+- The renderer-frame probe reads the Animator's actual `RCL_IsMoving` bool together with clip/time, direct Game-camera callback state, retarget counts, and bounded `BakeMesh` vertex deltas. If a disposable motion helper is needed, label the result synthetic transform motion; it does not prove native pathfinding. No probe field is pixel/rendered-image evidence. If the stop call reports an expired token, query for remaining `RuntimeRendererFrameProbeBehaviour` components before claiming cleanup.
 
 ## Native Retarget Runtime Follow-up (2026-11-10)
 

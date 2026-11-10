@@ -5,7 +5,7 @@
     <Nullable>disable</Nullable>
     <AssemblyName>RogueCommandExpansionLoader</AssemblyName>
     <RootNamespace>RogueCommandExpansionLoader</RootNamespace>
-    <Version>1.20.3</Version>
+    <Version>1.20.4</Version>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <GameRoot Condition="'$(GameRoot)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Rogue Command</GameRoot>
     <GameManagedPath>$(GameRoot)\Rogue Command_Data\Managed</GameManagedPath>
