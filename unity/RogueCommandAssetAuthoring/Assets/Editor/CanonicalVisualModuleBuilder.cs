@@ -40,6 +40,8 @@ namespace RogueCommandExpansion.Authoring
             public string assetName;
             public string texturePrefix;
             public string preset;
+            public string slotId;
+            public string visualEngineeringRole;
         }
 
         [Serializable]
@@ -74,12 +76,14 @@ namespace RogueCommandExpansion.Authoring
         [Serializable]
         private sealed class ContentVisualVariantReference
         {
+            public string id;
             public ContentVisualModuleReference[] modules;
         }
 
         [Serializable]
         private sealed class ContentVisualModuleReference
         {
+            public string slotId;
             public string assetName;
         }
 
@@ -146,9 +150,9 @@ namespace RogueCommandExpansion.Authoring
             }
 
             ModuleManifest manifest = JsonUtility.FromJson<ModuleManifest>(File.ReadAllText(manifestPath));
-            if (manifest == null || manifest.modules == null || manifest.modules.Length != 35)
+            if (manifest == null || manifest.schemaVersion != 2 || manifest.modules == null || manifest.modules.Length == 0)
             {
-                throw new InvalidDataException("Canonical visual module manifest must contain exactly 35 module entries.");
+                throw new InvalidDataException("Canonical visual module manifest must use schema version 2 and contain modules.");
             }
 
             Shader shader = Shader.Find(ShaderName);
@@ -161,6 +165,12 @@ namespace RogueCommandExpansion.Authoring
             EnsureAssetFolder(TextureFolder);
             EnsureAssetFolder(MaterialFolder);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+            int validatedHardpointBindings = 0;
+            validatedHardpointBindings += ValidatePackModuleBindingsAndLevelOneHardpoints(
+                "sample-native-expansion", repositoryRoot, manifest.modules);
+            validatedHardpointBindings += ValidatePackModuleBindingsAndLevelOneHardpoints(
+                "tactical-operations", repositoryRoot, manifest.modules);
 
             var seenPrefabPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var materialSets = new Dictionary<string, ModuleMaterials>(StringComparer.Ordinal);
@@ -191,8 +201,234 @@ namespace RogueCommandExpansion.Authoring
             RogueCommandAssetBundleBuilder.BuildContentPacksByName(
                 "sample-native-expansion", "tactical-operations");
             ValidateBuiltBundleContents(manifest.modules, repositoryRoot);
-            Debug.Log("[CanonicalVisualModuleBuilder] Built 35 visual-only modules, 28 shared PBR sets, labeled " +
+            Debug.Log("[CanonicalVisualModuleBuilder] Built " + manifest.modules.Length +
+                " visual-only modules, " + materialSets.Count + " shared PBR sets, validated " +
+                validatedHardpointBindings + " Level 1 hardpoint bindings, labeled " +
                 referencedAssets + " referenced pack assets, and built both content packs.");
+        }
+
+        private static int ValidatePackModuleBindingsAndLevelOneHardpoints(
+            string packName,
+            string repositoryRoot,
+            ModuleEntry[] manifestEntries)
+        {
+            string packPath = Path.Combine(repositoryRoot, "content", "packs", packName, "content.json");
+            if (!File.Exists(packPath))
+            {
+                throw new FileNotFoundException("Content pack manifest is missing.", packPath);
+            }
+
+            ContentPackReferences pack = JsonUtility.FromJson<ContentPackReferences>(File.ReadAllText(packPath));
+            if (pack == null || pack.units == null)
+            {
+                throw new InvalidDataException("Content pack has no units for Level 1 hardpoint validation: " + packName);
+            }
+
+            var expectedByVariantSlot = new Dictionary<string, ModuleEntry>(StringComparer.Ordinal);
+            for (int i = 0; i < manifestEntries.Length; i++)
+            {
+                ModuleEntry entry = manifestEntries[i];
+                if (entry == null || !String.Equals(entry.packName, packName, StringComparison.Ordinal)) continue;
+                string key = ModuleBindingKey(entry.variantId, entry.slotId);
+                if (expectedByVariantSlot.ContainsKey(key))
+                {
+                    throw new InvalidDataException("Canonical module manifest duplicates a variant hardpoint binding: " + key);
+                }
+                expectedByVariantSlot.Add(key, entry);
+            }
+
+            var matchedBindings = new HashSet<string>(StringComparer.Ordinal);
+            var assetPathsByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            string[] allAssetPaths = AssetDatabase.GetAllAssetPaths();
+            for (int i = 0; i < allAssetPaths.Length; i++)
+            {
+                string assetPath = allAssetPaths[i];
+                if (assetPath.StartsWith("Assets/", StringComparison.Ordinal))
+                {
+                    assetPathsByName[assetPath] = assetPath;
+                }
+            }
+
+            int validatedBindings = 0;
+            for (int unitIndex = 0; unitIndex < pack.units.Length; unitIndex++)
+            {
+                ContentUnitReference unit = pack.units[unitIndex];
+                if (unit == null || String.IsNullOrWhiteSpace(unit.id)) continue;
+                ContentVisualVariantReference[] variants = unit.visualVariants;
+                if (variants == null || variants.Length == 0)
+                {
+                    bool hasExpectedBinding = false;
+                    foreach (ModuleEntry entry in expectedByVariantSlot.Values)
+                    {
+                        if (String.Equals(entry.unitId, unit.id, StringComparison.Ordinal))
+                        {
+                            hasExpectedBinding = true;
+                            break;
+                        }
+                    }
+                    if (hasExpectedBinding)
+                    {
+                        throw new InvalidDataException("Unit with generated modules has no Level 1 primary visual variant: " + unit.id);
+                    }
+                    continue;
+                }
+                if (variants[0] != null && variants[0].modules != null && variants[0].modules.Length > 0)
+                {
+                    throw new InvalidDataException("Level 1 primary variant cannot declare Level 2 modules: " + unit.id);
+                }
+
+                var requiredSlots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int variantIndex = 1; variantIndex < variants.Length; variantIndex++)
+                {
+                    ContentVisualVariantReference variant = variants[variantIndex];
+                    if (variant == null || variant.modules == null) continue;
+                    for (int moduleIndex = 0; moduleIndex < variant.modules.Length; moduleIndex++)
+                    {
+                        ContentVisualModuleReference module = variant.modules[moduleIndex];
+                        if (module == null || String.IsNullOrWhiteSpace(variant.id))
+                        {
+                            throw new InvalidDataException("A Level 2 module or its variant ID is missing for unit " + unit.id);
+                        }
+                        if (!IsCanonicalHardpointSlot(module.slotId))
+                        {
+                            throw new InvalidDataException("Level 2 module uses a noncanonical hardpoint slot: " +
+                                variant.id + " / " + module.slotId);
+                        }
+
+                        string key = ModuleBindingKey(variant.id, module.slotId);
+                        ModuleEntry expected;
+                        if (!expectedByVariantSlot.TryGetValue(key, out expected) ||
+                            !String.Equals(expected.unitId, unit.id, StringComparison.Ordinal) ||
+                            !String.Equals(expected.assetName, module.assetName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            throw new InvalidDataException("Level 2 pack binding differs from the generated module manifest: " +
+                                variant.id + " / " + module.slotId);
+                        }
+                        if (!matchedBindings.Add(key))
+                        {
+                            throw new InvalidDataException("Duplicate Level 2 module binding: " + variant.id + " / " + module.slotId);
+                        }
+                        requiredSlots.Add(module.slotId);
+                        validatedBindings++;
+                    }
+                }
+
+                if (requiredSlots.Count == 0) continue;
+                if (String.IsNullOrWhiteSpace(unit.visualAssetName))
+                {
+                    throw new InvalidDataException("Unit with Level 2 modules has no Level 1 visualAssetName: " + unit.id);
+                }
+
+                string primaryAssetPath = ResolveUnityContentAssetPath(
+                    assetPathsByName, unit.visualAssetName, "unit:" + unit.id + ".visualAssetName");
+                GameObject primaryRoot = PrefabUtility.LoadPrefabContents(primaryAssetPath);
+                if (primaryRoot == null)
+                {
+                    throw new InvalidDataException("Unity could not load the Level 1 primary prefab: " + primaryAssetPath);
+                }
+
+                try
+                {
+                    var socketCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                    foreach (string slot in CanonicalHardpointSlots()) socketCounts.Add(slot, 0);
+                    Transform[] hierarchy = primaryRoot.GetComponentsInChildren<Transform>(true);
+                    for (int transformIndex = 0; transformIndex < hierarchy.Length; transformIndex++)
+                    {
+                        string socketName = hierarchy[transformIndex].name;
+                        const string socketPrefix = "Socket_Hardpoint_";
+                        if (!socketName.StartsWith(socketPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                        string slot = socketName.Substring(socketPrefix.Length);
+                        if (!socketCounts.ContainsKey(slot))
+                        {
+                            throw new InvalidDataException("Level 1 primary prefab contains a noncanonical hardpoint socket: " +
+                                unit.id + " / " + socketName);
+                        }
+                        socketCounts[slot]++;
+                    }
+
+                    foreach (KeyValuePair<string, int> socket in socketCounts)
+                    {
+                        if (socket.Value > 1)
+                        {
+                            throw new InvalidDataException("Level 1 primary prefab has duplicate hardpoint sockets: " +
+                                unit.id + " / " + socket.Key + " (" + socket.Value + ")");
+                        }
+                    }
+                    foreach (string requiredSlot in requiredSlots)
+                    {
+                        if (socketCounts[requiredSlot] != 1)
+                        {
+                            throw new InvalidDataException("Level 2 module requires exactly one matching Level 1 socket: " +
+                                unit.id + " / Socket_Hardpoint_" + requiredSlot + " (found " + socketCounts[requiredSlot] + ")");
+                        }
+                    }
+                }
+                finally
+                {
+                    PrefabUtility.UnloadPrefabContents(primaryRoot);
+                }
+            }
+
+            if (matchedBindings.Count != expectedByVariantSlot.Count)
+            {
+                var missing = new List<string>();
+                foreach (string key in expectedByVariantSlot.Keys)
+                {
+                    if (!matchedBindings.Contains(key)) missing.Add(key);
+                }
+                throw new InvalidDataException("Generated canonical modules are not declared by the pack: " +
+                    String.Join(", ", missing.ToArray()));
+            }
+            return validatedBindings;
+        }
+
+        private static string ModuleBindingKey(string variantId, string slotId)
+        {
+            return (variantId ?? String.Empty) + "|" + (slotId ?? String.Empty);
+        }
+
+        private static bool IsCanonicalHardpointSlot(string slotId)
+        {
+            string[] slots = CanonicalHardpointSlots();
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (String.Equals(slotId, slots[i], StringComparison.Ordinal)) return true;
+            }
+            return false;
+        }
+
+        private static string[] CanonicalHardpointSlots()
+        {
+            return new[] { "ERA", "APS", "Sponsons", "FuelDrums" };
+        }
+
+        private static string ResolveUnityContentAssetPath(
+            Dictionary<string, string> assetPathsByName,
+            string assetName,
+            string label)
+        {
+            if (String.IsNullOrWhiteSpace(assetName) || !assetName.StartsWith("assets/", StringComparison.OrdinalIgnoreCase) ||
+                assetName.IndexOf('\\') >= 0)
+            {
+                throw new InvalidDataException(label + " has an invalid Unity asset name: " + assetName);
+            }
+
+            string[] segments = assetName.Split('/');
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (segments[i] == "." || segments[i] == "..")
+                {
+                    throw new InvalidDataException(label + " contains a path traversal segment: " + assetName);
+                }
+            }
+
+            string lookupPath = "Assets/" + assetName.Substring("assets/".Length);
+            string resolvedPath;
+            if (!assetPathsByName.TryGetValue(lookupPath, out resolvedPath))
+            {
+                throw new FileNotFoundException(label + " has no imported Unity asset: " + lookupPath);
+            }
+            return resolvedPath;
         }
 
         private static int AssignContentPackReferences(string packName, string repositoryRoot)
@@ -364,9 +600,12 @@ namespace RogueCommandExpansion.Authoring
                 String.IsNullOrWhiteSpace(entry.assetBundleName) || String.IsNullOrWhiteSpace(entry.fbxAssetPath) ||
                 String.IsNullOrWhiteSpace(entry.prefabAssetPath) || String.IsNullOrWhiteSpace(entry.assetName) ||
                 String.IsNullOrWhiteSpace(entry.texturePrefix) ||
-                String.IsNullOrWhiteSpace(entry.preset))
+                String.IsNullOrWhiteSpace(entry.preset) ||
+                String.IsNullOrWhiteSpace(entry.visualEngineeringRole) ||
+                !IsCanonicalHardpointSlot(entry.slotId) ||
+                !IsVisualEngineeringRoleAllowedForSlot(entry.visualEngineeringRole, entry.slotId))
             {
-                throw new InvalidDataException("Canonical module manifest contains an incomplete entry.");
+                throw new InvalidDataException("Canonical module manifest contains an incomplete or incompatible visual engineering role entry.");
             }
 
             if (!seenPrefabPaths.Add(entry.prefabAssetPath) ||
@@ -391,6 +630,31 @@ namespace RogueCommandExpansion.Authoring
             {
                 throw new FileNotFoundException("Canonical module FBX or one of its four PBR maps is missing: " +
                     entry.moduleName);
+            }
+        }
+
+        private static bool IsVisualEngineeringRoleAllowedForSlot(string role, string slot)
+        {
+            switch (role)
+            {
+                case "armor_cassette":
+                    return String.Equals(slot, "ERA", StringComparison.Ordinal);
+                case "aps_sensor_suite":
+                case "aps_magnetic_shield":
+                    return String.Equals(slot, "APS", StringComparison.Ordinal);
+                case "fuel_drum_pair":
+                case "ordnance_carrier":
+                    return String.Equals(slot, "FuelDrums", StringComparison.Ordinal);
+                case "excavation_drill":
+                case "thermal_radiator":
+                case "heavy_flak_battery":
+                case "repair_dispenser":
+                case "power_containment":
+                case "docking_clamp":
+                case "utility_sponson":
+                    return String.Equals(slot, "Sponsons", StringComparison.Ordinal);
+                default:
+                    return false;
             }
         }
 

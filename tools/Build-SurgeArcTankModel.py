@@ -12,6 +12,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 import RogueModelKit as rmk
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 
 
 UNIT_NAME = "SurgeArcTank"
@@ -253,6 +254,7 @@ def build_surge_arc_tank_model() -> None:
         structural_wear_mask=True,
     )
     rmk.generate_lightmap_uvs(builder.objects)
+    hardpoint_sockets = create_canonical_hardpoint_sockets(UNIT_NAME)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
 
     export_batches = rmk.merge_meshes_by_material(
@@ -269,7 +271,7 @@ def build_surge_arc_tank_model() -> None:
             builder.palette.emissive: "arc",
         },
     )
-    rmk.export_unity_fbx(FBX_PATH, export_batches)
+    rmk.export_unity_fbx(FBX_PATH, export_batches + hardpoint_sockets, include_empties=True)
 
     print(f"Editable source: {BLEND_PATH}")
     print(f"Unity FBX: {FBX_PATH}")

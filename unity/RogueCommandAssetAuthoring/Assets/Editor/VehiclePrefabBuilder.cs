@@ -545,7 +545,7 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void EnsureCanonicalHardpointSockets(GameObject root, GameObject model)
+        internal static void EnsureCanonicalHardpointSockets(GameObject root, GameObject model)
         {
             if (root == null || model == null) return;
             string[] socketTypes = { "ERA", "APS", "Sponsons", "FuelDrums" };

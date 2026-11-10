@@ -237,8 +237,14 @@ try {
         $packArgs += "--strict"
     }
     & python @packArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "Material Maker PBR pack failed with exit code $LASTEXITCODE"
+    $packExitCode = $LASTEXITCODE
+    if ($packExitCode -ne 0) {
+        Write-Warning "Material Maker PBR packing returned $packExitCode; retrying once after the failed process has exited."
+        & python @packArgs
+        $packExitCode = $LASTEXITCODE
+    }
+    if ($packExitCode -ne 0) {
+        throw "Material Maker PBR pack failed with exit code $packExitCode after one retry."
     }
     $qualityReport = Join-Path $outDir ("${templatePrefix}_quality-report.json")
     $auditArgs = @(

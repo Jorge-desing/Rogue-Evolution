@@ -14,6 +14,10 @@ from VisualModelAuthoringSupport import (
     validate_rigid_weights,
     validate_root_motion,
 )
+from CanonicalUnitHardpoints import (
+    create_canonical_hardpoint_sockets,
+    get_canonical_hardpoint_socket_positions,
+)
 from mathutils import Vector
 
 UNIT_NAME = "ColossusSiegePlatform"
@@ -30,6 +34,19 @@ MODEL_DIR = (
 FBX_PATH = MODEL_DIR / f"{UNIT_NAME}.fbx"
 ATLAS_FBX_PATH = MODEL_DIR / f"{UNIT_NAME}_Atlas.fbx"
 TEXTURE_DIR = MODEL_DIR / "Textures"
+SOCKET_POSITIONS = {
+    "Socket_MuzzlePrimary": (0.0, 3.04, 1.5),
+    "Socket_TurretPivot": (0.0, 1.0, 1.2),
+    "Socket_TurretPitch": (0.0, 1.5, 1.4),
+    "Socket_RecoilPrimary": (0.0, 2.5, 1.5),
+    "Socket_DamageSmoke": (0.0, -1.0, 1.5),
+    "Socket_DamageFire": (0.0, -0.5, 1.2),
+    "Socket_GroundCenter": (0.0, 0.0, 0.0),
+    "Socket_GroundContact": (0.0, 0.0, 0.0),
+    "Socket_EngineAudio": (0.0, -1.2, 0.8),
+    "Socket_WeaponAudio": (0.0, 3.04, 1.5),
+}
+SOCKET_POSITIONS.update(get_canonical_hardpoint_socket_positions(UNIT_NAME))
 
 
 def _validate_root_motion(armature, walk_action):
@@ -40,19 +57,8 @@ _validate_rigid_weights = validate_rigid_weights
 
 
 def _create_sockets():
-    socket_defs = {
-        "Socket_MuzzlePrimary": (0.0, 3.04, 1.5),
-        "Socket_TurretPivot": (0.0, 1.0, 1.2),
-        "Socket_TurretPitch": (0.0, 1.5, 1.4),
-        "Socket_RecoilPrimary": (0.0, 2.5, 1.5),
-        "Socket_DamageSmoke": (0.0, -1.0, 1.5),
-        "Socket_DamageFire": (0.0, -0.5, 1.2),
-        "Socket_GroundCenter": (0.0, 0.0, 0.0),
-        "Socket_GroundContact": (0.0, 0.0, 0.0),
-        "Socket_EngineAudio": (0.0, -1.2, 0.8),
-        "Socket_WeaponAudio": (0.0, 3.04, 1.5),
-    }
-    create_canonical_sockets(socket_defs)
+    create_canonical_hardpoint_sockets(UNIT_NAME)
+    create_canonical_sockets(SOCKET_POSITIONS)
 
 
 def build_model():
@@ -84,18 +90,7 @@ def build_model():
     _validate_root_motion(armature, actions["Walk"])
     _validate_rigid_weights(meshes, armature)
 
-    socket_positions = {
-        "Socket_MuzzlePrimary": Vector((0.0, 3.04, 1.5)),
-        "Socket_TurretPivot": Vector((0.0, 1.0, 1.2)),
-        "Socket_TurretPitch": Vector((0.0, 1.5, 1.4)),
-        "Socket_RecoilPrimary": Vector((0.0, 2.5, 1.5)),
-        "Socket_DamageSmoke": Vector((0.0, -1.0, 1.5)),
-        "Socket_DamageFire": Vector((0.0, -0.5, 1.2)),
-        "Socket_GroundCenter": Vector((0.0, 0.0, 0.0)),
-        "Socket_GroundContact": Vector((0.0, 0.0, 0.0)),
-        "Socket_EngineAudio": Vector((0.0, -1.2, 0.8)),
-        "Socket_WeaponAudio": Vector((0.0, 3.04, 1.5)),
-    }
+    socket_positions = {name: Vector(position) for name, position in SOCKET_POSITIONS.items()}
     for socket_name, location in socket_positions.items():
         socket = bpy.data.objects.get(socket_name)
         if socket is None or socket.type != "EMPTY":

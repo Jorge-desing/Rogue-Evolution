@@ -364,6 +364,92 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
+        /// <summary>
+        /// Regenerates the Level 1 visuals that currently back canonical Level 2
+        /// modules, without rebuilding or copying the sample AssetBundle snapshot.
+        /// </summary>
+        public static void RefreshCanonicalLevelOneVisuals()
+        {
+            try
+            {
+                if (!String.Equals(Application.unityVersion, RequiredUnityVersion, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Canonical Level 1 visuals require Unity " +
+                        RequiredUnityVersion + "; current Editor is " + Application.unityVersion + ".");
+                }
+
+                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                ValidateRiggedWalkerSources(projectRoot);
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+                string[] prefabPaths = { PrefabPath, BikePrefabPath, ColossusPrefabPath, SurgeArcTankPrefabPath };
+                string[] modelNames = { "SandlanceScout", "SkirmishStrikeBike", "ColossusSiegePlatform", "SurgeArcTank" };
+                for (int i = 0; i < prefabPaths.Length; i++)
+                {
+                    GameObject prefabContents = PrefabUtility.LoadPrefabContents(prefabPaths[i]);
+                    if (prefabContents == null)
+                    {
+                        throw new FileNotFoundException("Level 1 visual prefab could not be loaded: " + prefabPaths[i]);
+                    }
+
+                    try
+                    {
+                        Transform model = GetUniqueNamedTransform(prefabContents, modelNames[i] + "Model", true);
+                        int transformCountBefore = prefabContents.GetComponentsInChildren<Transform>(true).Length;
+                        VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, model.gameObject);
+                        int transformCountAfter = prefabContents.GetComponentsInChildren<Transform>(true).Length;
+                        if (transformCountAfter != transformCountBefore)
+                        {
+                            bool saved;
+                            PrefabUtility.SaveAsPrefabAsset(prefabContents, prefabPaths[i], out saved);
+                            if (!saved)
+                            {
+                                throw new InvalidOperationException("Unity could not save canonical hardpoint fallbacks to " + prefabPaths[i] + ".");
+                            }
+                            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, prefabPaths[i])));
+                        }
+
+                        ValidateCanonicalModuleHardpoints(prefabContents, prefabPaths[i]);
+                    }
+                    finally
+                    {
+                        PrefabUtility.UnloadPrefabContents(prefabContents);
+                    }
+                }
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+                Debug.Log("[CanonicalLevelOneVisuals] Refreshed " + prefabPaths.Length +
+                    " Level 1 prefab hierarchies and validated four unique canonical hardpoints on each; existing animator and visual hierarchies were preserved.");
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(0);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(1);
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Canonical Level 1 refresh failed", exception.Message, "OK");
+                }
+            }
+        }
+
+        private static void ValidateCanonicalModuleHardpoints(GameObject prefab, string prefabPath)
+        {
+            string[] slots = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            for (int i = 0; i < slots.Length; i++)
+            {
+                GetUniqueNamedTransform(prefab, "Socket_Hardpoint_" + slots[i], true);
+            }
+            Debug.Log("[CanonicalLevelOneVisuals] Validated " + prefabPath + ".");
+        }
+
         // Targeted recovery/build entry point. This consumes already-authored prefabs and
         // cards without invoking any model, material, animation, or prefab scaffolding.
         public static void BuildBastionBundleFromExistingAssets()
@@ -2089,6 +2175,7 @@ namespace RogueCommandExpansion.Authoring
 
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 EnsureTurretAndRadarSockets(root, modelInstance, hasTurretOrRadar);
+                VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(root, modelInstance);
                 EnsureCanonicalWalkerSockets(root, modelInstance, rapidFireMuzzle, quadrupedCrawler, requireFootContactSockets);
                 if (configureAdditionalComponents != null)
                 {

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build the 35 Level 2 hardpoint modules from the canonical pack declarations.
+"""Build declared Level 2 hardpoint modules from the canonical pack declarations.
 
 Run with the repository's pinned Blender 4.5.14 executable. The source chassis
 blend files are read only; this script writes one new module source blend, its
-35 visual-only FBXs, and a manifest used by the Unity prefab/AssetBundle builder.
+visual-only FBXs, and a manifest used by the Unity prefab/AssetBundle builder.
 """
 
 from __future__ import annotations
@@ -33,10 +33,12 @@ MODULE_ASSET_ROOT = "Assets/RogueCommandExpansionSample/VisualModules"
 MODULE_FBX_ROOT = MODULE_ASSET_ROOT + "/Source"
 MODULE_PREFAB_ROOT = MODULE_ASSET_ROOT + "/Prefabs"
 MANIFEST_PATH = ROOT / "content" / "source-art" / "canonical-visual-modules.json"
+ROLE_REGISTRY_PATH = ROOT / "content" / "source-art" / "canonical-visual-module-roles.json"
 ACTIVE_PACKS = (
     "sample-native-expansion",
     "tactical-operations",
 )
+CANONICAL_SLOTS = {"ERA", "APS", "Sponsons", "FuelDrums"}
 
 
 def load_presets() -> dict[str, dict[str, Any]]:
@@ -68,22 +70,29 @@ def resolve_preset(variant_id: str, unit_profile: Any) -> str:
     raise ValueError(f"No registered Material Maker preset matches Level 2 variant {variant_id!r}")
 
 
-def choose_slot(preset: str) -> str:
-    name = normalized(preset)
-    if any(token in name for token in ("minefield", "ordnance-carrier", "fuel-shroud")):
-        return "FuelDrums"
-    if any(token in name for token in (
-        "radar", "phased-array", "magnetic-shield", "void-composite", "nanoweave",
-        "sniper-camo", "radiation-shield",
-    )):
-        return "APS"
-    if any(token in name for token in (
-        "radiator", "reactor", "conduit", "thruster", "hyperdrive", "containment",
-        "singularity", "borer", "repair", "industrial", "docking", "heavy-flak",
-        "salvage-reclamation",
-    )):
-        return "Sponsons"
-    return "ERA"
+def load_visual_engineering_roles() -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str], str]]:
+    registry = json.loads(ROLE_REGISTRY_PATH.read_text(encoding="utf-8"))
+    definitions = registry.get("roleDefinitions")
+    rows = registry.get("variantRoles")
+    if not isinstance(definitions, dict) or not isinstance(rows, list):
+        raise ValueError(f"Visual engineering role registry is incomplete: {ROLE_REGISTRY_PATH}")
+
+    roles_by_variant_slot: dict[tuple[str, str], str] = {}
+    for row in rows:
+        variant_id = row.get("variantId")
+        slot_id = row.get("slotId")
+        role = row.get("visualEngineeringRole")
+        if not variant_id or slot_id not in CANONICAL_SLOTS or role not in definitions:
+            raise ValueError(f"Invalid visual engineering role declaration: {row}")
+        key = (variant_id, slot_id)
+        if key in roles_by_variant_slot:
+            raise ValueError(f"Duplicate visual engineering role declaration: {variant_id} at {slot_id}")
+        allowed_slots = definitions[role].get("allowedSlots") or []
+        if slot_id not in allowed_slots:
+            raise ValueError(f"Role {role!r} cannot mount at {slot_id!r}: {variant_id}")
+        roles_by_variant_slot[key] = role
+
+    return definitions, roles_by_variant_slot
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,6 +103,8 @@ def parse_args() -> argparse.Namespace:
 
 def read_module_entries() -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
+    role_definitions, roles_by_variant_slot = load_visual_engineering_roles()
+    seen_roles: set[tuple[str, str]] = set()
     for pack_name in ACTIVE_PACKS:
         pack_path = ROOT / "content" / "packs" / pack_name / "content.json"
         pack = json.loads(pack_path.read_text(encoding="utf-8"))
@@ -110,44 +121,76 @@ def read_module_entries() -> list[dict[str, Any]]:
                     if variant.get("modules"):
                         raise ValueError(f"Level 1 primary variant cannot author modules: {variant['id']}")
                     continue
-
+                module_declarations = variant.get("modules") or []
+                if not isinstance(module_declarations, list):
+                    raise ValueError(f"Level 2 modules must be an array: {variant['id']}")
                 preset = resolve_preset(variant["id"], profile)
                 if preset not in PRESETS:
                     raise ValueError(f"Unknown Material Maker preset {preset!r} for {variant['id']}")
-                unit_slug = unit_id.split(":", 1)[1].replace("-", "_")
-                module_name = f"RCLModule_{unit_slug}_{preset}"
-                fbx_path = f"{MODULE_FBX_ROOT}/{module_name}.fbx"
-                prefab_path = f"{MODULE_PREFAB_ROOT}/{module_name}.prefab"
-                fbx_file_path = f"unity/RogueCommandAssetAuthoring/{fbx_path}"
-                bundle_id = unit.get("assetBundleId")
-                bundle_name = bundle_map.get(bundle_id)
-                if not bundle_name:
-                    raise ValueError(f"Unit {unit_id} lacks a declared bundle for module {variant['id']}")
-                entries.append({
-                    "moduleName": module_name,
-                    "packName": pack_name,
-                    "packId": pack_id,
-                    "unitId": unit_id,
-                    "variantId": variant["id"],
-                    "level": 2,
-                    "preset": preset,
-                    "slotId": choose_slot(preset),
-                    "assetBundleId": bundle_id,
-                    "assetBundleName": bundle_name,
-                    "fbxAssetPath": fbx_path,
-                    "fbxFilePath": fbx_file_path,
-                    "prefabAssetPath": prefab_path,
-                    # Unity serializes AssetBundle container keys in lowercase;
-                    # runtime LoadAsset and bundle-reference validation use that exact key.
-                    "assetName": prefab_path.lower(),
-                    "texturePrefix": f"RCLModule_{preset}",
-                })
+
+                for module_index, declaration in enumerate(module_declarations):
+                    if not isinstance(declaration, dict):
+                        raise ValueError(f"Invalid module declaration {module_index} on {variant['id']}")
+                    slot_id = declaration.get("slotId")
+                    asset_name = declaration.get("assetName")
+                    if slot_id not in CANONICAL_SLOTS or not asset_name:
+                        raise ValueError(f"Level 2 module requires a canonical slot and assetName: {variant['id']}")
+                    role_key = (variant["id"], slot_id)
+                    visual_role = roles_by_variant_slot.get(role_key)
+                    if visual_role is None:
+                        raise ValueError(f"No explicit visual engineering role for {variant['id']} at {slot_id}")
+                    seen_roles.add(role_key)
+
+                    unit_slug = unit_id.split(":", 1)[1].replace("-", "_")
+                    module_suffix = f"_{slot_id.lower()}" if len(module_declarations) > 1 else ""
+                    module_name = f"RCLModule_{unit_slug}_{preset}{module_suffix}"
+                    fbx_path = f"{MODULE_FBX_ROOT}/{module_name}.fbx"
+                    prefab_path = f"{MODULE_PREFAB_ROOT}/{module_name}.prefab"
+                    fbx_file_path = f"unity/RogueCommandAssetAuthoring/{fbx_path}"
+                    expected_asset_name = prefab_path.lower()
+                    if asset_name.casefold() != expected_asset_name.casefold():
+                        raise ValueError(
+                            f"Declared Level 2 assetName must match the generated module path for "
+                            f"{variant['id']} at {slot_id}: {asset_name!r} != {expected_asset_name!r}"
+                        )
+
+                    bundle_id = unit.get("assetBundleId")
+                    bundle_name = bundle_map.get(bundle_id)
+                    if not bundle_name:
+                        raise ValueError(f"Unit {unit_id} lacks a declared bundle for module {variant['id']}")
+                    entries.append({
+                        "moduleName": module_name,
+                        "packName": pack_name,
+                        "packId": pack_id,
+                        "unitId": unit_id,
+                        "variantId": variant["id"],
+                        "level": 2,
+                        "preset": preset,
+                        "slotId": slot_id,
+                        "visualEngineeringRole": visual_role,
+                        "assetBundleId": bundle_id,
+                        "assetBundleName": bundle_name,
+                        "fbxAssetPath": fbx_path,
+                        "fbxFilePath": fbx_file_path,
+                        "prefabAssetPath": prefab_path,
+                        # Unity serializes AssetBundle container keys in lowercase;
+                        # runtime LoadAsset and bundle-reference validation use that exact key.
+                        "assetName": expected_asset_name,
+                        "texturePrefix": f"RCLModule_{preset}",
+                    })
 
     names = [entry["moduleName"].casefold() for entry in entries]
-    if len(entries) != 35:
-        raise ValueError(f"Expected 35 Level 2 visual modules for 53 variants, found {len(entries)}")
+    missing_roles = sorted(set(roles_by_variant_slot) - seen_roles)
+    if missing_roles:
+        raise ValueError(f"Visual engineering roles do not match declared pack modules; unused roles: {missing_roles}")
+    if not entries:
+        raise ValueError("The active packs declare no Level 2 visual modules")
     if len(names) != len(set(names)):
         raise ValueError("Canonical visual module names must be unique across both active packs")
+    for entry in entries:
+        role = entry["visualEngineeringRole"]
+        if not role_definitions[role].get("visibleAssembly"):
+            raise ValueError(f"Visual engineering role lacks a form description: {role}")
     return entries
 
 
@@ -205,7 +248,7 @@ def build_aps_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: A
                                   major_radius=0.19 + (seed % 3) * 0.012,
                                   minor_radius=0.018, material=gunmetal,
                                   rotation=(0.0, 0.0, 0.0), major_segments=16, minor_segments=6))
-    if "magnetic-shield" in normalized(entry["preset"]) or "phased-array" in normalized(entry["preset"]):
+    if entry["visualEngineeringRole"] == "aps_magnetic_shield":
         for y in (-0.17, 0.17):
             objects.append(rmk.make_box(prefix + f"_ArrayFacet_{'A' if y < 0 else 'B'}",
                                         (0.11, 0.06, 0.13), (side * 0.25, y, 0.08), accent, bevel=0.008))
@@ -214,7 +257,7 @@ def build_aps_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: A
 
 def build_fuel_or_ordnance_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int) -> list[bpy.types.Object]:
     prefix = entry["moduleName"]
-    preset = normalized(entry["preset"])
+    role = entry["visualEngineeringRole"]
     radius = 0.16 + (seed % 3) * 0.018
     objects = rmk.make_aux_fuel_drums(prefix, (0.0, 0.0, 0.0),
                                       rear_width=0.78 + (seed % 2) * 0.12,
@@ -223,7 +266,7 @@ def build_fuel_or_ordnance_module(entry: dict[str, Any], armor: Any, gunmetal: A
                                       drum_mat=armor, mount_mat=gunmetal, strap_mat=accent)
     objects.append(rmk.make_box(prefix + "_TwinDrumCarrier", (0.92, 0.24, 0.30),
                                 (0.0, 0.0, -radius * 0.80), gunmetal, bevel=0.035))
-    if "ordnance-carrier" in preset or "minefield" in preset:
+    if role == "ordnance_carrier":
         for index in range(3):
             y = -0.22 + index * 0.22
             objects.append(rmk.make_cylinder(prefix + f"_SealedOrdnanceCanister_{index + 1}",
@@ -263,29 +306,32 @@ def build_drill_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent:
     return objects
 
 
-def build_power_or_radiator_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int) -> list[bpy.types.Object]:
+def build_engineering_sponson_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int) -> list[bpy.types.Object]:
     prefix = entry["moduleName"]
-    preset = normalized(entry["preset"])
-    if "repair" in preset or "chitin" in preset:
+    role = entry["visualEngineeringRole"]
+    if role == "repair_dispenser":
         return rmk.make_nanite_repair_dispenser_assembly(
             prefix, (0.0, 0.0, 0.0), scale=0.62,
             canister_radius=0.14, canister_height=0.40 + (seed % 2) * 0.05,
             spacing_x=0.60, canister_mat=armor, frame_mat=gunmetal,
             glow_mat=accent, hose_mat=gunmetal,
         )
-    if "radiator" in preset or "thruster" in preset or "solar" in preset:
+    if role == "thermal_radiator":
         return rmk.make_thermal_radiator_assembly(
             prefix, hull_length=0.92, hull_width=0.82,
             deck_z=0.0, fin_count=5 + seed % 3,
             housing_mat=armor, fin_mat=gunmetal, glow_mat=accent, pipe_mat=gunmetal,
         )
-    if "heavy-flak" in preset:
+    if role == "heavy_flak_battery":
         return rmk.make_quad_flak_autocannon_assembly(
             prefix, (0.0, 0.0, 0.02), direction=(0.0, 1.0, 0.08),
             barrel_length=0.62, caliber_radius=0.032,
             spacing_x=0.22, spacing_z=0.18,
             cradle_mat=armor, barrel_mat=gunmetal, mag_mat=gunmetal, accent_mat=accent,
         )
+
+    if role != "power_containment":
+        raise ValueError(f"Unsupported engineering sponson role {role!r} for {entry['variantId']}")
 
     base = rmk.make_box(prefix + "_PowerCellArmorCase", (0.68, 0.62, 0.46),
                         (0.0, -0.02, 0.0), armor, bevel=0.05)
@@ -311,8 +357,8 @@ def build_power_or_radiator_module(entry: dict[str, Any], armor: Any, gunmetal: 
 
 def build_utility_sponson_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int) -> list[bpy.types.Object]:
     prefix = entry["moduleName"]
-    preset = normalized(entry["preset"])
-    if "docking" in preset:
+    role = entry["visualEngineeringRole"]
+    if role == "docking_clamp":
         objects = [rmk.make_box(prefix + "_ClampRoot", (0.62, 0.48, 0.36), (0.0, 0.0, 0.0), armor, bevel=0.035)]
         for side in (-1.0, 1.0):
             tag = "L" if side < 0 else "R"
@@ -324,6 +370,9 @@ def build_utility_sponson_module(entry: dict[str, Any], armor: Any, gunmetal: An
                                              (side * 0.45, 0.34, 0.08), accent,
                                              rotation=(0.0, math.pi / 2.0, 0.0), vertices=10, bevel=0.004))
         return objects
+
+    if role != "utility_sponson":
+        raise ValueError(f"Unsupported utility sponson role {role!r} for {entry['variantId']}")
 
     objects = rmk.make_side_sponson_assembly(
         prefix, (0.0, 0.0, 0.0), side=1,
@@ -341,23 +390,21 @@ def build_utility_sponson_module(entry: dict[str, Any], armor: Any, gunmetal: An
 
 def build_module_geometry(entry: dict[str, Any], seed: int) -> tuple[list[bpy.types.Object], list[bpy.types.Material]]:
     armor, gunmetal, accent = make_materials(entry)
-    slot = entry["slotId"]
-    preset = normalized(entry["preset"])
-    if slot == "ERA":
+    role = entry["visualEngineeringRole"]
+    if role == "armor_cassette":
         objects = build_armor_module(entry, armor, gunmetal, accent, seed)
-    elif slot == "APS":
+    elif role in ("aps_sensor_suite", "aps_magnetic_shield"):
         objects = build_aps_module(entry, armor, gunmetal, accent, seed)
-    elif slot == "FuelDrums":
+    elif role in ("fuel_drum_pair", "ordnance_carrier"):
         objects = build_fuel_or_ordnance_module(entry, armor, gunmetal, accent, seed)
-    elif "borer" in preset:
+    elif role == "excavation_drill":
         objects = build_drill_module(entry, armor, gunmetal, accent, seed)
-    elif any(token in preset for token in (
-        "radiator", "thruster", "solar", "repair", "chitin", "heavy-flak",
-        "conduit", "reactor", "hyperdrive", "containment", "singularity", "arc-discharge",
-    )):
-        objects = build_power_or_radiator_module(entry, armor, gunmetal, accent, seed)
-    else:
+    elif role in ("thermal_radiator", "heavy_flak_battery", "repair_dispenser", "power_containment"):
+        objects = build_engineering_sponson_module(entry, armor, gunmetal, accent, seed)
+    elif role in ("docking_clamp", "utility_sponson"):
         objects = build_utility_sponson_module(entry, armor, gunmetal, accent, seed)
+    else:
+        raise ValueError(f"No geometry builder registered for visual engineering role {role!r}")
 
     return objects, [armor]
 
@@ -433,11 +480,13 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         if not fbx_path.is_file() or fbx_path.stat().st_size <= 0:
             raise RuntimeError(f"Blender did not export a non-empty FBX: {fbx_path}")
 
+    role_registry = json.loads(ROLE_REGISTRY_PATH.read_text(encoding="utf-8"))
     manifest = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "sourceBlend": SOURCE_BLEND.relative_to(ROOT).as_posix(),
         "level1Authority": "Existing unit chassis geometry, functional hierarchy, rig, pivots, canonical sockets, LOD and PBR atlas.",
         "level2Contract": "Each listed GameObject is visual-only geometry attached to exactly one canonical hardpoint group; no gameplay components or balance changes.",
+        "visualEngineeringRoleContract": role_registry.get("scope", ""),
         "modules": entries,
     }
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)

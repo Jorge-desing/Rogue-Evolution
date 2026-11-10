@@ -16,6 +16,7 @@ PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "sandlance-scout.png"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import RogueModelKit as modelkit
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 
 
 def clear_scene():
@@ -297,6 +298,7 @@ def main():
         wear_level="field_tested",
         structural_wear_mask=True,
     )
+    hardpoint_sockets = create_canonical_hardpoint_sockets("SandlanceScout")
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
@@ -304,7 +306,7 @@ def main():
         armor: "armor", armor_light: "lightArmor", tread: "tread", wheel: "wheel",
         gunmetal: "gunmetal", amber: "amber", sensor: "sensor"
     })
-    modelkit.export_unity_fbx(FBX_PATH, batched_objects)
+    modelkit.export_unity_fbx(FBX_PATH, batched_objects + hardpoint_sockets, include_empties=True)
     print("Created source model: {0}".format(BLEND_PATH))
     print("Created Unity model: {0}".format(FBX_PATH))
     print("Created preview: {0}".format(PREVIEW_PATH))

@@ -25,6 +25,7 @@ import bpy
 from mathutils import Vector
 import RogueModelKit as rmk
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 
 
 # Target paths (customize for your unit)
@@ -349,6 +350,7 @@ def build_colossus_siege_model():
         wear_level="field_tested",
         structural_wear_mask=True,
     )
+    hardpoint_sockets = create_canonical_hardpoint_sockets("ColossusSiegePlatform")
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
@@ -362,7 +364,7 @@ def build_colossus_siege_model():
         warning_amber: "amber",
         sensor_cyan: "sensor",
     })
-    rmk.export_unity_fbx(FBX_PATH, export_batches)
+    rmk.export_unity_fbx(FBX_PATH, export_batches + hardpoint_sockets, include_empties=True)
 
     print(f"Created source model: {BLEND_PATH}")
     print(f"Created Unity model: {FBX_PATH}")
