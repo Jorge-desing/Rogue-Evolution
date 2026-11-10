@@ -91,12 +91,30 @@ These assemblies are repeatable starting forms. A faceted housing or wedge hull 
 
 | Generator Function | Primary Parameters | Geometric Features & Chamfers |
 |---|---|---|
+| `make_lofted_superellipse_shell` | `stations`, `axis`, `segments`, `exponent`, `smooth` | Profiled armor/cabin/body shell with tapered sections; use shape stations to create shoulders, formed covers, or sloped noses instead of visible primitive stacks |
 | `make_sloped_glacis_hull` | `length_front`, `length_rear`, `width_front`, `width_rear`, `height_lower`, `height_upper`, `bevel=0.045` | Armored wedge chassis, sloped frontal glacis, undercut belly clearance, tapered sponson flanks |
 | `make_faceted_turret_housing` | `location`, `size=(x,y,z)`, `armor_mat`, `roof_mat`, `bevel=0.035` | Octagonal faceted turret shell, sloped gun mantlet cradle, rear bustle counterweight |
 | `make_troop_compartment` | `location`, `size`, `armor_mat`, `door_mat`, `detail_mat` | Armored personnel cabin, rear clamshell access doors with grab handles, roof commander cupola |
 | `make_tubular_rollcage_assembly` | `size`, `location`, `bar_radius=0.034`, `tube_mat`, `roof_mat`, `visor_mat` | Welded tubular roll cage, A/B pillars, cross-header bar, diagonal C-stays, armored sun visor plate |
 
 ```python
+# Profile a body from rear to front. Each Y-axis station is
+# (y, center_x, center_z, half_width, half_height).
+hull_shell = rmk.make_lofted_superellipse_shell(
+    name="Vehicle_HullShell",
+    stations=[
+        (-1.35, 0.0, 0.48, 0.48, 0.24),
+        (-1.12, 0.0, 0.50, 0.64, 0.29),
+        (0.70, 0.0, 0.50, 0.62, 0.29),
+        (1.12, 0.0, 0.43, 0.42, 0.20),
+    ],
+    material=armor_primary,
+    axis="Y",
+    segments=24,
+    exponent=0.72,
+    smooth=False,
+)
+
 # Chassis and superstructure construction pattern
 hull = rmk.make_sloped_glacis_hull(
     name="Vehicle_Hull", length_front=1.45, length_rear=1.40,
@@ -267,9 +285,9 @@ optimized_objects = rmk.batch_and_join_by_material(
   - *Export & Unity URP Alignment:*
     - FBX Export: `mesh_smooth_type="FACE"`, `use_mesh_modifiers=True`, `bake_space_transform=False`.
     - Unity Import: `Normals = Import`, `Normal Generation = MikkTSpace`, `Tangents = Calculate MikkTSpace`.
-- **Integrated FOSS Ecosystem:**
-  - *DreamUV:* Viewport trim sheet alignment (`Shift + D`) for modular factory panels and catwalks.
-  - *BagaPie Free / JMesh:* Geometry Nodes-based parametric pipes, cables, and non-destructive boolean cuts.
+- **Optional Blender Add-ons:**
+  - Third-party UV, procedural-geometry, or hard-surface add-ons are optional. Verify license, Blender 4.5.14 compatibility, install path, and reproducible export before using them in a project workflow.
+  - Prefer the pinned repository helpers and Blender built-ins for the production baseline. Add-ons must not change the authored hierarchy, sockets, UV contract, mesh Color RGBA, or export settings.
 - **Batching Estimate**: The authoring report estimates fewer mesh/material groups after batching; confirm actual draw calls in Unity with the selected prefab source and rendering settings.
 - **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
 
@@ -357,13 +375,13 @@ Inspects model boundaries, ground contact, vertex counts, and material coverage 
 diagnostics = rmk.validate_model_mesh_quality(model_objects)
 # Verifies:
 # - Ground contact: -0.02m <= Z_min <= 0.08m
-# - Polycount: typically 1,500 to 5,000 polygons
+# - Face count, export triangle count, bounds, contact, and material assignment
 # - Material slots: zero unassigned faces or missing materials
 
 profile = rmk.profile_model_budget_and_drawcalls(
     model_objects,
     prefix="Colossus",
-    target_budget=4500
+    target_budget=7500
 )
 # Outputs detailed subsystem triangle distribution & budget health
 ```

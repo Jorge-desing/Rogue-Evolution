@@ -1,6 +1,6 @@
 # Rogue Command 3D Model Authoring — Technical Architecture & Enhancements
 
-**Updated:** 2026-10-18  
+**Updated:** 2026-11-10
 **Repository:** Mod Rogue Command  
 **Applies to:** `.agents/skills/rogue-command-3d-model-authoring`, `tools/RogueModelKit.py`, `tools/generate_unit_model.py`  
 **Tooling Baseline:** Blender 4.5.14 LTS (pinned in `.tools/Blender-4.5.14/`), Unity 2021.3.45f2 (pinned in `unity/RogueCommandAssetAuthoring/`)
@@ -44,59 +44,39 @@ bpy.ops.export_scene.fbx(
 
 ## 2. Art Direction & The 3-Tier RTS Visual Hierarchy
 
-Assets are viewed from an elevated orthographic/isometric camera ($45^\circ - 60^\circ$ pitch) at 30–120 pixel heights. Keep the macro silhouette easy to parse, but refine generated blockouts so visible hulls and housings do not read as unmodified boxes or disconnected primitives. Use tapered profiles, compound transitions, plausible panel thickness, and restrained curvature on cast or formed components. Keep planar facets when they describe armor construction.
+Target grounded, stylized military sci-fi realism: original silhouettes, believable mass, connected mechanisms, and surfaces that communicate their construction while remaining readable from the elevated RTS camera. The 30–120 pixel review range is an internal heuristic; check the actual game camera and unit size before accepting detail.
 
-```
-+-------------------------------------------------------------------------+
-| TIER 1: Macro Silhouette (65% of visual read)                           |
-| - Bold volume, aspect ratio, stance, ground clearance                   |
-| - Must pass the "Squint Test" in < 250ms at 50px rendering              |
-+-------------------------------------------------------------------------+
-                                    |
-                                    v
-+-------------------------------------------------------------------------+
-| TIER 2: Meso Mechanical Construction (25% of visual read)               |
-| - Hull transitions, suspension, weapon mounts, cooling, and access      |
-| - Explains how the vehicle is built and operated                        |
-+-------------------------------------------------------------------------+
-                                    |
-                                    v
-+-------------------------------------------------------------------------+
-| TIER 3: Micro High-Contrast Accents (10% of visual read)                |
-| - Recessed emissive optics, hazard stripes, whip antennas, rivets       |
-| - Catches specular highlights and guides player combat focus            |
-+-------------------------------------------------------------------------+
-```
+- **Tier 1 — Macro silhouette and stance:** role, mobility, proportion, weapon placement, ground clearance.
+- **Tier 2 — Meso construction:** hull transitions, joints, support paths, cooling, access.
+- **Tier 3 — Micro cues:** selective seams, optics, labels, wear, and service detail.
+
+Use this hierarchy as a composition aid, not as a fixed percentage target. Generate a functional blockout first, then refine the visible primary shells. Replace primitive stacks where they define a whole body; retain boxes, cylinders, and rods when they are appropriate plates, axles, barrels, joints, tanks, or supports. Use broad facets for fabricated armor, controlled curvature for cast or formed parts, and purposeful asymmetry where it supports the role.
 
 ### The 4 Core Visual Rules
-1. **The Squint Test**: Zooming out the Blender viewport until the model is 50 pixels tall must clearly communicate archetype, role, and heading within 250 ms.
-2. **Scale-Aware Edge Treatment**: Do not apply a universal bevel to every edge. Use a crisp 1-segment chamfer for a deliberately cut or protected plate edge; use 2–4 segments for a visible rolled radius on cast or formed parts. Scale the width to the part, keep broad armor planes clean, and review the shading in neutral grazing light. A bevel must describe construction and catch light without making the panels look inflated.
-3. **Smart Angle Smoothing**: Cylindrical parts (barrels, wheels, exhausts) use `bpy.ops.object.shade_smooth_by_angle(angle=math.radians(38.0))`, keeping chamfers sharp while smoothing round surfaces without edge-split modifiers.
-4. **Recessed Emissive Optics**: Sensor glass and headlamps are recessed inside armored brow hoods and assigned real-time emissive materials (`_EMISSION` keyword with HDR multipliers 1.5×–2.5×) that pierce the post-processing bloom filter.
+
+1. **Silhouette gate**: Compare a black silhouette from the elevated gameplay view and front/side/top. Test at actual on-screen sizes and distinguish the unit from neighboring classes before adding micro-detail.
+2. **Scale-aware edge treatment**: Choose bevel width and segments for the part and its visible radius. Use crisp chamfers for plate breaks and rounded transitions only where a formed or cast part calls for them; do not bevel every edge uniformly.
+3. **Per-surface shading**: Flat-shade deliberate armor facets and smooth curved surfaces by intent. Authored normals and weighted normals stabilize a modeled form; they do not repair a weak silhouette or justify smoothing every armor boundary.
+4. **Functional detail**: Connect visible equipment to its support and clearance. Recess optics where the housing allows it, and keep emissive regions legible without relying on unverified renderer or bloom assumptions.
+
+These project rules adapt public hard-surface and RTS art guidance; numeric view sizes and composition ratios are local heuristics, not published industry standards.
 
 ---
+## 3. Palette and PBR Material Cues
 
-## 3. The 5-Tone Material Palette Standard
+There is no fixed five-tone count, coverage ratio, or universal metallic/smoothness value. Separate armor, machinery, rubber, optics, and warning accents through role-appropriate color and material response. Tune values for the unit, atlas, and gameplay lighting; consult the live generator and PBR preset registry for current names.
 
-Vehicles adhere to a disciplined 5-tone structural palette designed for maximum visual separation:
+| Material role | Visual cue |
+|---|---|
+| Armor | Faction color and broad readable panel groups |
+| Machinery | Dark alloy or exposed metal at joints, axles, actuators, and weapon housings |
+| Rubber / flexible parts | Low-metal response on tires, pads, seals, and gaiters |
+| Warning accents | Localized safety markings or unit identification |
+| Optics / energy | Small, controlled emissive regions |
 
-| Material Role | Proportion | Surface Description | Metallic | Smoothness | Emission |
-|---|---|---|---|---|---|
-| **Primary Armor** | 40–45% | Main hull plates, sponsons, lower chassis | 0.35–0.45 | 0.60–0.65 | None |
-| **Light Armor** | 20–25% | Turret cheeks, upper deck, hatch covers | 0.30–0.35 | 0.58–0.62 | None |
-| **Mechanical Gunmetal** | 15–20% | Cannon barrels, roll bars, suspension, axles | 0.74–0.80 | 0.68–0.75 | None |
-| **Tread / Rubber** | 10–15% | Track shoes, road wheels, tire rubber | 0.08–0.18 | 0.28–0.34 | None |
-| **Warning Accent** | 3–5% | High-contrast identification stripes, battery rails | 0.16–0.20 | 0.60–0.65 | None |
-| **Emissive Tech/Optics** | 1–3% | Sensor lenses, headlamps, arc discharge rings | 0.15–0.25 | 0.75–0.85 | **HDR ×1.5–2.5** |
-
-### Standard Faction Color Palettes
-- **Vanguard (Industrial Olive / Tan)**: Primary `#4A5340`, Light `#7D8471`, Accent `#D9822B`
-- **Siege (Heavy Crimson / Charcoal)**: Primary `#6B2D2D`, Light `#994D4D`, Accent `#E5A823`
-- **Arctic (Sub-Zero White / Steel Blue)**: Primary `#D6DEE5`, Light `#A3B5C4`, Accent `#2980B9`
-- **Syndicate (High-Tech Carbon / Gold)**: Primary `#2C3E50`, Light `#4A627A`, Accent `#F1C40F`
+Camouflage and procedural variation should reinforce the armor layout and unit identity. Do not allow noise, high-contrast markings, or emissive regions to erase the macro silhouette.
 
 ---
-
 ## 4. Master Roster: The 24 Tactical Archetypes & 13 Weapons
 
 | Archetype | Native Template | Proportions (W × L × H) | Stance / Mobility | Default Weapon | Rig Architecture | Signature Visual Features |
@@ -654,7 +634,7 @@ dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
 The local art direction now uses a source-backed, camera-first review sequence. These sources inform the workflow; Rogue Command's own style, face budget, shader, and export contracts remain authoritative.
 
 - **RTS silhouette before surface detail**: PlaySide's *Age of Darkness* art director describes prioritizing silhouettes from the gameplay camera and removing micro-detail that adds noise. Blizzard's *StarCraft* retrospective describes testing tiny renders and selectively widening/thickening features that failed to read. Adaptation: test each unit as a black silhouette at the elevated game view; exaggerate only role-defining parts that disappear at the local 30–120 px review scale. [PlaySide interview](https://www.unrealengine.com/developer-interviews/age-of-darkness-is-an-rts-that-throws-thousands-of-undead-monsters-at-you), [Blizzard retrospective](https://news.blizzard.com/en-us/article/20719767/rock-and-roll-days-of-starcraft-a-development-retrospective).
-- **Reference-led hard-surface refinement**: Blender Studio's modeling guide and Blender's bevel documentation support a staged workflow that starts from references and blockout, then applies edge geometry selectively. Adaptation: treat RogueModelKit outputs as functional blockouts, shape the primary shells, and spend segments only on the silhouette or highlights that need them. Weighted normals improve shading but do not change the outline. [Blender Studio guide](https://studio.blender.org/tools/artist-guide/asset-creation/modeling), [Bevel Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/generate/bevel.html), [Weighted Normal Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/normals/weighted_normal.html).
+- **Reference-led hard-surface refinement**: Blender Studio's modeling guide and Blender's bevel documentation support a staged workflow that starts from references and blockout, then applies edge geometry selectively. Adaptation: treat RogueModelKit outputs as functional blockouts, shape the primary shells, and spend segments only on the silhouette or highlights that need them. Weighted normals improve shading but do not change the outline. [Blender Studio guide](https://studio.blender.org/tools/pipeline-overview/asset-creation/modeling), [Bevel Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/generate/bevel.html), [Weighted Normal Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/normals/weighted_normal.html).
 - **Shading and runtime budgets**: Unity 2021.3 supports importing authored normals and tangents, warns that a single smoothing angle can smooth some edges incorrectly, and describes LOD as reducing triangles for distant objects. The current 7,500-face profile target is a project-specific LOD0 budget, not an official Unity limit or a quota. Record Blender faces and Unity-exported triangles separately. [Unity FBX Model Importer](https://docs.unity3d.com/2021.3/Documentation/Manual/FBXImporter-Model.html), [Unity LOD](https://docs.unity3d.com/2021.3/Documentation/Manual/LevelOfDetail.html).
 - **Baked surface relief**: Blender's bake workflow and URP's Lit material documentation support transferring fine normal detail to a lower-detail mesh. Adaptation: bake into the existing Normal atlas only after UVs stabilize, and preserve MetallicGloss R/A, texture import settings, and mesh vertex-wear RGBA. [Blender Cycles baking](https://docs.blender.org/manual/en/4.5/render/cycles/baking.html), [URP 12.1 Lit](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@12.1/manual/lit-shader.html).
 
@@ -700,7 +680,9 @@ VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents adds (idempotently) Fi
 
 ## 25. Hard-Surface Realism & Anti-Primitive Architectural Overhaul (local build/validation evidence)
 
-To eliminate the visible appearance of disconnected geometric primitives ("figuras geométricas unidas") and achieve grounded military sci-fi realism, the procedural modeling pipeline has undergone a structural overhaul across `RogueModelKit.py` and `generate_unit_model.py`:
+This is a historical implementation inventory. The listed helpers do not guarantee that each generated asset is realistic or finished; Section 26 and the current authoring skill define the active silhouette, form, motion, and surface acceptance rules.
+
+To address disconnected primitive stacks, the procedural modeling pipeline added or updated construction helpers across `RogueModelKit.py` and `generate_unit_model.py`:
 
 - **Compound Faceted Ballistic Turret Architecture (`make_faceted_turret_housing`)**:
   - Replaces raw 3-box stacking with a 16-vertex monocoque kinetic turret shell:
@@ -721,6 +703,8 @@ To eliminate the visible appearance of disconnected geometric primitives ("figur
 - **Sculpted Wheel Arch Fenders (`make_sculpted_wheel_fender_assembly` / `.add_wheel_fenders()`)**:
   - Contoured 3-segment arched wheel well fenders hugging all-terrain tires, with forward mudflap deflectors, rear splash guards, and outer chamfered flare skirts.
   - Deployed on `nanite_support_rover`, `tactical_relay_carrier`, `halftrack`, and wheeled variants.
+
+
 - **Transitional Mounting Coamings (`make_transitional_coaming_collar` / `.add_transitional_coaming()`)**:
   - Beveled perimeter mounting flanges bridging cabins, cowls, superstructures, hoppers, and equipment bays to chassis decks, eliminating unnatural computer-generated 90-degree knife-edge intersections.
   - Deployed across the full fleet: `super_heavy`, `siege_crawler`, `drone_carrier`, `combat_harvester`, `gravity_siege_breaker`, `mortar_carrier`, `mine_layer`, `recovery_crawler`, `bridge_layer`, `demolition_breacher`, `amphibious_assault_tank`, `ew_jammer`, `mobile_sam_launcher`, `command_hq_rig`, `buggy`, `bike`, `quad_mech`, `spider`, `hexapod_assault`, `plasma_mortar_strider`.
@@ -928,7 +912,7 @@ To banish floating track idlers, plain featureless sponsons, and flat turret fac
 
 ### Full Fleet & Active Unit Realism Rollout (Waves 11–13 Completed Integration)
 
-To establish complete realism across the entire vehicle catalog, all Wave 11–13 anti-primitive hard-surface assemblies are now integrated across **all 42 archetypes** in `generate_unit_model.py` and across **all 18 active pack units** in `ActiveUnitVisualEnhancements.py`:
+Wave 11–13 procedural assembly coverage now reaches **all 42 archetypes** in `generate_unit_model.py` and **all 18 active pack units** in `ActiveUnitVisualEnhancements.py`. These counts describe helper deployment only; they do not certify realistic silhouettes, model finish, or gameplay readability:
 
 - **Complete 42-Archetype Generator Coverage (`generate_unit_model.py` & skill twin)**:
   - **Raised Access & Maintenance Hatches (`add_access_hatches`)**: 43 deployments across tanks, tracked crawlers, walkers, mechs, wheeled vehicles, and aircraft.
@@ -940,7 +924,7 @@ To establish complete realism across the entire vehicle catalog, all Wave 11–1
   - **Planetary Final-Drive Housings (`add_final_drive_housings`)**: 19 deployments on tracked chassis and heavy crawlers.
   - **Hydraulic Track Tensioners & Front Idlers (`add_track_tensioners`)**: 19 deployments on front track sponsons.
   - **Exhaust Heat Shields (`add_exhaust_heat_shield`)**: 13 deployments over engine manifolds and exhaust pipes.
-  - Zero archetypes remain unenhanced or lacking hard-surface assemblies.
+  - Every archetype has at least one assembly from these waves; this inventory is not a visual-quality score.
 - **Full Active Pack Unit Integration (`ActiveUnitVisualEnhancements.py`)**:
   - Authoring profile map `ACTIVE_UNIT_REALISM_PROFILES` added for all 18 active units:
     - Tracked: `SandlanceScout`, `ColossusSiegePlatform`, `SurgeArcTank`, `BulwarkSiegeTank`, `GravitasBreaker` (final drive, track tensioner, access hatch, pioneer rack, turret ring guard, coaxial port, driver periscope, weapon trunnions).
@@ -953,3 +937,35 @@ To establish complete realism across the entire vehicle catalog, all Wave 11–1
   - Comprehensive unit test `test_active_units_have_realism_profiles` and updated threshold assertions verified in `tests/python/authoring/test_model_kit_skill_copy.py`.
   - Full Python test suite passed cleanly (131/131 tests).
 - Evidence level: local build/validation evidence only; no fresh Steam runtime proof.
+
+## 26. Stylized Realism Research and Three-Model Pilot (local Blender evidence)
+
+The current art direction is grounded stylized military science-fiction realism. This section and the linked authoring skill supersede any earlier implication that fixed detail ratios, a generator preset, or adding hardware by itself guarantees a realistic model.
+
+### Research translated into project rules
+
+- Blender Studio recommends collecting references, establishing a scaled blockout, testing movement, and refining the asset from several views. Rogue Command now treats generator output as a functional blockout: refine the primary hull, torso, fairing, or facility shell before adding small details. [Blender Studio modeling guide](https://studio.blender.org/tools/pipeline-overview/asset-creation/modeling)
+- Blizzard's StarCraft: Remastered team retained recognizable unit silhouettes while increasing visible detail. For Rogue Command, preserve each unit role and recognition cues, while developing original stance, proportions, negative space, and construction. [Blizzard development interview](https://news.blizzard.com/en-us/article/20726732/behind-the-scenes-of-starcraft-remastered)
+- Blender's bevel and baking references distinguish edge geometry and surface shading from transferred fine relief. Apply bevels by part construction, use flat shading for intentional armor facets and smooth shading for formed parts, and reserve tangent-space normal maps, cage setup, and UV padding for detail after geometry and UVs settle. [Bevel Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/generate/bevel.html), [Cycles baking](https://docs.blender.org/manual/en/4.5/render/cycles/baking.html)
+- Blender's Weighted Normal modifier changes custom shading normals based on face area, corner angle, or face strength. Use it to preserve broad designed planes after the shape is authored; it cannot replace silhouette and cross-section refinement. [Weighted Normal Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/normals/weighted_normal.html)
+- Unity's model importer and LOD workflow support authored normals/tangents and screen-relative simplification. Review shape at the actual camera scale, preserve authored shading, and simplify hidden or sub-pixel geometry first. The 7,500-face LOD0 value is a project profiling ceiling, not an engine limit or target. [Unity 2021.3 Model Importer](https://docs.unity3d.com/2021.3/Documentation/Manual/FBXImporter-Model.html), [Unity 2021.3 LOD](https://docs.unity3d.com/2021.3/Documentation/Manual/LevelOfDetail.html)
+- PBR guidance separates metalness from roughness: roughness controls reflection sharpness. For Rogue Command, use that principle to choose material-specific values and localized wear while preserving the project's MetallicGloss packing and vertex-wear contract. [Adobe OpenPBR overview](https://experienceleague.adobe.com/en/docs/substance-3d/general-knowledge/openpbr/openpbr-overview)
+
+### Pilot results
+
+- **Sandlance Scout:** refined the main hull, deck, side pods, turret, and gun nose with profiled shells. Local Blender builder result: 6,946 faces; bounds 2.17 × 2.70 × 1.57 m; ground contact passed.
+- **Skirmish Strike Bike:** refined the front fairing and side/body shells, reduced the battery volume, and added four insulator supports beneath the induction ring. Local Blender builder result: 3,910 faces; bounds 1.20 × 2.20 × 1.31 m; ground contact passed. Its separate rig/export builder validated rigid weights and in-place clips and regenerated the atlas FBX.
+- **Ironclad Walker:** refined torso, pelvis, shoulder, guard, and bracer shells. Faceted armor remains flat-shaded while formed housings and smaller joint-related covers use restrained smooth shading. Local Blender builder result: 4,396 faces; bounds 2.02 × 1.98 × 2.546 m; ground contact passed; rig, five action clips, and atlas export completed.
+
+All three remain within the 7,500-face project ceiling. Their preview renders are under `artifacts/previews/`; face counts refer to Blender source geometry, not Unity triangles. Material Maker 1.7 produced strict 2048×2048 four-map preview sets under `artifacts/model-realism-pilot/material-maker/` with the matching unit presets. These generated maps remain review intermediates and were not promoted over the current unit material atlases. The local Unity authoring build and live Steam appearance were not verified in this pass.
+
+### Acceptance rules for future fleet work
+
+1. Define role, movement, primary system, and two or three silhouette cues from several references; use them to make an original design.
+2. Pass black silhouette and neutral-clay reviews at actual RTS size before tertiary detail. Review front, side, top, elevated gameplay view, and a representative movement pose.
+3. Refine large connected forms with changing profiles and purposeful transitions. Keep separate plates and joints where the mechanism requires them; reject both unmodified block stacks and oversized smooth blobs.
+4. Recheck support, load path, clearance, and motion for every prominent weapon, sensor, wheel, leg, hatch, or suspension part.
+5. Finalize geometry and UVs before baking. Keep the exact PBR map/channel/import contract, vertex Color RGBA, canonical sockets, rig/pivots, hierarchy, and LOD behavior.
+6. Report Blender faces, exported Unity triangles, local Unity validation, and runtime appearance as separate evidence levels.
+7. Keep the material pass subordinate to the form pass: tune response per material and place grime/wear where use or exposure explains it. Do not use full-surface noise or edge highlights to compensate for weak shape design.
+8. Select bevel and smoothing per part construction. Use weighted normals to preserve large authored faces, not as a blanket smoothing fix; inspect both clay and textured assets at the actual RTS view size.

@@ -93,6 +93,89 @@ def finish_mesh(
     return obj
 
 
+def make_lofted_superellipse_shell(
+    name: str,
+    stations: Sequence[Sequence[float]],
+    material: bpy.types.Material | None,
+    axis: str = "Y",
+    segments: int = 24,
+    exponent: float = 0.78,
+    smooth: bool = True,
+) -> bpy.types.Object:
+    """Build a shaped armor shell from cross-section stations.
+
+    Each station is ``(axis_position, center_a, center_b, half_a, half_b)``.
+    The cross-section axes are X/Z for a Y loft, X/Y for a Z loft, and Y/Z
+    for an X loft. ``exponent`` controls the transition from an ellipse toward
+    a softly squared armor section; use profile stations to form shoulders,
+    tapers, and sloped noses instead of stacking primitive boxes.
+    """
+    axis = axis.upper()
+    if axis not in {"X", "Y", "Z"}:
+        raise ValueError("axis must be X, Y, or Z")
+    if len(stations) < 2:
+        raise ValueError("a lofted shell requires at least two stations")
+    if segments < 8 or exponent <= 0.0:
+        raise ValueError("segments must be >= 8 and exponent must be positive")
+
+    normalized = []
+    for index, station in enumerate(stations):
+        if len(station) != 5:
+            raise ValueError("each station must contain five values")
+        position, center_a, center_b, half_a, half_b = map(float, station)
+        if half_a <= 0.0 or half_b <= 0.0:
+            raise ValueError(f"station {index} must have positive cross-section radii")
+        normalized.append((position, center_a, center_b, half_a, half_b))
+    if any(b[0] <= a[0] for a, b in zip(normalized, normalized[1:])):
+        raise ValueError("station axis positions must increase monotonically")
+
+    vertices = []
+    for position, center_a, center_b, half_a, half_b in normalized:
+        for segment in range(segments):
+            angle = 2.0 * math.pi * segment / segments
+            unit_a = math.copysign(abs(math.cos(angle)) ** exponent, math.cos(angle))
+            unit_b = math.copysign(abs(math.sin(angle)) ** exponent, math.sin(angle))
+            a = center_a + unit_a * half_a
+            b = center_b + unit_b * half_b
+            if axis == "Y":
+                point = (a, position, b)
+            elif axis == "Z":
+                point = (a, b, position)
+            else:
+                point = (position, a, b)
+            vertices.append(point)
+
+    faces = [tuple(reversed(range(segments)))]
+    last_ring = (len(normalized) - 1) * segments
+    faces.append(tuple(last_ring + segment for segment in range(segments)))
+    for ring in range(len(normalized) - 1):
+        lower = ring * segments
+        upper = (ring + 1) * segments
+        for segment in range(segments):
+            following = (segment + 1) % segments
+            faces.append((lower + segment, lower + following,
+                          upper + following, upper + segment))
+
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.update()
+
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    if material is not None:
+        mesh.materials.append(material)
+    for polygon in mesh.polygons:
+        polygon.use_smooth = smooth and polygon.index not in {0, 1}
+    obj.select_set(False)
+    return obj
+
+
 def _auto_box_bevel(size: Sequence[float], bevel: float) -> float:
     """Widens bevels on major armor volumes while leaving small hardware crisp."""
     dimensions = [abs(float(component)) for component in size]

@@ -123,22 +123,21 @@ def make_torus(name, location, major_radius, minor_radius, material, rotation=(0
 
 
 def make_front_fairing(material):
-    vertices = [
-        (-0.39, 0.20, 0.55), (0.39, 0.20, 0.55),
-        (-0.29, 0.92, 0.58), (0.29, 0.92, 0.58),
-        (-0.23, 0.69, 1.22), (0.23, 0.69, 1.22),
-        (-0.32, 0.24, 1.04), (0.32, 0.24, 1.04),
-    ]
-    faces = [
-        (3, 2, 1, 0), (4, 5, 3, 2), (0, 1, 7, 6),
-        (1, 3, 5, 7), (0, 6, 4, 2), (6, 7, 5, 4),
-    ]
-    mesh = bpy.data.meshes.new("Strike Bike sloped front fairing")
-    mesh.from_pydata(vertices, [], faces)
-    mesh.update()
-    obj = bpy.data.objects.new("StrikeBikeArmor_FrontFairing", mesh)
-    bpy.context.collection.objects.link(obj)
-    return finish_mesh(obj, material, 0.035)
+    return modelkit.make_lofted_superellipse_shell(
+        "StrikeBikeArmor_FrontFairing",
+        [
+            (0.18, 0.0, 0.78, 0.25, 0.22),
+            (0.38, 0.0, 0.84, 0.34, 0.30),
+            (0.64, 0.0, 0.90, 0.28, 0.30),
+            (0.80, 0.0, 0.74, 0.20, 0.14),
+            (0.90, 0.0, 0.62, 0.10, 0.07),
+        ],
+        material,
+        axis="Y",
+        segments=20,
+        exponent=0.76,
+        smooth=True,
+    )
 
 
 def add_preview_stage(model_objects):
@@ -234,18 +233,35 @@ def main():
                      (side * 0.23, -0.06, 0.79), 0.055, wheel),
             make_rod("StrikeBikeFork_{0}".format(side), (x, 0.72, 0.42),
                      (side * 0.19, 0.50, 1.16), 0.055, wheel),
-            make_box("StrikeBikeArmor_SidePod_{0}".format(side),
-                     (0.18, 0.78, 0.30), (side * 0.48, -0.10, 0.69), armor, 0.045),
+            modelkit.make_lofted_superellipse_shell(
+                "StrikeBikeArmor_SidePod_{0}".format(side),
+                [(-0.54, side * 0.46, 0.68, 0.06, 0.10),
+                 (-0.42, side * 0.48, 0.69, 0.09, 0.15),
+                 (0.20, side * 0.48, 0.69, 0.09, 0.15),
+                 (0.30, side * 0.46, 0.68, 0.06, 0.10)],
+                armor, axis="Y", segments=16, exponent=0.76, smooth=True),
             make_box("StrikeBikeAccent_SideStripe_{0}".format(side),
                      (0.04, 0.53, 0.055), (side * 0.578, -0.07, 0.76), warning, 0.012),
         ]
 
     model_objects += [
-        make_box("StrikeBikeArmor_LowerFrame", (0.60, 1.28, 0.29), (0.0, -0.03, 0.62), gunmetal, 0.08),
-        make_box("StrikeBikeArmor_BatteryPod", (0.69, 0.65, 0.51), (0.0, -0.13, 0.94), armor_light, 0.095),
+        modelkit.make_lofted_superellipse_shell(
+            "StrikeBikeArmor_LowerFrame",
+            [(-0.70, 0.0, 0.60, 0.20, 0.09), (-0.54, 0.0, 0.63, 0.26, 0.13),
+             (0.45, 0.0, 0.63, 0.25, 0.13), (0.64, 0.0, 0.59, 0.16, 0.08)],
+            gunmetal, axis="Y", segments=20, exponent=0.76, smooth=True),
+        modelkit.make_lofted_superellipse_shell(
+            "StrikeBikeArmor_BatteryPod",
+            [(-0.49, 0.0, 0.89, 0.17, 0.14), (-0.36, 0.0, 0.92, 0.25, 0.20),
+             (0.10, 0.0, 0.93, 0.27, 0.21), (0.26, 0.0, 0.89, 0.21, 0.15)],
+            armor_light, axis="Y", segments=20, exponent=0.74, smooth=True),
         make_box("StrikeBikeAccent_BatteryRail", (0.76, 0.16, 0.08), (0.0, -0.14, 1.22), warning, 0.025),
         make_front_fairing(armor),
-        make_box("StrikeBikeArmor_RearChargeCage", (0.88, 0.43, 0.68), (0.0, -0.74, 1.05), armor, 0.095),
+        modelkit.make_lofted_superellipse_shell(
+            "StrikeBikeArmor_RearChargeCage",
+            [(-1.03, 0.0, 1.00, 0.18, 0.16), (-0.92, 0.0, 1.01, 0.27, 0.22),
+             (-0.57, 0.0, 1.01, 0.27, 0.22), (-0.46, 0.0, 0.99, 0.19, 0.17)],
+            armor, axis="Y", segments=20, exponent=0.70, smooth=True),
         make_cylinder("StrikeBikePayload_Core", 0.25, 0.64, (0.0, -0.74, 1.07),
                       warning, (math.radians(90), 0.0, 0.0), 10),
         make_box("StrikeBikePayload_ChargeBand", (0.90, 0.10, 0.10),
@@ -257,6 +273,21 @@ def main():
         make_box("StrikeBikeAccent_FrontMarker_L", (0.07, 0.08, 0.045), (-0.27, 0.82, 0.72), warning, 0.015),
         make_box("StrikeBikeAccent_FrontMarker_R", (0.07, 0.08, 0.045), (0.27, 0.82, 0.72), warning, 0.015),
     ]
+
+    # Four insulated standoffs carry the induction ring from the battery deck
+    # instead of leaving the emissive assembly visually unsupported.
+    for index, (offset_x, offset_y) in enumerate(
+        ((0.18, 0.0), (0.0, -0.18), (-0.18, 0.0), (0.0, 0.18)),
+        start=1,
+    ):
+        model_objects.append(make_cylinder(
+            "StrikeBikeArc_InductionSupport_{0}".format(index),
+            0.028,
+            0.13,
+            (offset_x, -0.12 + offset_y, 1.19),
+            armor_light,
+            vertices=8,
+        ))
 
     # A narrow saddle and visible suspension struts clarify the rider-facing
     # layout while keeping the model inside the BombBike collider width.
