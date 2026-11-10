@@ -1,7 +1,7 @@
 ---
 name: rogue-command-steam-runtime-validation
 description: "Use when a Rogue Command claim needs live Steam evidence. Run a reversible, fail-closed validation session."
-version: 2.2.0
+version: 2.3.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -78,7 +78,10 @@ python tools/runtime_profile_checkpoint.py verify `
 - **HTTP Query Parameter Protocol:** `POST /mcp/component/call_method` requires ALL arguments as URL query parameters (`id`, `componentName`, `methodName`, `args`). NEVER send them in a JSON body.
 - **Dynamic Identity Across Scenes:** Component IDs change per scene load (e.g. `LoaderDiagnosticsComponent` ID `-4880` in `MainMenu` becomes `-67812` in `IntermissionScreen`). Always re-resolve IDs via `find_objects_with_component` using full type name `RogueCommandExpansionLoader.Runtime.LoaderDiagnosticsComponent`.
 - **Response Parsing:** Method return values are embedded inside the `message` string: `{"status":"ok", "message":"Called 'X' with N args. ReturnValue: <JSON>"}`.
-- **Safe Button Clicks:** `diagnostics_ui_press_button` by name is fragile. First resolve the target GameObject ID via `scene_search_gameobjects`, then invoke click via `call_component_method` on `TryUiClickJson("[<name>, <id>]")`.
+- **Screenless UI Flow:** Discover Unity `Selectable` controls and labels with `diagnostics_get_ui_accessibility_census`, wait with `diagnostics_wait_for_ui_text`, and click by unique label or exact `hierarchyPath` with `diagnostics_ui_click_text` (supports unlabeled controls). Clicks use the real EventSystem/raycast route; the census does not capture pixels. Sequence bounded diagnostics actions with `automation_run_sequence`.
+- **Process Lifecycle:** Use `system_get_game_process_state` to inspect PIDs, `system_launch_game` to start through Steam AppID `1461910` without changing the saved-profile selector, and `system_wait_for_game_bridge` to require a live scene query after ping. `diagnostics_request_graceful_exit` requires `confirmExit=true`; verify process closure and profile hashes after exit.
+- **No Computer Use / Captures:** The loader enables `Application.runInBackground`. Do not switch to Computer Use or screenshots when MCP observations fail; retry bounded scene/UI queries, add telemetry, or classify the claim as `BLOCKED`/`UNKNOWN`.
+- **Steam Cloud API:** `diagnostics_get_steam_cloud_state` reads account/app state through `SteamRemoteStorage.IsCloudEnabledForAccount/IsCloudEnabledForApp`. If Steamworks was not initialized by the game, the wrapper calls `SteamAPI.Init()` and shuts it down only if the wrapper initialized it. `diagnostics_set_steam_cloud_enabled(enabled, explicitUserAuthorization=true)` changes only this app's toggle, only after the user explicitly authorizes it. Never touch the account-wide toggle. Restore the chosen file source, verify Profile2/checkpoint, then re-enable Cloud and confirm its app state.
 
 ### Intermission Progression & Level Transition Chains
 1. **Conserved Map Native Progression (Preferred / Zero Stall):**

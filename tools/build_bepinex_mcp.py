@@ -16,6 +16,28 @@ MCP_DIR = Path(r"C:\Users\Alex\.gemini\antigravity\mcp\bepinex_mcp")
 
 # All tools with name, description, parameters schema, and handler key
 TOOL_SPECS = [
+    {
+        "name": "system_get_game_process_state",
+        "description": "Reads Rogue Command.exe process IDs from the Windows process table; no window focus or screenshot is used.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "system_launch_game",
+        "description": "Launches Rogue Command through its installed Steam AppID (1461910). Refuses duplicate launches and does not select, create, or reset a profile.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "system_wait_for_game_bridge",
+        "description": "Waits for both the live BepInEx HTTP bridge and a Unity scene query to become available after Steam launch; does not require focus or screenshots.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "timeoutSeconds": {"type": "number", "description": "Wait limit from 1 to 60 seconds (default 30)."},
+                "pollIntervalMs": {"type": "integer", "description": "Poll interval from 250 to 2000 ms (default 500)."},
+            },
+            "additionalProperties": False,
+        },
+    },
     # ---- Core Bridge & System ----
     {
         "name": "system_ping",
@@ -1246,11 +1268,18 @@ TOOL_SPECS = [
     {"name": "diagnostics_get_combat_health_summary", "description": "Aggregates battlefield, rosters, production, base, AI director, hazard, veterancy, combat status, economy, and system health into a single combat-health payload.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"name": "diagnostics_get_entity_detail", "description": "Returns a single-entity drill-down across battlefield, rosters, threat, stance, affix, veterancy, loadout, mechanics, visual, and balance for one entity key.", "parameters": {"type": "object", "properties": {"entityKeyId": {"type": "string", "description": "Target entity key ID."}}, "required": ["entityKeyId"], "additionalProperties": False}},
     {"name": "diagnostics_get_agent_lock_status", "description": "Reports whether a resource is locked, its owner and remaining time, and whether the requesting agent session is active.", "parameters": {"type": "object", "properties": {"agentId": {"type": "string", "description": "Requesting agent identifier."}, "resourceKey": {"type": "string", "description": "Resource identifier to check."}}, "required": ["agentId", "resourceKey"], "additionalProperties": False}},
+    {"name": "automation_run_sequence", "description": "Runs an ordered sequence of existing diagnostics MCP tools without screenshots or computer-use interaction. A shared 1-120 second budget limits delays and bridge request timeouts. If a request times out in flight, completion is unknown; inspect the postcondition before retrying. Failures can stop the sequence, and mutations keep their own tool/profile safety contract.", "parameters": {"type": "object", "properties": {"steps": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "object", "properties": {"tool": {"type": "string", "description": "Existing diagnostics tool name."}, "arguments": {"type": "object", "description": "Arguments for the selected tool."}, "delayAfterMs": {"type": "integer", "description": "Optional delay after the step (0-2000 ms)."}}, "required": ["tool"], "additionalProperties": False}}, "stopOnFailure": {"type": "boolean", "description": "Stop after a tool error or JSON success=false response (default true)."}, "maxDurationSeconds": {"type": "integer", "description": "Shared request and delay budget (1-120 seconds, default 60)."}}, "required": ["steps"], "additionalProperties": False}},
     {"name": "diagnostics_preflight", "description": "Runs parallel preflight checks (system ping, capabilities, diagnostics component discovery) and returns readiness verdict with checks, system health, and time scale.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"name": "diagnostics_get_gui_state", "description": "Returns overlay, range display, hooks, time scale, and camera state from the running game.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
+    {"name": "diagnostics_request_graceful_exit", "description": "Requests normal Unity player shutdown through Application.Quit without synthetic keyboard input. Required confirmExit=true because the game may persist normal save state; verify closure with system_get_game_process_state.", "parameters": {"type": "object", "properties": {"confirmExit": {"type": "boolean", "description": "Must be true to acknowledge normal shutdown and possible save persistence."}}, "required": ["confirmExit"], "additionalProperties": False}},
+    {"name": "diagnostics_get_steam_cloud_state", "description": "Reads Steamworks account and Rogue Command app Cloud toggles; no profile or save-file access.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
+    {"name": "diagnostics_set_steam_cloud_enabled", "description": "Changes only Rogue Command's Steam Cloud app toggle. Requires explicitUserAuthorization=true after the user explicitly authorized this exact Cloud change; does not touch saves. Verify the returned app state before exit/relaunch.", "parameters": {"type": "object", "properties": {"enabled": {"type": "boolean", "description": "Desired Cloud state for this app only."}, "explicitUserAuthorization": {"type": "boolean", "description": "Must be true only when the user explicitly authorized changing Rogue Command Steam Cloud."}}, "required": ["enabled", "explicitUserAuthorization"], "additionalProperties": False}},
     {"name": "diagnostics_order_batch", "description": "Executes multiple diagnostic commands in parallel and returns aggregated results with meta counts.", "parameters": {"type": "object", "properties": {"operations": {"type": "array", "items": {"type": "object", "properties": {"tool": {"type": "string"}, "arguments": {"type": "object"}}, "required": ["tool"]}, "description": "List of operations to execute."}}, "required": ["operations"], "additionalProperties": False}},
     {"name": "diagnostics_get_control_guide", "description": "Returns a control guide with preflight, control, and cleanup recipes for Profile2 QA.", "parameters": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"name": "diagnostics_gui_control", "description": "Composite GUI control: open/close overlay, toggle range display, select tab, set timeScale, move/focus camera, and select units in one round-trip.", "parameters": {"type": "object", "properties": {"overlayOpen": {"type": "boolean"}, "rangeEnabled": {"type": "boolean"}, "overlayTab": {"type": "integer"}, "timeScale": {"type": "number"}, "cameraX": {"type": "number"}, "cameraZ": {"type": "number"}, "focusEntityKeyId": {"type": "string"}}, "additionalProperties": False}},
+    {"name": "diagnostics_get_ui_accessibility_census", "description": "Screenless Unity UI discovery: returns selectable controls, accessible text/TMP labels, stable hierarchy paths, active/interactable state, selection, and screen bounds. No screenshots are captured. Use this before clicking profile/menu controls; instance IDs are ephemeral.", "parameters": {"type": "object", "properties": {"query": {"type": "string", "description": "Optional case-insensitive substring over label, object name, and hierarchy path."}, "includeInactive": {"type": "boolean", "description": "Include inactive controls (default false)."}, "maxResults": {"type": "integer", "description": "Maximum rows (1-100, default 32)."}}, "additionalProperties": False}},
+    {"name": "diagnostics_ui_click_text", "description": "Clicks one active Unity UI control by accessible label or exact hierarchyPath from the UI census through the real EventSystem raycast/pointer path. Ambiguous matches fail closed; use the scene-qualified path for unlabeled controls. No screenshots or direct Button.Invoke calls.", "parameters": {"type": "object", "properties": {"label": {"type": "string", "description": "Optional Unity Text/TMP label."}, "exactMatch": {"type": "boolean", "description": "Require an exact case-insensitive label match (default true)."}, "hierarchyPath": {"type": "string", "description": "Optional exact scene-qualified hierarchy path from the UI census; required if label is empty."}}, "additionalProperties": False}},
+    {"name": "diagnostics_wait_for_ui_text", "description": "Waits for one active Unity UI control by label or exact hierarchyPath to appear and optionally become interactable, polling the screenshot-free accessibility census. Bounded to 30 seconds; returns the matched control or timeout state.", "parameters": {"type": "object", "properties": {"label": {"type": "string", "description": "Optional Unity Text/TMP label to wait for."}, "exactMatch": {"type": "boolean", "description": "Require an exact case-insensitive label match (default true)."}, "hierarchyPath": {"type": "string", "description": "Optional exact scene-qualified hierarchy path; required if label is empty."}, "requireInteractable": {"type": "boolean", "description": "Wait until the control is interactable and on screen (default true)."}, "timeoutSeconds": {"type": "number", "description": "Wait limit from 0.1 to 30 seconds (default 10)."}, "pollIntervalMs": {"type": "integer", "description": "Poll interval from 100 to 1000 ms (default 250)."}}, "additionalProperties": False}},
     {"name": "diagnostics_ui_click", "description": "Click a UI element or 3D world object by real screen coordinates (not InvokeOnClick): RectTransform center → EventSystem raycast → pointer sequence replay. Accepts buttonName/selector/gameObjectId or pixel coordinates x/y; occluded, off-screen, or non-interactive targets fail closed.", "parameters": {"type": "object", "properties": {"buttonName": {"type": "string"}, "selector": {"type": "string", "description": "Name or hierarchy path."}, "gameObjectId": {"type": "integer"}, "x": {"type": "integer"}, "y": {"type": "integer"}}, "additionalProperties": False}},
     {"name": "diagnostics_ui_press_button", "description": "Alias for diagnostics_ui_click: kept for compatibility; accepts x/y for point clicks.", "parameters": {"type": "object", "properties": {"buttonName": {"type": "string"}, "selector": {"type": "string", "description": "Name or hierarchy path."}, "gameObjectId": {"type": "integer"}, "x": {"type": "integer"}, "y": {"type": "integer"}}, "additionalProperties": False}},
     {"name": "diagnostics_fast_snapshot", "description": "Curated preset snapshot: gui, match, combat, health. Faster than full runtime_snapshot.", "parameters": {"type": "object", "properties": {"preset": {"type": "string"}}, "additionalProperties": False}},
@@ -1281,7 +1310,7 @@ TOOL_SPECS = [
 # ---------------------------------------------------------------------------
 # Schema optimisation (wire-size reduction without losing functionality)
 # ---------------------------------------------------------------------------
-# Single source of truth remains TOOL_SPECS above (207 tools). The helpers
+# Single source of truth remains TOOL_SPECS above (233 tools). The helpers
 # below produce the optimised view that bepinex_mcp_server and the
 # Antigravity schema files advertise:
 # - Strip redundant LoaderDiagnosticsComponent provenance phrases from tool
@@ -1296,7 +1325,7 @@ TOOL_SPECS = [
 #   "GameObject ID.", etc.) so alias/canonical pairs cannot drift.
 # - Add the runtime-supported optional selector_json to the canonical
 #   scene_resolve_selector, then copy canonical parameters to every alias so
-#   all 19 aliases deep-equal their canonical tool. All 207 names, types,
+#   all 19 aliases deep-equal their canonical tool. All 233 names, types,
 #   required lists, enums, and handler endpoints are preserved.
 
 _PROPERTY_DESCRIPTION_SHORTENING: dict[str, str] = {

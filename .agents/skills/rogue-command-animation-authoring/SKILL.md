@@ -214,6 +214,12 @@ Do not rotate a model or change yaw correction based only on static evidence. Re
 - Keep the death Animator and `RuntimeVisualDirector` enabled while the Harmony terminal-destroy callback holds the visual. Disable gameplay behaviours and colliders and freeze rigidbodies so the death pose cannot continue affecting combat. Use the valid `Action_Death` clip duration divided by effective Animator speed plus the configured grace interval, with bounded/fail-closed timing; honor scaled versus unscaled Animator update mode.
 - The 2026-11-10 saved-Profile2 BepInEx probe observed `IroncladWalker_Action_Death` (1.416667 s), a 1.566667 s hold, normalized time above 1, then GameObject removal while scaled `Time.time` stayed fixed. `UnscaledTime` was set only on the disposable probe clone to keep the saved match paused. This is direct-diagnostic runtime telemetry, not natural-combat or rendered-appearance evidence: `artifacts/runtime-smoke/retarget-death-visual-cloud-20261110170654/death-hold-runtime-result.json`.
 
+### Screenshot-free runtime automation
+
+- Use `diagnostics_get_ui_accessibility_census`, `diagnostics_wait_for_ui_text`, and `diagnostics_ui_click_text` for native profile/menu flows. They read Unity `Selectable` labels and hierarchy state and deliver clicks through EventSystem; they do not use Computer Use, screenshots, or screen-image inference. `automation_run_sequence` chains bounded MCP diagnostics calls.
+- `Application.runInBackground` is enabled by the loader. Use `system_launch_game` only through Steam and preserve the selected saved profile. Confirm readiness with a live Unity scene query before claiming runtime evidence.
+- Runtime animation telemetry (Animator state, clip time, mapped poses, lifecycle counters) remains distinct from rendered appearance. If MCP cannot observe a needed state, extend the bridge or report `BLOCKED`/`UNKNOWN`; a label census or computed rectangle is not pixel/render evidence.
+
 ## Completion report
 
 List edited source, clips, controllers, prefabs, and bundles; state tool/engine versions and commands; report observed diagnostics; and separate static, local Unity, and live-game evidence. Identify unverified state transitions or motion behavior explicitly.

@@ -1,9 +1,20 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
-**Updated:** 2026-11-09
+**Updated:** 2026-11-10
 **Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
+
+---
+
+## 2026-11-10 Screenshot-Free BepInEx MCP Automation
+
+- **Bridge/tooling:** Added process-state lookup, Steam URI launch that preserves the current selector, bounded wait for both bridge ping and a live Unity scene query, normal `Application.Quit` request, Unity `Selectable` census with Text/TMP labels and scene-qualified hierarchy paths, path-or-label wait/click, bounded ordered diagnostics sequences, and Steamworks per-app Cloud state/read control. `system_capabilities` reports MCP server 1.4.0 and declares `screenshotCapture=false` / `computerUseRequired=false`; schemas now total 233 tools. The Cloud setter requires an explicit authorization flag and cannot change account-wide Cloud. Sequence calls share request/delay budget; a timed-out in-flight action is completion-unknown and must be checked before retry.
+- **Click contract:** `RuntimeUiAccessibility` resolves current GameObject instance IDs directly, includes unlabeled controls by exact `hierarchyPath`, checks active/interactable/on-screen state, then delegates delivery to `RuntimeUiClickDirector`'s EventSystem raycast and pointer event sequence. Ambiguous labels and raycast occlusion fail closed. Screen rectangles and `visible` are runtime metadata, not rendered-pixel evidence.
+- **Local build/config:** `dotnet build src/RogueCommandExpansionLoader/RogueCommandExpansionLoader.csproj -c Release -v:minimal` passed with 0 warnings/errors. Python source compiled; `tools/build_bepinex_mcp.py` generated 233 schemas and `tools/bepinex_mcp_server.py --generate-configs` refreshed the Claude, Cursor, VS Code, and Hermes configuration outputs. Automated test suites were not run.
+- **Live bridge evidence:** With per-app Steam Cloud already disabled (`IsCloudEnabledForApp=false`; account Cloud remained enabled), the new Steam launch/wait tools started the game using existing Profile2 without selector/profile UI actions. The bridge became ready in 9.594 s. `system_capabilities` returned server 1.4.0; the screenshot-free census found 3 active selectables in `MainMenu`, and exact path-only `diagnostics_wait_for_ui_text` found the unlabeled ProfileSelectionButton in 0.203 s. This validates tool availability and read/wait telemetry; no menu click was performed, and no animation/combat/rendered-pixel claim is inferred.
+- **Profile and deployment:** The game was gracefully closed through BepInEx MCP; the full checkpoint still reports `profileFilesExactMatch=true`, `selectorMatch=true`, and no added/changed files. Cloud remains disabled for Rogue Command. Release artifact and installed loader match SHA-256 `1235E95D14926C65DECC1E5C00D30D6636984EE5E8FF3C534F9D0DBEDFB7EE08`. Pre-deploy backup and copy/hash record: `artifacts/deployment-backups/20261110T185405Z-mcp-screenless-automation/deployment-manifest.json` (`deployed_sha256_verified`).
+- **Evidence boundary:** Build and schema generation are local validation. Live proof covers launch, bridge readiness, Cloud state, UI census, path-only wait, and process closure. The new text/path click was compiled and registered but was not exercised against a UI action. The diagnostic census is structured runtime state, not a screenshot or rendered appearance.
 
 ---
 

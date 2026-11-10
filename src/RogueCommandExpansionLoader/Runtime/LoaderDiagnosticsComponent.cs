@@ -906,6 +906,65 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeUiClickDirector.TryClickAtScreenPoint(new Vector2(x, y)));
         }
 
+        /// <summary>
+        /// Lists active/inactive Unity Selectables and their accessible labels,
+        /// stable hierarchy paths, interaction state, and bounds without image
+        /// capture. Screen coordinates are descriptive only; clicks remain gated
+        /// by the real EventSystem raycast path.
+        /// </summary>
+        public string GetUiAccessibilityCensusJson(string query = "", bool includeInactive = false, int maxResults = 32)
+        {
+            return RuntimeUiAccessibility.GetCensusJson(query, includeInactive, maxResults);
+        }
+
+        /// <summary>
+        /// Finds a unique active UI control by exact label (or substring when
+        /// requested) and delivers a real EventSystem click. Ambiguous labels
+        /// fail closed; hierarchyPath disambiguates using a census result.
+        /// </summary>
+        public string TryUiClickTextJson(string label, bool exactMatch = true, string hierarchyPath = "")
+        {
+            return RuntimeUiAccessibility.TryClickTextJson(label, exactMatch, hierarchyPath);
+        }
+
+        /// <summary>
+        /// Requests normal Unity player shutdown after the caller explicitly
+        /// confirms. This lets the host bridge close the game without window
+        /// focus or synthetic keyboard input.
+        /// </summary>
+        public string RequestGracefulExitJson(bool confirmExit)
+        {
+            if (!confirmExit)
+            {
+                return AgentDiagnosticsFormatter.SerializeUiAccessibilityPayload(new Dictionary<string, object>
+                {
+                    ["success"] = false,
+                    ["message"] = "confirmExit must be true to request normal player shutdown"
+                });
+            }
+
+            Application.Quit();
+            return AgentDiagnosticsFormatter.SerializeUiAccessibilityPayload(new Dictionary<string, object>
+            {
+                ["success"] = true,
+                ["requested"] = true,
+                ["method"] = "UnityEngine.Application.Quit",
+                ["message"] = "graceful exit requested; confirm process closure through system_get_game_process_state"
+            });
+        }
+
+        /// <summary>Reads account/app Steam Cloud state through Steamworks without file access.</summary>
+        public string GetSteamCloudStateJson()
+        {
+            return RuntimeSteamCloudController.GetStateJson();
+        }
+
+        /// <summary>Changes only this app's Cloud toggle after explicit user authorization.</summary>
+        public string SetSteamCloudAppEnabledJson(bool enabled, bool explicitUserAuthorization)
+        {
+            return RuntimeSteamCloudController.SetAppEnabledJson(enabled, explicitUserAuthorization);
+        }
+
         private static GameObject ResolveUiClickTarget(string target, int gameObjectId)
         {
             if (gameObjectId != 0)

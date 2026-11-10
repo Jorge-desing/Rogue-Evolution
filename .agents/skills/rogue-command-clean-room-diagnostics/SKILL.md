@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.13.0
+version: 1.14.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -83,6 +83,15 @@ All censuses query live singletons through fail-closed reflection, format primit
 ---
 
 ## 4. Runtime Gameplay Command Director
+
+### Screenshot-free MCP control
+
+- Use `diagnostics_get_ui_accessibility_census` to discover `Selectable` controls, Unity Text/TMP labels, scene-qualified hierarchy paths, active/visible/interactable state, and computed screen bounds. This is transform telemetry, not a screenshot or pixel observation.
+- Use `diagnostics_wait_for_ui_text` for bounded state waits and `diagnostics_ui_click_text` by a unique accessible label or exact `hierarchyPath` (needed for unlabeled controls). Clicks go through `RuntimeUiClickDirector`'s real EventSystem raycast and fail closed on ambiguity, inactive/off-screen targets, missing handlers, or occlusion. The census `visible` value is diagnostic metadata; click delivery uses active/interactable/bounds checks and the actual raycast.
+- `automation_run_sequence` runs at most 16 diagnostics tools in order, with bounded delays and a shared request-time budget; it excludes recursive sequence calls and synthetic jump/load tools. A timed-out in-flight request has unknown completion, so inspect its postcondition before retrying. Each operation still obeys its own QA profile, evidence, and mutation contract.
+- Use `system_launch_game` for Steam launch, `system_wait_for_game_bridge` for ping plus live scene readiness, and `system_get_game_process_state` to confirm process lifecycle. `diagnostics_request_graceful_exit` requires explicit `confirmExit=true` and normal save/profile checkpoint handling.
+- `diagnostics_get_steam_cloud_state` is read-only. `diagnostics_set_steam_cloud_enabled` may change only Rogue Command's per-app Steamworks toggle, only after explicit user authorization; never alter account-wide Cloud. Verify local/remote selected-profile bytes before re-enabling.
+- The loader sets `Application.runInBackground=true`; MCP scene/UI operations need no focus. Do not use Computer Use or captures as a fallback. If a state is missing, extend structured bridge telemetry or record the evidence as blocked/unknown.
 
 Dispatches validated, safe in-game actions for automated testing and agent execution:
 

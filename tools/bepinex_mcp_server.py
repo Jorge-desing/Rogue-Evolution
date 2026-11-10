@@ -12,6 +12,9 @@ import json
 import os
 import sys
 import time
+import csv
+import subprocess
+import contextvars
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,8 +24,11 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.2.0"
+SERVER_VERSION = "1.4.0"
+GAME_PROCESS_NAME = "Rogue Command.exe"
+GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
+_AUTOMATION_DEADLINE: contextvars.ContextVar[float | None] = contextvars.ContextVar("bepinex_automation_deadline", default=None)
 
 # Try importing profiles from upstream BepInExMCP if available
 _profile_store = None
@@ -307,17 +313,36 @@ def _call_http(endpoint: str, method: str = "GET", params: dict[str, Any] | None
     if data:
         req.add_header("Content-Type", "application/json")
 
+    automation_deadline = _AUTOMATION_DEADLINE.get()
+    effective_timeout = timeout
+    if automation_deadline is not None:
+        remaining = automation_deadline - time.monotonic()
+        if remaining <= 0:
+            return json.dumps({
+                "error": "automation sequence time budget exhausted before bridge request started",
+                "completionStatus": "not_started",
+            })
+        effective_timeout = min(timeout, remaining)
+
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=effective_timeout) as resp:
             return resp.read().decode("utf-8", errors="replace")
     except urllib.error.URLError as err:
-        return json.dumps({
+        failure = {
             "error": f"Failed to communicate with BepInEx MCP on {url}: {err}. Ensure Rogue Command is running."
-        })
+        }
+        if automation_deadline is not None:
+            failure["completionStatus"] = "unknown"
+            failure["message"] = "the request may have been processed remotely; inspect its postcondition before retrying"
+        return json.dumps(failure)
     except Exception as exc:
-        return json.dumps({
+        failure = {
             "error": f"Unexpected error communicating with BepInEx MCP: {exc}"
-        })
+        }
+        if automation_deadline is not None:
+            failure["completionStatus"] = "unknown"
+            failure["message"] = "the request may have been processed remotely; inspect its postcondition before retrying"
+        return json.dumps(failure)
 
 
 def _tool_response(text: str, is_error: bool = False) -> dict[str, Any]:
@@ -507,8 +532,15 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
             "methodName": method_name,
             "args": args_json,
         })
-        # If cached go_id became stale, retry once after discovery
-        if "Missing or invalid 'id'" in raw or "not found" in raw.lower() or "GameObject" in raw or "500" in raw or "HTTP Error" in raw:
+        # If cached go_id became stale, retry once after discovery. Never
+        # replay a request whose transport timed out: its runtime effect may
+        # still have completed and must be checked through a postcondition.
+        try:
+            response_metadata = json.loads(raw)
+        except (TypeError, ValueError):
+            response_metadata = None
+        transport_expired = isinstance(response_metadata, dict) and bool(response_metadata.get("completionStatus"))
+        if not transport_expired and ("Missing or invalid 'id'" in raw or "not found" in raw.lower() or "GameObject" in raw or "500" in raw or "HTTP Error" in raw):
             _DIAGNOSTICS_GO_ID = None
             go_id = _get_diagnostics_go_id()
             raw = _call_http("component/call_method", params={
@@ -544,13 +576,265 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 if entry["name"] == target:
                     return _tool_response(json.dumps(entry, indent=2))
             return _tool_response(json.dumps({"success": False, "message": f"tool not found: {target}"}), True)
+        elif name == "automation_run_sequence":
+            steps = arguments.get("steps")
+            if not isinstance(steps, list) or not 1 <= len(steps) <= 16:
+                return _tool_response(json.dumps({"error": "steps must contain 1 to 16 operations"}), is_error=True)
+            stop_on_failure = arguments.get("stopOnFailure", True)
+            if not isinstance(stop_on_failure, bool):
+                return _tool_response(json.dumps({"error": "stopOnFailure must be a boolean"}), is_error=True)
+            try:
+                max_duration = int(arguments.get("maxDurationSeconds", 60))
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "maxDurationSeconds must be an integer"}), is_error=True)
+            if not 1 <= max_duration <= 120:
+                return _tool_response(json.dumps({"error": "maxDurationSeconds must be in [1, 120]"}), is_error=True)
+
+            known_tools = {entry["name"] for entry in TOOLS}
+            forbidden = {
+                "automation_run_sequence",
+                "diagnostics_run_synthetic_gameplay_scenario",
+                "diagnostics_jump_to_level",
+                "diagnostics_load_next_level",
+            }
+            started = time.monotonic()
+            deadline = started + max_duration
+            sequence_results: list[dict[str, Any]] = []
+            failed = False
+            for index, step in enumerate(steps):
+                if not isinstance(step, dict):
+                    return _tool_response(json.dumps({"error": f"steps[{index}] must be an object"}), is_error=True)
+                step_tool = str(step.get("tool", "")).strip()
+                step_arguments = step.get("arguments", {})
+                if step_tool not in known_tools or not step_tool.startswith("diagnostics_") or step_tool in forbidden:
+                    return _tool_response(json.dumps({"error": f"steps[{index}].tool is not an allowed diagnostics tool", "tool": step_tool}), is_error=True)
+                if not isinstance(step_arguments, dict):
+                    return _tool_response(json.dumps({"error": f"steps[{index}].arguments must be an object"}), is_error=True)
+                try:
+                    delay_after_ms = int(step.get("delayAfterMs", 0))
+                except (TypeError, ValueError):
+                    return _tool_response(json.dumps({"error": f"steps[{index}].delayAfterMs must be an integer"}), is_error=True)
+                if not 0 <= delay_after_ms <= 2000:
+                    return _tool_response(json.dumps({"error": f"steps[{index}].delayAfterMs must be in [0, 2000]"}), is_error=True)
+                if time.monotonic() - started >= max_duration:
+                    failed = True
+                    sequence_results.append({"index": index, "tool": step_tool, "success": False, "error": "sequence time budget exhausted"})
+                    break
+
+                step_started = time.monotonic()
+                deadline_token = _AUTOMATION_DEADLINE.set(deadline)
+                try:
+                    response = execute_tool(step_tool, step_arguments)
+                finally:
+                    _AUTOMATION_DEADLINE.reset(deadline_token)
+                text_parts = [
+                    str(block.get("text", ""))
+                    for block in response.get("content", [])
+                    if isinstance(block, dict) and block.get("type") == "text"
+                ]
+                result_text = "\n".join(text_parts)
+                step_failed = bool(response.get("isError", False))
+                try:
+                    parsed_step = json.loads(result_text) if result_text else None
+                    if isinstance(parsed_step, dict) and (parsed_step.get("success") is False or "error" in parsed_step):
+                        step_failed = True
+                except (TypeError, ValueError):
+                    parsed_step = result_text
+                if isinstance(parsed_step, (dict, list)):
+                    step_result: Any = parsed_step
+                else:
+                    step_result = result_text
+                budget_exceeded = time.monotonic() > deadline
+                if budget_exceeded:
+                    step_failed = True
+                sequence_results.append({
+                    "index": index,
+                    "tool": step_tool,
+                    "success": not step_failed,
+                    "budgetExceeded": budget_exceeded,
+                    "durationMs": round((time.monotonic() - step_started) * 1000, 1),
+                    "result": step_result,
+                })
+                if step_failed:
+                    failed = True
+                    if stop_on_failure:
+                        break
+                if delay_after_ms:
+                    remaining = max_duration - (time.monotonic() - started)
+                    if remaining <= 0:
+                        failed = True
+                        break
+                    time.sleep(min(delay_after_ms / 1000.0, remaining))
+
+            return _tool_response(json.dumps({
+                "success": not failed and len(sequence_results) == len(steps),
+                "completedSteps": len(sequence_results),
+                "requestedSteps": len(steps),
+                "elapsedSeconds": round(time.monotonic() - started, 3),
+                "results": sequence_results,
+                "source": "ordered BepInEx MCP tool calls; no computer-use interaction or screenshot",
+            }, indent=2))
         # ---- Core Bridge & System ----
-        if name in ("system_ping", "ping_unity_bridge"):
+        if name == "system_get_game_process_state":
+            if os.name != "nt":
+                return _tool_response(json.dumps({"supported": False, "error": "process lookup is currently implemented for Windows hosts"}), is_error=True)
+            try:
+                proc = subprocess.run(
+                    ["tasklist.exe", "/FI", f"IMAGENAME eq {GAME_PROCESS_NAME}", "/FO", "CSV", "/NH"],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=10,
+                    check=False,
+                )
+                if proc.returncode != 0:
+                    return _tool_response(json.dumps({"supported": True, "error": proc.stderr.strip() or f"tasklist exited {proc.returncode}"}), is_error=True)
+                processes: list[dict[str, Any]] = []
+                for row in csv.reader(proc.stdout.splitlines()):
+                    if len(row) < 2 or row[0].strip().casefold() != GAME_PROCESS_NAME.casefold():
+                        continue
+                    try:
+                        process_id = int(row[1].replace(",", "").strip())
+                    except ValueError:
+                        continue
+                    processes.append({"processId": process_id, "imageName": row[0].strip()})
+                return _tool_response(json.dumps({
+                    "supported": True,
+                    "running": bool(processes),
+                    "processCount": len(processes),
+                    "processes": processes,
+                    "source": "Windows tasklist; no window focus or screenshot",
+                }, indent=2))
+            except (OSError, subprocess.SubprocessError) as exc:
+                return _tool_response(json.dumps({"supported": True, "error": str(exc)}), is_error=True)
+
+        elif name == "system_launch_game":
+            if os.name != "nt":
+                return _tool_response(json.dumps({"success": False, "error": "Steam URI launch is currently implemented for Windows hosts"}), is_error=True)
+            process_state = execute_tool("system_get_game_process_state", {})
+            process_text = "\n".join(
+                str(block.get("text", ""))
+                for block in process_state.get("content", [])
+                if isinstance(block, dict) and block.get("type") == "text"
+            )
+            try:
+                current_processes = json.loads(process_text)
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"success": False, "error": "could not determine whether Rogue Command is already running", "processState": process_text}), is_error=True)
+            if not current_processes.get("supported") or current_processes.get("error"):
+                return _tool_response(json.dumps({"success": False, "error": "process-state lookup failed; refusing to launch without duplicate-process check", "processState": current_processes}), is_error=True)
+            if current_processes.get("running"):
+                return _tool_response(json.dumps({"success": False, "alreadyRunning": True, "processes": current_processes.get("processes", []), "message": "inspect the existing instance instead of launching another"}))
+            try:
+                startfile = getattr(os, "startfile", None)
+                if startfile is None:
+                    raise OSError("Windows ShellExecute is unavailable")
+                steam_uri = f"steam://run/{GAME_STEAM_APP_ID}"
+                startfile(steam_uri)
+                return _tool_response(json.dumps({
+                    "success": True,
+                    "launchRequested": True,
+                    "steamAppId": GAME_STEAM_APP_ID,
+                    "uri": steam_uri,
+                    "profileAction": "none; existing selector/profile state is preserved",
+                    "nextTool": "system_wait_for_game_bridge",
+                }, indent=2))
+            except OSError as exc:
+                return _tool_response(json.dumps({"success": False, "error": str(exc), "steamAppId": GAME_STEAM_APP_ID}), is_error=True)
+
+        elif name == "system_wait_for_game_bridge":
+            try:
+                timeout_seconds = float(arguments.get("timeoutSeconds", 30))
+                poll_interval_ms = int(arguments.get("pollIntervalMs", 500))
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "timeoutSeconds must be numeric and pollIntervalMs an integer"}), is_error=True)
+            if not 1 <= timeout_seconds <= 60:
+                return _tool_response(json.dumps({"error": "timeoutSeconds must be in [1, 60]"}), is_error=True)
+            if not 250 <= poll_interval_ms <= 2000:
+                return _tool_response(json.dumps({"error": "pollIntervalMs must be in [250, 2000]"}), is_error=True)
+            started = time.monotonic()
+            deadline = started + timeout_seconds
+            last_error = "bridge not ready"
+            while True:
+                try:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        return _tool_response(json.dumps({"success": False, "waitedSeconds": round(time.monotonic() - started, 3), "error": last_error}), is_error=False)
+                    ping_raw = _call_http("system/ping", timeout=min(4.0, remaining / 2))
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        return _tool_response(json.dumps({"success": False, "waitedSeconds": round(time.monotonic() - started, 3), "error": last_error}), is_error=False)
+                    scene_raw = _call_http("scene/list_root_gameobjects", timeout=min(4.0, remaining))
+                    ping_data = json.loads(ping_raw) if isinstance(ping_raw, str) else ping_raw
+                    scene_data = json.loads(scene_raw) if isinstance(scene_raw, str) else scene_raw
+                    ping_ok = isinstance(ping_data, dict) and ping_data.get("status") == "ok"
+                    scene_ok = isinstance(scene_data, (list, dict)) and not (isinstance(scene_data, dict) and scene_data.get("error"))
+                    if ping_ok and scene_ok:
+                        return _tool_response(json.dumps({
+                            "success": True,
+                            "waitedSeconds": round(time.monotonic() - started, 3),
+                            "ping": ping_data,
+                            "sceneQueryReady": True,
+                            "sceneRootCount": len(scene_data) if isinstance(scene_data, list) else None,
+                            "source": "live BepInEx ping plus Unity scene query; no focus or screenshot",
+                        }, indent=2))
+                    last_error = "ping or Unity scene query returned an error payload"
+                except Exception as exc:
+                    last_error = str(exc)
+                if time.monotonic() >= deadline:
+                    return _tool_response(json.dumps({"success": False, "waitedSeconds": round(time.monotonic() - started, 3), "error": last_error}), is_error=False)
+                time.sleep(min(poll_interval_ms / 1000.0, max(0.0, deadline - time.monotonic())))
+
+        elif name == "diagnostics_request_graceful_exit":
+            confirm_exit = arguments.get("confirmExit")
+            if confirm_exit is not True:
+                return _tool_response(json.dumps({"error": "confirmExit must be true; normal shutdown may persist save state"}), is_error=True)
+            res = _call_diagnostics_method("RequestGracefulExitJson", [True])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_steam_cloud_state":
+            res = _call_diagnostics_method("GetSteamCloudStateJson", [])
+            return _tool_response(res)
+
+        elif name == "diagnostics_set_steam_cloud_enabled":
+            enabled = arguments.get("enabled")
+            explicit_authorization = arguments.get("explicitUserAuthorization")
+            if not isinstance(enabled, bool):
+                return _tool_response(json.dumps({"error": "enabled must be a boolean"}), is_error=True)
+            if explicit_authorization is not True:
+                return _tool_response(json.dumps({"error": "explicitUserAuthorization must be true only after explicit user authorization"}), is_error=True)
+            res = _call_diagnostics_method("SetSteamCloudAppEnabledJson", [enabled, True])
+            return _tool_response(res)
+
+        elif name in ("system_ping", "ping_unity_bridge"):
             res = _call_http("system/ping")
             return _tool_response(res)
 
         elif name in ("system_capabilities", "get_runtime_capabilities"):
             res = _call_http("system/capabilities")
+            try:
+                capabilities = json.loads(res)
+                if isinstance(capabilities, dict):
+                    capabilities["automation"] = {
+                        "serverVersion": SERVER_VERSION,
+                        "screenshotCapture": False,
+                        "computerUseRequired": False,
+                        "runInBackgroundConfigured": True,
+                        "features": [
+                            "uiAccessibilityCensus",
+                            "uiTextClickWithAmbiguityGuard",
+                            "waitForUiText",
+                            "orderedDiagnosticsSequences",
+                            "steamLaunchWithExistingProfileState",
+                            "gameProcessState",
+                            "gracefulPlayerExit",
+                            "steamCloudStateAndPerAppToggle",
+                        ],
+                    }
+                    res = json.dumps(capabilities, indent=2)
+            except (TypeError, ValueError):
+                pass
             return _tool_response(res)
 
         elif name in ("system_paths", "get_game_paths"):
@@ -1134,9 +1418,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             return _tool_response(res)
 
         elif name == "diagnostics_select_units":
-            csv = str(arguments.get("entityKeysCsv", ""))
+            entity_keys_csv = str(arguments.get("entityKeysCsv", ""))
             additive = bool(arguments.get("additive", False))
-            res = _call_diagnostics_method("SelectUnitsJson", [csv, additive])
+            res = _call_diagnostics_method("SelectUnitsJson", [entity_keys_csv, additive])
             return _tool_response(res)
 
         elif name == "diagnostics_set_fog_of_war":
@@ -2296,6 +2580,126 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("SetNavigatorPausedJson", [arguments["paused"]])
             return _tool_response(res)
 
+        elif name == "diagnostics_get_ui_accessibility_census":
+            query = str(arguments.get("query", "") or "")
+            include_inactive = arguments.get("includeInactive", False)
+            if not isinstance(include_inactive, bool):
+                return _tool_response(json.dumps({"error": "includeInactive must be a boolean"}), is_error=True)
+            try:
+                max_results = int(arguments.get("maxResults", 32))
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "maxResults must be an integer"}), is_error=True)
+            max_results = max(1, min(100, max_results))
+            res = _call_diagnostics_method("GetUiAccessibilityCensusJson", [query, include_inactive, max_results])
+            return _tool_response(res)
+
+        elif name == "diagnostics_ui_click_text":
+            label = str(arguments.get("label", "") or "").strip()
+            hierarchy_path = str(arguments.get("hierarchyPath", "") or "").strip()
+            if not label and not hierarchy_path:
+                return _tool_response(json.dumps({"error": "label or hierarchyPath is required"}), is_error=True)
+            exact_match = arguments.get("exactMatch", True)
+            if not isinstance(exact_match, bool):
+                return _tool_response(json.dumps({"error": "exactMatch must be a boolean"}), is_error=True)
+            res = _call_diagnostics_method("TryUiClickTextJson", [label, exact_match, hierarchy_path])
+            return _tool_response(res)
+
+        elif name == "diagnostics_wait_for_ui_text":
+            label = str(arguments.get("label", "") or "").strip()
+            hierarchy_path = str(arguments.get("hierarchyPath", "") or "").strip()
+            if not label and not hierarchy_path:
+                return _tool_response(json.dumps({"error": "label or hierarchyPath is required"}), is_error=True)
+            exact_match = arguments.get("exactMatch", True)
+            require_interactable = arguments.get("requireInteractable", True)
+            if not isinstance(exact_match, bool) or not isinstance(require_interactable, bool):
+                return _tool_response(json.dumps({"error": "exactMatch and requireInteractable must be booleans"}), is_error=True)
+            try:
+                timeout_seconds = float(arguments.get("timeoutSeconds", 10))
+                poll_interval_ms = int(arguments.get("pollIntervalMs", 250))
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "timeoutSeconds must be numeric and pollIntervalMs an integer"}), is_error=True)
+            if not 0.1 <= timeout_seconds <= 30:
+                return _tool_response(json.dumps({"error": "timeoutSeconds must be in [0.1, 30]"}), is_error=True)
+            if not 100 <= poll_interval_ms <= 1000:
+                return _tool_response(json.dumps({"error": "pollIntervalMs must be in [100, 1000]"}), is_error=True)
+
+            started = time.monotonic()
+            deadline = started + timeout_seconds
+            last_candidates: list[dict[str, Any]] = []
+            census_query = label or hierarchy_path
+            while True:
+                if time.monotonic() >= deadline:
+                    return _tool_response(json.dumps({
+                        "success": False,
+                        "label": label,
+                        "hierarchyPath": hierarchy_path,
+                        "waitedSeconds": round(time.monotonic() - started, 3),
+                        "reason": "timeout",
+                        "candidates": last_candidates,
+                        "source": "Unity UI accessibility census; no screenshot captured",
+                    }, indent=2))
+                request_deadline = deadline
+                automation_deadline = _AUTOMATION_DEADLINE.get()
+                if automation_deadline is not None:
+                    request_deadline = min(request_deadline, automation_deadline)
+                deadline_token = _AUTOMATION_DEADLINE.set(request_deadline)
+                try:
+                    raw = _call_diagnostics_method("GetUiAccessibilityCensusJson", [census_query, False, 100])
+                finally:
+                    _AUTOMATION_DEADLINE.reset(deadline_token)
+                try:
+                    census = json.loads(raw)
+                except (TypeError, ValueError):
+                    return _tool_response(json.dumps({"success": False, "label": label, "error": "invalid UI census response", "response": raw}), is_error=True)
+                if isinstance(census, dict) and census.get("error"):
+                    return _tool_response(json.dumps({
+                        "success": False,
+                        "label": label,
+                        "hierarchyPath": hierarchy_path,
+                        "error": census.get("error"),
+                        "completionStatus": census.get("completionStatus", "unknown"),
+                        "message": census.get("message", "inspect the UI state before retrying"),
+                    }, indent=2), is_error=True)
+                rows = census.get("candidates", []) if isinstance(census, dict) else []
+                matched: list[dict[str, Any]] = []
+                for row in rows if isinstance(rows, list) else []:
+                    if not isinstance(row, dict):
+                        continue
+                    candidate_label = str(row.get("label", ""))
+                    candidate_path = str(row.get("hierarchyPath", ""))
+                    label_matches = not label or (candidate_label.casefold() == label.casefold() if exact_match else label.casefold() in candidate_label.casefold())
+                    path_matches = not hierarchy_path or candidate_path == hierarchy_path
+                    if label_matches and path_matches:
+                        matched.append(row)
+                last_candidates = matched
+                ready = len(matched) == 1
+                if ready and require_interactable:
+                    ready = bool(matched[0].get("interactable")) and bool(matched[0].get("onScreen"))
+                if ready:
+                    return _tool_response(json.dumps({
+                        "success": True,
+                        "label": label,
+                        "exactMatch": exact_match,
+                        "hierarchyPath": hierarchy_path,
+                        "waitedSeconds": round(time.monotonic() - started, 3),
+                        "candidate": matched[0],
+                        "source": "Unity UI accessibility census; no screenshot captured",
+                    }, indent=2))
+                if time.monotonic() >= deadline:
+                    reason = "ambiguous" if len(matched) > 1 else ("not_interactable_or_off_screen" if matched else "not_found")
+                    return _tool_response(json.dumps({
+                        "success": False,
+                        "label": label,
+                        "exactMatch": exact_match,
+                        "hierarchyPath": hierarchy_path,
+                        "waitedSeconds": round(time.monotonic() - started, 3),
+                        "reason": reason,
+                        "requireInteractable": require_interactable,
+                        "candidates": last_candidates,
+                        "source": "Unity UI accessibility census; no screenshot captured",
+                    }, indent=2))
+                time.sleep(min(poll_interval_ms / 1000.0, max(0.0, deadline - time.monotonic())))
+
         elif name in ("diagnostics_ui_press_button", "diagnostics_ui_click"):
             # Point mode takes precedence: explicit x/y clicks whatever is on top.
             dx = arguments.get("x")
@@ -2494,7 +2898,7 @@ def generate_agent_configs(repo_root: Path | None = None) -> dict[str, str]:
         "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
         "name": "bepinex-mcp",
         "version": SERVER_VERSION,
-        "description": "BepInEx MCP server bridge for Rogue Command runtime diagnostics, telemetry censuses, multi-agent coordination, and tactical gameplay commands.",
+        "description": "BepInEx MCP server bridge for Rogue Command runtime diagnostics, screenless UI automation, Steam launch/Cloud control, telemetry censuses, and tactical gameplay commands.",
         "author": {
             "name": "Hermes Agent",
             "url": "https://github.com/Jorge-desing/Rogue-Evolution"

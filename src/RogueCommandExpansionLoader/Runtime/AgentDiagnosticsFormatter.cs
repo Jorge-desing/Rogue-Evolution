@@ -1114,6 +1114,15 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes a bounded primitive UI-accessibility payload with the
+        /// same dependency-free JSON writer used by the other diagnostics.
+        /// </summary>
+        public static string SerializeUiAccessibilityPayload(Dictionary<string, object> payload)
+        {
+            return Serialize(payload ?? new Dictionary<string, object>());
+        }
+
+        /// <summary>
         /// Serializes the intermission node-selection result. Status fields come
         /// before the reason detail so bounded truncation never hides the outcome.
         /// </summary>

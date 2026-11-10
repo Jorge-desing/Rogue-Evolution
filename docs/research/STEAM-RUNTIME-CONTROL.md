@@ -4,11 +4,11 @@ Este runbook es obligatorio antes de interactuar con una partida de Rogue Comman
 
 ## Ruta de control
 
-Usa el puente **BepInEx MCP** para inspeccionar y controlar una partida. En la sesión del 18 de octubre de 2026, el puente conectado ejecutó consultas y llamadas de Unity sin que Rogue Command tuviera que estar enfocado; no hace falta Computer Use para dar foco o para los controles que expone el puente. Recurre a control visual solo si una observación no está disponible por el puente y el usuario lo solicita.
+Usa el puente **BepInEx MCP** para inspeccionar y controlar una partida sin Computer Use ni capturas. El plugin establece `Application.runInBackground=true`; el puente puede operar aunque la ventana no tenga foco. Para menús usa `diagnostics_get_ui_accessibility_census`, `diagnostics_wait_for_ui_text` y `diagnostics_ui_click_text`; para cadenas acotadas usa `automation_run_sequence`. Si una observación no está expuesta, amplía la telemetría MCP o clasifica la comprobación como `BLOCKED`/`UNKNOWN`; no sustituyas el dato con una captura.
 
-Si tras dos intentos una consulta/control sigue fallando o el resultado del puente contradice el estado visible, detén los intentos a ciegas y aplica la skill `screenshot` como diagnóstico visual. Prefiere `tools/Capture-RogueCommand-Background.ps1`, que usa `PrintWindow` sin activar la ventana; registra la ruta de salida y compara el HWND en primer plano antes y después para demostrar que la captura no robó el foco. La captura complementa las lecturas del puente, no sustituye la comprobación de flags o del reloj del juego.
+Si tras dos intentos una consulta/control sigue fallando o contradice otra lectura MCP, detén los intentos a ciegas. Re-resuelve la escena y el componente, reduce el censo/lote, comprueba PID y conexión con `system_get_game_process_state`/`system_wait_for_game_bridge`, y conserva los payloads de error. No uses Computer Use ni captures como respaldo de diagnóstico.
 
-No inicies `RogueCommand.exe` directamente. La partida de aceptación debe venir de Steam. Si ya hay una instancia abierta, inspecciona esa instancia y no la reinicies para repetir una prueba.
+Inicia la partida con `system_launch_game`, que usa el AppID de Steam `1461910`, o desde Steam. No inicies `Rogue Command.exe` directamente. La herramienta no cambia ni crea perfiles. Si ya hay una instancia abierta, inspecciónala y no la reinicies para repetir una prueba. Para salir con normalidad usa `diagnostics_request_graceful_exit` con `confirmExit=true`, verifica luego el proceso con `system_get_game_process_state` y conserva la política de checkpoint de perfiles.
 
 ## Pausa segura y control de botones
 
@@ -107,16 +107,14 @@ El script valida las rutas confinadas a `.tools/BepInExMCP`, instala una versió
 
 Un `ping` correcto solo demuestra que responde el endpoint. Si una lectura grande se trunca, reduce profundidad/número de nodos y consulta campos concretos. Si falla un helper PowerShell/C# local, clasifica primero si falló la compilación del helper o la llamada MCP; un error de `Add-Type` (por ejemplo, un `using System` ausente) no demuestra que BepInEx esté caído.
 
-### Captura visual como respaldo de diagnóstico
+### Automatización de menús sin capturas
 
-Si dos intentos independientes de inspección fallan o devuelven estados contradictorios, deja de repetir la misma llamada y consulta la skill `screenshot` (`C:\Users\Alex\.codex\skills\screenshot\SKILL.md`). Para una captura de escritorio normal, su helper es `scripts/take_screenshot.ps1`; para análisis temporal usa `-Mode temp`. Si el juego está cubierto por otra ventana y no quieres activarlo, usa `tools/Capture-RogueCommand-Background.ps1`: llama `PrintWindow(hwnd, memoryDC, 2)` directamente, no llama `SetForegroundWindow`, guarda el PNG en `%TEMP%` y registra el handle de primer plano antes y después. Ejemplo:
-
-```powershell
-$shot = Join-Path $env:TEMP ("rogue-command-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.png')
-.\tools\Capture-RogueCommand-Background.ps1 -OutputPath $shot
-```
-
-El script busca exactamente un proceso `Rogue Command.exe`; si hay varios, vuelve a resolver el PID con `Get-CimInstance Win32_Process` y pásalo en `-ProcessId`. Inspecciona la imagen resultante: `PrintWindow` puede no producir contenido útil con una ventana minimizada o ciertos renderizadores. Si la captura falla, reporta su resultado y usa la skill para capturar la pantalla visible; no cambies el foco de la ventana sin autorización. Conserva una copia bajo `artifacts/runtime-smoke/` únicamente si aporta evidencia útil. Correlaciona imagen, escena, log y lecturas del puente; la imagen no demuestra estado interno que no se vea.
+- `diagnostics_get_ui_accessibility_census` devuelve controles `Selectable`, etiquetas Unity Text/TMP, escena, ruta jerárquica, estado visible/interactable y rectángulos calculados desde transforms. El censo no captura ni interpreta píxeles; `gameObjectId` es efímero y `hierarchyPath` debe re-resolverse tras cada transición.
+- `diagnostics_ui_click_text` exige una etiqueta única o una `hierarchyPath` exacta de escena (también admite controles sin etiqueta). Los duplicados fallan cerrados. La entrega sigue la ruta real de EventSystem/raycast y falla ante controles inactivos, fuera de pantalla, sin handlers u ocluidos. No llama `Button.onClick` directamente.
+- `diagnostics_wait_for_ui_text` espera hasta 30 segundos por etiqueta o ruta jerárquica exacta y puede exigir que el control esté interactuable y dentro de pantalla. `automation_run_sequence` ejecuta hasta 16 herramientas diagnósticas ordenadas, con límites de duración y parada por fallo.
+- `system_launch_game` solo lanza a través de Steam y conserva el selector/perfil actual. `system_wait_for_game_bridge` exige ping y una consulta de escena Unity, no solo un endpoint HTTP. `diagnostics_request_graceful_exit` solicita cierre normal; su persistencia debe tratarse con el checkpoint de perfil y Cloud.
+- `diagnostics_get_steam_cloud_state` lee los toggles de cuenta y de Rogue Command. `diagnostics_set_steam_cloud_enabled` modifica solo el toggle de esta app y exige autorización explícita del usuario; nunca desactives Cloud de toda la cuenta. Después de restaurar la copia elegida y relanzar, lee el estado y vuelve a habilitarlo solo cuando la copia local coincida con la fuente seleccionada.
+- Si un control no tiene componente `Selectable` o etiqueta Text/TMP, inspecciona su jerarquía y expón un selector específico mediante MCP. Mantén los resultados internos del runtime como telemetría; este flujo no prueba apariencia renderizada.
 
 Identidad observada en esta sesión: Rogue Command 1.0.9; Unity 2021.3.45f2; BepInEx 5.4.23.5 Mono x64; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`; MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Son valores de referencia, no sustituyen la comprobación de cada sesión.
 
@@ -180,12 +178,9 @@ Anota escena, ruta/ID del GameObject, componente, perfil, modo de progresión y 
 
 ### Pulsar controles de Unity
 
-Un `ButtonManager` puede tener listeners que abren diálogos o avanzan una secuencia, sin iniciar todavía la partida. Antes de invocarlo:
+Para un control, primero consulta `diagnostics_get_ui_accessibility_census` y espera el estado adecuado con `diagnostics_wait_for_ui_text`. Pulsa una etiqueta única o usa su `hierarchyPath` exacta con `diagnostics_ui_click_text`; los controles sin etiqueta requieren la ruta. El click valida `interactable`, actividad, bounds y oclusión mediante EventSystem/raycast, sin screenshot ni llamada directa a `Button.onClick`.
 
-1. Lee `onClick` y enumera sus listeners persistentes (`GetPersistentTarget`, `GetPersistentMethodName`) con un único componente de inspección temporal.
-2. Verifica `IsActive()` e `IsInteractable()` y revisa que el listener sea el esperado.
-3. Invoca una sola vez mediante el componente temporal o el método específico expuesto por el puente. Comprueba escena y jerarquía después.
-4. Destruye el componente temporal y confirma que ya no aparece en `inspect_components`.
+Un `ButtonManager` puede tener listeners que abren diálogos o avanzan una secuencia, sin iniciar todavía la partida. Antes de accionar uno, inspecciona sus listeners por reflexión con las herramientas MCP y confirma el target/método esperado. Usa el click por etiqueta para entregar una pulsación auténtica; si el objeto no es un `Selectable`/no tiene etiqueta accesible, añade un endpoint MCP tipado y específico, con postcondiciones observables. No uses componentes temporales para invocar listeners a ciegas.
 
 No confirmes el diálogo de sobrescritura de una partida guardada. `StartNewRun.OnClick()` comprueba si existe el archivo del perfil; si existe, ofrece sobrescribirlo. Usa solo un perfil QA aislado verificado y sin `savegame.dat`; conserva un inventario previo de QA y hashes de todos los perfiles del usuario. Nunca llames a `Game.Init`, `MetaGame.AddExperiencePoints` ni escribas campos de progresión como atajo para demostrar una recompensa real.
 

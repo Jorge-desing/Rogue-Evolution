@@ -76,7 +76,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             _provider = provider;
-            _pluginVersion = pluginVersion ?? "1.19.0";
+            _pluginVersion = pluginVersion ?? "1.20.0";
             _patchResult = patchResult;
             _compatibilityError = compatibilityError;
             _logWarning = logWarning;
