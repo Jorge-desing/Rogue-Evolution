@@ -758,6 +758,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_run_synthetic_gameplay_scenario",
             "diagnostics_get_control_guide",
             "diagnostics_gui_control",
+            "diagnostics_ui_invoke_native_button",
             "diagnostics_ui_click",
             "diagnostics_ui_press_button",
             "diagnostics_get_intermission_census",
@@ -775,6 +776,15 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         ):
             self.assertIn(expected, names)
         self.assertEqual(237, len(names))
+
+    def test_initialize_reports_current_bridge_version(self) -> None:
+        response = SERVER.handle_request({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2024-11-05"},
+        })
+        self.assertEqual("1.4.3", response["result"]["serverInfo"]["version"])
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})

@@ -25,7 +25,7 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.4.2"
+SERVER_VERSION = "1.4.3"
 GAME_PROCESS_NAME = "Rogue Command.exe"
 GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
