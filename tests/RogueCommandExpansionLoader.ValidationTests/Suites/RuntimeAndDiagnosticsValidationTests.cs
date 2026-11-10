@@ -79,7 +79,8 @@ internal static partial class ValidationTestRunner
             new[] { "Rig/Bone" },
             "Visual",
             0.5f);
-        if (!profile.Bind(entity) || !profile.IsBound || profile.BoundMappingCount != 1)
+        if (!profile.Bind(entity) || !profile.IsBound || profile.ConfiguredMappingCount != 1 ||
+            profile.BoundMappingCount != 1 || profile.IsSuspended)
         {
             throw new InvalidOperationException("A unique source/target path pair must bind exactly one retarget mapping.");
         }
@@ -150,7 +151,8 @@ internal static partial class ValidationTestRunner
 
         NativeRigRetargetProfile profile = root.AddComponent<NativeRigRetargetProfile>();
         profile.Configure(new[] { "Native/Bone" }, new[] { "Rig/Bone" }, "Visual", 1f);
-        if (profile.Bind(entity) || profile.IsBound || profile.BoundMappingCount != 0)
+        if (profile.Bind(entity) || profile.IsBound || profile.ConfiguredMappingCount != 1 ||
+            profile.BoundMappingCount != 0 || !profile.IsSuspended)
         {
             throw new InvalidOperationException("An ambiguous target path must disable the whole retarget profile without partial bindings.");
         }
@@ -7909,10 +7911,15 @@ internal static partial class ValidationTestRunner
             true, true, "Controller_Walker", "Avatar_Walker", true,
             "Walk", "Action_Walk", 1.0f, 0.5f, 1.0f,
             new[] { new VisualAnimationParameterRow("RCL_IsMoving", "Bool", "true") },
-            true, false, false, false, 0f, 0f);
+            true, false, false, false, 0f, 0f,
+            new VisualNativeRigRetargetState(true, true, false, 8, 8));
 
         string diagJson = AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(diag);
-        if (!diagJson.Contains("\"kind\":\"detailedEntityVisualDiagnostic\"") || !diagJson.Contains("\"render\":") || !diagJson.Contains("\"rig\":") || !diagJson.Contains("\"animation\":") || !diagJson.Contains("\"director\":"))
+        if (!diagJson.Contains("\"kind\":\"detailedEntityVisualDiagnostic\"") ||
+            !diagJson.Contains("\"render\":") || !diagJson.Contains("\"rig\":") ||
+            !diagJson.Contains("\"animation\":") || !diagJson.Contains("\"nativeRigRetarget\":") ||
+            !diagJson.Contains("\"configuredMappingCount\":8") || !diagJson.Contains("\"boundMappingCount\":8") ||
+            !diagJson.Contains("\"director\":"))
         {
             throw new InvalidOperationException($"Detailed diagnostic JSON missing required sections: {diagJson}");
         }
@@ -7945,6 +7952,21 @@ internal static partial class ValidationTestRunner
         var anim = go.AddComponent<Animator>();
         anim.activeClip = new AnimationClip { name = "Action_Walk", length = 1.0f };
 
+        Transform nativeRoot = new GameObject("Native").transform;
+        nativeRoot.parent = go.transform;
+        new GameObject("Bone").transform.parent = nativeRoot;
+        Transform visualRoot = new GameObject("Visual").transform;
+        visualRoot.parent = go.transform;
+        Transform rig = new GameObject("Rig").transform;
+        rig.parent = visualRoot;
+        new GameObject("Bone").transform.parent = rig;
+        NativeRigRetargetProfile retargetProfile = go.AddComponent<NativeRigRetargetProfile>();
+        retargetProfile.Configure(new[] { "Native/Bone" }, new[] { "Rig/Bone" }, "Visual", 1f);
+        if (!retargetProfile.Bind(unit))
+        {
+            throw new InvalidOperationException("The census fixture must bind its declared retarget mapping.");
+        }
+
         ExistingControllers.Instance.PlayerUnits().Add(unit);
 
         VisualRenderCensus census = RuntimeVisualCensus.Current(32);
@@ -7969,9 +7991,19 @@ internal static partial class ValidationTestRunner
 
         DetailedEntityVisualDiagnostic diag = RuntimeGameplayCommandDirector.InspectEntityVisual("998");
         string inspectJson = AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(diag);
-        if (!inspectJson.Contains("\"success\":true") || !inspectJson.Contains("MeshScalar"))
+        if (!inspectJson.Contains("\"success\":true") || !inspectJson.Contains("MeshScalar") ||
+            !inspectJson.Contains("\"nativeRigRetarget\":{\"present\":true,\"isBound\":true") ||
+            !inspectJson.Contains("\"configuredMappingCount\":1") || !inspectJson.Contains("\"boundMappingCount\":1"))
         {
             throw new InvalidOperationException($"Inspect JSON missing expected content: {inspectJson}");
+        }
+
+        retargetProfile.SuspendForDeath();
+        DetailedEntityVisualDiagnostic suspendedDiag = RuntimeGameplayCommandDirector.InspectEntityVisual("998");
+        string suspendedJson = AgentDiagnosticsFormatter.SerializeDetailedEntityVisualDiagnostic(suspendedDiag);
+        if (!suspendedJson.Contains("\"isSuspended\":true"))
+        {
+            throw new InvalidOperationException($"Inspect JSON must expose death-suspended retarget state: {suspendedJson}");
         }
 
         ExistingControllers.Instance.Reset();

@@ -19,6 +19,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private EntityController _entity;
         private BoundMapping[] _bindings = Array.Empty<BoundMapping>();
+        private int _configuredMappingCount;
         private bool _isBound;
         private bool _isSuspended;
         private bool _bindingFailureLogged;
@@ -41,6 +42,16 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public int BoundMappingCount
         {
             get { return _bindings == null ? 0 : _bindings.Length; }
+        }
+
+        public int ConfiguredMappingCount
+        {
+            get { return _configuredMappingCount; }
+        }
+
+        public bool IsSuspended
+        {
+            get { return _isSuspended; }
         }
 
         public void Configure(
@@ -67,6 +78,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _sourceToTargetPositionScale = IsFinitePositive(sourceToTargetPositionScale)
                 ? sourceToTargetPositionScale
                 : 1f;
+            _configuredMappingCount = count;
             _entity = null;
             _bindings = Array.Empty<BoundMapping>();
             _isBound = false;

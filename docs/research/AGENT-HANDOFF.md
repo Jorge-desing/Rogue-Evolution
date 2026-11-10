@@ -1321,3 +1321,12 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
 - **Runtime preflight:** Rogue Command was closed. The actual LocalLow selector was 2 and Profile2/savegame.dat existed. The all-profile checkpoint matched exactly after the read-only checks; no selector or tutorial state changed and no game was launched.
 - **Runtime verdict:** BLOCKED before Steam. The existing Profile2 run was preserved. Locomotion, aiming, firing, death, and pooled reuse remain unverified in-game. Evidence is in artifacts/runtime-smoke/animation-retarget-20261109T200556/runtime-evidence.json.
 - **Deployment:** Existing Release artifact and installed plugin matched SHA-256 e2e11582c7ee21aae70cb9f1f19507c905906b9a2d280c8d45809cd776937afd; the game process remained closed. No runtime source changed during this follow-up.
+
+## 2026-11-09 Native Rig Retarget Diagnostics
+
+- Added read-only NativeRigRetargetProfile state for configured mapping count and death suspension. The detailed entity visual diagnostic now includes animation.nativeRigRetarget with presence, bound/suspended state, and configured/bound mapping counts.
+- A matching configured/bound count confirms that exact paths resolved. It does not prove visible pose transfer; compare source and target hierarchy snapshots during movement and firing.
+- C# coverage now checks the diagnostic JSON for a successfully bound profile and for death suspension, alongside the lifecycle binding/reset tests.
+- Local validation: Release plugin build 0 warnings / 0 errors; C# harness 566/567 passed, with one Windows symlink-privilege skip and zero failures; git diff --check passed.
+- Deployment: Rogue Command was closed. Release artifact and installed plugin both hash to 32ad9178d2b658821a368a9453ee584881c09897bddbd85083ffe0e868c0d19a. Predeploy backup and manifest are in artifacts/deployment/native-retarget-diagnostics-20261109T203120/.
+- Runtime remains unverified. The current selector is Profile2 and Profile2/savegame.dat exists; a fresh all-profile checkpoint matched exactly after deployment. No game was launched, selector/tutorial state was not changed, and the existing run was preserved. Current preflight evidence is at artifacts/runtime-smoke/animation-retarget-diagnostics-20261109T203213/runtime-evidence.json.

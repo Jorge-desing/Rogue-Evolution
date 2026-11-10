@@ -1962,7 +1962,15 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["clipLength"] = diag.ClipLength,
                 ["normalizedTime"] = diag.NormalizedTime,
                 ["speed"] = diag.Speed,
-                ["parameters"] = paramList
+                ["parameters"] = paramList,
+                ["nativeRigRetarget"] = new Dictionary<string, object>
+                {
+                    ["present"] = diag.NativeRigRetarget.Present,
+                    ["isBound"] = diag.NativeRigRetarget.IsBound,
+                    ["isSuspended"] = diag.NativeRigRetarget.IsSuspended,
+                    ["configuredMappingCount"] = diag.NativeRigRetarget.ConfiguredMappingCount,
+                    ["boundMappingCount"] = diag.NativeRigRetarget.BoundMappingCount
+                }
             };
 
             var directorSection = new Dictionary<string, object>

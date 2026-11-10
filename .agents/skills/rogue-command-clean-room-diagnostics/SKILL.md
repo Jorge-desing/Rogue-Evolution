@@ -206,6 +206,7 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 - **Canonical Sockets**: `Socket_MuzzlePrimary` (with nested `FirePoint_0`), `Socket_EngineAudio`, `Socket_WeaponAudio`, `Socket_FootContact_*` ($Z = 0.0$), `Socket_DamageSmoke`, `Socket_DamageFire`. Zero ambiguous socket roles (`hasAmbiguousRoles == false`).
 - **Generic Avatar & Animator**: `hasAnimator == true`, `isAvatarValid == true`, standard parameters bound (`RCL_IsMoving`, `RCL_Fire`, `RCL_Death`).
 - **RuntimeVisualDirector**: Reflects dynamic state (`isDamagedActive` at $\le 50\%$ HP, `isCriticalActive` at $\le 25\%$ HP, `isTurretJammed`, `currentRecoilOffset`, `doorOpenProgress`).
+- **Native animation retarget**: `diagnostics_inspect_entity_visual` exposes `animation.nativeRigRetarget` with `present`, `isBound`, `isSuspended`, `configuredMappingCount`, and `boundMappingCount`. For a live unit, require `present == true`, `isBound == true`, matching configured/bound counts, and `isSuspended == false`; compare source/target Transform snapshots across movement and firing to prove pose transfer, because binding state alone is not visual proof.
 - **Vertex-Wear Channels**: R cavity/AO ($\le 0.4$), G edge wear ($\ge 0.7$), B soot/mud ($\ge 0.5$), A team mask.
 
 ## Canonical Two-Level Variant Runtime Check

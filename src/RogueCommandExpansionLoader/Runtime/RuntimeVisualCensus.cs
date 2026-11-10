@@ -217,6 +217,32 @@ namespace RogueCommandExpansionLoader.Runtime
     }
 
     /// <summary>
+    /// Bounded runtime state for an optional native-to-visual rig pose bridge.
+    /// </summary>
+    public readonly struct VisualNativeRigRetargetState
+    {
+        public VisualNativeRigRetargetState(
+            bool present,
+            bool isBound,
+            bool isSuspended,
+            int configuredMappingCount,
+            int boundMappingCount)
+        {
+            Present = present;
+            IsBound = isBound;
+            IsSuspended = isSuspended;
+            ConfiguredMappingCount = Math.Max(0, configuredMappingCount);
+            BoundMappingCount = Math.Max(0, boundMappingCount);
+        }
+
+        public bool Present { get; }
+        public bool IsBound { get; }
+        public bool IsSuspended { get; }
+        public int ConfiguredMappingCount { get; }
+        public int BoundMappingCount { get; }
+    }
+
+    /// <summary>
     /// Pure diagnostic DTO containing deep visual render, rig, and animation evidence for a specific entity.
     /// </summary>
     public sealed class DetailedEntityVisualDiagnostic
@@ -256,6 +282,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public float NormalizedTime { get; }
         public float Speed { get; }
         public IReadOnlyList<VisualAnimationParameterRow> Parameters { get; }
+        public VisualNativeRigRetargetState NativeRigRetarget { get; }
 
         // Visual Director Evidence
         public bool HasVisualDirector { get; }
@@ -300,7 +327,8 @@ namespace RogueCommandExpansionLoader.Runtime
             bool isCriticalVfxActive,
             bool isTurretJammed,
             float recoilOffset,
-            float doorOpenProgress)
+            float doorOpenProgress,
+            VisualNativeRigRetargetState nativeRigRetarget = default(VisualNativeRigRetargetState))
         {
             Success = success;
             EntityKeyId = entityKeyId ?? string.Empty;
@@ -331,6 +359,7 @@ namespace RogueCommandExpansionLoader.Runtime
             NormalizedTime = normalizedTime;
             Speed = speed;
             Parameters = parameters ?? new List<VisualAnimationParameterRow>().AsReadOnly();
+            NativeRigRetarget = nativeRigRetarget;
             HasVisualDirector = hasVisualDirector;
             IsDamagedVfxActive = isDamagedVfxActive;
             IsCriticalVfxActive = isCriticalVfxActive;
@@ -1130,6 +1159,16 @@ namespace RogueCommandExpansionLoader.Runtime
                     }
                 }
 
+                NativeRigRetargetProfile retargetProfile = go.GetComponent<NativeRigRetargetProfile>();
+                VisualNativeRigRetargetState nativeRigRetargetState = retargetProfile == null
+                    ? default(VisualNativeRigRetargetState)
+                    : new VisualNativeRigRetargetState(
+                        true,
+                        retargetProfile.IsBound,
+                        retargetProfile.IsSuspended,
+                        retargetProfile.ConfiguredMappingCount,
+                        retargetProfile.BoundMappingCount);
+
                 // 4. RuntimeVisualDirector Details
                 bool hasDirector;
                 bool isDamaged;
@@ -1174,7 +1213,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     isCritical,
                     isJammed,
                     recoil,
-                    doorProgress);
+                    doorProgress,
+                    nativeRigRetargetState);
             }
             catch (Exception ex)
             {
