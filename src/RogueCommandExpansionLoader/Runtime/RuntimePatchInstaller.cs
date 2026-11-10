@@ -1514,38 +1514,60 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        public static IEnumerable<CodeInstruction> EntityControllerDestroyTranspiler(IEnumerable<CodeInstruction> instructions)
+        public static IEnumerable<CodeInstruction> EntityControllerDestroyTranspiler(
+            IEnumerable<CodeInstruction> instructions,
+            MethodBase __originalMethod)
         {
-            try
+            MethodInfo originalMethod = __originalMethod as MethodInfo;
+            Type declaringType = originalMethod == null ? null : originalMethod.DeclaringType;
+            ParameterInfo[] originalParameters = originalMethod == null
+                ? new ParameterInfo[0]
+                : originalMethod.GetParameters();
+            if (originalMethod == null || originalMethod.IsStatic ||
+                !String.Equals(originalMethod.Name, "Destroy", StringComparison.Ordinal) ||
+                declaringType == null || !String.Equals(declaringType.Name, "EntityController", StringComparison.Ordinal) ||
+                originalMethod.ReturnType != typeof(void) || originalParameters.Length != 2 ||
+                originalParameters[0].ParameterType != typeof(bool) ||
+                originalParameters[1].ParameterType != declaringType)
             {
-                var list = new List<CodeInstruction>(instructions);
-                MethodInfo hookMethod = typeof(RuntimeHarmonyPatches).GetMethod(
-                    nameof(RuntimeHarmonyPatches.OnEntityDestroyTranspilerHook),
-                    BindingFlags.Public | BindingFlags.Static);
-
-                if (hookMethod == null || list.Count == 0)
-                {
-                    return list;
-                }
-
-                var ldarg0 = new CodeInstruction(OpCodes.Ldarg_0);
-                var ldarg1 = new CodeInstruction(OpCodes.Ldarg_1);
-                var ldarg2 = new CodeInstruction(OpCodes.Ldarg_2);
-                var callHook = new CodeInstruction(OpCodes.Call, hookMethod);
-
-                TransferLabels(list[0], ldarg0);
-
-                list.Insert(0, ldarg0);
-                list.Insert(1, ldarg1);
-                list.Insert(2, ldarg2);
-                list.Insert(3, callHook);
-
-                return list;
+                throw new InvalidOperationException(
+                    "EntityController.Destroy transpiler requires an instance void Destroy(bool, EntityController) target.");
             }
-            catch
+
+            MethodInfo hookMethod = typeof(RuntimeHarmonyPatches).GetMethod(
+                nameof(RuntimeHarmonyPatches.OnEntityDestroyTranspilerHook),
+                BindingFlags.Public | BindingFlags.Static);
+            ParameterInfo[] hookParameters = hookMethod == null
+                ? new ParameterInfo[0]
+                : hookMethod.GetParameters();
+            if (hookMethod == null || hookMethod.ReturnType != typeof(void) ||
+                hookParameters.Length != 3 || hookParameters[0].ParameterType != typeof(object) ||
+                hookParameters[1].ParameterType != typeof(bool) ||
+                hookParameters[2].ParameterType != typeof(object))
             {
-                return instructions;
+                throw new InvalidOperationException(
+                    "EntityController.Destroy transpiler callback must be void(object, bool, object).");
             }
+
+            var list = new List<CodeInstruction>(instructions);
+            if (list.Count == 0)
+            {
+                throw new InvalidOperationException("EntityController.Destroy transpiler received an empty instruction stream.");
+            }
+
+            var ldarg0 = new CodeInstruction(OpCodes.Ldarg_0);
+            var ldarg1 = new CodeInstruction(OpCodes.Ldarg_1);
+            var ldarg2 = new CodeInstruction(OpCodes.Ldarg_2);
+            var callHook = new CodeInstruction(OpCodes.Call, hookMethod);
+
+            TransferLabels(list[0], ldarg0);
+
+            list.Insert(0, ldarg0);
+            list.Insert(1, ldarg1);
+            list.Insert(2, ldarg2);
+            list.Insert(3, callHook);
+
+            return list;
         }
 
         public static IEnumerable<CodeInstruction> EntityControllerExecuteCommandTranspiler(IEnumerable<CodeInstruction> instructions)

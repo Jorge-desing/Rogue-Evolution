@@ -107,7 +107,7 @@ The loader registers 65 verified hooks across core game simulation systems, incl
   - `EntityFactory.InitEntityController`: Value-returning method (`EntityController`). Injects `OpCodes.Dup` + `call OnInitEntityControllerTranspilerHook` before each `OpCodes.Ret`, preserving the returned instance on the stack.
   - `EntityFactory.CreateBuildingPlacementGhost`: Value-returning method (`GameObject`). Injects `OpCodes.Dup` + `ldarg.0` + `ldarg.1` + `call OnCreateBuildingPlacementGhostTranspilerHook` before each `OpCodes.Ret`.
   - `EntityController.Init`: Injects `ldarg.0` + `ldarg.1` + `call OnEntityInitTranspilerHook` before all `OpCodes.Ret` exit points with label transfer.
-  - `EntityController.Destroy`: Injects `ldarg.0..2` + `call OnEntityDestroyTranspilerHook` at method entry (index 0) with label transfer.
+  - `EntityController.Destroy`: Injects `ldarg.0..2` + `call OnEntityDestroyTranspilerHook` at method entry (index 0) with label transfer. Validate `MethodBase __originalMethod` as instance `void Destroy(bool, EntityController)` and callback `void(object, bool, object)` before emitting IL; throw on mismatch so Harmony rolls back instead of silently leaving an unpatched destroy hook.
   - `EntityController.ExecuteCommand`: Injects `ldarg.0` + `call OnEntityExecuteCommandTranspilerHook` at method entry (index 0) with label transfer.
   - `EntityController.ExecuteNextCommand`: Injects `ldarg.0` + `call OnEntityExecuteNextCommandTranspilerHook` before all `OpCodes.Ret` exits.
   - `EntityController.ResetCurrentCommand`: Injects `ldarg.0` + `call OnEntityResetCurrentCommandTranspilerHook` before each `OpCodes.Ret` exit.
@@ -158,5 +158,6 @@ The loader registers 65 verified hooks across core game simulation systems, incl
 
 - Reuse the installed `EntityController.OnHasBeenInstantiatedForReuse` hook and its existing `RuntimeHooks.OnEntityHasBeenInstantiatedForReuseTranspiler` callback. Route the entity to `RuntimeVisualDirector.OnEntityReused`; do not add another Harmony target for retarget reset.
 - The installed `EntityController.Destroy` CIL transpiler invokes `OnEntityDestroyTranspiler` at method entry; suspend `NativeRigRetargetProfile` there before native destruction proceeds. On the pinned build, `EntityController.TakeDamage` calls this `Destroy` method. Keep `RuntimeVisualDirector.Update`'s dead-state check as a fallback, and recheck the complete game identity before relying on these members.
+- The destroy transpiler validates `__originalMethod` and the callback stack signature before injecting `ldarg.0..2`; a mismatch must fail Harmony installation and roll back instead of silently returning untouched IL.
 - Resolve serialized source/target Transform paths and bind poses on the cloned unit instance. The retarget component performs local pose copying in `LateUpdate`; the existing reuse transpiler callback resets animator state and mapped bind poses for the next pooled lifetime.
 - Recheck the full game compatibility tuple before relying on reflected hooks. A local harness confirms dispatch wiring only; it does not prove pool behavior inside a Steam match.
