@@ -1,5 +1,26 @@
 namespace UnityEngine
 {
+    [System.AttributeUsage(System.AttributeTargets.Class)]
+    public sealed class DisallowMultipleComponent : System.Attribute
+    {
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class)]
+    public sealed class DefaultExecutionOrder : System.Attribute
+    {
+        public DefaultExecutionOrder(int order)
+        {
+            this.order = order;
+        }
+
+        public int order { get; }
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Field)]
+    public sealed class SerializeField : System.Attribute
+    {
+    }
+
     public struct Vector2Int
     {
         public int x;

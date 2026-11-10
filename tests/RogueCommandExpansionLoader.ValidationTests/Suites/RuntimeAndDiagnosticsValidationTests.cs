@@ -44,6 +44,117 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Retargeted rotation must apply the source bind-relative delta to the target bind rotation.");
         }
     }),
+    ("native rig retarget binds mapped transforms, suspends on death, and restores on pool reuse", () =>
+    {
+        static Transform AddChild(Transform parent, string name)
+        {
+            var child = new GameObject(name);
+            child.transform.parent = parent;
+            return child.transform;
+        }
+
+        static bool Near(float actual, float expected) => Math.Abs(actual - expected) <= 0.0001f;
+
+        var root = new GameObject("Entity");
+        EntityController entity = root.AddComponent<EntityController>();
+        Transform source = AddChild(AddChild(root.transform, "Native"), "Bone");
+        Transform visualRoot = AddChild(root.transform, "Visual");
+        Transform target = AddChild(AddChild(visualRoot, "Rig"), "Bone");
+        Vector3 sourceRestPosition = new Vector3(1f, 2f, 3f);
+        Vector3 targetRestPosition = new Vector3(10f, 20f, 30f);
+        float halfSqrt = (float)Math.Sqrt(0.5f);
+        Quaternion sourceRestRotation = new Quaternion(0f, 0f, 0f, 1f);
+        Quaternion targetRestRotation = new Quaternion(0f, halfSqrt, 0f, halfSqrt);
+        Quaternion sourceCurrentRotation = new Quaternion(0f, 0f, halfSqrt, halfSqrt);
+        Vector3 targetScale = new Vector3(2f, 3f, 4f);
+        source.localPosition = sourceRestPosition;
+        source.localRotation = sourceRestRotation;
+        target.localPosition = targetRestPosition;
+        target.localRotation = targetRestRotation;
+        target.localScale = targetScale;
+
+        NativeRigRetargetProfile profile = root.AddComponent<NativeRigRetargetProfile>();
+        profile.Configure(
+            new[] { "Native/Bone" },
+            new[] { "Rig/Bone" },
+            "Visual",
+            0.5f);
+        if (!profile.Bind(entity) || !profile.IsBound || profile.BoundMappingCount != 1)
+        {
+            throw new InvalidOperationException("A unique source/target path pair must bind exactly one retarget mapping.");
+        }
+
+        MethodInfo? lateUpdate = typeof(NativeRigRetargetProfile).GetMethod(
+            "LateUpdate",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (lateUpdate == null)
+        {
+            throw new InvalidOperationException("The retarget LateUpdate entry point must remain available to the runtime lifecycle.");
+        }
+
+        source.localPosition = new Vector3(3f, 4f, 7f);
+        source.localRotation = sourceCurrentRotation;
+        lateUpdate.Invoke(profile, null);
+        if (!Near(target.localPosition.x, 11f) || !Near(target.localPosition.y, 21f) ||
+            !Near(target.localPosition.z, 32f) || !Near(target.localRotation.x, 0.5f) ||
+            !Near(target.localRotation.y, 0.5f) || !Near(target.localRotation.z, 0.5f) ||
+            !Near(target.localRotation.w, 0.5f) || !Near(target.localScale.x, targetScale.x) ||
+            !Near(target.localScale.y, targetScale.y) || !Near(target.localScale.z, targetScale.z))
+        {
+            throw new InvalidOperationException("LateUpdate must transfer only bind-relative position/rotation deltas and preserve target scale.");
+        }
+
+        Vector3 deathPose = target.localPosition;
+        profile.SuspendForDeath();
+        source.localPosition = new Vector3(50f, 60f, 70f);
+        lateUpdate.Invoke(profile, null);
+        if (!Near(target.localPosition.x, deathPose.x) || !Near(target.localPosition.y, deathPose.y) ||
+            !Near(target.localPosition.z, deathPose.z))
+        {
+            throw new InvalidOperationException("A death-suspended retarget profile must stop copying later native poses.");
+        }
+
+        profile.ResetForReuse();
+        if (!Near(source.localPosition.x, sourceRestPosition.x) ||
+            !Near(source.localPosition.y, sourceRestPosition.y) ||
+            !Near(source.localPosition.z, sourceRestPosition.z) ||
+            !Near(target.localPosition.x, targetRestPosition.x) ||
+            !Near(target.localPosition.y, targetRestPosition.y) ||
+            !Near(target.localPosition.z, targetRestPosition.z))
+        {
+            throw new InvalidOperationException("Pool reuse must restore both mapped bind poses before retargeting resumes.");
+        }
+
+        source.localPosition = new Vector3(3f, 4f, 7f);
+        lateUpdate.Invoke(profile, null);
+        if (!Near(target.localPosition.x, 11f) || !Near(target.localPosition.y, 21f) ||
+            !Near(target.localPosition.z, 32f))
+        {
+            throw new InvalidOperationException("Retargeting must resume for the new pooled unit lifetime.");
+        }
+    }),
+    ("native rig retarget fails closed when a target path is ambiguous", () =>
+    {
+        var root = new GameObject("Entity");
+        EntityController entity = root.AddComponent<EntityController>();
+        Transform nativeRoot = new GameObject("Native").transform;
+        nativeRoot.parent = root.transform;
+        Transform source = new GameObject("Bone").transform;
+        source.parent = nativeRoot;
+        Transform visualRoot = new GameObject("Visual").transform;
+        visualRoot.parent = root.transform;
+        Transform rig = new GameObject("Rig").transform;
+        rig.parent = visualRoot;
+        new GameObject("Bone").transform.parent = rig;
+        new GameObject("Bone").transform.parent = rig;
+
+        NativeRigRetargetProfile profile = root.AddComponent<NativeRigRetargetProfile>();
+        profile.Configure(new[] { "Native/Bone" }, new[] { "Rig/Bone" }, "Visual", 1f);
+        if (profile.Bind(entity) || profile.IsBound || profile.BoundMappingCount != 0)
+        {
+            throw new InvalidOperationException("An ambiguous target path must disable the whole retarget profile without partial bindings.");
+        }
+    }),
     ("localization language resolution falls back when the reflected getter throws", () =>
     {
         int logCount = 0;

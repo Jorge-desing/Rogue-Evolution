@@ -86,6 +86,8 @@
              Link="Runtime/RuntimeVisualCensusSupport.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/NativeRigRetargetPoseMath.cs"
              Link="Runtime/Visual/NativeRigRetargetPoseMath.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/NativeRigRetargetProfile.cs"
+             Link="Runtime/Visual/NativeRigRetargetProfile.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVisualSurfaceCensus.cs"
              Link="Runtime/RuntimeVisualSurfaceCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeVisualMaterialCensus.cs"
