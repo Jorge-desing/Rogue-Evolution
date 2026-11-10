@@ -213,6 +213,12 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 
 - Use one `run_bridge_batch` for `Animator.GetBool("RCL_IsMoving")`, the current clip, and mapped poses when possible. Calls issued separately may sample different Unity frames. At `Time.timeScale = 0`, `Time.deltaTime` is zero and locomotion policy intentionally reports not moving; briefly unpause for a movement sample, then restore the prior pause state. A paused false readback is not proof of a retarget defect.
 
+## Native Retarget Runtime Follow-up (2026-11-10)
+
+- On a saved Profile1 boss run, `InspectEntityVisualJson` captured `Action_FireRecoil`, a triggered fire parameter, positive recoil, 8/8 mappings, and yaw/pitch target poses matching the computed poses. This is BepInEx runtime telemetry, not rendered appearance proof.
+- A lethal QA clone advanced the destroy-transpiler counter 16→17 and disappeared. The post-destroy `IsSuspended` value and death clip could not be read; keep direct suspension state and death appearance unknown. The native reuse-transpiler counter stayed 0; an active non-pooled `OnHasBeenInstantiatedForReuse(false)` probe failed.
+- After graceful exit, the saved-profile selector and all profile hashes were restored to the preflight checkpoint. Keep test actors disposable and pause at `timeScale=0` between samples.
+
 ## Canonical Two-Level Variant Runtime Check
 
 - For a clean-room variant check, use the existing `diagnostics_order_apply_visual_variant` command on a known entity and a declared Level 2 variant. Capture the returned variant/module count and `diagnostics_get_visual_census` / `diagnostics_inspect_entity_visual` readback, then apply `ResetVisualVariant` and confirm the Level 1 appearance, original transform scale, tint property blocks, and hardpoint group active states are restored.

@@ -165,4 +165,5 @@ The loader registers 65 verified hooks across core game simulation systems, incl
 ### Native Rig Retarget Lifecycle Evidence
 
 - The exact `EntityController.Destroy` transpiler is locally covered for suspension dispatch and signature drift, but a live locomotion check does not prove that the destruction hook ran. Verify `isSuspended` during a real death and verify reset/resume during real pooled reuse as separate runtime claims.
-- The 2026-11-10 Profile2 runtime pass observed locomotion pose transfer only. Do not report death suspension or pool reuse as Steam-verified from the passing C# harness or from the movement observation.
+- The 2026-11-10 saved-Profile1 BepInEx pass observed the lethal-test `EntityController.Destroy` transpiler counter increase from 16 to 17. Its callback calls `SuspendForDeath`, but the GameObject disappeared before `IsSuspended` could be read; report this as Destroy-hook runtime evidence, not a direct suspension-state read.
+- The same pass captured `Action_FireRecoil`, `RCL_Fire=triggered`, positive recoil, and matching computed yaw/pitch target poses. The live reuse counter stayed 0. A direct `OnHasBeenInstantiatedForReuse(false)` call on an active non-pooled entity threw `TargetInvocationException`; do not treat it as pool evidence.

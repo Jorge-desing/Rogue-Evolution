@@ -129,3 +129,8 @@ python tools/runtime_profile_checkpoint.py verify `
 - After confirming the installed Release DLL hash and pack registration, select a known unit through the existing diagnostics path and run `diagnostics_order_apply_visual_variant` for a declared Level 2 variant. Verify the target entity's visual census shows the selected variant and module count, and inspect the matching canonical hardpoint groups.
 - Apply the primary/reset state and verify module instances are removed while the original chassis, scale, tint blocks, and group active state return. Keep screenshots/logs and verdict under `artifacts/runtime-smoke/<session-id>/`; distinguish a successful command response from direct renderer/appearance evidence.
 - Follow the runbook's Steam launch. For ordinary continuation tests, restart and use an existing tutorial-complete saved profile through the native UI; reserve the isolated no-save QA procedure for tests that truly bypass `FirstRun`. If the MCP bridge or direct postconditions are unavailable, report runtime status as `BLOCKED` or `UNKNOWN` and retain local-build/bundle evidence separately.
+
+### Saved-profile retarget pass (2026-11-10)
+
+- The user required an existing saved profile after restart. Profile1 was selected through the native UI with tutorial completion already true; the resumed route was level 4 boss. No clean slot, tutorial bypass, or tutorial-file edit was used.
+- After `LoadScene.QuitGame`, restore test-modified metadata from the pre-run backup and restore the selector to its captured original value. This pass restored Profile1 metadata and selector `2`; all profile hashes matched the 09:38 preflight checkpoint. Keep the current default QA-profile procedure for future acceptance runs.
