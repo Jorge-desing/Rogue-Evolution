@@ -87,7 +87,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         public int ConfiguredMappingCount
         {
-            get { return _configuredMappingCount; }
+            get
+            {
+                int serializedPathCount = _sourcePaths == null ? 0 : _sourcePaths.Length;
+                return Math.Max(0, Math.Max(_configuredMappingCount, serializedPathCount));
+            }
         }
 
         public bool IsSuspended
@@ -236,10 +240,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             int limit = Math.Max(0, Math.Min(maximumCount, MaxDiagnosticMappingSamples));
             if (!_isBound || _bindings == null)
             {
-                return Math.Max(0, _configuredMappingCount);
+                return ConfiguredMappingCount;
             }
 
-            int totalCount = Math.Max(_configuredMappingCount, _bindings.Length);
+            int totalCount = Math.Max(ConfiguredMappingCount, _bindings.Length);
             int sampleCount = Math.Min(limit, _bindings.Length);
             for (int i = 0; i < sampleCount; i++)
             {

@@ -80,6 +80,8 @@ python tools/validate_loader_registry.py --json
 - **MCP Quirks:** `component/call_method` requires full type names; `LoaderDiagnostics` ID is scene-dependent (re-resolve via `find_objects_with_component`).
 - **Retarget Readback:** `diagnostics_inspect_entity_visual` includes `animation.nativeRigRetarget` state plus up to 16 rows with mapping paths, source/target availability, current local poses, and computed target pose. `omittedMappingCount` precedes `mappings`. Equal counts and a computed pose confirm mapping/math state only; live locomotion/fire still requires source/target pose changes in-game, with death suspension and pool reuse checked separately.
 - **Retarget Static Preflight:** `tools/validate_native_visual_roots.py <pack>` validates each exact native `sourcePath` and declared bundle-prefab `targetPath` after checking the game version/SHA/MVID tuple. The companion test also checks pack-relative bundle path containment. This is static hierarchy evidence only.
+- **Saved-Run Restart:** If the current session is in the tutorial or a menu state cannot continue the run, close Rogue Command and relaunch through Steam, then choose an existing tutorial-complete profile with the native profile UI and use Continue Run. Never select/reset a clean profile or edit tutorial files. Profile and scene GameObject IDs are session-dependent; resolve them again through BepInEx MCP.
+- **Frame-Coherent Retarget Sampling:** Batch the moving flag, current Animator clip, and mapped source/target poses in one bridge frame when possible. A paused `Time.deltaTime == 0` intentionally clears the movement policy, and separate calls may observe different frames.
 
 ---
 

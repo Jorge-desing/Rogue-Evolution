@@ -186,7 +186,7 @@ When multiple autonomous agents operate on the same match (e.g., economy manager
 
 ## 8. Operational Safety & Scene Placement Rules
 
-- **Dedicated QA Profile**: Always test on `Profile2` (the dedicated QA profile without a tutorial). Never touch active player saves.
+- **Saved-Profile Continuity**: For normal continuation testing, restart and select an existing tutorial-complete saved profile through the game's native profile UI; never reset or start clean because that re-triggers the tutorial. Preserve its save and restore any test-modified save/meta files after exit. A separate no-save QA profile is for tests that explicitly bypass `FirstRun`.
 - **Preserve Unrelated Work**: Stage only task-owned files explicitly. Never run `git add -A`.
 - **Installed DLL Parity**: Ensure `BepInEx/plugins/RogueCommandExpansionLoader.dll` SHA-256 matches the local Release build artifact before live validation.
 - **Scene-Local Diagnostics Host**: `LoaderDiagnosticsComponent` is intentionally scene-local. On additive loads (`sceneLoaded` fires before `activeSceneChanged`), `EnsureDiagnosticsComponent` moves the GameObject via `SceneManager.MoveGameObjectToScene`.
@@ -208,6 +208,10 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 - **RuntimeVisualDirector**: Reflects dynamic state (`isDamagedActive` at $\le 50\%$ HP, `isCriticalActive` at $\le 25\%$ HP, `isTurretJammed`, `currentRecoilOffset`, `doorOpenProgress`).
 - **Native animation retarget**: `diagnostics_inspect_entity_visual` exposes state plus up to 16 `mappings`, each with exact paths, availability, current source/target local poses, and the computed target pose. `omittedMappingCount` is serialized before `mappings`. For a live unit, require `present == true`, `isBound == true`, matching configured/bound counts, and `isSuspended == false`; during movement/fire compare source motion with target motion and the computed pose. The `EntityController.Destroy` transpiler entry hook should set `isSuspended == true` before native destruction continues; its original-method and callback stack signatures are validated before IL injection, while the visual director's dead-state check remains a fallback. The computed pose is a math reference; telemetry alone does not establish rendered motion. Verify death appearance and pooled reuse separately.
 - **Vertex-Wear Channels**: R cavity/AO ($\le 0.4$), G edge wear ($\ge 0.7$), B soot/mud ($\ge 0.5$), A team mask.
+
+## Frame-Coherent Retarget Sampling
+
+- Use one `run_bridge_batch` for `Animator.GetBool("RCL_IsMoving")`, the current clip, and mapped poses when possible. Calls issued separately may sample different Unity frames. At `Time.timeScale = 0`, `Time.deltaTime` is zero and locomotion policy intentionally reports not moving; briefly unpause for a movement sample, then restore the prior pause state. A paused false readback is not proof of a retarget defect.
 
 ## Canonical Two-Level Variant Runtime Check
 

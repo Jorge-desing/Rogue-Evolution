@@ -20,7 +20,7 @@ Runbook for fail-closed, reversible in-game validation sessions on live Rogue Co
 
 Stop immediately before mutation if any gate is violated:
 
-1. **Profile2 Dedicated QA Invariant:** Always use dedicated `Profile2` resolved via `ProfileManager.CurrentProfileTextPath` under `Application.persistentDataPath`. Profile2 has no tutorial. NEVER gate QA on tutorial status, switch to Profile3, or edit `tutorialState.txt`.
+1. **Saved-Profile Continuity:** Never start or reset a clean/new profile for a run that must preserve completed tutorial progress; doing so re-triggers the tutorial. For ordinary continuation testing, restart the game and select an existing saved profile through the native profile-management UI, verify its tutorial remains completed, and use its saved run normally. Do not call tutorial methods or edit `tutorialState.txt`. Use a distinct isolated QA profile with no saved run only when a test specifically requires bypassing `FirstRun`; complete tutorial progression normally through the game before that test. If switching the authoritative selector, checkpoint its value and every user-profile file first. Back up a continued run and restore any test-modified save/meta files after exit; leave the user's explicitly selected profile active.
 2. **Process Ownership:** Verify `Rogue Command.exe` state. If an unowned instance is running, perform read-only inspection only; never restart, deploy over, or kill it without authorization.
 3. **Compatibility Identity:** Recheck version (`1.0.9`), Unity (`2021.3.45f2`), `Assembly-CSharp.dll` SHA-256 (`d2da384df...`), and MVID (`db0e9462...`).
 4. **Exact Deployment:** Compute SHA-256 of local Release artifacts and compare with deployed files. Mismatch = blocked.
@@ -115,17 +115,17 @@ python tools/runtime_profile_checkpoint.py verify `
 ## 6. End-of-Session Verification Checklist
 
 - [ ] Checkout branch, commit hash, and Release artifact SHA-256 recorded.
-- [ ] Profile2 authoritative selector verified; tutorial bypasses strictly avoided.
-- [ ] Pre-run all-profile checkpoint created.
+- [ ] Existing saved profile selected through native profile UI after restart; no clean/new profile or tutorial bypass used.
+- [ ] Selector and all-profile hashes checkpointed before any profile switch; tutorial completion and the selected save verified.
 - [ ] BepInEx MCP listener URL matched to live PID; response payloads checked for errors.
 - [ ] Native pause confirmed prior to automated inspections.
 - [ ] Claim postconditions observed and recorded in `artifacts/runtime-smoke/<session-id>/`.
 - [ ] Process gracefully exited; verified process termination before restoring files.
-- [ ] Deployment restored and post-run profile checkpoint verified (`Profile2/metaSavegame.dat` only allowed delta).
+- [ ] Any test-modified save/meta files restored from the pre-run backup; tutorial and unrelated profile hashes verified, with the explicitly selected profile left active.
 - [ ] `runtime-evidence.json` generated with explicit verdict (`PASS`, `FAIL`, `BLOCKED`, `UNKNOWN`).
 
 ## Two-Level Variant Acceptance
 
 - After confirming the installed Release DLL hash and pack registration, select a known unit through the existing diagnostics path and run `diagnostics_order_apply_visual_variant` for a declared Level 2 variant. Verify the target entity's visual census shows the selected variant and module count, and inspect the matching canonical hardpoint groups.
 - Apply the primary/reset state and verify module instances are removed while the original chassis, scale, tint blocks, and group active state return. Keep screenshots/logs and verdict under `artifacts/runtime-smoke/<session-id>/`; distinguish a successful command response from direct renderer/appearance evidence.
-- Use only the runbook's Steam launch and isolated QA-profile procedure. If the MCP bridge, profile isolation, or direct postconditions are unavailable, report runtime status as `BLOCKED` or `UNKNOWN` and retain the local-build/bundle evidence separately.
+- Follow the runbook's Steam launch. For ordinary continuation tests, restart and use an existing tutorial-complete saved profile through the native UI; reserve the isolated no-save QA procedure for tests that truly bypass `FirstRun`. If the MCP bridge or direct postconditions are unavailable, report runtime status as `BLOCKED` or `UNKNOWN` and retain local-build/bundle evidence separately.

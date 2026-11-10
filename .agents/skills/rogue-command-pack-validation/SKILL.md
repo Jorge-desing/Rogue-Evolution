@@ -87,6 +87,7 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 
 ## Native Rig Retarget Manifest Checks
 
+- Install a refreshed native-retarget pack as one artifact set: `content.json`, `assetbundle-manifest.bundle`, and its referenced content bundle. Record and compare each installed SHA-256 with the canonical validated output; changing only the manifest can leave the game loading a stale prefab hierarchy.
 - Validate `nativeRigRetarget.mappings[]` as 1–64 `{sourcePath,targetPath}` pairs, present only on a native-template visual overlay. Paths are relative to different roots: the native unit prefab and the custom visual prefab.
 - Reject empty, rooted, backslash, whitespace-only, `.`/`..`, duplicate target, and source paths equal to or above the visual root. Runtime binding requires each exact path to resolve once.
 - Run `tools/validate_native_visual_roots.py <pack>` to resolve every source path in the pinned game's `resources.assets` and every target path under the exact GameObject container entry for `visualAssetName` in the unit's declared bundle. The companion `tests.python.authoring.test_native_visual_retarget_preflight` protects this source/target check and pack-relative bundle path containment. These checks do not prove that the mapped motion works in a Steam match.

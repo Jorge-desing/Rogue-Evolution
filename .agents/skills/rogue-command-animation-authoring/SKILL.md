@@ -198,6 +198,13 @@ Do not rotate a model or change yaw correction based only on static evidence. Re
 - Keep reflected-signature claims behind the complete game identity check: Rogue Command version, Unity version, `Assembly-CSharp.dll` SHA-256, and MVID.
 - Label results as **static inspection**, **local build/validation**, or **in-game runtime evidence**; never promote one tier into another.
 
+## Runtime follow-up: cloned retarget profiles and delayed Animators
+
+- Unity can clone a `NativeRigRetargetProfile` after its non-serialized `_configuredMappingCount` was assigned. Derive the public configured count and omission diagnostics from serialized `_sourcePaths` as well, so the clone reports configured mappings before binding.
+- A visual clone's `Animator` or controller parameters may become available after `RuntimeVisualDirector.Initialize`. Retry parameter discovery on `Time.unscaledTime` while the controller is missing or an expected `RCL_IsMoving`, `RCL_Fire`, or `RCL_Death` parameter is absent, and refresh immediately when the controller reference changes.
+- For live locomotion evidence, sample `Animator.GetBool("RCL_IsMoving")`, the current clip, and source/target mapped poses in one BepInEx bridge batch while the unit is moving. At `Time.timeScale = 0`, `Time.deltaTime` is zero and the movement policy returns false; independent bridge calls can observe different frames.
+- The 2026-11-10 Profile2 movement check observed 8/8 bound mappings and matching target/expected leg poses during `Action_Walk`. It did not exercise live death suspension, firing, or pooled reuse; keep those claims open until separately observed.
+
 ## Completion report
 
 List edited source, clips, controllers, prefabs, and bundles; state tool/engine versions and commands; report observed diagnostics; and separate static, local Unity, and live-game evidence. Identify unverified state transitions or motion behavior explicitly.

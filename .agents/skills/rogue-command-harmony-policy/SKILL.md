@@ -161,3 +161,8 @@ The loader registers 65 verified hooks across core game simulation systems, incl
 - The destroy transpiler validates `__originalMethod` against the exact game `EntityController` type and validates the exact static, non-generic callback before injecting `ldarg.0..2`; signature drift or empty IL must fail Harmony installation and roll back instead of silently returning untouched IL.
 - Resolve serialized source/target Transform paths and bind poses on the cloned unit instance. The retarget component performs local pose copying in `LateUpdate`; the existing reuse transpiler callback resets animator state and mapped bind poses for the next pooled lifetime.
 - Recheck the full game compatibility tuple before relying on reflected hooks. A local harness confirms dispatch wiring only; it does not prove pool behavior inside a Steam match.
+
+### Native Rig Retarget Lifecycle Evidence
+
+- The exact `EntityController.Destroy` transpiler is locally covered for suspension dispatch and signature drift, but a live locomotion check does not prove that the destruction hook ran. Verify `isSuspended` during a real death and verify reset/resume during real pooled reuse as separate runtime claims.
+- The 2026-11-10 Profile2 runtime pass observed locomotion pose transfer only. Do not report death suspension or pool reuse as Steam-verified from the passing C# harness or from the movement observation.

@@ -25,6 +25,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private Transform _socketRecoilPrimary;
         private Transform _socketMuzzlePrimary;
         private Animator _animator;
+        private RuntimeAnimatorController _cachedAnimatorController;
+        private float _nextAnimatorParameterCacheRetryAt;
         private NativeRigRetargetProfile _nativeRigRetargetProfile;
         private readonly Dictionary<string, Transform> _socketHardpoints = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Transform> _attachmentGroups = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
@@ -104,6 +106,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private const string MovementAnimationParameter = "RCL_IsMoving";
         private const string FireAnimationParameter = "RCL_Fire";
         private const string DeathAnimationParameter = "RCL_Death";
+        private const float AnimatorParameterCacheRetryInterval = 0.5f;
 
         private static PropertyInfo _healthRatioProp;
         private static PropertyInfo _currentHealthProp;
@@ -240,6 +243,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private void ResetForReuse(EntityController entity)
         {
             _entity = entity;
+            RefreshAnimatorParameterCacheIfNeeded();
             _deathAnimationTriggered = false;
             _isMoving = false;
             _lastShotTimestamp = -1f;
@@ -291,6 +295,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void CacheAnimatorParameters()
         {
+            _hasMovementAnimationParameter = false;
+            _hasFireAnimationParameter = false;
+            _hasDeathAnimationParameter = false;
+
             Animator preferredAnimator = null;
             Transform[] hierarchyTransforms = GetComponentsInChildren<Transform>(true);
             for (int animatorIndex = 0; animatorIndex < hierarchyTransforms.Length; animatorIndex++)
@@ -311,7 +319,16 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
 
             _animator = preferredAnimator != null ? preferredAnimator : GetComponentInChildren<Animator>(true);
-            if (_animator == null || _animator.runtimeAnimatorController == null) return;
+            RuntimeAnimatorController controller = _animator != null ? _animator.runtimeAnimatorController : null;
+            if (controller == null)
+            {
+                _cachedAnimatorController = null;
+                _nextAnimatorParameterCacheRetryAt = Time.unscaledTime + AnimatorParameterCacheRetryInterval;
+                return;
+            }
+
+            _cachedAnimatorController = controller;
+            _nextAnimatorParameterCacheRetryAt = 0f;
 
             foreach (AnimatorControllerParameter parameter in _animator.parameters)
             {
@@ -332,10 +349,37 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
             }
 
+            if (!_hasMovementAnimationParameter || !_hasFireAnimationParameter || !_hasDeathAnimationParameter)
+            {
+                _nextAnimatorParameterCacheRetryAt = Time.unscaledTime + AnimatorParameterCacheRetryInterval;
+            }
+
             if (_entity != null)
             {
                 _lastAnimationPosition = _entity.transform.position;
                 _hasLastAnimationPosition = true;
+            }
+        }
+
+        private void RefreshAnimatorParameterCacheIfNeeded()
+        {
+            RuntimeAnimatorController controller = _animator != null ? _animator.runtimeAnimatorController : null;
+            if (controller != null)
+            {
+                if (!ReferenceEquals(controller, _cachedAnimatorController))
+                {
+                    CacheAnimatorParameters();
+                    return;
+                }
+            }
+
+            bool missingExpectedParameter = !_hasMovementAnimationParameter ||
+                !_hasFireAnimationParameter ||
+                !_hasDeathAnimationParameter;
+            if ((controller == null || missingExpectedParameter) &&
+                Time.unscaledTime >= _nextAnimatorParameterCacheRetryAt)
+            {
+                CacheAnimatorParameters();
             }
         }
 
@@ -763,6 +807,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_entity == null) return;
 
+            RefreshAnimatorParameterCacheIfNeeded();
             bool isDead = IsEntityDead();
             UpdateHealthAndDamageTransitions(isDead);
             if (isDead)

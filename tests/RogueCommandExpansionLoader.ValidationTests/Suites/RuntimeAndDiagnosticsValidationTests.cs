@@ -79,6 +79,23 @@ internal static partial class ValidationTestRunner
             new[] { "Rig/Bone" },
             "Visual",
             0.5f);
+        FieldInfo? configuredMappingCountField = typeof(NativeRigRetargetProfile).GetField(
+            "_configuredMappingCount",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (configuredMappingCountField == null)
+        {
+            throw new InvalidOperationException("The retarget mapping-count fixture must be able to emulate a cloned Unity component.");
+        }
+
+        configuredMappingCountField.SetValue(profile, 0);
+        var unboundMappingSamples = new List<NativeRigRetargetMappingSample>();
+        if (profile.ConfiguredMappingCount != 1 ||
+            profile.CopyDiagnosticMappingSamples(unboundMappingSamples, 1) != 1 ||
+            unboundMappingSamples.Count != 0)
+        {
+            throw new InvalidOperationException("Serialized mapping paths must preserve configured counts when Unity clones the profile component.");
+        }
+
         if (!profile.Bind(entity) || !profile.IsBound || profile.ConfiguredMappingCount != 1 ||
             profile.BoundMappingCount != 1 || profile.IsSuspended)
         {
