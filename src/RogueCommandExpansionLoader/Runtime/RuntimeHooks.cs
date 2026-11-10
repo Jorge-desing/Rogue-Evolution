@@ -2038,7 +2038,10 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Increment(ref _unitCreationTranspilerCount);
             SafeCall(delegate
             {
-                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                // EntityFactory.InstantiateEntity also returns objects popped from its
+                // native stack pool, where OnHasBeenInstantiatedForReuse is not called.
+                // Reset visuals here after factory initialization for both new and reused units.
+                Visual.RuntimeVisualDirector.OnEntityReused(entityObj);
                 RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
                 RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
             });

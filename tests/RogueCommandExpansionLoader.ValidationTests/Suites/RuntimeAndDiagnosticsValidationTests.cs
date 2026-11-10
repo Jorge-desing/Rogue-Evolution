@@ -10942,10 +10942,24 @@ internal static partial class ValidationTestRunner
                 };
 
                 // 1. Unit Creation Transpiler Hook (EntityFactory.InstantiateEntity)
-                RuntimeHarmonyPatches.OnEntityInstantiatedTranspilerHook(unit, false);
+                object? factoryVisualResetEntity = null;
+                RuntimeVisualDirector.OnEntityReusedAction = entity => factoryVisualResetEntity = entity;
+                try
+                {
+                    RuntimeHarmonyPatches.OnEntityInstantiatedTranspilerHook(unit, false);
+                }
+                finally
+                {
+                    RuntimeVisualDirector.OnEntityReusedAction = null;
+                }
+
                 if (RuntimeHooks.UnitCreationTranspilerCount != 1)
                 {
                     throw new InvalidOperationException("OnEntityInstantiatedTranspilerHook must increment UnitCreationTranspilerCount.");
+                }
+                if (!ReferenceEquals(factoryVisualResetEntity, unit))
+                {
+                    throw new InvalidOperationException("OnEntityInstantiatedTranspilerHook must reset visual lifecycle state for factory stack-pool reuse.");
                 }
 
                 // 2. Init Entity Controller Transpiler Hook (EntityFactory.InitEntityController)
