@@ -15,6 +15,7 @@ import time
 import csv
 import subprocess
 import contextvars
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -350,6 +351,36 @@ def _tool_response(text: str, is_error: bool = False) -> dict[str, Any]:
         "content": [{"type": "text", "text": text}],
         "isError": is_error,
     }
+
+
+def _component_detail_value(details: dict[str, Any], name: str) -> Any:
+    value = details.get(name)
+    if isinstance(value, dict) and "value" in value:
+        return value["value"]
+    return value
+
+
+def _parse_component_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        folded = value.strip().casefold()
+        if folded in ("true", "1"):
+            return True
+        if folded in ("false", "0"):
+            return False
+    return None
+
+
+def _normalise_ui_hierarchy_path(value: str) -> tuple[str, str]:
+    text = str(value or "").strip()
+    scene = ""
+    if "::" in text:
+        scene, text = text.split("::", 1)
+    text = urllib.parse.unquote(text.replace("\\", "/")).lstrip("/")
+    text = re.sub(r"\[\d+\]", "", text)
+    text = re.sub(r"/+", "/", text).strip("/")
+    return scene.strip().casefold(), text.casefold()
 
 
 def _get_diagnostics_go_id() -> int:
@@ -2615,6 +2646,124 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             max_results = max(1, min(100, max_results))
             res = _call_diagnostics_method("GetUiAccessibilityCensusJson", [query, include_inactive, max_results])
             return _tool_response(res)
+
+        elif name == "diagnostics_ui_invoke_native_button":
+            selector = str(arguments.get("selector", "") or "").strip()
+            scene = str(arguments.get("scene", "") or "").strip()
+            expected_text = str(arguments.get("expectedButtonText", "") or "").strip()
+            requested_path = str(arguments.get("hierarchyPath", "") or "").strip()
+            if not selector or not scene or not expected_text:
+                return _tool_response(json.dumps({"success": False, "message": "selector, scene, and expectedButtonText are required"}), is_error=True)
+
+            try:
+                scene_state_raw = _call_diagnostics_method("GetRunProgressionCensusJson")
+                scene_state = json.loads(scene_state_raw) if isinstance(scene_state_raw, str) else scene_state_raw
+            except Exception as exc:
+                return _tool_response(json.dumps({"success": False, "message": f"active scene lookup failed: {exc}"}), is_error=True)
+            active_scene = scene_state.get("activeSceneName") if isinstance(scene_state, dict) else None
+            if not isinstance(active_scene, str) or not active_scene.strip() or active_scene.casefold() != scene.casefold():
+                return _tool_response(json.dumps({
+                    "success": False,
+                    "message": "requested scene does not exactly match the current active scene; refusing native callback",
+                    "requestedScene": scene,
+                    "activeScene": active_scene,
+                }))
+
+            component_name = "Michsky.UI.Reach.ButtonManager"
+            try:
+                search_raw = _call_http("scene/search_gameobjects", params={
+                    "name": selector,
+                    "scene": scene,
+                    "includeInactive": "true",
+                    "limit": "100",
+                })
+                search_data = json.loads(search_raw) if isinstance(search_raw, str) else search_raw
+            except Exception as exc:
+                return _tool_response(json.dumps({"success": False, "message": f"button lookup failed: {exc}"}), is_error=True)
+
+            if isinstance(search_data, list):
+                items = search_data
+                truncated = False
+            elif isinstance(search_data, dict):
+                items = next((search_data.get(key) for key in ("items", "objects", "results") if isinstance(search_data.get(key), list)), [])
+                truncated = bool(search_data.get("truncated", False))
+            else:
+                items, truncated = [], False
+            if truncated:
+                return _tool_response(json.dumps({"success": False, "message": "button lookup was truncated; refusing an incomplete match set"}))
+
+            target_scene = scene.casefold()
+            target_path = _normalise_ui_hierarchy_path(requested_path) if requested_path else None
+            matches: list[dict[str, Any]] = []
+            for item in items:
+                if not isinstance(item, dict) or item.get("id") is None:
+                    continue
+                item_name = str(item.get("name", ""))
+                item_scene = str(item.get("scene", ""))
+                if item_name.casefold() != selector.casefold() or item_scene.casefold() != target_scene:
+                    continue
+                item_path = str(item.get("path", ""))
+                qualified_path = f"{item_scene}::{urllib.parse.unquote(item_path).lstrip('/')}"
+                if target_path and _normalise_ui_hierarchy_path(qualified_path) != target_path:
+                    continue
+                try:
+                    detail_raw = _call_http("component/get_details", params={"id": item["id"], "componentName": component_name})
+                    details = json.loads(detail_raw) if isinstance(detail_raw, str) else detail_raw
+                except Exception:
+                    continue
+                if not isinstance(details, dict):
+                    continue
+                button_text = _component_detail_value(details, "buttonText")
+                if not isinstance(button_text, str) or button_text.strip().casefold() != expected_text.casefold():
+                    continue
+                matches.append({
+                    "id": int(item["id"]),
+                    "name": item_name,
+                    "scene": item_scene,
+                    "path": qualified_path,
+                    "active": item.get("active") is True,
+                    "enabled": _parse_component_bool(_component_detail_value(details, "enabled")),
+                    "activeAndEnabled": _parse_component_bool(_component_detail_value(details, "isActiveAndEnabled")),
+                    "interactable": _parse_component_bool(_component_detail_value(details, "isInteractable")),
+                    "buttonText": button_text.strip(),
+                })
+
+            if len(matches) != 1:
+                return _tool_response(json.dumps({
+                    "success": False,
+                    "message": "native button must resolve to exactly one matching active-scene control; refusing ambiguous or missing targets",
+                    "matchCount": len(matches),
+                    "candidates": matches[:12],
+                }))
+
+            target = matches[0]
+            if not target["active"] or target["enabled"] is not True or target["interactable"] is not True or target["activeAndEnabled"] is not True:
+                return _tool_response(json.dumps({
+                    "success": False,
+                    "message": "native button is inactive, disabled, or not interactable; callback was not invoked",
+                    "target": target,
+                }))
+
+            try:
+                invoke_raw = _call_http("component/call_method", params={
+                    "id": target["id"],
+                    "componentName": component_name,
+                    "methodName": "InvokeOnClick",
+                    "args": "[]",
+                })
+                invoke_data = json.loads(invoke_raw) if isinstance(invoke_raw, str) else invoke_raw
+            except Exception as exc:
+                return _tool_response(json.dumps({"success": False, "message": f"native button callback failed: {exc}", "target": target}), is_error=True)
+            if not isinstance(invoke_data, dict) or str(invoke_data.get("status", "")).casefold() not in ("ok", "success"):
+                return _tool_response(json.dumps({"success": False, "message": "native button callback returned an unsuccessful bridge status", "target": target, "callback": invoke_data}))
+            return _tool_response(json.dumps({
+                "success": True,
+                "activated": True,
+                "activation": "Michsky.UI.Reach.ButtonManager.InvokeOnClick",
+                "target": target,
+                "callback": invoke_data,
+                "source": "BepInEx MCP component callback; no screenshot or computer-use interaction",
+            }, indent=2))
 
         elif name == "diagnostics_ui_click_text":
             label = str(arguments.get("label", "") or "").strip()
