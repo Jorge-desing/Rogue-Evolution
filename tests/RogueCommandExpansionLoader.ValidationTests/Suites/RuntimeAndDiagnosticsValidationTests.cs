@@ -11045,10 +11045,15 @@ internal static partial class ValidationTestRunner
                 }
 
                 // 12. Entity Destroy Transpiler Hook (EntityController.Destroy)
+                RuntimeVisualDirector destroyVisualDirector = unit.gameObject.AddComponent<RuntimeVisualDirector>();
                 RuntimeHarmonyPatches.OnEntityDestroyTranspilerHook(unit, false, null);
                 if (RuntimeHooks.EntityDestroyTranspilerCount != 1)
                 {
                     throw new InvalidOperationException("OnEntityDestroyTranspilerHook must increment EntityDestroyTranspilerCount.");
+                }
+                if (!destroyVisualDirector.DeathAnimationTriggeredForDestruction)
+                {
+                    throw new InvalidOperationException("Entity destruction must trigger the unit death animation before retarget suspension.");
                 }
 
                 // 13. Entity Execute Command Transpiler Hook (EntityController.ExecuteCommand)

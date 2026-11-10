@@ -782,12 +782,18 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public bool IsStunnedVisualActive { get; set; }
         public bool IsOnFireVisualActive { get; set; }
         public bool IsBoostedVisualActive { get; set; }
+        public bool DeathAnimationTriggeredForDestruction { get; private set; }
         public string ActiveTacticalStanceVisual { get; set; } = "Standard";
         public string ActiveVisualVariantId { get; set; }
         public string ActivePresetName { get; set; }
         public int ActiveVisualModuleCount { get; set; }
         public Color? ActiveColorTint { get; set; }
         public readonly Dictionary<string, bool> AttachmentStates = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+
+        public void TriggerDeathAnimationForDestruction()
+        {
+            DeathAnimationTriggeredForDestruction = true;
+        }
 
         public bool TryApplyVisualVariant(RuntimeUnitVisualVariant variant)
         {

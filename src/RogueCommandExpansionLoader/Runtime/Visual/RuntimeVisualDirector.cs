@@ -1070,15 +1070,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     _authoredDamageSmoke.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 }
 
-                if (!_deathAnimationTriggered && _animator != null && _hasDeathAnimationParameter)
-                {
-                    _deathAnimationTriggered = true;
-                    if (_hasMovementAnimationParameter)
-                    {
-                        _animator.SetBool(MovementAnimationParameter, false);
-                    }
-                    _animator.SetTrigger(DeathAnimationParameter);
-                }
+                TriggerDeathAnimation();
 
                 if (_fireVfxInstance != null)
                 {
@@ -1090,6 +1082,46 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     UnityEngine.Object.Destroy(_smokeVfxInstance, 8.0f);
                     _smokeVfxInstance = null;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Issues the authored death trigger before EntityController.Destroy removes or pools
+        /// this visual. The native destruction hook calls this because lethal damage can destroy
+        /// an entity before this director receives another Update with its health at zero.
+        /// </summary>
+        public void TriggerDeathAnimationForDestruction()
+        {
+            TriggerDeathAnimation();
+        }
+
+        private void TriggerDeathAnimation()
+        {
+            if (_deathAnimationTriggered || _animator == null || !_hasDeathAnimationParameter)
+            {
+                return;
+            }
+
+            if (_hasMovementAnimationParameter)
+            {
+                try
+                {
+                    _animator.SetBool(MovementAnimationParameter, false);
+                }
+                catch
+                {
+                    // The death trigger should still be issued if locomotion reset fails.
+                }
+            }
+
+            try
+            {
+                _animator.SetTrigger(DeathAnimationParameter);
+                _deathAnimationTriggered = true;
+            }
+            catch
+            {
+                // Unity may already be tearing down the Animator during a native destroy.
             }
         }
 

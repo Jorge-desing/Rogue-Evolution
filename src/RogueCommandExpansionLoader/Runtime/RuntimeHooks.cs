@@ -1863,6 +1863,16 @@ namespace RogueCommandExpansionLoader.Runtime
                     Component entityComponent = entityObj as Component;
                     if (entityComponent != null)
                     {
+                        if (!withoutTriggeringActions)
+                        {
+                            Visual.RuntimeVisualDirector visualDirector =
+                                entityComponent.GetComponent<Visual.RuntimeVisualDirector>();
+                            if (visualDirector != null)
+                            {
+                                visualDirector.TriggerDeathAnimationForDestruction();
+                            }
+                        }
+
                         Visual.NativeRigRetargetProfile profile =
                             entityComponent.GetComponent<Visual.NativeRigRetargetProfile>();
                         if (profile != null)

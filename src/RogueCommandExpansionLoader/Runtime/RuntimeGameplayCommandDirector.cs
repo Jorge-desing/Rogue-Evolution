@@ -3981,7 +3981,20 @@ namespace RogueCommandExpansionLoader.Runtime
 
             {
 
-                string tag = string.Equals(side, "Ai", StringComparison.OrdinalIgnoreCase) ? "Ai" : "Player";
+                string tag;
+                if (string.Equals(side, Tags.Ai, StringComparison.OrdinalIgnoreCase))
+                {
+                    tag = Tags.Ai;
+                }
+                else if (string.Equals(side, Tags.Player, StringComparison.OrdinalIgnoreCase))
+                {
+                    tag = Tags.Player;
+                }
+                else
+                {
+                    return new EntitySpawnResult(false, string.Empty, entityId.Trim(), side ?? string.Empty,
+                        targetX, 0f, targetZ, 0f, "Side must be 'AI' or 'Player'.");
+                }
 
                 Vector3 position = new Vector3(targetX, 0f, targetZ);
 
