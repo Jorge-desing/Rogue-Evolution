@@ -216,8 +216,8 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 ## Native Retarget Runtime Follow-up (2026-11-10)
 
 - On a saved Profile1 boss run, `InspectEntityVisualJson` captured `Action_FireRecoil`, a triggered fire parameter, positive recoil, 8/8 mappings, and yaw/pitch target poses matching the computed poses. This is BepInEx runtime telemetry, not rendered appearance proof.
-- A lethal QA clone advanced the destroy-transpiler counter 16→17 and disappeared. The post-destroy `IsSuspended` value and death clip could not be read; keep direct suspension state and death appearance unknown. The native reuse-transpiler counter stayed 0; an active non-pooled `OnHasBeenInstantiatedForReuse(false)` probe failed.
-- After graceful exit, the saved-profile selector and all profile hashes were restored to the preflight checkpoint. Keep test actors disposable and pause at `timeScale=0` between samples.
+- A following Profile2 pass installed a temporary BepInEx postfix on `RuntimeHarmonyPatches.OnEntityDestroyTranspilerHook`. It read `IsSuspended=true` with 8/8 mappings still bound after the hook returned and before native `Destroy` continued. Two actors used direct diagnostic damage, not natural combat; this proves the lifecycle boundary only, not a death clip or rendered death appearance. Both test entities, the postfix, and its helper component were removed. Trace: `artifacts/runtime-smoke/restart-saved-profile-20261110T061923/retarget-destroy-entry-follow-up.json`.
+- Ordinary continuation must restart Rogue Command and select an existing saved profile through the native profile UI; never start a clean profile or touch tutorial flags/files. In this pass Profile2 tutorial completion, selector `2`, and savegame hash were preserved. After exit, the changed `Profile2/metaSavegame.dat` was saved as evidence, restored from its pre-run backup, and the all-profile checkpoint matched exactly. Keep test actors disposable and pause at `timeScale=0` between samples.
 
 ## Canonical Two-Level Variant Runtime Check
 

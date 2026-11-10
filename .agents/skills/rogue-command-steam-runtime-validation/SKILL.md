@@ -134,3 +134,9 @@ python tools/runtime_profile_checkpoint.py verify `
 
 - The user required an existing saved profile after restart. Profile1 was selected through the native UI with tutorial completion already true; the resumed route was level 4 boss. No clean slot, tutorial bypass, or tutorial-file edit was used.
 - After `LoadScene.QuitGame`, restore test-modified metadata from the pre-run backup and restore the selector to its captured original value. This pass restored Profile1 metadata and selector `2`; all profile hashes matched the 09:38 preflight checkpoint. Keep the current default QA-profile procedure for future acceptance runs.
+
+### Destroy-entry retarget follow-up (2026-11-10)
+
+- Restart through Steam, select the existing tutorial-complete Profile2 with the native profile UI, and continue its saved run. Do not use a clean profile or tutorial bypass. This pass continued the save into Game level 4 with `mainTutorialIsFinished=true`, `playerHasFinishedLevel1=true`, selector `2`, and unchanged `savegame.dat` / `tutorialState.txt` hashes.
+- A temporary BepInEx Harmony postfix captured the retarget profile after `SuspendForDeath` returned but before `EntityController.Destroy` continued: two direct-diagnostic-damage cases remained bound 8/8 and reported `IsSuspended=true`. This is not natural-combat or death-animation evidence. Remove the temporary Harmony patch/component and verify no test actors remain.
+- After graceful exit, compare all profile files to the pre-run checkpoint. This run changed only `Profile2/metaSavegame.dat`; preserve its post-run bytes as evidence, restore the matching pre-run backup with the game closed, then rerun checkpoint verification. The restored selector and all profile files matched exactly. Trace: `artifacts/runtime-smoke/restart-saved-profile-20261110T061923/retarget-destroy-entry-follow-up.json`.
