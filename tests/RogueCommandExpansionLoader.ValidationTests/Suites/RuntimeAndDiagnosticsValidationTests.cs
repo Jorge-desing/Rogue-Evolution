@@ -17,6 +17,33 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("native rig retarget maps local position and rotation deltas onto target bind pose", () =>
+    {
+        Vector3 position = NativeRigRetargetPoseMath.RetargetLocalPosition(
+            new Vector3(1f, 2f, 3f),
+            new Vector3(2f, 4f, 6f),
+            new Vector3(10f, 20f, 30f),
+            0.5f);
+        if (Math.Abs(position.x - 10.5f) > 0.0001f ||
+            Math.Abs(position.y - 21f) > 0.0001f ||
+            Math.Abs(position.z - 31.5f) > 0.0001f)
+        {
+            throw new InvalidOperationException("Retargeted local position must preserve the target bind pose and scale only the source delta.");
+        }
+
+        float halfSqrt = (float)Math.Sqrt(0.5f);
+        Quaternion rotation = NativeRigRetargetPoseMath.RetargetLocalRotation(
+            new Quaternion(0f, 0f, halfSqrt, halfSqrt),
+            new Quaternion(0f, 0f, 1f, 0f),
+            new Quaternion(0f, halfSqrt, 0f, halfSqrt));
+        if (Math.Abs(rotation.x - 0.5f) > 0.0001f ||
+            Math.Abs(rotation.y - 0.5f) > 0.0001f ||
+            Math.Abs(rotation.z - 0.5f) > 0.0001f ||
+            Math.Abs(rotation.w - 0.5f) > 0.0001f)
+        {
+            throw new InvalidOperationException("Retargeted rotation must apply the source bind-relative delta to the target bind rotation.");
+        }
+    }),
     ("localization language resolution falls back when the reflected getter throws", () =>
     {
         int logCount = 0;
@@ -10654,10 +10681,17 @@ internal static partial class ValidationTestRunner
                 }
 
                 // 6. Entity OnInstantiated For Reuse Transpiler Hook (EntityController.OnHasBeenInstantiatedForReuse)
+                object? reusedVisualEntity = null;
+                RuntimeVisualDirector.OnEntityReusedAction = entity => reusedVisualEntity = entity;
                 RuntimeHarmonyPatches.OnEntityHasBeenInstantiatedForReuseTranspilerHook(unit, false);
+                RuntimeVisualDirector.OnEntityReusedAction = null;
                 if (RuntimeHooks.EntityReuseOnInstantiatedTranspilerCount != 1)
                 {
                     throw new InvalidOperationException("OnEntityHasBeenInstantiatedForReuseTranspilerHook must increment EntityReuseOnInstantiatedTranspilerCount.");
+                }
+                if (!ReferenceEquals(reusedVisualEntity, unit))
+                {
+                    throw new InvalidOperationException("OnEntityHasBeenInstantiatedForReuseTranspilerHook must notify the visual director with the reused entity.");
                 }
 
                 // 7. Factory Produce Transpiler Hook (EntityController.Produce)

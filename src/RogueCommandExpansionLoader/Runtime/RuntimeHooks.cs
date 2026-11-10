@@ -1783,6 +1783,7 @@ namespace RogueCommandExpansionLoader.Runtime
             SafeCall(delegate
             {
                 Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                Visual.RuntimeVisualDirector.OnEntityReused(entityObj);
                 RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
                 RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
             });

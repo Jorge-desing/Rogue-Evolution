@@ -774,6 +774,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
     public sealed class RuntimeVisualDirector : Component
     {
         public static void AttachIfApplicable(object entityObj) { }
+        public static System.Action<object> OnEntityReusedAction;
+        public static void OnEntityReused(object entityObj) => OnEntityReusedAction?.Invoke(entityObj);
         public bool IsTurretJammed { get; set; }
         public float CurrentRecoilOffset { get; set; }
         public float DoorOpenProgress { get; set; }
@@ -783,6 +785,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public string ActiveTacticalStanceVisual { get; set; } = "Standard";
         public string ActiveVisualVariantId { get; set; }
         public string ActivePresetName { get; set; }
+        public int ActiveVisualModuleCount { get; set; }
         public Color? ActiveColorTint { get; set; }
         public readonly Dictionary<string, bool> AttachmentStates = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 

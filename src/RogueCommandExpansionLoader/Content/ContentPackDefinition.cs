@@ -314,6 +314,19 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentNativeRigRetargetDefinition
+    {
+        public ContentNativeRigRetargetMappingDefinition[] mappings;
+    }
+
+    [Serializable]
+    public sealed class ContentNativeRigRetargetMappingDefinition
+    {
+        public string sourcePath;
+        public string targetPath;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
@@ -325,6 +338,7 @@ namespace RogueCommandExpansionLoader.Content
         public string cardImageAssetName;
         public string visualAssetName;
         public string visualRootPath;
+        public ContentNativeRigRetargetDefinition nativeRigRetarget;
         public string nativeTemplateId;
         public bool isAllowedAsStartingBlueprint;
         public bool isAllowedForAi;
@@ -1225,6 +1239,7 @@ namespace RogueCommandExpansionLoader.Content
                 cardImageAssetName = source.cardImageAssetName,
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
+                nativeRigRetarget = CloneNativeRigRetarget(source.nativeRigRetarget),
                 nativeTemplateId = source.nativeTemplateId,
                 isAllowedAsStartingBlueprint = source.isAllowedAsStartingBlueprint,
                 isAllowedForAi = source.isAllowedForAi,
@@ -1386,6 +1401,25 @@ namespace RogueCommandExpansionLoader.Content
                 colorTint = source.colorTint,
                 scale = source.scale,
                 modules = CloneArray(source.modules, CloneUnitVisualModule)
+            };
+        }
+
+        private static ContentNativeRigRetargetDefinition CloneNativeRigRetarget(
+            ContentNativeRigRetargetDefinition source)
+        {
+            return source == null ? null : new ContentNativeRigRetargetDefinition
+            {
+                mappings = CloneArray(source.mappings, CloneNativeRigRetargetMapping)
+            };
+        }
+
+        private static ContentNativeRigRetargetMappingDefinition CloneNativeRigRetargetMapping(
+            ContentNativeRigRetargetMappingDefinition source)
+        {
+            return source == null ? null : new ContentNativeRigRetargetMappingDefinition
+            {
+                sourcePath = source.sourcePath,
+                targetPath = source.targetPath
             };
         }
 

@@ -166,6 +166,7 @@ namespace RogueCommandExpansionLoader.Content
         public const int MaxLocalizationsPerDefinition = 10;
         public const int MaxNeededExperienceLevel = 10000;
         public const int MaxAiModulesPerProfile = 8;
+        public const int MaxNativeRigRetargetMappings = 64;
         public const int MaxAiUnitEntriesPerProfile = 32;
         public const int MaxAiProductionBuildingEntriesPerProfile = 32;
         public const int MaxAiUnitDependenciesPerProfile = 64;
@@ -485,6 +486,15 @@ namespace RogueCommandExpansionLoader.Content
                             "visualAssetName and visualRootPath are only valid with nativeTemplateId.");
                     }
                 }
+
+                ValidateUnitNativeRigRetarget(
+                    unit.nativeRigRetarget,
+                    hasNativeTemplate,
+                    !String.IsNullOrWhiteSpace(unit.visualAssetName),
+                    !String.IsNullOrWhiteSpace(unit.visualRootPath),
+                    unit.visualRootPath,
+                    itemPath + ".nativeRigRetarget",
+                    diagnostics);
 
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
                 ValidateUnitBalanceOverrides(unit, itemPath + ".balanceOverrides", diagnostics);
@@ -1652,12 +1662,107 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics,
             string diagnosticCode = "unit.visual-root-path-invalid")
         {
-            if (String.IsNullOrWhiteSpace(value) || value.StartsWith("/", StringComparison.Ordinal) ||
-                value.EndsWith("/", StringComparison.Ordinal) || value.IndexOf('\\') >= 0)
+            ValidateRelativeTransformPath(value, path, "visualRootPath", diagnostics, diagnosticCode);
+        }
+
+        private static void ValidateUnitNativeRigRetarget(
+            ContentNativeRigRetargetDefinition retarget,
+            bool hasNativeTemplate,
+            bool hasVisualAsset,
+            bool hasVisualRoot,
+            string visualRootPath,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (retarget == null)
+            {
+                return;
+            }
+
+            if (!hasNativeTemplate || !hasVisualAsset || !hasVisualRoot)
+            {
+                Add(diagnostics, "unit.native-rig-retarget-source-invalid", path,
+                    "nativeRigRetarget requires nativeTemplateId, visualAssetName, and visualRootPath.");
+            }
+
+            ContentNativeRigRetargetMappingDefinition[] mappings = retarget.mappings;
+            if (mappings == null || mappings.Length == 0)
+            {
+                Add(diagnostics, "unit.native-rig-retarget-mappings-empty", path + ".mappings",
+                    "nativeRigRetarget must declare at least one sourcePath/targetPath mapping.");
+                return;
+            }
+
+            if (mappings.Length > MaxNativeRigRetargetMappings)
+            {
+                Add(diagnostics, "unit.native-rig-retarget-mappings-limit", path + ".mappings",
+                    "nativeRigRetarget can declare at most " + MaxNativeRigRetargetMappings + " mappings.");
+            }
+
+            bool visualRootIsValid = IsValidRelativeTransformPath(visualRootPath);
+            var targetPaths = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < mappings.Length; i++)
+            {
+                ContentNativeRigRetargetMappingDefinition mapping = mappings[i];
+                string itemPath = path + ".mappings[" + i + "]";
+                if (mapping == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Retarget mapping entries cannot be null.");
+                    continue;
+                }
+
+                bool sourcePathIsValid = ValidateRelativeTransformPath(
+                    mapping.sourcePath,
+                    itemPath + ".sourcePath",
+                    "sourcePath",
+                    diagnostics,
+                    "unit.native-rig-retarget-source-path-invalid");
+                bool targetPathIsValid = ValidateRelativeTransformPath(
+                    mapping.targetPath,
+                    itemPath + ".targetPath",
+                    "targetPath",
+                    diagnostics,
+                    "unit.native-rig-retarget-target-path-invalid");
+
+                if (targetPathIsValid && !targetPaths.Add(mapping.targetPath))
+                {
+                    Add(diagnostics, "unit.native-rig-retarget-target-duplicate", itemPath + ".targetPath",
+                        "Each native rig retarget targetPath must be unique; sourcePath values may be reused.");
+                }
+
+                if (sourcePathIsValid && visualRootIsValid &&
+                    IsSameOrAncestorTransformPath(mapping.sourcePath, visualRootPath))
+                {
+                    Add(diagnostics, "unit.native-rig-retarget-source-overlap", itemPath + ".sourcePath",
+                        "A retarget sourcePath cannot be equal to or an ancestor of visualRootPath because the overlay already inherits that transform.");
+                }
+            }
+        }
+
+        private static bool ValidateRelativeTransformPath(
+            string value,
+            string path,
+            string fieldName,
+            List<ContentDiagnostic> diagnostics,
+            string diagnosticCode)
+        {
+            if (!IsValidRelativeTransformPath(value))
             {
                 Add(diagnostics, diagnosticCode, path,
-                    "visualRootPath must be a relative Unity Transform path using forward slashes.");
-                return;
+                    fieldName + " must be a relative Unity Transform path using forward slashes and cannot contain empty, current-directory, or parent-directory segments.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsValidRelativeTransformPath(string value)
+        {
+            if (String.IsNullOrWhiteSpace(value) || value.StartsWith("/", StringComparison.Ordinal) ||
+                value.EndsWith("/", StringComparison.Ordinal) || value.IndexOf('\\') >= 0 ||
+                value.IndexOf('\r') >= 0 || value.IndexOf('\n') >= 0)
+            {
+                return false;
             }
 
             string[] segments = value.Split('/');
@@ -1665,11 +1770,17 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (String.IsNullOrWhiteSpace(segments[i]) || segments[i] == "." || segments[i] == "..")
                 {
-                    Add(diagnostics, diagnosticCode, path,
-                        "visualRootPath cannot contain empty, current-directory, or parent-directory segments.");
-                    return;
+                    return false;
                 }
             }
+
+            return true;
+        }
+
+        private static bool IsSameOrAncestorTransformPath(string sourcePath, string visualRootPath)
+        {
+            return String.Equals(sourcePath, visualRootPath, StringComparison.Ordinal) ||
+                visualRootPath.StartsWith(sourcePath + "/", StringComparison.Ordinal);
         }
 
         private static void ValidateBalanceOverrides(

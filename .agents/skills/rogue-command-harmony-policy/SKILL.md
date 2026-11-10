@@ -153,3 +153,9 @@ The loader registers 65 verified hooks across core game simulation systems, incl
 - [Reverse Engineering Skill](../rogue-command-reverse-engineering/SKILL.md) — REA inspection, metadata tokens, member signatures.
 - [Steam Runtime Validation Skill](../rogue-command-steam-runtime-validation/SKILL.md) — Reversible live validation runbook.
 - `docs/research/BASELINE.md` & `AGENT-HANDOFF.md` — Verified commands and environment contracts.
+
+### Existing pooled reuse route for native visual retargeting
+
+- Reuse the installed `EntityController.OnHasBeenInstantiatedForReuse` hook and its existing `RuntimeHooks.OnEntityHasBeenInstantiatedForReuseTranspiler` callback. Route the entity to `RuntimeVisualDirector.OnEntityReused`; do not add another Harmony target for retarget reset.
+- Resolve serialized source/target Transform paths and bind poses on the cloned unit instance. The retarget component performs local pose copying in `LateUpdate`; the existing lifecycle callback only resets animator state and mapped bind poses for the next pooled lifetime.
+- Recheck the full game compatibility tuple before relying on reflected hooks. A local harness confirms dispatch wiring only; it does not prove pool behavior inside a Steam match.

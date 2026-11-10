@@ -56,7 +56,8 @@ internal static partial class ValidationTestRunner
             ("tauntPulse", "unitTauntPulse", typeof(ContentUnitTauntDefinition), false),
             ("shieldOverloadNova", "unitShieldOverloadNova", typeof(ContentUnitShieldOverloadNovaDefinition), false),
             ("damageReflect", "unitDamageReflect", typeof(ContentUnitDamageReflectDefinition), false),
-            ("deathNova", "unitDeathNova", typeof(ContentUnitDeathNovaDefinition), false)
+            ("deathNova", "unitDeathNova", typeof(ContentUnitDeathNovaDefinition), false),
+            ("nativeRigRetarget", "nativeRigRetarget", typeof(ContentNativeRigRetargetDefinition), false)
         };
 
         foreach (var entry in subDefinitions)
@@ -82,8 +83,30 @@ internal static partial class ValidationTestRunner
             if (!dtoFields.SetEquals(schemaFields))
             {
                 throw new InvalidOperationException("Unit schema definition " + entry.SchemaName +
-                    " does not match its DTO fields.");
+                    " does not match its DTO fields. DTO fields: [" +
+                    String.Join(",", dtoFields.OrderBy(field => field, StringComparer.Ordinal)) +
+                    "]; schema fields: [" +
+                    String.Join(",", schemaFields.OrderBy(field => field, StringComparer.Ordinal)) + "].");
             }
+        }
+
+        JsonElement nativeRigRetarget = definitions.GetProperty("nativeRigRetarget");
+        JsonElement mappingsItems = nativeRigRetarget.GetProperty("properties").GetProperty("mappings")
+            .GetProperty("items");
+        if (mappingsItems.GetProperty("$ref").GetString() != "#/$defs/nativeRigRetargetMapping")
+        {
+            throw new InvalidOperationException("nativeRigRetarget.mappings must reference nativeRigRetargetMapping.");
+        }
+
+        HashSet<string> mappingDtoFields = typeof(ContentNativeRigRetargetMappingDefinition)
+            .GetFields(BindingFlags.Instance | BindingFlags.Public)
+            .Select(field => field.Name).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> mappingSchemaFields = definitions.GetProperty("nativeRigRetargetMapping")
+            .GetProperty("properties").EnumerateObject()
+            .Select(propertyDefinition => propertyDefinition.Name).ToHashSet(StringComparer.Ordinal);
+        if (!mappingDtoFields.SetEquals(mappingSchemaFields))
+        {
+            throw new InvalidOperationException("nativeRigRetargetMapping schema fields must match its DTO.");
         }
     }),
     ("unit armor validation rejects non-finite armor values", () =>
@@ -492,6 +515,125 @@ internal static partial class ValidationTestRunner
             ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
         });
     }),
+    ("native rig retarget accepts explicit relative transform mappings", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.balanceAssetName = null;
+            unit.prefabAssetName = null;
+            unit.cardImageAssetName = null;
+            unit.nativeTemplateId = "PCXBaseTank";
+            unit.assetBundleId = pack.assetBundles[0].id;
+            unit.visualAssetName = "ScoutTankVisual";
+            unit.visualRootPath = "Vehicle";
+            unit.nativeRigRetarget = new ContentNativeRigRetargetDefinition
+            {
+                mappings = new[]
+                {
+                    new ContentNativeRigRetargetMappingDefinition
+                    {
+                        sourcePath = "Vehicle/Leg/LowerLeg",
+                        targetPath = "ScoutModel/Armature/Leg/LowerLeg"
+                    }
+                }
+            };
+
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("native rig retarget rejects source paths equal to or above the visual root", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.balanceAssetName = null;
+            unit.prefabAssetName = null;
+            unit.cardImageAssetName = null;
+            unit.nativeTemplateId = "PCXBaseTank";
+            unit.assetBundleId = pack.assetBundles[0].id;
+            unit.visualAssetName = "ScoutTankVisual";
+            unit.visualRootPath = "Vehicle";
+            unit.nativeRigRetarget = new ContentNativeRigRetargetDefinition
+            {
+                mappings = new[]
+                {
+                    new ContentNativeRigRetargetMappingDefinition
+                    {
+                        sourcePath = "Vehicle",
+                        targetPath = "ScoutModel/Armature/Root"
+                    }
+                }
+            };
+
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.native-rig-retarget-source-overlap");
+        });
+    }),
+    ("native rig retarget rejects duplicate target paths and traversal segments", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            ContentUnitDefinition unit = pack.units[0];
+            unit.balanceAssetName = null;
+            unit.prefabAssetName = null;
+            unit.cardImageAssetName = null;
+            unit.nativeTemplateId = "PCXBaseTank";
+            unit.assetBundleId = pack.assetBundles[0].id;
+            unit.visualAssetName = "ScoutTankVisual";
+            unit.visualRootPath = "Vehicle";
+            unit.nativeRigRetarget = new ContentNativeRigRetargetDefinition
+            {
+                mappings = new[]
+                {
+                    new ContentNativeRigRetargetMappingDefinition
+                    {
+                        sourcePath = "Vehicle/LeftLeg",
+                        targetPath = "ScoutModel/Armature/Root/Leg"
+                    },
+                    new ContentNativeRigRetargetMappingDefinition
+                    {
+                        sourcePath = "Vehicle/RightLeg",
+                        targetPath = "ScoutModel/Armature/Root/Leg"
+                    }
+                }
+            };
+
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.native-rig-retarget-target-duplicate");
+            unit.nativeRigRetarget.mappings[0].sourcePath = "Vehicle/../Leg";
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.native-rig-retarget-source-path-invalid");
+            unit.nativeRigRetarget.mappings = Enumerable.Range(0, 65)
+                .Select(index => new ContentNativeRigRetargetMappingDefinition
+                {
+                    sourcePath = "Vehicle/Joint" + index,
+                    targetPath = "ScoutModel/Joint" + index
+                })
+                .ToArray();
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.native-rig-retarget-mappings-limit");
+        });
+    }),
+    ("native rig retarget is limited to units with a native visual overlay", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].nativeRigRetarget = new ContentNativeRigRetargetDefinition
+            {
+                mappings = new[]
+                {
+                    new ContentNativeRigRetargetMappingDefinition
+                    {
+                        sourcePath = "Native/Rig/Joint",
+                        targetPath = "Visual/Rig/Joint"
+                    }
+                }
+            };
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit.native-rig-retarget-source-invalid");
+        });
+    }),
     ("native-template unit requires a visual prefab and native root path together", () =>
     {
         WithPackage(sample, (pack, root) =>
@@ -499,6 +641,7 @@ internal static partial class ValidationTestRunner
             ContentUnitDefinition unit = pack.units[0];
             unit.balanceAssetName = null;
             unit.prefabAssetName = null;
+            unit.cardImageAssetName = null;
             unit.nativeTemplateId = "PCXBaseTank";
             unit.visualAssetName = "ScoutTankVisual";
             unit.visualRootPath = null;

@@ -25,6 +25,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private Transform _socketRecoilPrimary;
         private Transform _socketMuzzlePrimary;
         private Animator _animator;
+        private NativeRigRetargetProfile _nativeRigRetargetProfile;
         private readonly Dictionary<string, Transform> _socketHardpoints = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Transform> _attachmentGroups = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, UniqueSocketRoleBinding<Transform>> _socketRoleBindings =
@@ -149,6 +150,27 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        public static void OnEntityReused(object entityObj)
+        {
+            EntityController entity = entityObj as EntityController;
+            if (entity == null || entity.gameObject == null)
+            {
+                return;
+            }
+
+            RuntimeVisualDirector director = entity.gameObject.GetComponent<RuntimeVisualDirector>();
+            if (director == null)
+            {
+                AttachIfApplicable(entity);
+                director = entity.gameObject.GetComponent<RuntimeVisualDirector>();
+            }
+
+            if (director != null)
+            {
+                director.ResetForReuse(entity);
+            }
+        }
+
         private static bool HasCompatibleVisualSockets(Transform root)
         {
             if (root == null) return false;
@@ -187,6 +209,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             DiscoverSocketsAndMeshes(transform);
             EnsureCanonicalHardpointGroups();
             CacheAnimatorParameters();
+            _nativeRigRetargetProfile = GetComponent<NativeRigRetargetProfile>();
+            if (_nativeRigRetargetProfile != null)
+            {
+                _nativeRigRetargetProfile.Bind(_entity);
+            }
 
             if (_intactMeshObject != null)
             {
@@ -208,6 +235,58 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             CacheReflectionAccess();
             _audioBindingStartedAt = Time.unscaledTime;
+        }
+
+        private void ResetForReuse(EntityController entity)
+        {
+            _entity = entity;
+            _deathAnimationTriggered = false;
+            _isMoving = false;
+            _lastShotTimestamp = -1f;
+            _lastVelocity = Vector3.zero;
+            _lastAcceleration = Vector3.zero;
+            _hasLastPosition = false;
+            _hasLastAnimationPosition = entity != null;
+            if (entity != null && entity.transform != null)
+            {
+                _lastPosition = entity.transform.position;
+                _lastAnimationPosition = entity.transform.position;
+            }
+
+            if (_animator != null)
+            {
+                try
+                {
+                    _animator.Rebind();
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    if (_hasMovementAnimationParameter)
+                    {
+                        _animator.SetBool(MovementAnimationParameter, false);
+                    }
+                    if (_hasFireAnimationParameter)
+                    {
+                        _animator.ResetTrigger(FireAnimationParameter);
+                    }
+                    if (_hasDeathAnimationParameter)
+                    {
+                        _animator.ResetTrigger(DeathAnimationParameter);
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            if (_nativeRigRetargetProfile != null)
+            {
+                _nativeRigRetargetProfile.ResetForReuse();
+            }
         }
 
         private void CacheAnimatorParameters()
@@ -688,6 +767,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             UpdateHealthAndDamageTransitions(isDead);
             if (isDead)
             {
+                if (_nativeRigRetargetProfile != null)
+                {
+                    _nativeRigRetargetProfile.SuspendForDeath();
+                }
                 return;
             }
 

@@ -772,6 +772,42 @@
       },
       "visualAssetName": "assets/roguecommandexpansionsample/ironcladwalkervisual.prefab",
       "visualRootPath": "RoboMarine_Mesh",
+      "nativeRigRetarget": {
+        "mappings": [
+          {
+            "sourcePath": "RoboMarine_Mesh/LEGS/LeftLeg",
+            "targetPath": "IroncladWalkerModel/IroncladWalker_Armature/Bone_Root/Bone_Pelvis/Bone_Thigh_L"
+          },
+          {
+            "sourcePath": "RoboMarine_Mesh/LEGS/LeftLeg/LLow",
+            "targetPath": "IroncladWalkerModel/IroncladWalker_Armature/Bone_Root/Bone_Pelvis/Bone_Thigh_L/Bone_Shin_L"
+          },
+          {
+            "sourcePath": "RoboMarine_Mesh/LEGS/LeftLeg/LLow/LFoot",
+            "targetPath": "IroncladWalkerModel/IroncladWalker_Armature/Bone_Root/Bone_Pelvis/Bone_Thigh_L/Bone_Shin_L/Bone_Foot_L"
+          },
+          {
+            "sourcePath": "RoboMarine_Mesh/LEGS/RightLeg",
+            "targetPath": "IroncladWalkerModel/IroncladWalker_Armature/Bone_Root/Bone_Pelvis/Bone_Thigh_R"
+          },
+          {
+            "sourcePath": "RoboMarine_Mesh/LEGS/RightLeg/Rlow",
+            "targetPath": "IroncladWalkerModel/IroncladWalker_Armature/Bone_Root/Bone_Pelvis/Bone_Thigh_R/Bone_Shin_R"
+          },
+          {
+            "sourcePath": "RoboMarine_Mesh/LEGS/RightLeg/Rlow/RFoot",
+            "targetPath": "IroncladWalkerModel/IroncladWalker_Armature/Bone_Root/Bone_Pelvis/Bone_Thigh_R/Bone_Shin_R/Bone_Foot_R"
+          },
+          {
+            "sourcePath": "RoboMarine_Mesh/RotHor",
+            "targetPath": "IroncladWalkerModel/IroncladWalker_Armature/Bone_Root/Bone_Pelvis/Bone_TurretYaw"
+          },
+          {
+            "sourcePath": "RoboMarine_Mesh/RotHor/UltraBody/ROTVERT",
+            "targetPath": "IroncladWalkerModel/IroncladWalker_Armature/Bone_Root/Bone_Pelvis/Bone_TurretYaw/Bone_TurretPitch"
+          }
+        ]
+      },
       "isAllowedForAi": true,
       "cardModelScalingFactor": 0.85,
       "healing": {

@@ -84,3 +84,9 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 - `tools/Bind-CanonicalVisualModules.py --check` enforces the current authored matrix (18 Level 1 primaries and 35 Level 2 modules). This matrix check is project content validation, not runtime behavior evidence.
 - The canonical build also requires exact authoring-role coverage from `content/source-art/canonical-visual-module-roles.json`, matching pack `modules[].slotId`/`assetName` to the generated manifest, and exactly one required hardpoint socket in the owning Level 1 prefab. These are build-time hierarchy checks; they do not prove variant application in a game run.
 - For the complete current Blender/Material Maker/Unity module rebuild, run `tools/Build-CanonicalVisualModules.ps1`; it refreshes four Level 1 visual prefabs before validating Level 2 slot bindings. The check rejects duplicate or noncanonical sockets as well as missing required sockets. Then audit both generated packs under `artifacts/canonical-two-level/validation-packs/`. Do not use versioned bundle snapshots under `content/packs/*/bundles/` after changing module assets.
+
+## Native Rig Retarget Manifest Checks
+
+- Validate `nativeRigRetarget.mappings[]` as 1–64 `{sourcePath,targetPath}` pairs, present only on a native-template visual overlay. Paths are relative to different roots: the native unit prefab and the custom visual prefab.
+- Reject empty, rooted, backslash, whitespace-only, `.`/`..`, duplicate target, and source paths equal to or above the visual root. Runtime binding requires each exact path to resolve once.
+- Verify serialized paths against the pinned `resources.assets` and the current bundle. The content/schema validator checks path syntax and the bundle-reference tool checks asset addresses, but neither proves that the mapped motion works in a Steam match.

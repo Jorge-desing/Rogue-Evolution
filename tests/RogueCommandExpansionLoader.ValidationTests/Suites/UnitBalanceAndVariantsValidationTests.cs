@@ -245,6 +245,47 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Mutating a variant clone modified its source.");
         }
     }),
+    ("native rig retarget mappings deep clone nested mutable entries", () =>
+    {
+        var original = new ContentPackDefinition
+        {
+            units = new[]
+            {
+                new ContentUnitDefinition
+                {
+                    id = "test-native-unit",
+                    nativeRigRetarget = new ContentNativeRigRetargetDefinition
+                    {
+                        mappings = new[]
+                        {
+                            new ContentNativeRigRetargetMappingDefinition
+                            {
+                                sourcePath = "Native/Leg",
+                                targetPath = "Visual/Leg"
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        ContentPackDefinition clone = ContentPackCopy.DeepClone(original);
+        ContentNativeRigRetargetDefinition sourceRetarget = original.units[0].nativeRigRetarget;
+        ContentNativeRigRetargetDefinition cloneRetarget = clone.units[0].nativeRigRetarget;
+        if (cloneRetarget == null || ReferenceEquals(sourceRetarget, cloneRetarget) ||
+            ReferenceEquals(sourceRetarget.mappings, cloneRetarget.mappings) ||
+            ReferenceEquals(sourceRetarget.mappings[0], cloneRetarget.mappings[0]))
+        {
+            throw new InvalidOperationException("Native rig retarget containers and mapping entries must be deeply cloned.");
+        }
+
+        cloneRetarget.mappings[0].sourcePath = "Changed/Source";
+        cloneRetarget.mappings[0].targetPath = "Changed/Target";
+        if (sourceRetarget.mappings[0].sourcePath != "Native/Leg" ||
+            sourceRetarget.mappings[0].targetPath != "Visual/Leg")
+        {
+            throw new InvalidOperationException("Mutating a native rig retarget clone changed the source mapping.");
+        }
+    }),
     ("unit loadout variants reject null entries", () =>
     {
         ExpectUnitLoadoutVariantDiagnostic(nativeSample, "[null]", "entry.null", "units[0].variants[0]");

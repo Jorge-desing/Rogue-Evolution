@@ -149,3 +149,9 @@ python tools/validate_mech_rigging.py
 ```
 
 The script evaluates armature presence, bone hierarchy, canonical sockets, and AnimatorController contracts, outputting an ASCII diagnostic table and non-zero exit codes on critical omissions.
+
+## Native Overlay Retarget Contract
+
+- For a native-template visual overlay, declare `nativeRigRetarget.mappings[]` only when a replacement rig needs selected native transform motion. Map exact paths from the native prefab root to exact paths from the visual prefab root; use the serialized Transform hierarchy as the source of truth.
+- Keep the map sparse and explicit. At runtime the loader applies source bind-relative local position/rotation deltas to target bind poses after Animator evaluation, scaling positions for the overlay's uniform scale. It never writes scale or root motion, and unmapped bones remain Animator-owned.
+- Native death suspends the bridge, and pool reuse restores source/target bind poses. This is a transform-pose bridge, not a Humanoid retargeter or proof that walk, turret, firing, death, and reuse all look correct; confirm those transitions in a game run.

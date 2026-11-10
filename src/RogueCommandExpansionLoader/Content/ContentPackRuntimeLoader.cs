@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using RogueCommandExpansionLoader.Contracts;
 using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
+using RogueCommandExpansionLoader.Runtime.Visual;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Content
@@ -6043,6 +6044,8 @@ namespace RogueCommandExpansionLoader.Content
                     "': visualRootPath '" + unit.visualRootPath + "' no contiene Renderer nativos que reemplazar.");
             }
 
+            ValidateNativeRigRetargetPaths(nativePrefab, visualTemplate, unit, packageName, ownerLabel);
+
             Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
             float nativeHalfExtent = CalculateRendererHalfExtent(originalRenderers.ToArray());
             float targetHalfExtent = VisualOverlayScaleCalibration.CalculateTargetHalfExtent(nativeHalfExtent, isBuilding);
@@ -6077,8 +6080,78 @@ namespace RogueCommandExpansionLoader.Content
             float scaleFactor = VisualOverlayScaleCalibration.CalculateUniformScale(visualExtent, targetHalfExtent);
             visualClone.transform.localScale = Vector3.one * scaleFactor;
 
+            if (unit.nativeRigRetarget != null)
+            {
+                ContentNativeRigRetargetMappingDefinition[] mappings = unit.nativeRigRetarget.mappings;
+                var sourcePaths = new string[mappings.Length];
+                var targetPaths = new string[mappings.Length];
+                for (int mappingIndex = 0; mappingIndex < mappings.Length; mappingIndex++)
+                {
+                    sourcePaths[mappingIndex] = mappings[mappingIndex].sourcePath;
+                    targetPaths[mappingIndex] = mappings[mappingIndex].targetPath;
+                }
+
+                NativeRigRetargetProfile retargetProfile = nativePrefab.GetComponent<NativeRigRetargetProfile>();
+                if (retargetProfile == null)
+                {
+                    retargetProfile = nativePrefab.AddComponent<NativeRigRetargetProfile>();
+                }
+
+                retargetProfile.Configure(
+                    sourcePaths,
+                    targetPaths,
+                    unit.visualRootPath + "/" + visualClone.name,
+                    scaleFactor > 0.0001f ? 1f / scaleFactor : 1f);
+            }
+
             ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
             visualClone.SetActive(true);
+        }
+
+        private static void ValidateNativeRigRetargetPaths(
+            GameObject nativePrefab,
+            GameObject visualTemplate,
+            ContentUnitDefinition unit,
+            string packageName,
+            string ownerLabel)
+        {
+            if (unit == null || unit.nativeRigRetarget == null)
+            {
+                return;
+            }
+
+            ContentNativeRigRetargetMappingDefinition[] mappings = unit.nativeRigRetarget.mappings;
+            if (mappings == null || mappings.Length == 0 ||
+                mappings.Length > ContentPackValidator.MaxNativeRigRetargetMappings)
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': nativeRigRetarget debe incluir entre 1 y " +
+                    ContentPackValidator.MaxNativeRigRetargetMappings + " mappings.");
+            }
+
+            for (int i = 0; i < mappings.Length; i++)
+            {
+                ContentNativeRigRetargetMappingDefinition mapping = mappings[i];
+                if (mapping == null)
+                {
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                        "': nativeRigRetarget.mappings[" + i + "] es nulo.");
+                }
+
+                if (FindUniqueTransformPath(nativePrefab.transform, mapping.sourcePath) == null)
+                {
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                        "': sourcePath '" + mapping.sourcePath +
+                        "' no identifica una única transformación en la plantilla nativa.");
+                }
+
+                if (FindUniqueTransformPath(visualTemplate.transform, mapping.targetPath) == null)
+                {
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                        "': targetPath '" + mapping.targetPath +
+                        "' no identifica una única transformación en el prefab visual.");
+                }
+            }
         }
 
         private static float CalculateRendererHalfExtent(Renderer[] renderers)
