@@ -219,6 +219,8 @@ Do not rotate a model or change yaw correction based only on static evidence. Re
 - Use `diagnostics_get_ui_accessibility_census`, `diagnostics_wait_for_ui_text`, and `diagnostics_ui_click_text` for native profile/menu flows. They read Unity `Selectable` labels and hierarchy state and deliver clicks through EventSystem; they do not use Computer Use, screenshots, or screen-image inference. `automation_run_sequence` chains bounded MCP diagnostics calls.
 - `Application.runInBackground` is enabled by the loader. Use `system_launch_game` only through Steam and preserve the selected saved profile. Confirm readiness with a live Unity scene query before claiming runtime evidence.
 - Runtime animation telemetry (Animator state, clip time, mapped poses, lifecycle counters) remains distinct from rendered appearance. If MCP cannot observe a needed state, extend the bridge or report `BLOCKED`/`UNKNOWN`; a label census or computed rectangle is not pixel/render evidence.
+- For bounded frame evidence without manual timing, call `diagnostics_wait_for_renderer_frame_evidence` with a clip substring and the required signals. It waits for distinct direct Game-camera samples and attempts to remove its probe in `finally` after receiving a cleanup token; check the returned cleanup status. A timeout is an unmet telemetry condition, not evidence that an animation failed to render.
+- `automation_run_sequence` can chain diagnostic spawn, native movement, and the frame-evidence wait. Pass the spawned `entityKeyId` using `{"$ref":{"step":0,"path":"/entityKeyId"}}`; only earlier successful JSON results can be referenced. Check each step result and preserve the evidence boundary between Animator/deformation telemetry and pixels.
 
 ## Completion report
 

@@ -62,6 +62,279 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertFalse(json.loads(response["content"][0]["text"])["pixelCapture"])
         self.assertTrue(invalid["isError"])
 
+    def test_wait_for_renderer_frame_evidence_matches_distinct_frames_and_stops_probe(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+        samples = []
+        for frame in (101, 102):
+            samples.append({
+                "frame": frame,
+                "cameraRenderCallbackObserved": True,
+                "cameraTargetTextureAssigned": False,
+                "rendererEnabled": True,
+                "rendererIsVisible": True,
+                "boundsIntersectsCameraFrustum": True,
+                "layerIncludedByCameraCullingMask": True,
+                "activeClip": "IroncladWalker_Action_Walk",
+                "isMoving": True,
+                "deformationDeltaAvailable": True,
+                "maximumLocalVertexDelta": 0.25,
+                "retargetPresent": True,
+                "retargetBound": True,
+                "retargetSuspended": False,
+                "boundMappingCount": 8,
+            })
+        probe = {"success": True, "status": "active", "token": "probe-token", "pixelCapture": False, "renderers": [{"name": "Body", "samples": samples}]}
+        stopped_probe = {**probe, "status": "stopped"}
+
+        def fake_diagnostics_method(method: str, args: list[object] | None = None) -> str:
+            calls.append((method, list(args or [])))
+            if method == "StartRendererFrameProbeJson":
+                return json.dumps({"success": True, "token": "probe-token", "pixelCapture": False})
+            if method == "ReadRendererFrameProbeJson":
+                return json.dumps(probe)
+            if method == "StopRendererFrameProbeJson":
+                return json.dumps(stopped_probe)
+            raise AssertionError(method)
+
+        schemas = {tool["name"]: tool["inputSchema"] for tool in SERVER.TOOLS}
+        self.assertIn("diagnostics_wait_for_renderer_frame_evidence", schemas)
+        self.assertEqual(["entityKeyId"], schemas["diagnostics_wait_for_renderer_frame_evidence"]["required"])
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method):
+            response = SERVER.execute_tool("diagnostics_wait_for_renderer_frame_evidence", {
+                "entityKeyId": "254",
+                "activeClipContains": "Action_Walk",
+                "requiredEvidence": ["moving", "deformation", "retargetBound", "visibleToCamera"],
+                "minimumMatchingFrames": 2,
+                "timeoutSeconds": 1,
+            })
+
+        payload = json.loads(response["content"][0]["text"])
+        self.assertFalse(response["isError"])
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["conditionMet"])
+        self.assertTrue(payload["probeStopped"])
+        self.assertEqual(2, payload["matchingFrameCount"])
+        self.assertEqual([101, 102], [row["frame"] for row in payload["matchingFrames"]])
+        self.assertEqual(["moving", "deformation", "retargetBound", "visibleToCamera"], payload["requiredEvidence"])
+        self.assertFalse(payload["pixelCapture"])
+        self.assertFalse(payload["computerUseRequired"])
+        self.assertEqual([
+            ("StartRendererFrameProbeJson", ["254", "", 12]),
+            ("ReadRendererFrameProbeJson", ["probe-token"]),
+            ("StopRendererFrameProbeJson", ["probe-token"]),
+        ], calls)
+
+    def test_wait_for_renderer_frame_evidence_times_out_but_still_removes_observers(self) -> None:
+        calls: list[str] = []
+        probe = {"success": True, "status": "active", "renderers": [{"name": "Body", "samples": [{
+            "frame": 103,
+            "cameraRenderCallbackObserved": True,
+            "cameraTargetTextureAssigned": False,
+            "rendererEnabled": True,
+            "activeClip": "IroncladWalker_Action_Walk",
+            "isMoving": True,
+        }]}]}
+        stopped_probe = {**probe, "status": "stopped"}
+
+        def fake_diagnostics_method(method: str, _args: list[object] | None = None) -> str:
+            calls.append(method)
+            if method == "StartRendererFrameProbeJson":
+                return json.dumps({"success": True, "token": "probe-token"})
+            if method == "ReadRendererFrameProbeJson":
+                return json.dumps(probe)
+            if method == "StopRendererFrameProbeJson":
+                return json.dumps(stopped_probe)
+            raise AssertionError(method)
+
+        clock_value = [0.0]
+        def fake_monotonic() -> float:
+            clock_value[0] += 0.3
+            return clock_value[0]
+
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method), \
+                mock.patch.object(SERVER.time, "monotonic", side_effect=fake_monotonic), \
+                mock.patch.object(SERVER.time, "sleep", return_value=None):
+            response = SERVER.execute_tool("diagnostics_wait_for_renderer_frame_evidence", {
+                "entityKeyId": "254",
+                "activeClipContains": "Action_Death",
+                "requiredEvidence": ["moving"],
+                "timeoutSeconds": 1,
+                "pollIntervalMs": 1000,
+            })
+
+        payload = json.loads(response["content"][0]["text"])
+        self.assertFalse(response["isError"])
+        self.assertFalse(payload["success"])
+        self.assertFalse(payload["conditionMet"])
+        self.assertTrue(payload["timedOut"])
+        self.assertTrue(payload["probeStopped"])
+        self.assertIn("StopRendererFrameProbeJson", calls)
+
+    def test_wait_for_renderer_frame_evidence_rejects_invalid_thresholds_before_start(self) -> None:
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as bridge_call:
+            response = SERVER.execute_tool("diagnostics_wait_for_renderer_frame_evidence", {
+                "entityKeyId": "254",
+                "timeoutSeconds": 21,
+            })
+        self.assertTrue(response["isError"])
+        self.assertIn("timeoutSeconds", response["content"][0]["text"])
+        bridge_call.assert_not_called()
+
+    def test_sequence_budget_expiry_still_stops_renderer_probe(self) -> None:
+        calls: list[str] = []
+
+        def fake_diagnostics_method(method: str, _args: list[object] | None = None) -> str:
+            calls.append(method)
+            if method == "StartRendererFrameProbeJson":
+                return json.dumps({"success": True, "token": "probe-token"})
+            if method == "StopRendererFrameProbeJson":
+                return json.dumps({"success": True, "status": "stopped", "renderers": [], "pixelCapture": False})
+            raise AssertionError(f"Unexpected bridge call after the request budget expired: {method}")
+
+        clock_value = [0.0]
+        def fake_monotonic() -> float:
+            clock_value[0] += 0.3
+            return clock_value[0]
+
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method), \
+                mock.patch.object(SERVER.time, "monotonic", side_effect=fake_monotonic), \
+                mock.patch.object(SERVER.time, "sleep", return_value=None):
+            response = SERVER.execute_tool("automation_run_sequence", {
+                "steps": [{
+                    "tool": "diagnostics_wait_for_renderer_frame_evidence",
+                    "arguments": {"entityKeyId": "254", "timeoutSeconds": 20},
+                }],
+                "maxDurationSeconds": 1,
+            })
+
+        payload = json.loads(response["content"][0]["text"])
+        step_result = payload["results"][0]["result"]
+        self.assertFalse(response["isError"])
+        self.assertTrue(payload["results"][0]["budgetExceeded"])
+        self.assertFalse(step_result["conditionMet"])
+        self.assertTrue(step_result["timedOut"])
+        self.assertTrue(step_result["probeStopped"])
+        self.assertEqual(["StartRendererFrameProbeJson", "StopRendererFrameProbeJson"], calls)
+
+    def test_automation_sequence_resolves_typed_values_from_prior_success(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_diagnostics_method(method: str, args: list[object] | None = None) -> str:
+            call_args = list(args or [])
+            calls.append((method, call_args))
+            if method == "SpawnEntityJson":
+                return json.dumps({"success": True, "entityKeyId": "sample-native:assault-walker#254", "spawnedX": -45.5})
+            if method == "OrderUnitMoveJson":
+                return json.dumps({"success": True, "entityKeyId": call_args[0], "targetX": call_args[1], "targetZ": call_args[2]})
+            if method == "StartRendererFrameProbeJson":
+                return json.dumps({"success": True, "token": "probe-token", "pixelCapture": False})
+            if method == "ReadRendererFrameProbeJson":
+                return json.dumps({"success": True, "renderers": [{"name": "Body", "samples": [{
+                    "frame": 101,
+                    "cameraRenderCallbackObserved": True,
+                    "cameraTargetTextureAssigned": False,
+                    "rendererEnabled": True,
+                    "activeClip": "IroncladWalker_Action_Walk",
+                    "isMoving": True,
+                    "retargetPresent": True,
+                    "retargetBound": True,
+                    "retargetSuspended": False,
+                    "boundMappingCount": 8,
+                }]}]})
+            if method == "StopRendererFrameProbeJson":
+                return json.dumps({"success": True, "status": "stopped", "renderers": [{"name": "Body", "samples": [{
+                    "frame": 101,
+                    "cameraRenderCallbackObserved": True,
+                    "cameraTargetTextureAssigned": False,
+                    "rendererEnabled": True,
+                    "activeClip": "IroncladWalker_Action_Walk",
+                    "isMoving": True,
+                    "retargetPresent": True,
+                    "retargetBound": True,
+                    "retargetSuspended": False,
+                    "boundMappingCount": 8,
+                }]}], "pixelCapture": False})
+            raise AssertionError(method)
+
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method):
+            response = SERVER.execute_tool("automation_run_sequence", {
+                "steps": [
+                    {
+                        "tool": "diagnostics_spawn_entity",
+                        "arguments": {"entityId": "sample-native:assault-walker", "side": "Player", "targetX": 12, "targetZ": 34},
+                    },
+                    {
+                        "tool": "diagnostics_order_unit_move",
+                        "arguments": {
+                            "entityKeyId": {"$ref": {"step": 0, "path": "/entityKeyId"}},
+                            "destinationX": {"$ref": {"step": 0, "path": "/spawnedX"}},
+                            "destinationZ": 90,
+                        },
+                    },
+                    {
+                        "tool": "diagnostics_wait_for_renderer_frame_evidence",
+                        "arguments": {
+                            "entityKeyId": {"$ref": {"step": 0, "path": "/entityKeyId"}},
+                            "timeoutSeconds": 2,
+                            "activeClipContains": "Action_Walk",
+                            "requiredEvidence": ["moving", "retargetBound"],
+                        },
+                    },
+                ],
+            })
+
+        payload = json.loads(response["content"][0]["text"])
+        self.assertFalse(response["isError"])
+        self.assertTrue(payload["success"])
+        self.assertEqual(3, payload["completedSteps"])
+        self.assertEqual(("OrderUnitMoveJson", ["sample-native:assault-walker#254", -45.5, 90.0]), calls[1])
+        self.assertEqual(("StartRendererFrameProbeJson", ["sample-native:assault-walker#254", "", 12]), calls[2])
+        self.assertEqual(("StopRendererFrameProbeJson", ["probe-token"]), calls[-1])
+        self.assertTrue(payload["results"][2]["result"]["conditionMet"])
+        self.assertTrue(payload["results"][2]["result"]["probeStopped"])
+
+    def test_automation_sequence_rejects_forward_or_failed_step_references(self) -> None:
+        calls: list[str] = []
+        def fake_diagnostics_method(method: str, _args: list[object] | None = None) -> str:
+            calls.append(method)
+            if method == "OrderUnitMoveJson":
+                return json.dumps({"success": False, "error": "entity not found"})
+            raise AssertionError(f"unexpected bridge call: {method}")
+
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method):
+            forward = SERVER.execute_tool("automation_run_sequence", {
+                "steps": [{
+                    "tool": "diagnostics_order_unit_move",
+                    "arguments": {
+                        "entityKeyId": {"$ref": {"step": 1, "path": "/entityKeyId"}},
+                        "destinationX": 1,
+                        "destinationZ": 2,
+                    },
+                }, {"tool": "diagnostics_get_game_time_scale"}],
+            })
+            failed_source = SERVER.execute_tool("automation_run_sequence", {
+                "stopOnFailure": False,
+                "steps": [
+                    {"tool": "diagnostics_order_unit_move", "arguments": {"entityKeyId": "missing-unit", "destinationX": 1, "destinationZ": 2}},
+                    {
+                        "tool": "diagnostics_order_unit_move",
+                        "arguments": {
+                            "entityKeyId": {"$ref": {"step": 0, "path": "/entityKeyId"}},
+                            "destinationX": 1,
+                            "destinationZ": 2,
+                        },
+                    },
+                ],
+            })
+
+        forward_payload = json.loads(forward["content"][0]["text"])
+        failed_payload = json.loads(failed_source["content"][0]["text"])
+        self.assertFalse(forward_payload["success"])
+        self.assertIn("earlier step", forward_payload["results"][0]["error"])
+        self.assertFalse(failed_payload["results"][1]["success"])
+        self.assertIn("did not succeed", failed_payload["results"][1]["error"])
+        self.assertEqual(["OrderUnitMoveJson"], calls)
+
     def test_native_michsky_button_activation_checks_target_then_invokes_callback(self) -> None:
         calls: list[tuple[str, dict[str, object]]] = []
         item = {
@@ -775,7 +1048,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(237, len(names))
+        self.assertEqual(238, len(names))
 
     def test_initialize_reports_current_bridge_version(self) -> None:
         response = SERVER.handle_request({
@@ -784,12 +1057,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "method": "initialize",
             "params": {"protocolVersion": "2024-11-05"},
         })
-        self.assertEqual("1.4.3", response["result"]["serverInfo"]["version"])
+        self.assertEqual("1.4.4", response["result"]["serverInfo"]["version"])
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(237, len(tools))
+        self.assertEqual(238, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -1227,11 +1500,11 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(237, len(names))
+        self.assertEqual(238, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
-        self.assertEqual(217, len(specs) - len(aliases))
+        self.assertEqual(218, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
         self.assertLess(compact, 90000, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
@@ -1283,7 +1556,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(387, total_props)
+        self.assertEqual(392, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()
@@ -1378,7 +1651,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("Parent GameObject instance ID.", blob)
         resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = resp["result"]["tools"]
-        self.assertEqual(237, len(tools))
+        self.assertEqual(238, len(tools))
         payload = json.dumps(resp["result"], separators=(",", ":"))
         self.assertLess(len(payload), 91000, f"tools/list payload too large: {len(payload)} bytes")
 

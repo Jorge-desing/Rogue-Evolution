@@ -13,8 +13,10 @@ import os
 import sys
 import time
 import csv
+import copy
 import subprocess
 import contextvars
+import math
 import re
 import urllib.error
 import urllib.parse
@@ -25,7 +27,7 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.4.3"
+SERVER_VERSION = "1.4.4"
 GAME_PROCESS_NAME = "Rogue Command.exe"
 GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
@@ -522,6 +524,163 @@ def _parse_component_member(raw: str) -> Any:
         return {"error": f"Could not parse {clr_type or 'component'} value: {value}"}
 
 
+def _parse_renderer_probe_result(raw: Any, operation: str) -> dict[str, Any]:
+    try:
+        result = json.loads(raw) if isinstance(raw, str) else raw
+    except (TypeError, ValueError) as exc:
+        return {"success": False, "error": f"{operation} returned invalid JSON: {exc}"}
+    if not isinstance(result, dict):
+        return {"success": False, "error": f"{operation} returned a non-object payload"}
+    return result
+
+
+def _matching_renderer_probe_frames(
+    probe: dict[str, Any],
+    *,
+    active_clip_contains: str,
+    is_moving: bool | None,
+    require_deformation_delta: bool,
+    require_retarget_bound: bool,
+    require_visible_to_camera: bool,
+) -> list[dict[str, Any]]:
+    frames: dict[int, dict[str, Any]] = {}
+    renderers = probe.get("renderers")
+    if not isinstance(renderers, list):
+        return []
+
+    clip_filter = active_clip_contains.casefold()
+    for renderer in renderers:
+        if not isinstance(renderer, dict):
+            continue
+        renderer_name = renderer.get("name")
+        if not isinstance(renderer_name, str):
+            renderer_name = ""
+        samples = renderer.get("samples")
+        if not isinstance(samples, list):
+            continue
+
+        for sample in samples:
+            if not isinstance(sample, dict):
+                continue
+            if sample.get("cameraRenderCallbackObserved") is not True or sample.get("cameraTargetTextureAssigned") is not False:
+                continue
+            if sample.get("rendererEnabled") is not True:
+                continue
+            clip = sample.get("activeClip")
+            if not isinstance(clip, str):
+                clip = ""
+            if clip_filter and clip_filter not in clip.casefold():
+                continue
+            if is_moving is not None and sample.get("isMoving") is not is_moving:
+                continue
+
+            delta = sample.get("maximumLocalVertexDelta")
+            has_delta = (
+                sample.get("deformationDeltaAvailable") is True
+                and isinstance(delta, (int, float))
+                and not isinstance(delta, bool)
+                and math.isfinite(float(delta))
+                and float(delta) > 1e-6
+            )
+            if require_deformation_delta and not has_delta:
+                continue
+
+            mapping_count = sample.get("boundMappingCount")
+            retarget_bound = (
+                sample.get("retargetPresent") is True
+                and sample.get("retargetBound") is True
+                and sample.get("retargetSuspended") is False
+                and isinstance(mapping_count, int)
+                and not isinstance(mapping_count, bool)
+                and mapping_count > 0
+            )
+            if require_retarget_bound and not retarget_bound:
+                continue
+
+            visible = (
+                sample.get("rendererIsVisible") is True
+                and sample.get("boundsIntersectsCameraFrustum") is True
+                and sample.get("layerIncludedByCameraCullingMask") is True
+            )
+            if require_visible_to_camera and not visible:
+                continue
+
+            frame = sample.get("frame")
+            if not isinstance(frame, int) or isinstance(frame, bool):
+                continue
+            row = frames.setdefault(frame, {
+                "frame": frame,
+                "rendererNames": [],
+                "activeClips": [],
+                "maximumLocalVertexDelta": None,
+                "moving": sample.get("isMoving") is True,
+                "retargetBound": retarget_bound,
+                "visibleToCamera": visible,
+            })
+            if renderer_name and renderer_name not in row["rendererNames"]:
+                row["rendererNames"].append(renderer_name)
+            if clip and clip not in row["activeClips"]:
+                row["activeClips"].append(clip)
+            if has_delta:
+                prior_delta = row["maximumLocalVertexDelta"]
+                if prior_delta is None or float(delta) > prior_delta:
+                    row["maximumLocalVertexDelta"] = float(delta)
+
+    return [frames[frame] for frame in sorted(frames)]
+
+
+def _resolve_sequence_references(value: Any, step_index: int, prior_results: list[dict[str, Any]], argument_path: str = "$") -> Any:
+    if isinstance(value, dict):
+        if "$ref" in value:
+            if set(value) != {"$ref"}:
+                raise ValueError(f"{argument_path}: a $ref object cannot contain sibling properties")
+            reference = value.get("$ref")
+            if not isinstance(reference, dict) or set(reference) != {"step", "path"}:
+                raise ValueError(f"{argument_path}: $ref must contain exactly 'step' and 'path'")
+            source_step = reference.get("step")
+            pointer = reference.get("path")
+            if isinstance(source_step, bool) or not isinstance(source_step, int):
+                raise ValueError(f"{argument_path}: $ref step must be a zero-based integer")
+            if source_step < 0 or source_step >= step_index:
+                raise ValueError(f"{argument_path}: $ref must point to an earlier step in this sequence")
+            if not isinstance(pointer, str) or not pointer.startswith("/"):
+                raise ValueError(f"{argument_path}: $ref path must be a non-empty JSON Pointer into the prior step result")
+            source = prior_results[source_step]
+            if source.get("success") is not True:
+                raise ValueError(f"{argument_path}: step {source_step} did not succeed; its result cannot be reused")
+
+            resolved = source.get("result")
+            for token in pointer[1:].split("/"):
+                if re.search(r"~(?![01])", token):
+                    raise ValueError(f"{argument_path}: invalid JSON Pointer escape in $ref path")
+                token = token.replace("~1", "/").replace("~0", "~")
+                if isinstance(resolved, dict):
+                    if token not in resolved:
+                        raise ValueError(f"{argument_path}: $ref path segment {token!r} was not present")
+                    resolved = resolved[token]
+                elif isinstance(resolved, list):
+                    if not token.isdigit() or (len(token) > 1 and token.startswith("0")):
+                        raise ValueError(f"{argument_path}: JSON Pointer array segment {token!r} is not a canonical index")
+                    array_index = int(token)
+                    if array_index >= len(resolved):
+                        raise ValueError(f"{argument_path}: JSON Pointer array index {array_index} is out of range")
+                    resolved = resolved[array_index]
+                else:
+                    raise ValueError(f"{argument_path}: $ref path traverses a non-object result")
+            return copy.deepcopy(resolved)
+
+        return {
+            key: _resolve_sequence_references(child, step_index, prior_results, f"{argument_path}.{key}")
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _resolve_sequence_references(child, step_index, prior_results, f"{argument_path}[{index}]")
+            for index, child in enumerate(value)
+        ]
+    return value
+
+
 def _call_diagnostics_member(member_name: str) -> Any:
     global _DIAGNOSTICS_GO_ID
     for attempt in range(2):
@@ -653,9 +812,24 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     break
 
                 step_started = time.monotonic()
+                try:
+                    resolved_arguments = _resolve_sequence_references(step_arguments, index, sequence_results)
+                except ValueError as exc:
+                    failed = True
+                    sequence_results.append({
+                        "index": index,
+                        "tool": step_tool,
+                        "success": False,
+                        "budgetExceeded": False,
+                        "durationMs": round((time.monotonic() - step_started) * 1000, 1),
+                        "error": f"sequence argument reference failed: {exc}",
+                    })
+                    if stop_on_failure:
+                        break
+                    continue
                 deadline_token = _AUTOMATION_DEADLINE.set(deadline)
                 try:
-                    response = execute_tool(step_tool, step_arguments)
+                    response = execute_tool(step_tool, resolved_arguments)
                 finally:
                     _AUTOMATION_DEADLINE.reset(deadline_token)
                 text_parts = [
@@ -1956,6 +2130,163 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             token = str(arguments.get("token", "")).strip()
             res = _call_diagnostics_method("StopRendererFrameProbeJson", [token])
             return _tool_response(res)
+
+        elif name == "diagnostics_wait_for_renderer_frame_evidence":
+            entity_key_id = arguments.get("entityKeyId")
+            if not isinstance(entity_key_id, str) or not entity_key_id.strip():
+                return _tool_response(json.dumps({"success": False, "error": "entityKeyId must be a non-empty string", "pixelCapture": False}), is_error=True)
+
+            try:
+                timeout_seconds = arguments.get("timeoutSeconds", 10)
+                if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)):
+                    raise ValueError
+                timeout_seconds = float(timeout_seconds)
+                minimum_matching_frames = arguments.get("minimumMatchingFrames", 1)
+                if isinstance(minimum_matching_frames, bool) or not isinstance(minimum_matching_frames, int):
+                    raise ValueError
+            except (TypeError, ValueError, OverflowError):
+                return _tool_response(json.dumps({"success": False, "error": "timeoutSeconds and minimumMatchingFrames must be numeric values of the declared types", "pixelCapture": False}), is_error=True)
+            if not math.isfinite(timeout_seconds) or not 1 <= timeout_seconds <= 20:
+                return _tool_response(json.dumps({"success": False, "error": "timeoutSeconds must be finite and in [1, 20]", "pixelCapture": False}), is_error=True)
+            if not 1 <= minimum_matching_frames <= 12:
+                return _tool_response(json.dumps({"success": False, "error": "minimumMatchingFrames must be in [1, 12]", "pixelCapture": False}), is_error=True)
+
+            active_clip_contains = arguments.get("activeClipContains", "")
+            if not isinstance(active_clip_contains, str):
+                return _tool_response(json.dumps({"success": False, "error": "activeClipContains must be a string", "pixelCapture": False}), is_error=True)
+
+            required_evidence = arguments.get("requiredEvidence", [])
+            allowed_evidence = {"moving", "stationary", "deformation", "retargetBound", "visibleToCamera"}
+            if not isinstance(required_evidence, list) or any(not isinstance(item, str) or item not in allowed_evidence for item in required_evidence):
+                return _tool_response(json.dumps({"success": False, "error": "requiredEvidence must be a list of supported signal names", "pixelCapture": False}), is_error=True)
+            if len(required_evidence) > len(allowed_evidence) or len(set(required_evidence)) != len(required_evidence):
+                return _tool_response(json.dumps({"success": False, "error": "requiredEvidence must contain unique signal names", "pixelCapture": False}), is_error=True)
+            if "moving" in required_evidence and "stationary" in required_evidence:
+                return _tool_response(json.dumps({"success": False, "error": "requiredEvidence cannot require both moving and stationary", "pixelCapture": False}), is_error=True)
+            is_moving = True if "moving" in required_evidence else False if "stationary" in required_evidence else None
+
+            started_at = time.monotonic()
+            deadline = started_at + timeout_seconds
+            automation_deadline = _AUTOMATION_DEADLINE.get()
+            if automation_deadline is not None:
+                deadline = min(deadline, automation_deadline)
+            if deadline <= started_at:
+                return _tool_response(json.dumps({"success": False, "error": "automation request time budget is exhausted", "pixelCapture": False}), is_error=False)
+
+            start_raw = _call_diagnostics_method("StartRendererFrameProbeJson", [entity_key_id.strip(), "", 12])
+            start_result = _parse_renderer_probe_result(start_raw, "StartRendererFrameProbeJson")
+            if start_result.get("success") is not True:
+                return _tool_response(json.dumps({
+                    "success": False,
+                    "error": start_result.get("error", "renderer frame probe did not start"),
+                    "startResult": start_result,
+                    "pixelCapture": False,
+                }, indent=2), is_error=False)
+
+            probe_token = start_result.get("token")
+            if not isinstance(probe_token, str) or not probe_token.strip():
+                return _tool_response(json.dumps({
+                    "success": False,
+                    "error": "renderer frame probe started without returning a cleanup token",
+                    "startResult": start_result,
+                    "pixelCapture": False,
+                }, indent=2), is_error=False)
+
+            last_probe: dict[str, Any] | None = None
+            read_count = 0
+            read_error: str | None = None
+            condition_met = False
+            stop_result: dict[str, Any] | None = None
+            try:
+                while time.monotonic() < deadline:
+                    try:
+                        read_raw = _call_diagnostics_method("ReadRendererFrameProbeJson", [probe_token])
+                        last_probe = _parse_renderer_probe_result(read_raw, "ReadRendererFrameProbeJson")
+                        read_count += 1
+                    except Exception as exc:
+                        read_error = str(exc)
+                        break
+
+                    if last_probe.get("success") is not True:
+                        read_error = str(last_probe.get("error", "renderer frame probe read failed"))
+                        break
+                    matching_frames = _matching_renderer_probe_frames(
+                        last_probe,
+                        active_clip_contains=active_clip_contains,
+                        is_moving=is_moving,
+                        require_deformation_delta="deformation" in required_evidence,
+                        require_retarget_bound="retargetBound" in required_evidence,
+                        require_visible_to_camera="visibleToCamera" in required_evidence,
+                    )
+                    if len(matching_frames) >= minimum_matching_frames:
+                        condition_met = True
+                        break
+
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    time.sleep(min(0.25, remaining))
+            finally:
+                # Observer cleanup must still run if the enclosing sequence budget expires.
+                cleanup_deadline = time.monotonic() + 4.0
+                cleanup_token = _AUTOMATION_DEADLINE.set(cleanup_deadline)
+                try:
+                    stop_raw = _call_diagnostics_method("StopRendererFrameProbeJson", [probe_token])
+                    stop_result = _parse_renderer_probe_result(stop_raw, "StopRendererFrameProbeJson")
+                except Exception as exc:
+                    stop_result = {"success": False, "error": str(exc)}
+                finally:
+                    _AUTOMATION_DEADLINE.reset(cleanup_token)
+
+            final_probe = stop_result if isinstance(stop_result, dict) and isinstance(stop_result.get("renderers"), list) else last_probe
+            if final_probe is None:
+                final_probe = {"success": False, "error": "no renderer frame payload was returned"}
+            matching_frames = _matching_renderer_probe_frames(
+                final_probe,
+                active_clip_contains=active_clip_contains,
+                is_moving=is_moving,
+                require_deformation_delta="deformation" in required_evidence,
+                require_retarget_bound="retargetBound" in required_evidence,
+                require_visible_to_camera="visibleToCamera" in required_evidence,
+            )
+            if len(matching_frames) >= minimum_matching_frames:
+                condition_met = True
+
+            probe_stopped = isinstance(stop_result, dict) and stop_result.get("success") is True
+            timed_out = not condition_met and read_error is None and time.monotonic() >= deadline
+            success = condition_met and probe_stopped
+            response_payload = {
+                "success": success,
+                "conditionMet": condition_met,
+                "timedOut": timed_out,
+                "probeStopped": probe_stopped,
+                "probeToken": probe_token,
+                "entityKeyId": entity_key_id.strip(),
+                "readCount": read_count,
+                "minimumMatchingFrames": minimum_matching_frames,
+                "requiredEvidence": required_evidence,
+                "matchingFrameCount": len(matching_frames),
+                "matchingFrames": matching_frames[:24],
+                "elapsedSeconds": round(time.monotonic() - started_at, 3),
+                "conditions": {
+                    "activeClipContains": active_clip_contains,
+                    "isMoving": is_moving,
+                    "requireDeformationDelta": "deformation" in required_evidence,
+                    "requireRetargetBound": "retargetBound" in required_evidence,
+                    "requireVisibleToCamera": "visibleToCamera" in required_evidence,
+                },
+                "probe": final_probe,
+                "stopResult": stop_result,
+                "pixelCapture": False,
+                "computerUseRequired": False,
+                "evidenceBoundary": "structured Unity camera, Animator, retarget, visibility, and sampled BakeMesh telemetry; not pixel or rendered-appearance proof",
+                "source": "BepInEx MCP; no screenshots, focus interaction, or Computer Use",
+            }
+            if read_error is not None:
+                response_payload["readError"] = read_error
+            if isinstance(stop_result, dict) and stop_result.get("success") is not True:
+                response_payload["stopError"] = stop_result.get("error", "renderer frame probe cleanup was not confirmed")
+            return _tool_response(json.dumps(response_payload, indent=2), is_error=False)
 
         elif name == "diagnostics_get_loaded_unit_visual_audit":
             max_entries = int(arguments.get("maxEntries", 64))
