@@ -122,6 +122,8 @@ Dispatches validated, safe in-game actions for automated testing and agent execu
 - `diagnostics_order_navigator_pause`: Pauses or unpauses navigator simulation (`paused` bool).
 - `diagnostics_jump_to_level` / `diagnostics_load_next_level`: Synthetic stage jump or level load.
 
+`GetIntermissionGraphJson` includes the special boss at `(LevelMap.LevelCount, 0)`. `GetIntermissionNodeJson(level, field)` must report that node as `found=true`, `isBoss=true`, with no reward and one field; `isChoosable` follows `IsLastLevelBeforeBoss`, and its incoming count equals the preceding level's field count. The `GetAiModulesDiagnosticsJson` registry census is not evidence of an active stage profile or running AI; pair it with current stage/profile, director, and roster reads before claiming execution.
+
 ### Skills, Status Effects & Vitality
 - `diagnostics_order_unit_active_skill`: Fires tactical skill (`entityKeyId`, `targetingMode` `"Self"`/`"TargetUnit"`/`"TargetPosition"`, `targetUnitKeyId`, `targetX`, `targetZ`).
 - `diagnostics_apply_status_effect` / `diagnostics_clear_status_effect`: Applies/clears effects (`SlowedDown`, `OnFire`, `Stun`, `CombatBoost`) (`entityKeyId`, `statusEffectName`, `durationSeconds`).

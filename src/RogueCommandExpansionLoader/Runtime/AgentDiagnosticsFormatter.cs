@@ -1229,6 +1229,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["level"] = detail.Level,
                 ["field"] = detail.Field,
                 ["isChoosable"] = detail.IsChoosable,
+                ["isBoss"] = detail.IsBoss,
                 ["isRestSite"] = detail.IsRestSite,
                 ["isShop"] = detail.IsShop,
                 ["hasCardReward"] = detail.HasCardReward,

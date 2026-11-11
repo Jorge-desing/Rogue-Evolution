@@ -74,9 +74,10 @@ namespace RogueCommandExpansionLoader.Runtime
 
     /// <summary>
     /// Pure, agent-readable detail for a single intermission node
-    /// (level, field). Reward classification comes from the native
-    /// <c>LevelMap.Is*Reward(level, field)</c> predicates; connectivity
-    /// counts come from <c>LevelMap.Connections(level)</c>.
+    /// (level, field). Regular-node reward classification comes from the
+    /// native <c>LevelMap.Is*Reward(level, field)</c> predicates; the special
+    /// boss node is at <c>LevelMap.LevelCount</c>, field 0, and has no reward.
+    /// Connectivity counts come from the native route structure.
     /// </summary>
     public readonly struct IntermissionNodeDetail
     {
@@ -85,6 +86,7 @@ namespace RogueCommandExpansionLoader.Runtime
             int level,
             int field,
             bool isChoosable,
+            bool isBoss,
             bool isRestSite,
             bool isShop,
             bool hasCardReward,
@@ -104,6 +106,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Level = level;
             Field = field;
             IsChoosable = isChoosable;
+            IsBoss = isBoss;
             IsRestSite = isRestSite;
             IsShop = isShop;
             HasCardReward = hasCardReward;
@@ -124,6 +127,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public int Level { get; }
         public int Field { get; }
         public bool IsChoosable { get; }
+        public bool IsBoss { get; }
         public bool IsRestSite { get; }
         public bool IsShop { get; }
         public bool HasCardReward { get; }
@@ -140,7 +144,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public int FieldCountInLevel { get; }
 
         public static IntermissionNodeDetail NotFound(int level, int field) =>
-            new IntermissionNodeDetail(false, level, field, false, false, false, false, false, false,
+            new IntermissionNodeDetail(false, level, field, false, false, false, false, false, false, false,
                 false, false, false, false, false, string.Empty, 0, 0, 0);
     }
 
@@ -385,6 +389,16 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 Type type = levelMap.GetType();
+                int levelCount = ReadIntField(type, levelMap, "LevelCount", 0);
+                if (IsBossNodeCoordinate(level, field, levelCount))
+                {
+                    bool isLastLevelBeforeBoss = ReadBoolProperty(
+                        type, levelMap, "IsLastLevelBeforeBoss", false);
+                    int incomingFieldCount = ReadFields(levelMap, levelCount - 1).Count;
+                    return CreateBossNodeDetail(
+                        level, field, levelCount, isLastLevelBeforeBoss, incomingFieldCount);
+                }
+
                 if (!HasField(type, levelMap, level))
                 {
                     return IntermissionNodeDetail.NotFound(level, field);
@@ -408,13 +422,31 @@ namespace RogueCommandExpansionLoader.Runtime
                 int fieldCountInLevel = ReadFields(levelMap, level).Count;
 
                 return new IntermissionNodeDetail(
-                    true, level, field, isChoosable, rest, shop, card, upgrade, relic, research, coin,
+                    true, level, field, isChoosable, false, rest, shop, card, upgrade, relic, research, coin,
                     crystal, points, drop, poolId, outgoing.Count, incoming.Count, fieldCountInLevel);
             }
             catch
             {
                 return IntermissionNodeDetail.NotFound(level, field);
             }
+        }
+
+        internal static bool IsBossNodeCoordinate(int level, int field, int levelCount)
+        {
+            return levelCount > 0 && level == levelCount && field == 0;
+        }
+
+        internal static IntermissionNodeDetail CreateBossNodeDetail(
+            int level, int field, int levelCount, bool isChoosable, int incomingFieldCount)
+        {
+            if (!IsBossNodeCoordinate(level, field, levelCount) || incomingFieldCount < 0)
+            {
+                return IntermissionNodeDetail.NotFound(level, field);
+            }
+
+            return new IntermissionNodeDetail(
+                true, level, field, isChoosable, true, false, false, false, false, false,
+                false, false, false, false, false, string.Empty, 0, incomingFieldCount, 1);
         }
 
         public static string ClassifyPrimaryRewardType(

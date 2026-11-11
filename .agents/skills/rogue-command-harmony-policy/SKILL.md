@@ -145,6 +145,8 @@ The loader registers 65 verified hooks across core game simulation systems, incl
 | **Local Build / Validation** | `dotnet build`, test harness, Python | Compile correctness, hook list | In-game execution or match flow |
 | **In-Game Steam Evidence** | Live Steam process (AppID `1461910`) | Active hook execution, live AI/commands | Universal cross-version behavior |
 
+For live AI evidence, separate module registration from stage activation: a 23-module registry census alone proves availability only. Confirm the current stage's AI profile and observe its director/roster plus module-specific effects or counters in `Game`. An intermission boss-node read proves route telemetry only, not AI execution.
+
 ---
 
 ## References

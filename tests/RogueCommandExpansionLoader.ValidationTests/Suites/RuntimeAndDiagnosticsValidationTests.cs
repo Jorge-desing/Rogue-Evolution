@@ -9870,7 +9870,7 @@ internal static partial class ValidationTestRunner
         }
 
         var detail = new IntermissionNodeDetail(
-            true, 3, 1, false, true, false, true, false, true, false, true, false, false, true,
+            true, 3, 1, false, false, true, false, true, false, true, false, true, false, false, true,
             "pool:bs", 2, 1, 4);
         string detailJson = AgentDiagnosticsFormatter.SerializeIntermissionNodeDetail(detail);
         using (JsonDocument doc = JsonDocument.Parse(detailJson))
@@ -9879,6 +9879,7 @@ internal static partial class ValidationTestRunner
             if (root.GetProperty("kind").GetString() != "intermissionNodeDetail"
                 || !root.GetProperty("found").GetBoolean()
                 || root.GetProperty("isChoosable").GetBoolean()
+                || root.GetProperty("isBoss").GetBoolean()
                 || !root.GetProperty("hasCardReward").GetBoolean()
                 || !root.GetProperty("hasRelicReward").GetBoolean()
                 || root.GetProperty("blueprintPoolId").GetString() != "pool:bs"
@@ -9896,6 +9897,30 @@ internal static partial class ValidationTestRunner
             if (doc.RootElement.GetProperty("found").GetBoolean())
             {
                 throw new InvalidOperationException("NotFound node detail must report found=false.");
+            }
+        }
+
+        if (!RuntimeIntermissionDeepReads.IsBossNodeCoordinate(4, 0, 4)
+            || RuntimeIntermissionDeepReads.IsBossNodeCoordinate(4, 1, 4)
+            || RuntimeIntermissionDeepReads.IsBossNodeCoordinate(4, 0, 0))
+        {
+            throw new InvalidOperationException("The special intermission boss node must be levelCount:0 only.");
+        }
+
+        IntermissionNodeDetail bossDetail = RuntimeIntermissionDeepReads.CreateBossNodeDetail(4, 0, 4, true, 4);
+        string bossJson = AgentDiagnosticsFormatter.SerializeIntermissionNodeDetail(bossDetail);
+        using (JsonDocument doc = JsonDocument.Parse(bossJson))
+        {
+            JsonElement root = doc.RootElement;
+            if (!root.GetProperty("found").GetBoolean()
+                || !root.GetProperty("isBoss").GetBoolean()
+                || !root.GetProperty("isChoosable").GetBoolean()
+                || root.GetProperty("incomingConnectionCount").GetInt32() != 4
+                || root.GetProperty("fieldCountInLevel").GetInt32() != 1
+                || root.GetProperty("hasCardReward").GetBoolean()
+                || root.GetProperty("blueprintPoolId").GetString() != string.Empty)
+            {
+                throw new InvalidOperationException("Special boss node detail mismatch: " + bossJson);
             }
         }
     }),

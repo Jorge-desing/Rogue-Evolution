@@ -107,6 +107,12 @@ Descubrimiento: `--operations-json` imprime el catálogo completo (JSON) y sale 
   --balance-name rarity --balance-value Rare --out-dir /tmp/out --dry-run
 ```
 
+## Intermission y selección del nodo jefe
+
+El grafo de `LevelMap` incluye un nodo jefe especial en `(LevelMap.LevelCount, 0)`, fuera de `Fields(level)`. `GetIntermissionNodeJson(level, field)` debe devolver `found=true`, `isBoss=true`, sin recompensas y con una sola casilla para esa coordenada; `isChoosable` refleja `IsLastLevelBeforeBoss` y las conexiones entrantes cuentan los campos del nivel anterior. La corrección del nodo no implica seleccionar ni cargarlo.
+
+`GetAiModulesDiagnosticsJson` informa módulos registrados, no el perfil asociado a la etapa actual ni su ejecución. Confirma el perfil de la etapa, el censo del director/roster y la telemetría propia del módulo antes de afirmar comportamiento AI en vivo.
+
 ## Reglas de evidencia
 
 Tests, validaciones de schema y registry: evidencia **local** únicamente. No prueban registro en runtime, ofertas, producción, render ni aceptación Steam.

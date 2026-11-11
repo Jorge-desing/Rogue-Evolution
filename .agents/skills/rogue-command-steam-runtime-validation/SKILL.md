@@ -95,6 +95,9 @@ python tools/runtime_profile_checkpoint.py verify `
 3. **Synthetic Jump Seams (User-Authorized Fallback):**
    - `diagnostics_jump_to_level(level)` and `diagnostics_load_next_level` provide fail-closed advancement tagged with `synthetic=true`. Use only if natural progression is obstructed.
 
+- Before an AI runtime sample, resolve the current stage's AI prefab/profile and its module list. A registry count such as `GetAiModulesDiagnosticsJson.registeredModuleCount` is availability only. If the existing saved route does not activate the target profile, stop at the native progression boundary and report the behavior as unverified instead of advancing solely to force that profile. `GetAiDirectorCensusJson.isAiDirectorAvailable` and `GetAiRosterJson` describe the live scene and should be captured alongside module-specific counters.
+- The final boss is the special graph coordinate `(LevelMap.LevelCount, 0)`. `GetIntermissionNodeJson` now identifies it with `isBoss=true`; use read-only graph/node census before any selection or load action.
+
 ---
 
 ## 5. Claim-Specific Acceptance Matrix
