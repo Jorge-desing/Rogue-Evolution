@@ -124,46 +124,18 @@ En el `Assembly-CSharp.dll` de esta identidad, el inicializador de `ProfileManag
 
 En la lectura en vivo del 2026-10-18, el selector de `LocalLow` valía `1`, mientras los dos archivos de la instalación valían `2` y `3`. El perfil activo era `Profile1`; al iniciar no tenía `savegame.dat`. `Profile2` y `Profile3` sí tenían guardados. Es una fotografía histórica, no el estado actual. Vuelve a resolver el selector real y los perfiles en cada sesión; los selectores heredados de la instalación no se usan.
 
-### Omitir FirstRun solo en un perfil QA aislado
+### Continuar o iniciar una corrida con el tutorial completado
 
-El bypass de tutorial para aceptación de contenido está permitido únicamente en un perfil QA separado. Nunca completes el tutorial en el perfil activo del usuario ni modifiques sus flags, guardados o progreso. La ruta exacta del selector se obtiene de `ProfileManager.CurrentProfileTextPath` bajo `Application.persistentDataPath`, no de archivos heredados en la carpeta de instalación.
+No inicies ni restablezcas un perfil limpio o vacío para pruebas: puede reactivar el tutorial y cambiar su progreso. Conserva el tutorial completado; nunca uses métodos nativos para finalizarlo/restablecerlo ni edites `tutorialState.txt`. Resuelve el selector activo en `ProfileManager.CurrentProfileTextPath` bajo `Application.persistentDataPath`; los selectores heredados de la carpeta de instalación no son autoritativos.
 
-1. No interrumpas una partida abierta. Primero inspecciona el proceso y su estado con las operaciones de lectura de este runbook. Si el juego ya está corriendo, no cambies su selector, no abandones el run y no apliques el bypass; espera a que el juego cierre normalmente o limita la sesión a lectura.
-2. Con el juego cerrado, registra el valor original del selector real y los SHA-256 de todos los archivos de todos los perfiles del usuario. Conserva un inventario de ruta, tamaño y hash bajo `artifacts/runtime-smoke/`. No uses los selectores de la instalación.
-3. Inicia por Steam y, sin empezar una corrida ni aplicar el bypass, crea/selecciona un perfil QA distinto mediante el flujo nativo de administración de perfiles. Cierra el juego normalmente. Con el proceso cerrado, confirma que el selector real apunta al QA nuevo, que no contiene `savegame.dat` ni un run guardado y que todos los hashes de perfiles del usuario siguen iguales. No clones un perfil del usuario ni edites manualmente sus datos. Si no puedes demostrar aislamiento o crear QA sin sobrescribir datos, detente; no cambies el tutorial del usuario como alternativa.
-4. Vuelve a iniciar por Steam y confirma otra vez el selector/perfil efectivo, el proceso, la escena y que QA sigue sin run guardado. Para el bypass, permanece en `MainMenu` o `RunSetup`, antes de iniciar una corrida. No abandones una partida activa para alcanzar ese estado.
-5. Antes de usar firmas nativas, verifica juntos la versión de Rogue Command, SHA-256 y MVID de `Assembly-CSharp.dll`. En la identidad observada de Rogue Command `1.0.9` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`), la inspección estática encontró `TutorialState.FinishMainTutorial()` y `TutorialState.OnPlayerHasFinishedLevel1()`. La primera persiste la finalización del tutorial principal y llama a `AutoFinishCustomTutorialsWithMainTutorial()`; la segunda persiste el indicador que hace que `GameBalancingStore.DetermineLevelProgressionModeForNewRun()` deje de escoger `FirstRun`. Estos métodos nativos no usan Harmony ni escriben XP. Si cualquier elemento de la identidad cambia, vuelve a inspeccionar las firmas y efectos y no reutilices esta referencia a ciegas.
-6. Solo en QA, invoca cada método una vez si su flag sigue falso, directamente por el puente si está disponible. Si hace falta un helper temporal, usa uno, llama una vez a `Apply()`, lee ambos flags y el modo de próxima corrida, llama `Remove()` y confirma que ya no aparece en `inspect_components`. El helper de referencia es:
+1. Si Rogue Command ya está abierto, inspecciona su estado de solo lectura. No cambies el selector, no abandones la partida y no la reinicies sin autorización explícita.
+2. Con el juego cerrado, crea un checkpoint con selector, ruta, tamaño y SHA-256 de todos los archivos de todos los perfiles. Incluye el perfil fuente y el destino QA; guarda el checkpoint bajo `artifacts/runtime-smoke/`.
+3. Para continuar, inicia por Steam y selecciona con la interfaz nativa un perfil cuyo tutorial ya esté completado. Para una corrida nueva, requiere autorización explícita del usuario: conserva intacto un perfil fuente con ambos flags de tutorial completado, respalda el destino QA autorizado y clona el perfil completo al destino mientras el juego está cerrado. Verifica los hashes de origen/destino y los dos flags del clon antes de iniciar.
+4. Inicia por Steam, confirma el perfil efectivo y selecciónalo mediante la interfaz nativa. Al empezar una corrida nueva, lee el diálogo de sobrescritura completo antes de confirmar. Nunca elijas un perfil limpio como atajo.
+5. Verifica la identidad completa del juego antes de depender de firmas reflejadas. Usa BepInEx MCP para las lecturas y mutaciones autorizadas; documenta por separado configuración, actividad del perfil AI y comportamiento observado. No infieras ejecución de contadores de instalación, directorios vacíos o filas futuras de la secuencia.
+6. Al salir, confirma que el proceso terminó. Guarda bajo `artifacts/runtime-smoke/` una copia/manifiesto de los archivos generados por el run, restaura el slot QA a su respaldo original y devuelve el selector a su valor original. Exige que el verificador de checkpoint reporte todos los archivos y el selector iguales. No cambies Steam Cloud salvo autorización explícita.
 
-   ```csharp
-   using UnityEngine;
-
-   public sealed class RclTutorialCompletion : MonoBehaviour
-   {
-       public bool mainTutorialFinished;
-       public bool playerHasFinishedLevel1;
-       public string nextRunMode;
-
-       public void Apply()
-       {
-           var tutorial = Game.TutorialState;
-           if (!tutorial.IsMainTutorialFinished)
-               tutorial.FinishMainTutorial();
-           if (!tutorial.PlayerHasFinishedLevel1)
-               tutorial.OnPlayerHasFinishedLevel1();
-
-           mainTutorialFinished = tutorial.IsMainTutorialFinished;
-           playerHasFinishedLevel1 = tutorial.PlayerHasFinishedLevel1;
-           nextRunMode = GameBalancingStore.DetermineLevelProgressionModeForNewRun().ToString();
-       }
-
-       public void Remove() => Destroy(this);
-   }
-   ```
-7. Confirma en QA `IsMainTutorialFinished=true`, `PlayerHasFinishedLevel1=true` y modo `Default` o `Heat`; tras iniciar, confirma `Game.CurrentLevelProgressionMode != FirstRun`. Si no se cumple, detente. No avances tutoriales manualmente ni modifiques el perfil del usuario.
-8. Al terminar, cierra el juego normalmente y confirma que el proceso salió. Restaura el selector real al valor original y verifica por SHA-256 que todos los archivos de los perfiles del usuario coinciden con el inventario previo. Si algún archivo del usuario cambió, conserva evidencia y detén la limpieza automática para investigar la causa. El estado QA puede conservar la finalización del tutorial; no elimines el perfil QA. Restaura por hash los archivos temporales de instalación y retira helpers/sondas.
-
-Las firmas y efectos anteriores tienen **inspección estática** para la identidad indicada; no demuestran que el bypass se haya ejecutado en QA. El procedimiento vigente exige perfil QA aislado y nunca autoriza alterar el tutorial del usuario.
+Si no puedes verificar el perfil fuente tutorial-completo, aislar el destino, leer el diálogo o restaurar exactamente el checkpoint, detente antes de iniciar o continuar mutaciones y reporta el estado como `BLOCKED` o `UNKNOWN`.
 
 ## Inspección primero
 
@@ -255,7 +227,7 @@ Para afirmar que una carta apareció, registra la oferta que realmente se render
 - **Validación local:** 132/133 checks del harness pasaron; el único omitido fue la fixture de symlink por falta de privilegio de Windows. El validador resolvió 10/10 referencias de Sprite/prefab y el preflight estático resolvió 5/5 raíces visuales. Son pruebas locales, no de oferta o renderizado en partida.
 - **Sondas:** los componentes temporales `Rcl*Probe`, el helper `RclRuntimeTimeControl` y la acción temporal se retiraron. La lista final de componentes de `InGameMenuCanvas` contenía solo componentes del juego. Las salidas de validación están bajo `artifacts/`.
 
-Las notas de ejecución anteriores describen perfiles y procesos observados en sesiones pasadas. Para la siguiente aceptación que omita `FirstRun`, sigue el procedimiento QA aislado de arriba: registra el selector actual, usa un perfil QA sin run guardado y restaura el selector original después de cerrar el juego. No cambies a Profile 2 ni sobrescribas o elimines perfiles para volver a un estado limpio.
+Las notas de ejecución anteriores describen perfiles y procesos observados en sesiones pasadas. Para cualquier aceptación que necesite una corrida nueva, sigue el procedimiento de clon tutorial-completo anterior. No cambies a Profile 2 ni sobrescribas o elimines perfiles para volver a un estado limpio.
 
 ## Opener `LoadingHider` tras la carga de nivel (2026-11-11)
 
