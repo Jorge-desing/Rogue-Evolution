@@ -54,6 +54,7 @@ def build_bulwark_siege_tank_model() -> None:
     ]
     if not meshes:
         raise ValueError("Bulwark Siege Tank source contains no mesh parts")
+    rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
 
     # Preserve the authored source file; the rigged, editable deliverable is a separate copy.
     armature = rmk.generate_procedural_armature(

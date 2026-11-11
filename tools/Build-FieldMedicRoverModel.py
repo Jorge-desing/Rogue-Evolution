@@ -54,6 +54,7 @@ def build_field_medic_rover_model() -> None:
     ]
     if not meshes:
         raise ValueError("Field Medic Rover source contains no mesh parts")
+    rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
 
     # Preserve the authored source file; the rigged, editable deliverable is a separate copy.
     armature = rmk.generate_procedural_armature(

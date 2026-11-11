@@ -59,6 +59,7 @@ def build_model() -> None:
     ]
     if not meshes:
         raise ValueError("BastionSiegeMech source contains no mesh parts")
+    rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
 
     if armature.animation_data:
         for track in list(armature.animation_data.nla_tracks):

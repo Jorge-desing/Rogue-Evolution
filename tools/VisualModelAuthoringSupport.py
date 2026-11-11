@@ -52,22 +52,41 @@ def remove_objects(builder, predicate: Callable[[str], bool]) -> list[str]:
     return removed
 
 
+def reduce_subpixel_details_to_budget(
+    builder,
+    max_faces: int = 6000,
+    max_dimension_m: float = 0.60,
+) -> dict[str, int]:
+    """Apply RogueModelKit's shared, protected fitting simplification pass."""
+    import RogueModelKit as rmk
+
+    return rmk.reduce_subpixel_details_to_budget(
+        builder.objects,
+        max_faces=max_faces,
+        max_dimension_m=max_dimension_m,
+    )
+
+
 def simplify_low_value_bevel_details(
     builder,
     max_dimension_m: float = 0.60,
     angle_degrees: float = 28.0,
     protected_name_tokens: Sequence[str] = (
-        "Weapon", "Cannon", "Missile", "Nanite", "Sensor", "Optic", "Lens",
-        "Socket", "FirePoint", "Comms", "Mast", "Radar", "Antenna",
-        "Treads_Belt", "Turret_BaseShell",
+        "Weapon", "Cannon", "Gun", "Gatling", "Howitzer", "Barrel", "Missile",
+        "Launcher", "Drill", "Auger", "Nanite", "Sensor", "Optic", "Lens",
+        "Socket", "FirePoint", "Comms", "Mast", "Radar", "Antenna", "Shield",
+        "Hull", "Chassis", "Turret", "Mantlet", "Trunnion", "Crane", "Boom",
+        "Wheel", "Track", "Tread", "Leg", "Foot", "Actuator", "Treads_Belt",
+        "Turret_BaseShell",
     ),
 ) -> dict[str, int]:
     """Collapse redundant bevel facets on small fittings, leaving primary forms intact.
 
-    The generator bakes bevels into source meshes.  Dissolving only low-angle edges
+    The generator bakes bevels into source meshes. Dissolving only low-angle edges
     on sub-60 cm details removes extra bevel rings while retaining a crisp chamfer.
-    Primary armor, articulated rigs, colliders, and named role-defining hardware are
-    excluded so the pass cannot smooth away the unit silhouette or function.
+    Primary armor, articulated rigs, colliders, authored surface data, and named
+    role-defining hardware are excluded so the pass cannot erase authored shading,
+    vertex wear, UV boundaries, or the unit silhouette.
     """
     changed_meshes = 0
     faces_removed = 0
@@ -83,6 +102,16 @@ def simplify_low_value_bevel_details(
             continue
         if len(obj.data.polygons) < 20:
             continue
+        if len(obj.data.color_attributes) > 0 or len(obj.vertex_groups) > 0:
+            continue
+        if any(modifier.type == "ARMATURE" for modifier in obj.modifiers):
+            continue
+        if getattr(obj.data, "has_custom_normals", False):
+            continue
+        if any(edge.use_seam or edge.use_edge_sharp for edge in obj.data.edges):
+            continue
+        if len({poly.material_index for poly in obj.data.polygons}) > 1:
+            continue
 
         bm = bmesh.new()
         bm.from_mesh(obj.data)
@@ -93,7 +122,7 @@ def simplify_low_value_bevel_details(
             use_dissolve_boundaries=False,
             verts=list(bm.verts),
             edges=list(bm.edges),
-            delimit={"MATERIAL"},
+            delimit={"MATERIAL", "UV", "SHARP", "SEAM"},
         )
         new_count = len(bm.faces)
         if new_count < old_count:

@@ -74,6 +74,7 @@ def build_model():
     ]
     if not meshes:
         raise ValueError("Surge Arc Tank source contains no mesh parts")
+    rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
 
     _create_sockets()
 

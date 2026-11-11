@@ -125,6 +125,7 @@ def build() -> None:
         objects=objects,
         materials={"armor": armor, "gunmetal": gunmetal, "warning": warning, "tread": tread},
     ))
+    rmk.enforce_face_budget_before_export(objects, UNIT_NAME)
     armature = rmk.generate_procedural_armature(objects, prefix=UNIT_NAME, turret_center=Vector((0.0, -0.1, 1.6)), gun_pivot=Vector((0.0, 0.4, 1.6)), hull_deck_z=0.95, leg_type=None, with_ik=False)
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type=None, fire_profile="light")
     from VisualModelAuthoringSupport import validate_root_motion, validate_rigid_weights

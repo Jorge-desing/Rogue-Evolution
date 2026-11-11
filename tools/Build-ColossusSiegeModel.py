@@ -332,6 +332,7 @@ def build_colossus_siege_model():
         object_prefix="Colossus",
         materials={"armor": armor_primary, "gunmetal": gunmetal, "warning": warning_amber, "tread": tread_mat},
     ))
+    rmk.enforce_face_budget_before_export(model_objects, "ColossusSiegePlatform")
 
     # 8. Automated Quality Diagnostics & Validation
     diagnostics = rmk.validate_model_mesh_quality(model_objects)

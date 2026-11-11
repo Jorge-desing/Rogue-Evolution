@@ -34,6 +34,151 @@ def clear_scene() -> None:
                 datablocks.remove(datablock)
 
 
+def reduce_subpixel_details_to_budget(
+    objects: Sequence[bpy.types.Object],
+    max_faces: int = DEFAULT_FACE_BUDGET,
+    max_dimension_m: float = 0.60,
+) -> Dict[str, int]:
+    """Remove redundant bevel splits from small fittings when an asset exceeds its face cap.
+
+    This deliberately leaves large forms, weapon systems, mobility, sensors, and
+    articulated equipment untouched. Meshes with Color data, vertex groups or
+    armature modifiers, material splits, or explicit sharp/seam edges are skipped
+    because those boundaries must remain exact. UV boundaries are passed to the
+    dissolve operator. The bounded second stage reaches fittings up to 0.90 m; if
+    the model remains over budget, the export gate fails for a model-specific
+    redesign.
+    """
+    if max_faces <= 0:
+        raise ValueError("max_faces must be greater than zero")
+
+    bpy.context.view_layer.update()
+    mesh_objects = [
+        obj for obj in objects
+        if obj is not None and obj.type == "MESH" and "_COLLIDER_" not in obj.name
+    ]
+    initial_faces = sum(len(obj.data.polygons) for obj in mesh_objects)
+    if initial_faces <= max_faces:
+        return {
+            "faces_before": initial_faces,
+            "faces_after": initial_faces,
+            "faces_removed": 0,
+            "changed_meshes": 0,
+        }
+
+    protected_tokens = (
+        "weapon", "cannon", "gun", "gatling", "howitzer", "missile", "launcher",
+        "barrel", "bore", "feedchute", "muzzle", "mantlet", "trunnion",
+        "drill", "auger", "optic", "lens", "camera", "radome", "dish", "antenna",
+        "sensorhead", "roadwheel", "drivewheel", "idler", "sprocket", "wheelcarcass",
+        "tire", "rim", "socket", "firepoint", "track", "tread", "fender",
+        "actuator", "foot", "leg", "turret", "cabin",
+        "cab", "mast", "engine", "exhaust", "nozzle", "shield", "hull",
+        "wing", "rotor", "propeller", "crane", "boom", "grapple",
+        "ramprow", "dozer", "flightdeck", "minecontainer",
+    )
+    fallback_protected_tokens = tuple(
+        token for token in protected_tokens if token != "turret"
+    ) + (
+        "turret_base", "turret_ring", "yawrace", "mantlet", "armor", "shell",
+        "bustle", "cheek",
+    )
+    changed_names: set[str] = set()
+    remaining_faces = initial_faces
+
+    def dissolve_one(obj: bpy.types.Object, angle_degrees: float) -> int:
+        before = len(obj.data.polygons)
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bmesh.ops.dissolve_limit(
+            bm,
+            angle_limit=math.radians(angle_degrees),
+            use_dissolve_boundaries=False,
+            verts=list(bm.verts),
+            edges=list(bm.edges),
+            delimit={"MATERIAL", "UV", "SHARP", "SEAM"},
+        )
+        after = len(bm.faces)
+        if after < before:
+            bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+            bm.to_mesh(obj.data)
+            obj.data.update()
+        bm.free()
+        return before - after
+
+    priority_tokens = ("bolt", "fastener", "rivet", "weld", "lug", "shackle", "hinge")
+    for dimension_limit, stage_protected_tokens in (
+        (max_dimension_m, protected_tokens),
+        (0.90, fallback_protected_tokens),
+    ):
+        candidates = [
+            obj for obj in mesh_objects
+            if len(obj.data.polygons) >= 20
+            and max(float(axis) for axis in obj.dimensions) <= dimension_limit
+            and not any(token in obj.name.casefold() for token in stage_protected_tokens)
+            and len(obj.data.color_attributes) == 0
+            and len(obj.vertex_groups) == 0
+            and not any(modifier.type == "ARMATURE" for modifier in obj.modifiers)
+            and not any(edge.use_seam or edge.use_edge_sharp for edge in obj.data.edges)
+            and not getattr(obj.data, "has_custom_normals", False)
+            and len({poly.material_index for poly in obj.data.polygons}) <= 1
+        ]
+        candidates.sort(key=lambda obj: (
+            0 if any(token in obj.name.casefold() for token in priority_tokens) else 1,
+            max(float(axis) for axis in obj.dimensions),
+            obj.name.casefold(),
+        ))
+        for angle_degrees in (45.0, 50.0):
+            for obj in candidates:
+                if remaining_faces <= max_faces:
+                    break
+                removed = dissolve_one(obj, angle_degrees)
+                if removed:
+                    changed_names.add(obj.name)
+                    remaining_faces -= removed
+            if remaining_faces <= max_faces:
+                break
+        if remaining_faces <= max_faces:
+            break
+
+    result = {
+        "faces_before": initial_faces,
+        "faces_after": remaining_faces,
+        "faces_removed": initial_faces - remaining_faces,
+        "changed_meshes": len(changed_names),
+    }
+    print(
+        f"[subpixel-face-budget] faces {initial_faces}->{remaining_faces} "
+        f"(removed {initial_faces - remaining_faces}) across "
+        f"{len(changed_names)} small-detail meshes"
+    )
+    return result
+
+
+def enforce_face_budget_before_export(
+    objects: Sequence[bpy.types.Object],
+    model_name: str,
+    max_faces: int = DEFAULT_FACE_BUDGET,
+) -> Dict[str, int]:
+    """Apply the safe fitting pass and reject exports that still exceed the cap."""
+    reduction = reduce_subpixel_details_to_budget(objects, max_faces=max_faces)
+    face_count = sum(
+        len(obj.data.polygons)
+        for obj in objects
+        if obj is not None
+        and obj.type == "MESH"
+        and "_COLLIDER_" not in obj.name
+    )
+    if face_count > max_faces:
+        raise ValueError(
+            f"{model_name} exceeds the {max_faces}-face LOD0 limit "
+            f"({face_count} faces after safe reduction; "
+            f"{reduction['faces_removed']} removed). Redesign redundant or "
+            "hidden geometry without simplifying role-defining forms."
+        )
+    return reduction
+
+
 def make_material(
     name: str,
     color: Tuple[float, float, float],
@@ -5316,54 +5461,68 @@ def make_weld_seam_bead(
     start: Tuple[float, float, float] | Vector,
     end: Tuple[float, float, float] | Vector,
     radius: float = 0.016,
-    bead_spacing: float = 0.032,
+    bead_spacing: float = 0.050,
     material: bpy.types.Material | None = None,
 ) -> bpy.types.Object | None:
-    """Generates an authentic scalloped military weld seam bead chain between start and end coordinates."""
+    """Build one continuous, lightly scalloped weld bead without overlapping cone caps.
+
+    Weld ripples are a sub-pixel surface cue at the RTS camera. A single 8-sided
+    tube sampled at bead spacing keeps the raised seam visible while eliminating
+    the hidden end caps and interpenetrating cones from the earlier bead chain.
+    """
     p1 = Vector(start)
     p2 = Vector(end)
     diff = p2 - p1
     length = diff.length
-    if length < 0.001:
+    if length < 0.001 or radius <= 0.0 or bead_spacing <= 0.0:
         return None
 
     direction = diff.normalized()
     bead_count = max(3, int(length / bead_spacing))
     actual_spacing = length / bead_count
-    rot_quat = direction.to_track_quat("Z", "Y")
+    side_u, side_v, _ = get_orthonormal_basis(direction)
+    radial_segments = 8
+    vertices = []
+    faces = []
+    for ring_idx in range(bead_count + 1):
+        center = p1 + direction * (ring_idx * actual_spacing)
+        # Keep the old welded-bead character with a restrained alternating
+        # crest. The continuous surface avoids internal caps at every bead.
+        radius_scale = 0.96 if ring_idx % 2 else 1.04
+        ring_radius = radius * radius_scale
+        for side_idx in range(radial_segments):
+            angle = 2.0 * math.pi * side_idx / radial_segments
+            point = center + (side_u * math.cos(angle) + side_v * math.sin(angle)) * ring_radius
+            vertices.append(tuple(point))
+
+    faces.append(tuple(reversed(range(radial_segments))))
+    final_ring = bead_count * radial_segments
+    faces.append(tuple(final_ring + side_idx for side_idx in range(radial_segments)))
+    for ring_idx in range(bead_count):
+        lower = ring_idx * radial_segments
+        upper = (ring_idx + 1) * radial_segments
+        for side_idx in range(radial_segments):
+            next_idx = (side_idx + 1) % radial_segments
+            faces.append((lower + side_idx, lower + next_idx,
+                          upper + next_idx, upper + side_idx))
 
     mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
     bm = bmesh.new()
-
-    for i in range(bead_count + 1):
-        pos = p1 + direction * (i * actual_spacing)
-        matrix = rot_quat.to_matrix().to_4x4()
-        matrix.translation = pos
-        tilt = Euler((0.14 * (1.0 if i % 2 == 0 else -0.14), 0.0, 0.0)).to_matrix().to_4x4()
-        full_mat = matrix @ tilt
-        bmesh.ops.create_cone(
-            bm,
-            cap_ends=True,
-            cap_tris=False,
-            segments=6,
-            radius1=radius,
-            radius2=radius * 0.45,
-            depth=actual_spacing * 0.90,
-            matrix=full_mat,
-        )
-
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
     bm.to_mesh(mesh)
     bm.free()
+    mesh.update()
 
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
     if material:
         obj.data.materials.append(material)
 
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    if hasattr(bpy.ops.object, "shade_smooth_by_angle"):
-        bpy.ops.object.shade_smooth_by_angle(angle=math.radians(45.0))
+    for polygon in mesh.polygons:
+        polygon.use_smooth = len(polygon.vertices) == 4
     return obj
 
 
@@ -7336,6 +7495,7 @@ def batch_and_join_by_material(
     When `weighted_normals` is True, applies face-area weighted normals (`WEIGHTED_NORMAL`)
     so broad armor plates remain flat without shading pinch across 1-segment bevels.
     """
+    enforce_face_budget_before_export(objects, prefix)
     material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
     preserved_objects: list[bpy.types.Object] = []
     # Rigged sample overlays are consumed as material batches under the
@@ -8089,6 +8249,13 @@ def merge_meshes_by_material(
 
     if not batches:
         raise ValueError(f"No mesh objects were provided for {model_prefix} export")
+
+    export_duplicates = [
+        duplicate
+        for _material, duplicates in batches.values()
+        for duplicate in duplicates
+    ]
+    enforce_face_budget_before_export(export_duplicates, model_prefix)
 
     exported_objects = []
     for material_key, (material, duplicates) in sorted(batches.items()):
@@ -15949,20 +16116,27 @@ class RogueVehicleBuilder:
         if include_shield_bubble:
             self.add_shield_bubble()
 
-        # 1. Quality diagnostics on raw source objects
-        # Mesh vertex edits performed by model presets can leave Blender's cached
-        # object bounds stale until the dependency graph evaluates.
+        # 1. Keep LOD0 within the project ceiling by dissolving only redundant
+        # low-angle splits on small fittings. Functional systems and large forms
+        # remain intact; an over-budget build still fails for manual redesign.
+        requested_face_budget = int(target_budget)
+        if requested_face_budget <= 0:
+            raise ValueError("target_budget must be greater than zero")
+        face_budget_limit = min(requested_face_budget, DEFAULT_FACE_BUDGET)
+        face_reduction = reduce_subpixel_details_to_budget(
+            self.objects,
+            max_faces=face_budget_limit,
+        )
         bpy.context.view_layer.update()
         diagnostics = validate_model_mesh_quality(self.objects, allow_hover=self.is_hover)
         source_face_count = sum(
             len(obj.data.polygons)
             for obj in self.objects
-            if obj is not None and obj.type == "MESH"
+            if obj is not None
+            and obj.type == "MESH"
+            and "_COLLIDER_" not in obj.name
         )
-        requested_face_budget = int(target_budget)
-        if requested_face_budget <= 0:
-            raise ValueError("target_budget must be greater than zero")
-        face_budget_limit = min(requested_face_budget, DEFAULT_FACE_BUDGET)
+        diagnostics["face_budget_reduction"] = face_reduction
         diagnostics["requested_face_budget"] = requested_face_budget
         diagnostics["source_face_count"] = source_face_count
         diagnostics["face_budget_limit"] = face_budget_limit
@@ -16991,6 +17165,7 @@ class RogueStructureBuilder:
         soot_intensity: float = 1.0,
         bake_vertex_shading: bool = True,
         structural_wear_mask: bool = False,
+        target_budget: int = DEFAULT_FACE_BUDGET,
     ) -> dict[str, Any]:
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -17001,10 +17176,36 @@ class RogueStructureBuilder:
         if not self.locator_sockets:
             self.add_unity_locators()
 
+        requested_face_budget = int(target_budget)
+        if requested_face_budget <= 0:
+            raise ValueError("target_budget must be greater than zero")
+        face_budget_limit = min(requested_face_budget, DEFAULT_FACE_BUDGET)
+        face_reduction = reduce_subpixel_details_to_budget(
+            self.objects,
+            max_faces=face_budget_limit,
+        )
         diagnostics = validate_model_mesh_quality(
             self.objects,
             allow_hover=False,
         )
+        source_face_count = sum(
+            len(obj.data.polygons)
+            for obj in self.objects
+            if obj is not None
+            and obj.type == "MESH"
+            and "_COLLIDER_" not in obj.name
+        )
+        diagnostics["face_budget_reduction"] = face_reduction
+        diagnostics["requested_face_budget"] = requested_face_budget
+        diagnostics["source_face_count"] = source_face_count
+        diagnostics["face_budget_limit"] = face_budget_limit
+        diagnostics["face_budget_passed"] = source_face_count <= face_budget_limit
+        if source_face_count > face_budget_limit:
+            raise ValueError(
+                f"{self.name} exceeds the {face_budget_limit}-face LOD0 limit "
+                f"({source_face_count} faces); reduce duplicate, hidden, or "
+                "redundant bevel geometry without changing role-defining forms."
+            )
 
         # Procedural multi-channel vertex shading & cavity AO for structures
         if bake_vertex_shading and wear_level and wear_level != "none":

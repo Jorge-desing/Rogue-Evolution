@@ -39,9 +39,11 @@ def apply_unit(unit_name: str, source_name: str, fbx_name: str, leg_type: str | 
     armature = armatures[0]
     if new_objects:
         rmk.assign_rigid_mesh_weights(new_objects, prefix=unit_name, armature_obj=armature, leg_type=leg_type)
+    meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH" and not obj.name.lower().startswith("preview")]
+    reduction = rmk.enforce_face_budget_before_export(meshes, unit_name)
+    if new_objects or reduction["faces_removed"]:
         bpy.context.view_layer.update()
         bpy.ops.wm.save_as_mainfile(filepath=str(source))
-    meshes = [obj for obj in bpy.context.scene.objects if obj.type == "MESH" and not obj.name.lower().startswith("preview")]
     if unit_name == "AtlasCraneMech":
         export_meshes = rmk.batch_and_join_by_material(
             meshes,

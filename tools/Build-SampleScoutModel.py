@@ -296,6 +296,7 @@ def main():
         object_prefix="Scout",
         materials={"armor": armor, "gunmetal": gunmetal, "warning": amber, "tread": tread},
     ))
+    modelkit.enforce_face_budget_before_export(model_objects, "SandlanceScout")
 
     diagnostics = modelkit.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:

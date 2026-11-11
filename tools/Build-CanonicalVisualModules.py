@@ -447,6 +447,7 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         created, armor_materials = build_module_geometry(entry, seed)
         if not created:
             raise RuntimeError(f"No geometry generated for {entry['variantId']}")
+        rmk.enforce_face_budget_before_export(created, entry["moduleName"])
         for obj in created:
             ensure_uv(obj)
             rmk.apply_weighted_normals(obj, weight=60, keep_sharp=True, apply_modifier=True)

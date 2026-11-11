@@ -196,6 +196,7 @@ def build_arachnid_hexapod_rigged_model() -> None:
     ]
     if not meshes:
         raise ValueError("Arachnid Hexapod source contains no mesh parts")
+    rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
 
     armature = bpy.data.objects.get("ArachnidHexapod_Armature")
     if armature is None or armature.type != "ARMATURE":

@@ -232,6 +232,7 @@ def build_surge_arc_tank_model() -> None:
         materials={"armor": armor, "gunmetal": gunmetal, "warning": warning, "tread": tread},
     ))
 
+    rmk.enforce_face_budget_before_export(builder.objects, UNIT_NAME)
     diagnostics = rmk.validate_model_mesh_quality(builder.objects)
     bounds = diagnostics["bounds"]
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
@@ -245,9 +246,6 @@ def build_surge_arc_tank_model() -> None:
             "Surge Arc Tank exceeds the approximate LightningTank envelope "
             f"(2.3 x 1.6 x 3.0 m): {bounds}"
         )
-    if diagnostics["total_polygons"] > 7000:
-        raise ValueError("Surge Arc Tank exceeds the 7,000-face low-poly authoring budget")
-
     rmk.bake_advanced_vertex_shading(
         builder.objects,
         wear_level="field_tested",

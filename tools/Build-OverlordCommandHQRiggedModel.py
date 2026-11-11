@@ -48,6 +48,7 @@ def build_overlord_command_hq_model() -> None:
     ]
     if not meshes:
         raise ValueError("Overlord Command HQ source contains no mesh parts")
+    rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
 
     armature = rmk.generate_procedural_armature(
         meshes,

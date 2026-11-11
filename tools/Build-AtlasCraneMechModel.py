@@ -58,6 +58,7 @@ def build_model() -> None:
     ]
     if not meshes:
         raise ValueError("AtlasCraneMech source contains no mesh parts")
+    rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
 
     # Delete old NLA tracks and Action_* clips (Walk is an alias of Drive for bipeds).
     if armature.animation_data:

@@ -53,6 +53,7 @@ def build_tidebreaker_hovercraft_model() -> None:
     ]
     if not meshes:
         raise ValueError("Tidebreaker Hovercraft source contains no mesh parts")
+    rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
 
     armature = rmk.generate_procedural_armature(
         meshes,

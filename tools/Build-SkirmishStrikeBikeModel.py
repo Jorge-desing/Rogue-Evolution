@@ -359,6 +359,7 @@ def main():
     ))
 
     fit_length_to_native_footprint(model_objects)
+    modelkit.enforce_face_budget_before_export(model_objects, "SkirmishStrikeBike")
     diagnostics = modelkit.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
         raise ValueError("Strike bike model failed ground-contact or material validation")
