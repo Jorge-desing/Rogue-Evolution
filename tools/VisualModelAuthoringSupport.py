@@ -54,16 +54,13 @@ def remove_objects(builder, predicate: Callable[[str], bool]) -> list[str]:
 
 def reduce_subpixel_details_to_budget(
     builder,
-    max_faces: int | None = None,
     max_dimension_m: float = 0.60,
 ) -> dict[str, Any]:
-    """Apply RogueModelKit's shared, protected fitting simplification pass."""
+    """Apply the calibrated per-asset LOD0 face allocation to protected cleanup."""
     import RogueModelKit as rmk
 
-    target_faces = max_faces
-    if target_faces is None:
-        allocation = rmk.resolve_geometry_budget(builder.name)
-        target_faces = int(allocation["lods"][0]["targetFacesPerInstance"])
+    allocation = rmk.resolve_geometry_budget(builder.name)
+    target_faces = int(allocation["lods"][0]["targetFacesPerInstance"])
     return rmk.reduce_subpixel_details_to_budget(
         builder.objects,
         max_faces=target_faces,
