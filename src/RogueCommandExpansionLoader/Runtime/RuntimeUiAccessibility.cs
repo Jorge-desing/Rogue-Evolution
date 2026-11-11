@@ -16,6 +16,7 @@ namespace RogueCommandExpansionLoader.Runtime
     {
         private const int MaxResultsLimit = 100;
         private const int MaxAmbiguousCandidates = 12;
+        private const string MichskyButtonManagerTypeName = "Michsky.UI.Reach.ButtonManager";
 
         public static string GetCensusJson(string query, bool includeInactive, int maxResults)
         {
@@ -171,49 +172,116 @@ namespace RogueCommandExpansionLoader.Runtime
         private static List<Dictionary<string, object>> CollectCandidates(string query, bool includeInactive, bool exactMatch, string hierarchyPath)
         {
             List<Dictionary<string, object>> rows = new List<Dictionary<string, object>>();
+            HashSet<int> seenGameObjects = new HashSet<int>();
             Selectable[] selectables = UnityEngine.Object.FindObjectsOfType<Selectable>(includeInactive);
-            if (selectables == null) return rows;
-
-            for (int i = 0; i < selectables.Length; i++)
+            if (selectables != null)
             {
-                Selectable selectable = selectables[i];
-                if (selectable == null || selectable.gameObject == null) continue;
-                GameObject gameObject = selectable.gameObject;
-                bool active = gameObject.activeInHierarchy;
-                if (!includeInactive && !active) continue;
-
-                string path = (gameObject.scene.name ?? string.Empty) + "::" + GetHierarchyPath(gameObject.transform);
-                if (!string.IsNullOrEmpty(hierarchyPath) && !string.Equals(path, hierarchyPath, StringComparison.Ordinal)) continue;
-                string label = GetAccessibleLabel(selectable);
-                if (!Matches(query, label, gameObject.name, path, exactMatch)) continue;
-
-                RectTransform rect = gameObject.transform as RectTransform;
-                Dictionary<string, object> screenRect = ReadScreenRect(rect, out bool onScreen);
-                bool interactable = false;
-                bool enabled = false;
-                try { enabled = selectable.enabled; } catch { }
-                try { interactable = active && enabled && selectable.IsInteractable(); } catch { }
-                bool visible = active && onScreen && IsCanvasVisible(selectable);
-
-                string componentType = selectable.GetType().Name;
-                rows.Add(new Dictionary<string, object>
+                for (int i = 0; i < selectables.Length; i++)
                 {
-                    ["label"] = label,
-                    ["gameObjectName"] = gameObject.name ?? string.Empty,
-                    ["hierarchyPath"] = path,
-                    ["scene"] = gameObject.scene.name ?? string.Empty,
-                    ["gameObjectId"] = gameObject.GetInstanceID(),
-                    ["selectableType"] = componentType,
-                    ["active"] = active,
-                    ["enabled"] = enabled,
-                    ["interactable"] = interactable,
-                    ["visible"] = visible,
-                    ["selected"] = EventSystemSelectionIs(gameObject),
-                    ["onScreen"] = onScreen,
-                    ["screenRect"] = screenRect
-                });
+                    Selectable selectable = selectables[i];
+                    if (selectable == null || selectable.gameObject == null) continue;
+
+                    bool enabled = false;
+                    bool interactable = false;
+                    try { enabled = selectable.enabled; } catch { }
+                    try { interactable = selectable.IsInteractable(); } catch { }
+                    AddCandidate(rows, seenGameObjects, selectable, selectable.gameObject, query, includeInactive,
+                        exactMatch, hierarchyPath, selectable.GetType().Name, enabled, interactable);
+                }
             }
+
+            // Rogue Command's Michsky ButtonManager implements pointer handlers
+            // directly instead of exposing a Unity Selectable. Include it so
+            // labels, bounds, and real EventSystem clicks work without focus.
+            MonoBehaviour[] behaviours = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>(includeInactive);
+            if (behaviours != null)
+            {
+                for (int i = 0; i < behaviours.Length; i++)
+                {
+                    MonoBehaviour behaviour = behaviours[i];
+                    if (behaviour == null || behaviour.gameObject == null) continue;
+                    Type type = behaviour.GetType();
+                    if (!string.Equals(type.FullName, MichskyButtonManagerTypeName, StringComparison.Ordinal)) continue;
+
+                    bool enabled = false;
+                    try { enabled = behaviour.enabled; } catch { }
+                    bool interactable = ReadBooleanMember(behaviour, "isInteractable");
+                    Selectable targetButton = ReadInstanceMember(behaviour, "targetButton") as Selectable;
+                    if (targetButton != null)
+                    {
+                        try { interactable = interactable && targetButton.IsInteractable(); }
+                        catch { interactable = false; }
+                    }
+
+                    AddCandidate(rows, seenGameObjects, behaviour, behaviour.gameObject, query, includeInactive,
+                        exactMatch, hierarchyPath, type.Name, enabled, interactable);
+                }
+            }
+
             return rows;
+        }
+
+        private static void AddCandidate(
+            List<Dictionary<string, object>> rows,
+            HashSet<int> seenGameObjects,
+            Component control,
+            GameObject gameObject,
+            string query,
+            bool includeInactive,
+            bool exactMatch,
+            string hierarchyPath,
+            string controlType,
+            bool enabled,
+            bool canInteract)
+        {
+            if (control == null || gameObject == null) return;
+            bool active = gameObject.activeInHierarchy;
+            if (!includeInactive && !active) return;
+
+            string path = (gameObject.scene.name ?? string.Empty) + "::" + GetHierarchyPath(gameObject.transform);
+            if (!string.IsNullOrEmpty(hierarchyPath) && !string.Equals(path, hierarchyPath, StringComparison.Ordinal)) return;
+            string label = GetAccessibleLabel(control);
+            if (!Matches(query, label, gameObject.name, path, exactMatch)) return;
+
+            int instanceId = gameObject.GetInstanceID();
+            if (!seenGameObjects.Add(instanceId))
+            {
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    Dictionary<string, object> existing = rows[i];
+                    if ((int)existing["gameObjectId"] != instanceId) continue;
+                    if (string.IsNullOrWhiteSpace(existing["label"] as string) && !string.IsNullOrWhiteSpace(label))
+                    {
+                        existing["label"] = label;
+                    }
+                    existing["enabled"] = (bool)existing["enabled"] || enabled;
+                    existing["interactable"] = (bool)existing["interactable"] || (active && enabled && canInteract);
+                    return;
+                }
+                return;
+            }
+
+            RectTransform rect = gameObject.transform as RectTransform;
+            Dictionary<string, object> screenRect = ReadScreenRect(rect, out bool onScreen);
+            bool interactable = active && enabled && canInteract;
+            bool visible = active && onScreen && IsCanvasVisible(control);
+            rows.Add(new Dictionary<string, object>
+            {
+                ["label"] = label,
+                ["gameObjectName"] = gameObject.name ?? string.Empty,
+                ["hierarchyPath"] = path,
+                ["scene"] = gameObject.scene.name ?? string.Empty,
+                ["gameObjectId"] = instanceId,
+                ["selectableType"] = controlType,
+                ["controlType"] = controlType,
+                ["active"] = active,
+                ["enabled"] = enabled,
+                ["interactable"] = interactable,
+                ["visible"] = visible,
+                ["selected"] = EventSystemSelectionIs(gameObject),
+                ["onScreen"] = onScreen,
+                ["screenRect"] = screenRect
+            });
         }
 
         private static bool Matches(string query, string label, string name, string path, bool exactMatch)
@@ -231,12 +299,14 @@ namespace RogueCommandExpansionLoader.Runtime
             return !string.IsNullOrEmpty(value) && value.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static string GetAccessibleLabel(Selectable selectable)
+        private static string GetAccessibleLabel(Component control)
         {
-            if (selectable == null || selectable.gameObject == null) return string.Empty;
+            if (control == null || control.gameObject == null) return string.Empty;
+            string directLabel = ReadInstanceMember(control, "buttonText") as string;
+            if (!string.IsNullOrWhiteSpace(directLabel)) return directLabel.Trim();
             try
             {
-                Text text = selectable.GetComponentInChildren<Text>(true);
+                Text text = control.GetComponentInChildren<Text>(true);
                 if (text != null && !string.IsNullOrWhiteSpace(text.text)) return text.text.Trim();
             }
             catch { }
@@ -245,7 +315,7 @@ namespace RogueCommandExpansionLoader.Runtime
             // assembly dependency, so projects without TMP can still load.
             try
             {
-                Component[] children = selectable.GetComponentsInChildren<Component>(true);
+                Component[] children = control.GetComponentsInChildren<Component>(true);
                 for (int i = 0; i < children.Length; i++)
                 {
                     Component child = children[i];
@@ -262,6 +332,31 @@ namespace RogueCommandExpansionLoader.Runtime
             return string.Empty;
         }
 
+        private static object ReadInstanceMember(Component component, string memberName)
+        {
+            if (component == null || string.IsNullOrEmpty(memberName)) return null;
+            try
+            {
+                Type type = component.GetType();
+                const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+                FieldInfo field = type.GetField(memberName, flags);
+                if (field != null) return field.GetValue(component);
+                PropertyInfo property = type.GetProperty(memberName, flags);
+                if (property != null && property.CanRead && property.GetIndexParameters().Length == 0)
+                {
+                    return property.GetValue(component, null);
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static bool ReadBooleanMember(Component component, string memberName)
+        {
+            object value = ReadInstanceMember(component, memberName);
+            return value is bool result && result;
+        }
+
         private static Dictionary<string, object> ReadScreenRect(RectTransform rect, out bool onScreen)
         {
             onScreen = false;
@@ -269,7 +364,7 @@ namespace RogueCommandExpansionLoader.Runtime
             try
             {
                 Canvas canvas = rect.GetComponentInParent<Canvas>();
-                Camera camera = canvas != null ? canvas.worldCamera : null;
+                Camera camera = RuntimeUiScreenProjection.GetProjectionCamera(canvas);
                 Vector3[] corners = new Vector3[4];
                 rect.GetWorldCorners(corners);
                 float minX = float.PositiveInfinity;
@@ -301,11 +396,11 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        private static bool IsCanvasVisible(Selectable selectable)
+        private static bool IsCanvasVisible(Component control)
         {
-            if (selectable == null || selectable.transform == null) return false;
+            if (control == null || control.transform == null) return false;
             float alpha = 1f;
-            for (Transform current = selectable.transform; current != null; current = current.parent)
+            for (Transform current = control.transform; current != null; current = current.parent)
             {
                 Canvas canvas = current.GetComponent<Canvas>();
                 if (canvas != null && !canvas.enabled) return false;

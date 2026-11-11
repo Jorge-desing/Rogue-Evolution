@@ -170,6 +170,120 @@ namespace RogueCommandExpansionLoader.Runtime
         }
     }
 
+    /// <summary>
+    /// One stable identity row in the captured StageMap order. Declared profile IDs are
+    /// configuration evidence for that stage; they do not imply a live AI instance.
+    /// </summary>
+    public sealed class StageAiAssociationSequenceEntry
+    {
+        public StageAiAssociationSequenceEntry(
+            int stageMapIndex,
+            bool stageIdentityResolved,
+            string stageId,
+            string packId,
+            string stageKind,
+            string failureReason,
+            IEnumerable<string> declaredAiProfileIds)
+        {
+            StageMapIndex = stageMapIndex;
+            StageIdentityResolved = stageIdentityResolved;
+            StageId = stageId ?? string.Empty;
+            PackId = packId ?? string.Empty;
+            StageKind = stageKind ?? string.Empty;
+            FailureReason = failureReason ?? string.Empty;
+
+            var profileIds = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            if (declaredAiProfileIds != null)
+            {
+                foreach (string profileId in declaredAiProfileIds)
+                {
+                    if (!String.IsNullOrWhiteSpace(profileId) && seen.Add(profileId))
+                    {
+                        profileIds.Add(profileId);
+                    }
+                }
+            }
+
+            DeclaredAiProfileIds = Array.AsReadOnly(profileIds.ToArray());
+        }
+
+        public int StageMapIndex { get; private set; }
+        public bool StageIdentityResolved { get; private set; }
+        public string StageId { get; private set; }
+        public string PackId { get; private set; }
+        public string StageKind { get; private set; }
+        public string FailureReason { get; private set; }
+        public IReadOnlyList<string> DeclaredAiProfileIds { get; private set; }
+    }
+
+    /// <summary>
+    /// Read-only captured StageMap order, resolved by the same stable runtime identity
+    /// source as the active-stage diagnostic. Unknown rows remain explicit.
+    /// </summary>
+    public sealed class StageAiAssociationSequenceDiagnostic
+    {
+        public StageAiAssociationSequenceDiagnostic(
+            string status,
+            int activeStageMapIndex,
+            int totalStageCount,
+            int omittedStageCount,
+            string identitySource,
+            string failureReason,
+            IEnumerable<StageAiAssociationSequenceEntry> entries)
+        {
+            Status = String.Equals(status, "resolved", StringComparison.Ordinal) ||
+                String.Equals(status, "partial", StringComparison.Ordinal)
+                ? status
+                : "unavailable";
+            ActiveStageMapIndex = activeStageMapIndex;
+            TotalStageCount = Math.Max(0, totalStageCount);
+            IdentitySource = identitySource ?? "unknown";
+            FailureReason = failureReason ?? string.Empty;
+
+            var rows = new List<StageAiAssociationSequenceEntry>();
+            if (entries != null)
+            {
+                foreach (StageAiAssociationSequenceEntry entry in entries)
+                {
+                    if (entry != null)
+                    {
+                        rows.Add(entry);
+                    }
+                }
+            }
+
+            Entries = Array.AsReadOnly(rows.ToArray());
+            OmittedStageCount = Math.Max(
+                Math.Max(0, omittedStageCount),
+                Math.Max(0, TotalStageCount - Entries.Count));
+        }
+
+        public string Status { get; private set; }
+        public int ActiveStageMapIndex { get; private set; }
+        public int TotalStageCount { get; private set; }
+        public int OmittedStageCount { get; private set; }
+        public string IdentitySource { get; private set; }
+        public string FailureReason { get; private set; }
+        public IReadOnlyList<StageAiAssociationSequenceEntry> Entries { get; private set; }
+
+        public static StageAiAssociationSequenceDiagnostic Unavailable(
+            string reason,
+            int activeStageMapIndex = -1,
+            string identitySource = "unknown",
+            int totalStageCount = 0)
+        {
+            return new StageAiAssociationSequenceDiagnostic(
+                "unavailable",
+                activeStageMapIndex,
+                totalStageCount,
+                totalStageCount,
+                identitySource,
+                reason,
+                null);
+        }
+    }
+
     public sealed class AiProfileDiagnosticReport
     {
         public AiProfileDiagnosticReport(

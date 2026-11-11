@@ -32,6 +32,8 @@
              Link="Runtime/RuntimeIntermissionSyntheticJump.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUiClickDirector.cs"
              Link="Runtime/RuntimeUiClickDirector.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeUiScreenProjection.cs"
+             Link="Runtime/RuntimeUiScreenProjection.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeBattlefieldCensus.cs"
              Link="Runtime/RuntimeBattlefieldCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeEntityBalanceLookup.cs"

@@ -42,7 +42,8 @@ namespace RogueCommandExpansionLoader.Runtime
     ///
     /// UI elements: the target's <see cref="RectTransform"/> center is projected
     /// to screen pixels via <see cref="RectTransformUtility.WorldToScreenPoint"/>
-    /// (through the ancestor Canvas worldCamera), raycast with
+    /// (using no camera for ScreenSpaceOverlay canvases and the ancestor canvas
+    /// camera for other modes), raycast with
     /// <see cref="EventSystem.RaycastAll"/>, and — when the top hit belongs to
     /// the target — the exact pointer sequence
     /// StandaloneInputModule performs (pointerEnter → pointerDown →
@@ -116,7 +117,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
             Vector3 worldCenter = rectTransform.TransformPoint(
                 new Vector3(rectTransform.rect.center.x, rectTransform.rect.center.y, 0f));
-            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(canvas.worldCamera, worldCenter);
+            Camera projectionCamera = RuntimeUiScreenProjection.GetProjectionCamera(canvas);
+            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(projectionCamera, worldCenter);
 
             if (!IsOnScreen(screenPoint))
             {

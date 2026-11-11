@@ -17,6 +17,148 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("screen overlay canvases bypass camera projection while camera canvases keep their assigned camera", () =>
+    {
+        var overlayCamera = new Camera();
+        var overlayCanvas = new Canvas
+        {
+            renderMode = RenderMode.ScreenSpaceOverlay,
+            worldCamera = overlayCamera,
+        };
+        if (RuntimeUiScreenProjection.GetProjectionCamera(overlayCanvas) != null)
+        {
+            throw new InvalidOperationException("A ScreenSpaceOverlay canvas must not project screen pixels through a camera.");
+        }
+
+        var rootCamera = new Camera();
+        var rootCanvas = new Canvas
+        {
+            renderMode = RenderMode.ScreenSpaceCamera,
+            worldCamera = rootCamera,
+        };
+        var nestedCanvas = new Canvas
+        {
+            rootCanvas = rootCanvas,
+            renderMode = RenderMode.WorldSpace,
+        };
+        if (!ReferenceEquals(RuntimeUiScreenProjection.GetProjectionCamera(nestedCanvas), rootCamera))
+        {
+            throw new InvalidOperationException("A nested camera/world-space canvas without an assigned camera must fall back to its root camera.");
+        }
+    }),
+    ("active stage association serializes configured stage sequence separately from live AI bindings", () =>
+    {
+        var sequence = new StageAiAssociationSequenceDiagnostic(
+            status: "resolved",
+            activeStageMapIndex: 1,
+            totalStageCount: 2,
+            omittedStageCount: 0,
+            identitySource: "live_progression_sequence",
+            failureReason: string.Empty,
+            entries: new[]
+            {
+                new StageAiAssociationSequenceEntry(
+                    stageMapIndex: 0,
+                    stageIdentityResolved: true,
+                    stageId: "frontier",
+                    packId: "sample-pack",
+                    stageKind: "custom",
+                    failureReason: string.Empty,
+                    declaredAiProfileIds: new[] { "sample-pack:raider" }),
+                new StageAiAssociationSequenceEntry(
+                    stageMapIndex: 1,
+                    stageIdentityResolved: true,
+                    stageId: "StageParameters_Native",
+                    packId: string.Empty,
+                    stageKind: "native",
+                    failureReason: string.Empty,
+                    declaredAiProfileIds: null),
+            });
+        var activeStage = new ActiveStageAiAssociationDiagnostic(
+            stageIdentityResolved: true,
+            stageMapIndex: 1,
+            stageId: "StageParameters_Native",
+            packId: string.Empty,
+            stageKind: "native",
+            identitySource: "live_progression_sequence",
+            failureReason: string.Empty,
+            declaredAiProfileIds: null);
+
+        string json = AgentDiagnosticsFormatter.SerializeActiveStageAiAssociation(
+            activeStage,
+            loaderSnapshot: null,
+            stageSequence: sequence);
+        int omittedCounterIndex = json.IndexOf("\"omittedStageSequenceCount\"", StringComparison.Ordinal);
+        int sequenceRowsIndex = json.IndexOf("\"stageSequenceRows\"", StringComparison.Ordinal);
+        if (omittedCounterIndex < 0 || sequenceRowsIndex <= omittedCounterIndex)
+        {
+            throw new InvalidOperationException("Stage-sequence omission counters must precede sequence rows.");
+        }
+
+        using (var doc = JsonDocument.Parse(json))
+        {
+            JsonElement root = doc.RootElement;
+            JsonElement rows = root.GetProperty("stageSequenceRows");
+            if (root.GetProperty("stageSequenceStatus").GetString() != "resolved" ||
+                root.GetProperty("stageSequenceIdentitySource").GetString() != "live_progression_sequence" ||
+                root.GetProperty("stageIdentityStatus").GetString() != "resolved" ||
+                root.GetProperty("runtimeBindingStatus").GetString() != "unavailable" ||
+                rows.GetArrayLength() != 2 ||
+                rows[0].GetProperty("qualifiedStageId").GetString() != "sample-pack:frontier" ||
+                rows[0].GetProperty("declaredAiProfileIds")[0].GetString() != "sample-pack:raider" ||
+                rows[1].GetProperty("qualifiedStageId").GetString() != "native:StageParameters_Native" ||
+                !rows[1].GetProperty("isActiveStageMapIndex").GetBoolean())
+            {
+                throw new InvalidOperationException("The active-stage diagnostic must preserve stable custom/native sequence IDs and configured/live evidence boundaries.");
+            }
+        }
+
+        var partialSequence = new StageAiAssociationSequenceDiagnostic(
+            status: "partial",
+            activeStageMapIndex: 0,
+            totalStageCount: 2,
+            omittedStageCount: 0,
+            identitySource: "persisted_rclStageOrderV1",
+            failureReason: "stage_identity_unresolved",
+            entries: new[]
+            {
+                new StageAiAssociationSequenceEntry(
+                    stageMapIndex: 0,
+                    stageIdentityResolved: false,
+                    stageId: string.Empty,
+                    packId: string.Empty,
+                    stageKind: "custom",
+                    failureReason: "custom_stage_qualified_identity_unavailable",
+                    declaredAiProfileIds: new[] { "sample-pack:raider", "sample-pack:artillery" }),
+                new StageAiAssociationSequenceEntry(
+                    stageMapIndex: 1,
+                    stageIdentityResolved: true,
+                    stageId: "StageParameters_Native",
+                    packId: string.Empty,
+                    stageKind: "native",
+                    failureReason: string.Empty,
+                    declaredAiProfileIds: null),
+            });
+        string boundedJson = AgentDiagnosticsFormatter.SerializeActiveStageAiAssociation(
+            activeStage,
+            loaderSnapshot: null,
+            stageSequence: partialSequence,
+            maxProfiles: 1);
+        using (var doc = JsonDocument.Parse(boundedJson))
+        {
+            JsonElement root = doc.RootElement;
+            JsonElement rows = root.GetProperty("stageSequenceRows");
+            if (root.GetProperty("stageSequenceStatus").GetString() != "partial" ||
+                root.GetProperty("omittedStageSequenceCount").GetInt32() != 1 ||
+                rows.GetArrayLength() != 1 ||
+                rows[0].GetProperty("stageIdentityStatus").GetString() != "unknown" ||
+                rows[0].GetProperty("identityFailureReason").GetString() != "custom_stage_qualified_identity_unavailable" ||
+                rows[0].GetProperty("omittedDeclaredAiProfileCount").GetInt32() != 1)
+            {
+                throw new InvalidOperationException("Bounded stage-sequence serialization must report omissions and retain explicit unknown identity reasons.");
+            }
+        }
+    }),
     ("native rig retarget maps local position and rotation deltas onto target bind pose", () =>
     {
         Vector3 position = NativeRigRetargetPoseMath.RetargetLocalPosition(

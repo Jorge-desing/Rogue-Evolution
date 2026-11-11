@@ -1027,6 +1027,19 @@ namespace RogueCommandExpansionLoader.Runtime
             LoaderDiagnosticsSnapshot loaderSnapshot,
             int maxProfiles = 32)
         {
+            return SerializeActiveStageAiAssociation(stage, loaderSnapshot, null, maxProfiles);
+        }
+
+        /// <summary>
+        /// Serializes stable StageMap identity, its bounded configured stage sequence, and
+        /// configured/live AI profile evidence separately. Omission counters precede rows.
+        /// </summary>
+        public static string SerializeActiveStageAiAssociation(
+            ActiveStageAiAssociationDiagnostic stage,
+            LoaderDiagnosticsSnapshot loaderSnapshot,
+            StageAiAssociationSequenceDiagnostic stageSequence,
+            int maxProfiles = 32)
+        {
             int limit = Math.Max(1, Math.Min(64, maxProfiles));
             var configuredProfileIds = new List<string>();
             int configuredProfileCount = stage != null && stage.DeclaredAiProfileIds != null
@@ -1072,12 +1085,101 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            var stageSequenceRows = new List<Dictionary<string, object>>();
+            int totalStageSequenceCount = stageSequence != null ? stageSequence.TotalStageCount : 0;
+            IReadOnlyList<StageAiAssociationSequenceEntry> stageSequenceEntries = stageSequence != null
+                ? stageSequence.Entries
+                : null;
+            int stageSequenceLimit = Math.Max(1, Math.Min(64, limit));
+            bool hasUnresolvedStageIdentity = false;
+            if (stageSequenceEntries != null)
+            {
+                for (int i = 0; i < stageSequenceEntries.Count && stageSequenceRows.Count < stageSequenceLimit; i++)
+                {
+                    StageAiAssociationSequenceEntry entry = stageSequenceEntries[i];
+                    if (entry == null)
+                    {
+                        continue;
+                    }
+
+                    int profileLimit = Math.Min(16, limit);
+                    int profileCount = entry.DeclaredAiProfileIds != null
+                        ? entry.DeclaredAiProfileIds.Count
+                        : 0;
+                    var rowProfileIds = new List<string>();
+                    for (int profileIndex = 0; entry.DeclaredAiProfileIds != null &&
+                        profileIndex < entry.DeclaredAiProfileIds.Count && rowProfileIds.Count < profileLimit; profileIndex++)
+                    {
+                        string profileId = entry.DeclaredAiProfileIds[profileIndex];
+                        if (!String.IsNullOrWhiteSpace(profileId))
+                        {
+                            rowProfileIds.Add(profileId);
+                        }
+                    }
+
+                    bool rowIdentityResolved = entry.StageIdentityResolved;
+                    hasUnresolvedStageIdentity |= !rowIdentityResolved;
+                    stageSequenceRows.Add(new Dictionary<string, object>
+                    {
+                        ["stageMapIndex"] = entry.StageMapIndex,
+                        ["isActiveStageMapIndex"] = stageSequence.ActiveStageMapIndex == entry.StageMapIndex,
+                        ["stageIdentityStatus"] = rowIdentityResolved ? "resolved" : "unknown",
+                        ["stageKind"] = entry.StageKind ?? string.Empty,
+                        ["stageId"] = entry.StageId ?? string.Empty,
+                        ["packId"] = entry.PackId ?? string.Empty,
+                        ["qualifiedStageId"] = rowIdentityResolved
+                            ? (!String.IsNullOrWhiteSpace(entry.PackId)
+                                ? entry.PackId + ":" + entry.StageId
+                                : (String.Equals(entry.StageKind, "native", StringComparison.Ordinal)
+                                    ? "native:" + entry.StageId
+                                    : entry.StageId))
+                            : string.Empty,
+                        ["identityFailureReason"] = entry.FailureReason ?? string.Empty,
+                        ["declaredAssociationStatus"] = !rowIdentityResolved
+                            ? "unknown"
+                            : (profileCount > 0 ? "declared" : "none_declared"),
+                        ["declaredAiProfileCount"] = profileCount,
+                        ["omittedDeclaredAiProfileCount"] = Math.Max(0, profileCount - rowProfileIds.Count),
+                        ["declaredAiProfileIds"] = rowProfileIds,
+                    });
+                }
+            }
+
+            int omittedStageSequenceCount = Math.Max(
+                stageSequence != null ? stageSequence.OmittedStageCount : 0,
+                Math.Max(0, totalStageSequenceCount - stageSequenceRows.Count));
+            string stageSequenceStatus = stageSequence == null ||
+                String.Equals(stageSequence.Status, "unavailable", StringComparison.Ordinal)
+                ? "unavailable"
+                : (omittedStageSequenceCount == 0 && !hasUnresolvedStageIdentity &&
+                    String.Equals(stageSequence.Status, "resolved", StringComparison.Ordinal)
+                    ? "resolved"
+                    : "partial");
+            string stageSequenceFailureReason = stageSequence != null
+                ? stageSequence.FailureReason ?? string.Empty
+                : "stage_identity_provider_unavailable";
+            if (String.IsNullOrWhiteSpace(stageSequenceFailureReason) && omittedStageSequenceCount > 0)
+            {
+                stageSequenceFailureReason = "stage_sequence_truncated";
+            }
+            else if (String.IsNullOrWhiteSpace(stageSequenceFailureReason) && hasUnresolvedStageIdentity)
+            {
+                stageSequenceFailureReason = "stage_identity_unresolved";
+            }
+
             bool identityResolved = stage != null && stage.StageIdentityResolved;
             var view = new Dictionary<string, object>
             {
                 ["kind"] = "activeStageAiAssociation",
                 ["omittedConfiguredAiProfileCount"] = Math.Max(0, configuredProfileCount - configuredProfileIds.Count),
                 ["omittedRuntimeBoundProfileCount"] = Math.Max(0, runtimeBoundProfileCount - runtimeBoundProfiles.Count),
+                ["omittedStageSequenceCount"] = omittedStageSequenceCount,
+                ["stageSequenceRowCount"] = stageSequenceRows.Count,
+                ["totalStageSequenceCount"] = totalStageSequenceCount,
+                ["stageSequenceStatus"] = stageSequenceStatus,
+                ["stageSequenceIdentitySource"] = stageSequence != null ? stageSequence.IdentitySource : "unknown",
+                ["stageSequenceActiveIndex"] = stageSequence != null ? stageSequence.ActiveStageMapIndex : -1,
+                ["stageSequenceFailureReason"] = stageSequenceFailureReason,
                 ["stageIdentityStatus"] = identityResolved ? "resolved" : "unknown",
                 ["stageMapIndex"] = stage != null ? stage.StageMapIndex : -1,
                 ["stageKind"] = stage != null ? stage.StageKind : string.Empty,
@@ -1103,7 +1205,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["runtimeBoundAiProfileCount"] = runtimeBoundProfileCount,
                 ["runtimeBoundAiInstanceCount"] = runtimeBoundInstanceCount,
                 ["runtimeBoundAiProfiles"] = runtimeBoundProfiles,
-                ["evidenceNote"] = "Configured IDs come from the resolved stage definition. Runtime counts include initialized loader-bound AI behaviours; zero runtime bindings do not negate a configured association.",
+                ["evidenceNote"] = "stageSequenceRows are configured identities from the captured StageMap order. Stage-declared profile IDs are configuration; runtimeBoundAiProfiles count initialized loader behaviours and do not prove tactical execution.",
+                ["stageSequenceRows"] = stageSequenceRows,
             };
             return Serialize(view);
         }

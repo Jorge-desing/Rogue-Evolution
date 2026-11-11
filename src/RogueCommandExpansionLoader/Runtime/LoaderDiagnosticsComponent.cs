@@ -1027,9 +1027,13 @@ namespace RogueCommandExpansionLoader.Runtime
             ActiveStageAiAssociationDiagnostic stage = contentLoader != null
                 ? contentLoader.GetActiveStageAiAssociationDiagnostic()
                 : ActiveStageAiAssociationDiagnostic.Unavailable("stage_identity_provider_unavailable");
+            StageAiAssociationSequenceDiagnostic stageSequence = contentLoader != null
+                ? contentLoader.GetStageAiAssociationSequenceDiagnostic()
+                : StageAiAssociationSequenceDiagnostic.Unavailable("stage_identity_provider_unavailable");
             return AgentDiagnosticsFormatter.SerializeActiveStageAiAssociation(
                 stage,
                 SafeSnapshot(),
+                stageSequence,
                 32);
         }
 

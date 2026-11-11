@@ -1650,6 +1650,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("18+", by_desc["diagnostics_get_catalog"])
         self.assertTrue(by_desc["diagnostics_get_system_health"].startswith("Queries unified live system health"))
         self.assertNotIn("directly from", by_desc["diagnostics_get_system_health"])
+        stage_association = by_desc["diagnostics_get_active_stage_ai_association"]
+        self.assertIn("bounded captured stage order", stage_association)
+        self.assertIn("separately from live initialized loader AI bindings", stage_association)
 
     def test_alias_schemas_match_canonical_and_cover_selector_json(self) -> None:
         specs = self._load_tool_specs()

@@ -967,10 +967,24 @@ namespace UnityEngine
         }
     }
 
+    public enum RenderMode
+    {
+        ScreenSpaceOverlay,
+        ScreenSpaceCamera,
+        WorldSpace,
+    }
+
     public class Canvas : Component
     {
+        private Canvas _rootCanvas;
         public bool enabled = true;
         public Camera worldCamera;
+        public Canvas rootCanvas
+        {
+            get => _rootCanvas ?? this;
+            set => _rootCanvas = value;
+        }
+        public RenderMode renderMode;
     }
 
     public struct Ray

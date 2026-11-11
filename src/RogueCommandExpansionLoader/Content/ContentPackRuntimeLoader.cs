@@ -2090,6 +2090,207 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        /// <summary>
+        /// Captures the bounded StageMap identity sequence used by active-stage resolution.
+        /// The returned rows describe configured stage identity and stage-declared AI profile
+        /// IDs only; they are not evidence of live AI behaviour.
+        /// </summary>
+        public StageAiAssociationSequenceDiagnostic GetStageAiAssociationSequenceDiagnostic(int maxEntries = 64)
+        {
+            int limit = Math.Max(1, Math.Min(128, maxEntries));
+            lock (_gate)
+            {
+                if (!_runtimeContentReady)
+                {
+                    return StageAiAssociationSequenceDiagnostic.Unavailable("runtime_content_not_ready");
+                }
+
+                object stageMap;
+                IList levelMaps;
+                int activeStageMapIndex;
+                try
+                {
+                    stageMap = _gameStageMapField.GetValue(null);
+                    if (stageMap == null)
+                    {
+                        return StageAiAssociationSequenceDiagnostic.Unavailable("stage_map_unavailable");
+                    }
+
+                    activeStageMapIndex = (int)_stageMapCurrentStageProperty.GetValue(stageMap, null);
+                    levelMaps = _stageMapLevelMapsField.GetValue(stageMap) as IList;
+                }
+                catch
+                {
+                    return StageAiAssociationSequenceDiagnostic.Unavailable("stage_map_read_failed");
+                }
+
+                int totalStageCount = levelMaps != null ? levelMaps.Count : 0;
+                if (!System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner))
+                {
+                    return StageAiAssociationSequenceDiagnostic.Unavailable(
+                        "stage_map_identity_sequence_not_captured",
+                        activeStageMapIndex,
+                        "unknown",
+                        totalStageCount);
+                }
+
+                if (levelMaps == null || _stageMapVisibleStages == null ||
+                    levelMaps.Count != _stageMapVisibleStages.Count)
+                {
+                    string reason = System.Object.ReferenceEquals(stageMap, _pendingStageMapSnapshotOwner)
+                        ? "persisted_stage_order_marker_unresolved"
+                        : "stage_identity_sequence_unavailable";
+                    return StageAiAssociationSequenceDiagnostic.Unavailable(
+                        reason,
+                        activeStageMapIndex,
+                        _stageMapIdentitySource,
+                        totalStageCount);
+                }
+
+                int rowLimit = totalStageCount > limit && activeStageMapIndex >= limit &&
+                    activeStageMapIndex < totalStageCount
+                    ? limit - 1
+                    : limit;
+                var entries = new List<StageAiAssociationSequenceEntry>(Math.Min(totalStageCount, limit));
+                bool hasUnresolvedIdentity = false;
+                for (int stageIndex = 0; stageIndex < rowLimit; stageIndex++)
+                {
+                    StageAiAssociationSequenceEntry entry = ResolveStageAiAssociationSequenceEntry(
+                        stageIndex,
+                        BlueprintRewardStageResolver.ResolveVisibleStage(_stageMapVisibleStages, stageIndex));
+                    entries.Add(entry);
+                    hasUnresolvedIdentity |= !entry.StageIdentityResolved;
+                }
+
+                if (rowLimit < limit && rowLimit < totalStageCount && activeStageMapIndex >= limit &&
+                    activeStageMapIndex < totalStageCount)
+                {
+                    StageAiAssociationSequenceEntry activeEntry = ResolveStageAiAssociationSequenceEntry(
+                        activeStageMapIndex,
+                        BlueprintRewardStageResolver.ResolveVisibleStage(_stageMapVisibleStages, activeStageMapIndex));
+                    entries.Add(activeEntry);
+                    hasUnresolvedIdentity |= !activeEntry.StageIdentityResolved;
+                }
+
+                int omittedStageCount = Math.Max(0, totalStageCount - entries.Count);
+                string failureReason = omittedStageCount > 0
+                    ? "stage_sequence_truncated"
+                    : (hasUnresolvedIdentity ? "stage_identity_unresolved" : string.Empty);
+                string status = omittedStageCount == 0 && !hasUnresolvedIdentity
+                    ? "resolved"
+                    : "partial";
+                return new StageAiAssociationSequenceDiagnostic(
+                    status,
+                    activeStageMapIndex,
+                    totalStageCount,
+                    omittedStageCount,
+                    _stageMapIdentitySource,
+                    failureReason,
+                    entries);
+            }
+        }
+
+        private StageAiAssociationSequenceEntry ResolveStageAiAssociationSequenceEntry(
+            int stageMapIndex,
+            object stage)
+        {
+            if (stage == null)
+            {
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    string.Empty,
+                    "stage_identity_not_resolved",
+                    null);
+            }
+
+            LoadedStage loadedStage = null;
+            int loadedStageMatchCount = 0;
+            for (int i = 0; i < _stages.Count; i++)
+            {
+                LoadedStage candidate = _stages[i];
+                if (candidate != null && System.Object.ReferenceEquals(candidate.RuntimeStage, stage))
+                {
+                    loadedStage = candidate;
+                    loadedStageMatchCount++;
+                }
+            }
+
+            if (loadedStageMatchCount > 1)
+            {
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    "custom",
+                    "custom_stage_runtime_identity_ambiguous",
+                    null);
+            }
+
+            if (loadedStage != null && loadedStage.Definition != null)
+            {
+                if (String.IsNullOrWhiteSpace(loadedStage.Definition.id) || String.IsNullOrWhiteSpace(loadedStage.PackId))
+                {
+                    return new StageAiAssociationSequenceEntry(
+                        stageMapIndex,
+                        false,
+                        loadedStage.Definition.id,
+                        loadedStage.PackId,
+                        "custom",
+                        "custom_stage_qualified_identity_unavailable",
+                        loadedStage.Definition.aiProfileIds);
+                }
+
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    true,
+                    loadedStage.Definition.id,
+                    loadedStage.PackId,
+                    "custom",
+                    string.Empty,
+                    loadedStage.Definition.aiProfileIds);
+            }
+
+            try
+            {
+                UnityEngine.Object stageParameters = _stageParametersField.GetValue(stage) as UnityEngine.Object;
+                if (stageParameters == null || String.IsNullOrWhiteSpace(stageParameters.name))
+                {
+                    return new StageAiAssociationSequenceEntry(
+                        stageMapIndex,
+                        false,
+                        string.Empty,
+                        string.Empty,
+                        "native",
+                        "native_stage_asset_identity_unavailable",
+                        null);
+                }
+
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    true,
+                    stageParameters.name,
+                    string.Empty,
+                    "native",
+                    string.Empty,
+                    null);
+            }
+            catch
+            {
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    "unknown",
+                    "stage_asset_identity_read_failed",
+                    null);
+            }
+        }
+
         public LoaderDiagnosticsSnapshot GetDiagnosticsSnapshot()
         {
             lock (_gate)
