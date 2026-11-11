@@ -919,6 +919,39 @@ TOOL_SPECS = [
         },
     },
     {
+        "name": "diagnostics_inspect_active_building_placement",
+        "description": "Read-only inspection of the active native building ghost: reads its current world position and preflights the exact footprint against native grid, height-layer, fog, refinery-distance, and spacing checks. Does not place a building or spend credits.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "name": "diagnostics_order_place_building",
+        "description": "Preflights or commits the currently selected building blueprint at world coordinates through native PlaceBuildings validation and construction. Set commit=false for a read-only preview; commit=true starts the native construction coroutine and charges normal in-game costs.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "worldX": {"type": "number", "description": "Target world X coordinate used to select native grid cells."},
+                "worldZ": {"type": "number", "description": "Target world Z coordinate used to select native grid cells."},
+                "commit": {"type": "boolean", "description": "False runs read-only native placement checks. True queues the native construction coroutine."},
+            },
+            "required": ["worldX", "worldZ", "commit"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "diagnostics_find_building_placement",
+        "description": "Read-only Manhattan search for a nearby footprint accepted by native placement checks. Reports blockers; never places or spends credits.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "originX": {"type": "number", "description": "World X origin."},
+                "originZ": {"type": "number", "description": "World Z origin."},
+                "radiusCells": {"type": "integer", "minimum": 0, "maximum": 12, "description": "Manhattan radius in 10-meter cells (default 8; maximum 12)."},
+            },
+            "required": ["originX", "originZ"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "diagnostics_order_unit_attack",
         "description": "Dispatches an in-game attack command on a target entity via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
         "parameters": {

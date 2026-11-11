@@ -1,7 +1,7 @@
 ---
 name: rogue-command-modding-tools
 description: "Use Rogue Command tools for verified asset and pack work."
-version: 1.5.0
+version: 1.5.1
 license: MIT
 author: Hermes Agent
 metadata:
@@ -167,3 +167,8 @@ AI `unitEntries` and `productionBuildingEntries` both use the produced product's
 - When only the generic BepInEx MCP bridge is connected, call `LoaderDiagnosticsComponent` directly with `call_component_method`; no screenshot/UI tool is needed for structured runtime evidence. Focus the Game camera on the disposable actor before a renderer-frame probe: high camera callback counts with zero samples and high frustum rejection only describe an off-screen target. The d576 death retry used the returned `token`, stopped after 1.16 unscaled seconds, and confirmed an empty observer census. The probe clamps per-renderer sample limits to a minimum of two.
 - A typed injected helper compiled against the pinned Mono game API can set `AnimatorUpdateMode.UnscaledTime` only on the disposable actor and call the exact `TakeDamage(float, EntityController, bool, bool)` overload when generic bridge argument conversion cannot represent the enum or null controller. Read and record the prior Animator mode first; remove/census the helper after use. Direct diagnostic damage remains separate from natural combat. Evidence: `docs/research/RETARGET-D576-DEATH-RUNTIME-2026-11-11.md`.
 - After a native level transition, verify the `LoadingHider` button through the scene-qualified BepInEx census and invoke the real `Iniciar` control through the EventSystem. Do not infer movement from `Game` scene plus `timeScale=1`; the d576 factory-product sample moved only after this opener was cleared. See `docs/research/RETARGET-D576-FACTORY-WALK-RUNTIME-2026-11-11.md`.
+
+### Active building ghost MCP inspection (1.4.9 / loader 1.20.9)
+
+- `diagnostics_inspect_active_building_placement` takes no arguments. It reads the selected native blueprint's live placement ghost and preflights that exact footprint in one Unity-thread call; it returns snapped world position, per-cell occupancy/layer/fog facts, and the native rejection reason without a screenshot, placement, or credit spend.
+- `diagnostics_order_place_building` defaults to `commit=false`; keep it read-only for diagnosis. `diagnostics_find_building_placement` performs a bounded Manhattan search (0–12 cells) and never commits. A no-result search may reflect a global native rule such as refinery distance, while its candidate cell rows describe local footprint blockers.

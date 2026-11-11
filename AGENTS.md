@@ -58,3 +58,6 @@ For live Hermes-owned memories, use the project MCP tool `search_hermes_memories
 
 The handoff contains the current layout, verified commands, evidence boundaries, and next implementation steps.
 
+### Native building-placement diagnostics
+- For screenshot-free placement QA, call `diagnostics_inspect_active_building_placement` to read the active native ghost and preflight its exact footprint in one Unity-thread call. Keep `BuildingPlacementHelper.IsPlacementValid`, fog, refinery-distance, and builder-base spacing rules authoritative. Use `commit=false` and `diagnostics_find_building_placement` for diagnosis; never bypass native placement checks or infer occupancy only from preview appearance.
+- Interpret per-cell `worldObject`, `multiLayer`, `sameHeightLayerAsFootprint`, and `blockingReasons` before acting. Separate local blockers (building, ramp, obstacle, mixed layer) from global native requirements. Bounded search failure does not authorize forcing construction.

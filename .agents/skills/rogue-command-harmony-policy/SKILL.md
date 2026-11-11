@@ -1,7 +1,7 @@
 ---
 name: rogue-command-harmony-policy
 description: "BepInEx 5 + Harmony 2 patching policy for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). When creating or auditing Unity game plugins, Harmony patches, assembly identity checks, or IL2CPP/back-end decisions. [Política de BepInEx 5 + Harmony 2 para Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). Uso: plugins Unity, patches Harmony, verificación de identidad de ensamblados, decisiones backend IL2CPP]"
-version: 1.4.1
+version: 1.4.2
 license: MIT
 author: Hermes Agent
 metadata:
@@ -197,3 +197,8 @@ For live AI evidence, separate module registration from stage activation: a 23-m
 - Release SHA-256 `2E740D387F600CAF0023ED7254F9F41ECF9E69E34E548328BFF147D250BC3DFB` was exercised against the pinned game identity. During direct diagnostic lethal damage to a disposable Ironclad Walker, the death visual entered pending retirement while its retarget profile was suspended and remained bound 8/8. `deathVisualRetirementCount` reached one; `entityDestroyTranspilerCount` and `entityDestroyGameObjectTranspilerCount` were each two for the whole QA scene, so do not attribute every callback to that actor. The actor later disappeared. This supports live lifecycle-hook telemetry, not natural combat, Harmony coverage on all destroy routes, or rendered pose quality. Evidence and identity: `docs/research/RETARGET-CURRENT-RELEASE-RUNTIME-2026-11-11.md`.
 - d576 Release follow-up (2026-11-11): A second direct-diagnostic death on a disposable Walker increased `deathVisualRetirementCount` by exactly one. During all 32 filtered Death rows, `DeathVisualRetirementPending=true`; the retarget profile was suspended while all eight mappings remained bound. The actor disappeared after the bounded hold and helper/probe components were absent. Keep this distinct from natural combat and pixel appearance; the probe sampled only the early normalized portion of the clip. Evidence: `docs/research/RETARGET-D576-DEATH-RUNTIME-2026-11-11.md`.
 - d576 factory-produced Walk pass (2026-11-11): the existing Harmony/retarget path kept 8/8 mappings bound and unsuspended during filtered Action_Walk samples from a native Move order. All four sampled renderer batches showed positive comparable deformation in 7/8 frames. This pass did not identify a failing hook, so it did not justify a speculative patch or transpiler; add one only after a reproducible lifecycle/signature gap is isolated against the pinned game identity. Evidence: `docs/research/RETARGET-D576-FACTORY-WALK-RUNTIME-2026-11-11.md`.
+
+### Native building-placement inspection (2026-11-11)
+
+- Use the active `PlaceBuildings._placementGhost` position for a screenshot-free, same-frame placement preflight. Keep `BuildingPlacementHelper.IsPlacementValid`, secondary-fog, player-refinery distance, and builder-base spacing checks authoritative; diagnostics and nearby search are read-only unless an explicit commit is requested.
+- Treat `multiLayer` as a per-cell blocker and `differentHeightLayer` as a per-cell comparison against the footprint anchor. Do not report a matching anchor cell as height-mismatched merely because another footprint cell differs. Preserve the native grid failure; never add a Harmony bypass to force construction.

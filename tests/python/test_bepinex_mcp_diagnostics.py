@@ -699,7 +699,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             if endpoint == "scene:find_objects_with_component":
                 return json.dumps([])
             if endpoint == "scene/search_gameobjects" and params and params.get("componentName") == "LoaderDiagnosticsComponent":
-                return json.dumps([{"name": "LoaderDiagnostics", "id": 88}])
+                return json.dumps({"items": [{"name": "LoaderDiagnostics", "gameObjectId": 88}], "truncated": False})
             self.fail(f"Unexpected bridge call: {endpoint} {params}")
 
         with (
@@ -711,6 +711,27 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertEqual(88, SERVER._DIAGNOSTICS_GO_ID)
 
         self.assertEqual(["scene:find_objects_with_component", "scene/search_gameobjects"], calls)
+
+    def test_diagnostics_discovery_reads_wrapped_primary_component_results(self) -> None:
+        calls: list[str] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            calls.append(endpoint)
+            self.assertEqual("scene:find_objects_with_component", endpoint)
+            self.assertEqual("LoaderDiagnosticsComponent", (params or {}).get("componentName"))
+            return json.dumps({
+                "items": [{"name": "LoaderDiagnostics", "id": -4880}],
+                "truncated": False,
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", None),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            resolved_id = SERVER._get_diagnostics_go_id()
+
+        self.assertEqual(-4880, resolved_id)
+        self.assertEqual(["scene:find_objects_with_component"], calls)
 
     def test_bridge_return_parser_handles_escaped_strings_inside_json(self) -> None:
         payload = json.dumps({"text": 'quote: "quoted" } path C:\\folder'})
@@ -1089,6 +1110,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_preflight",
             "diagnostics_get_gui_state",
             "diagnostics_order_batch",
+            "diagnostics_order_place_building",
+            "diagnostics_inspect_active_building_placement",
+            "diagnostics_find_building_placement",
             "diagnostics_run_synthetic_gameplay_scenario",
             "diagnostics_get_control_guide",
             "diagnostics_gui_control",
@@ -1109,7 +1133,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(239, len(names))
+        self.assertEqual(242, len(names))
 
     def test_initialize_reports_current_bridge_version(self) -> None:
         response = SERVER.handle_request({
@@ -1118,12 +1142,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "method": "initialize",
             "params": {"protocolVersion": "2024-11-05"},
         })
-        self.assertEqual("1.4.6", response["result"]["serverInfo"]["version"])
+        self.assertEqual("1.4.9", response["result"]["serverInfo"]["version"])
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(239, len(tools))
+        self.assertEqual(242, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -1137,7 +1161,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(len(names) >= 1)
         self.assertTrue(len(names) >= 1)
         resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
-        self.assertLess(len(resp2["result"]["tools"]), 220)
+        self.assertLess(len(resp2["result"]["tools"]), 223)
         self.assertNotIn("ping_unity_bridge", [t["name"] for t in resp2["result"]["tools"]])
         self.assertIn("system_ping", [t["name"] for t in resp2["result"]["tools"]])
 
@@ -1439,6 +1463,128 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             data2 = json.loads(resp2["content"][0]["text"])
             self.assertEqual(1, data2["_meta"]["errorCount"])
 
+    def test_diagnostics_order_place_building_routes_read_only_preflight(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual("component/call_method", endpoint)
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = {
+                "success": True,
+                "committed": False,
+                "entityId": "tactical-operations:field-medic-rover-factory",
+                "method": "native-PlaceBuildings-coroutine",
+            }
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(args)} args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_order_place_building", {
+                "worldX": -50.0,
+                "worldZ": -120.0,
+                "commit": False,
+            })
+
+        self.assertFalse(response["isError"])
+        result = json.loads(response["content"][0]["text"])
+        self.assertTrue(result["success"])
+        self.assertFalse(result["committed"])
+        self.assertEqual("OrderPlaceBuildingJson", calls[0][0])
+        self.assertEqual([-50.0, -120.0, False], calls[0][1])
+
+    def test_diagnostics_inspect_active_building_placement_uses_exact_native_ghost(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual("component/call_method", endpoint)
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = {
+                "success": False,
+                "committed": False,
+                "entityId": "tactical-operations:field-medic-rover-factory",
+                "worldX": 5.0,
+                "worldZ": -145.0,
+                "cellDiagnostics": [{"gridX": 0, "gridY": -15, "multiLayer": True}],
+            }
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(args)} args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_inspect_active_building_placement", {})
+
+        self.assertFalse(response["isError"])
+        result = json.loads(response["content"][0]["text"])
+        self.assertFalse(result["success"])
+        self.assertFalse(result["committed"])
+        self.assertEqual("InspectActiveBuildingPlacementJson", calls[0][0])
+        self.assertEqual([], calls[0][1])
+        self.assertTrue(result["cellDiagnostics"][0]["multiLayer"])
+
+    def test_diagnostics_find_building_placement_routes_bounded_read_only_search(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_http(endpoint: str, params: dict[str, object] | None = None, **_: object) -> str:
+            self.assertEqual("component/call_method", endpoint)
+            params = params or {}
+            method = str(params.get("methodName", ""))
+            args = json.loads(str(params.get("args", "[]")))
+            calls.append((method, args))
+            payload = {
+                "found": True,
+                "radiusCells": args[2],
+                "candidatesChecked": 12,
+                "candidate": {"success": True, "committed": False, "cellDiagnostics": []},
+            }
+            return json.dumps({
+                "status": "ok",
+                "message": f"Called '{method}' with {len(args)} args. ReturnValue: {json.dumps(payload)}"
+            })
+
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
+            mock.patch.object(SERVER, "_call_http", side_effect=fake_http),
+        ):
+            response = SERVER.execute_tool("diagnostics_find_building_placement", {
+                "originX": 0.0,
+                "originZ": -120.0,
+                "radiusCells": 8,
+            })
+            invalid_radius = SERVER.execute_tool("diagnostics_find_building_placement", {
+                "originX": 0.0,
+                "originZ": -120.0,
+                "radiusCells": 13,
+            })
+            invalid_origin = SERVER.execute_tool("diagnostics_find_building_placement", {
+                "originX": float("nan"),
+                "originZ": -120.0,
+            })
+
+        self.assertFalse(response["isError"])
+        result = json.loads(response["content"][0]["text"])
+        self.assertTrue(result["found"])
+        self.assertFalse(result["candidate"]["committed"])
+        self.assertEqual("FindBuildingPlacementJson", calls[0][0])
+        self.assertEqual([0.0, -120.0, 8], calls[0][1])
+        self.assertTrue(invalid_radius["isError"])
+        self.assertTrue(invalid_origin["isError"])
+        self.assertEqual(1, len(calls), "invalid arguments must not reach the runtime bridge")
+
     def test_diagnostics_get_control_guide_returns_recipes(self) -> None:
         with (
             mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73),
@@ -1561,13 +1707,13 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(239, len(names))
+        self.assertEqual(242, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
-        self.assertEqual(219, len(specs) - len(aliases))
+        self.assertEqual(222, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
-        self.assertLess(compact, 91000, f"optimised schemas too large: {compact} bytes")
+        self.assertLess(compact, 93000, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
         for spec in specs:
             params = spec["parameters"]
@@ -1617,12 +1763,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(394, total_props)
+        self.assertEqual(400, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()
         empty = [s for s in specs if not s["parameters"].get("properties")]
-        self.assertEqual(80, len(empty))
+        self.assertEqual(81, len(empty))
         for spec in empty:
             self.assertEqual(
                 {"type": "object", "additionalProperties": False},
@@ -1715,9 +1861,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("Parent GameObject instance ID.", blob)
         resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = resp["result"]["tools"]
-        self.assertEqual(239, len(tools))
+        self.assertEqual(242, len(tools))
         payload = json.dumps(resp["result"], separators=(",", ":"))
-        self.assertLess(len(payload), 91000, f"tools/list payload too large: {len(payload)} bytes")
+        self.assertLess(len(payload), 93000, f"tools/list payload too large: {len(payload)} bytes")
 
 if __name__ == "__main__":
     unittest.main()

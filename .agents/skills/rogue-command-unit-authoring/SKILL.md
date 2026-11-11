@@ -1,7 +1,7 @@
 ---
 name: rogue-command-unit-authoring
 description: "Author or review Rogue Command units, including balance variants, model overlays, card sprites, and localized names."
-version: 1.2.0
+version: 1.2.1
 license: MIT
 author: Hermes Agent
 metadata:
@@ -131,3 +131,8 @@ When adding or altering runtime mechanics, update all 4 layers simultaneously: S
 - Current Release live retarget evidence (SHA-256 `2E740D387F600CAF0023ED7254F9F41ECF9E69E34E548328BFF147D250BC3DFB`): a disposable native-template Ironclad Walker reported 8/8 mappings during native Move/Action_Walk and during diagnostic Death retirement. Walk rows were moving and unsuspended; Death rows were stationary and suspended while still bound. The test stage declared no loader AI profiles, so it does not establish AI use, factory/blueprint production, natural combat, or animation quality. Report: `docs/research/RETARGET-CURRENT-RELEASE-RUNTIME-2026-11-11.md`.
 - d576 Profile3 new-run reward evidence (2026-11-11): the native IntermissionScreen offered `sample-native:scout-tank` as a `CardNew`; choosing it produced a deck census containing `sample-native:scout-tank-factory` linked to `sample-native:scout-tank`. This verifies the in-run custom card offer and deck registration path only; no ordinary placement or factory production was exercised. The active combat stage was native and declared no loader AI profiles. Evidence: `docs/research/RETARGET-D576-DEATH-RUNTIME-2026-11-11.md`.
 - d576 factory-product retarget follow-up (2026-11-11): a diagnostic-spawned `sample-native:assault-walker-factory` used native `OrderFactoryProduceJson` to create a Walker whose origin ID matched the factory. The order was instant/free, so this confirms origin/product linkage and a test actor path only; it does not validate ordinary placement, costs, blueprint availability, or AI production. After the `LoadingHider` opener was invoked, the product moved and emitted Action_Walk renderer telemetry. Evidence: `docs/research/RETARGET-D576-FACTORY-WALK-RUNTIME-2026-11-11.md`.
+
+## Native production-building placement checks (2026-11-11)
+
+- A custom `productionBuilding` remains subject to the game's native footprint occupancy, height-layer, fog, refinery-distance, and builder-base spacing rules. A clear-looking preview is not enough; inspect the active ghost with `diagnostics_inspect_active_building_placement` and read its per-cell blocker reasons before diagnosing the pack or prefab.
+- Keep the inspection and `diagnostics_find_building_placement` read-only. Never patch around `BuildingPlacementHelper.IsPlacementValid` or queue a factory on occupied cells to make a QA attempt pass. A search can find no site when a global native requirement fails even after a local obstruction is cleared.

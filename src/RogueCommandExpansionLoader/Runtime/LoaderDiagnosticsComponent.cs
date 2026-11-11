@@ -711,6 +711,36 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Preflights or commits the currently selected blueprint at a world coordinate
+        /// through the native PlaceBuildings validation and coroutine path.
+        /// </summary>
+        public string OrderPlaceBuildingJson(float worldX, float worldZ, bool commit = false)
+        {
+            return AgentDiagnosticsFormatter.SerializeBuildingPlacementCommandResult(
+                RuntimeBuildingPlacementDirector.TryPlaceCurrentBlueprint(worldX, worldZ, commit));
+        }
+
+        /// <summary>
+        /// Inspects the live native placement ghost and preflights its current footprint
+        /// without queuing a build or spending credits.
+        /// </summary>
+        public string InspectActiveBuildingPlacementJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeBuildingPlacementCommandResult(
+                RuntimeBuildingPlacementDirector.InspectActivePlacement());
+        }
+
+        /// <summary>
+        /// Searches nearby grid offsets for the first location accepted by native placement checks.
+        /// The search is always read-only and never starts a construction coroutine.
+        /// </summary>
+        public string FindBuildingPlacementJson(float originX, float originZ, int radiusCells = 8)
+        {
+            return AgentDiagnosticsFormatter.SerializeBuildingPlacementSearchResult(
+                RuntimeBuildingPlacementDirector.FindNearbyPlacement(originX, originZ, radiusCells));
+        }
+
+        /// <summary>
         /// Read-only intermission level-select census (OverWorldMapEnemy nodes)
         /// as agent-readable JSON. Field order puts omission counters before
         /// the node detail list.

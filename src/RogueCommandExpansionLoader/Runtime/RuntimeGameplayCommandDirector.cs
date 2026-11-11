@@ -13,6 +13,122 @@ namespace RogueCommandExpansionLoader.Runtime
 {
 
     /// <summary>
+    /// Result of a no-focus native building placement preview or commit.
+    /// </summary>
+    public readonly struct BuildingPlacementCommandResult
+    {
+        public BuildingPlacementCommandResult(
+            bool success, bool committed, string entityId, int cost, int balanceBefore,
+            float worldX, float worldY, float worldZ, int cellCount, string message,
+            IReadOnlyList<BuildingPlacementCellDiagnostic> cellDiagnostics = null,
+            int omittedCellDiagnosticCount = 0)
+        {
+            Success = success;
+            Committed = committed;
+            EntityId = entityId ?? string.Empty;
+            Cost = cost;
+            BalanceBefore = balanceBefore;
+            WorldX = worldX;
+            WorldY = worldY;
+            WorldZ = worldZ;
+            CellCount = cellCount;
+            Message = message ?? string.Empty;
+            CellDiagnostics = cellDiagnostics ?? Array.Empty<BuildingPlacementCellDiagnostic>();
+            OmittedCellDiagnosticCount = Math.Max(0, omittedCellDiagnosticCount);
+        }
+
+        public bool Success { get; }
+        public bool Committed { get; }
+        public string EntityId { get; }
+        public int Cost { get; }
+        public int BalanceBefore { get; }
+        public float WorldX { get; }
+        public float WorldY { get; }
+        public float WorldZ { get; }
+        public int CellCount { get; }
+        public string Message { get; }
+        public IReadOnlyList<BuildingPlacementCellDiagnostic> CellDiagnostics { get; }
+        public int OmittedCellDiagnosticCount { get; }
+    }
+
+    /// <summary>
+    /// Read-only cell telemetry explaining native placement preflight results.
+    /// </summary>
+    public readonly struct BuildingPlacementCellDiagnostic
+    {
+        public BuildingPlacementCellDiagnostic(
+            int gridX, int gridY, string worldObject, string heightLayer,
+            bool withinGrid, bool ground, bool obstacle, bool building, bool ramp,
+            bool crystal, bool unit, bool unitBlocksPlacement, bool multiLayer,
+            bool buildingInProgress, bool secondaryFogOccluded,
+            bool sameHeightLayerAsFootprint, IReadOnlyList<string> blockingReasons)
+        {
+            GridX = gridX;
+            GridY = gridY;
+            WorldObject = worldObject ?? string.Empty;
+            HeightLayer = heightLayer ?? string.Empty;
+            WithinGrid = withinGrid;
+            Ground = ground;
+            Obstacle = obstacle;
+            Building = building;
+            Ramp = ramp;
+            Crystal = crystal;
+            Unit = unit;
+            UnitBlocksPlacement = unitBlocksPlacement;
+            MultiLayer = multiLayer;
+            BuildingInProgress = buildingInProgress;
+            SecondaryFogOccluded = secondaryFogOccluded;
+            SameHeightLayerAsFootprint = sameHeightLayerAsFootprint;
+            BlockingReasons = blockingReasons ?? Array.Empty<string>();
+        }
+
+        public int GridX { get; }
+        public int GridY { get; }
+        public string WorldObject { get; }
+        public string HeightLayer { get; }
+        public bool WithinGrid { get; }
+        public bool Ground { get; }
+        public bool Obstacle { get; }
+        public bool Building { get; }
+        public bool Ramp { get; }
+        public bool Crystal { get; }
+        public bool Unit { get; }
+        public bool UnitBlocksPlacement { get; }
+        public bool MultiLayer { get; }
+        public bool BuildingInProgress { get; }
+        public bool SecondaryFogOccluded { get; }
+        public bool SameHeightLayerAsFootprint { get; }
+        public IReadOnlyList<string> BlockingReasons { get; }
+    }
+
+    /// <summary>
+    /// Bounded search for a nearby location accepted by native placement checks.
+    /// </summary>
+    public readonly struct BuildingPlacementSearchResult
+    {
+        public BuildingPlacementSearchResult(
+            bool found, float originX, float originZ, int radiusCells,
+            int candidatesChecked, BuildingPlacementCommandResult candidate, string message)
+        {
+            Found = found;
+            OriginX = originX;
+            OriginZ = originZ;
+            RadiusCells = radiusCells;
+            CandidatesChecked = candidatesChecked;
+            Candidate = candidate;
+            Message = message ?? string.Empty;
+        }
+
+        public bool Found { get; }
+        public float OriginX { get; }
+        public float OriginZ { get; }
+        public int RadiusCells { get; }
+        public int CandidatesChecked { get; }
+        public BuildingPlacementCommandResult Candidate { get; }
+        public string Message { get; }
+    }
+
+    /// <summary>
 
     /// Pure diagnostic DTO returned when granting credits to the game bank.
 

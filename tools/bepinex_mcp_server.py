@@ -27,7 +27,7 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.4.6"
+SERVER_VERSION = "1.4.9"
 GAME_PROCESS_NAME = "Rogue Command.exe"
 GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
@@ -386,6 +386,30 @@ def _normalise_ui_hierarchy_path(value: str) -> tuple[str, str]:
     return scene.strip().casefold(), text.casefold()
 
 
+def _scene_search_rows(data: Any) -> list[dict[str, Any]]:
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    if not isinstance(data, dict) or data.get("truncated") is True:
+        return []
+    for key in ("items", "objects", "results", "gameObjects"):
+        rows = data.get(key)
+        if isinstance(rows, list):
+            return [row for row in rows if isinstance(row, dict)]
+    return [data] if "id" in data or "gameObjectId" in data else []
+
+
+def _scene_search_object_id(row: dict[str, Any]) -> int | None:
+    for key in ("id", "gameObjectId"):
+        value = row.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return None
+
+
 def _get_diagnostics_go_id() -> int:
     global _DIAGNOSTICS_GO_ID
     if _DIAGNOSTICS_GO_ID is not None:
@@ -395,12 +419,11 @@ def _get_diagnostics_go_id() -> int:
     raw = _call_http("scene:find_objects_with_component", params={"componentName": "LoaderDiagnosticsComponent"})
     try:
         data = json.loads(raw)
-        if isinstance(data, list) and len(data) > 0 and "id" in data[0]:
-            _DIAGNOSTICS_GO_ID = int(data[0]["id"])
-            return _DIAGNOSTICS_GO_ID
-        elif isinstance(data, dict) and "id" in data:
-            _DIAGNOSTICS_GO_ID = int(data["id"])
-            return _DIAGNOSTICS_GO_ID
+        for row in _scene_search_rows(data):
+            game_object_id = _scene_search_object_id(row)
+            if game_object_id is not None:
+                _DIAGNOSTICS_GO_ID = game_object_id
+                return _DIAGNOSTICS_GO_ID
     except Exception:
         pass
 
@@ -408,10 +431,10 @@ def _get_diagnostics_go_id() -> int:
     try:
         raw = _call_http("scene/search_gameobjects", params={"componentName": "LoaderDiagnosticsComponent", "includeInactive": "true", "limit": "50"})
         data = json.loads(raw)
-        items = data if isinstance(data, list) else ([data] if isinstance(data, dict) and "id" in data else [])
-        for item in items:
-            if isinstance(item, dict) and "id" in item:
-                _DIAGNOSTICS_GO_ID = int(item["id"])
+        for item in _scene_search_rows(data):
+            game_object_id = _scene_search_object_id(item)
+            if game_object_id is not None:
+                _DIAGNOSTICS_GO_ID = game_object_id
                 return _DIAGNOSTICS_GO_ID
     except Exception:
         pass
@@ -420,10 +443,10 @@ def _get_diagnostics_go_id() -> int:
     try:
         raw = _call_http("scene/search_gameobjects", params={"name": "LoaderDiagnostics", "includeInactive": "true", "limit": "50"})
         data = json.loads(raw)
-        items = data if isinstance(data, list) else ([data] if isinstance(data, dict) and "id" in data else [])
-        for item in items:
-            if isinstance(item, dict) and "id" in item:
-                _DIAGNOSTICS_GO_ID = int(item["id"])
+        for item in _scene_search_rows(data):
+            game_object_id = _scene_search_object_id(item)
+            if game_object_id is not None:
+                _DIAGNOSTICS_GO_ID = game_object_id
                 return _DIAGNOSTICS_GO_ID
     except Exception:
         pass
@@ -1329,6 +1352,50 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             x = float(arguments.get("destinationX", 0.0))
             z = float(arguments.get("destinationZ", 0.0))
             res = _call_diagnostics_method("OrderUnitMoveJson", [e_key, x, z])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_place_building":
+            x = float(arguments.get("worldX", 0.0))
+            z = float(arguments.get("worldZ", 0.0))
+            commit = arguments.get("commit", False)
+            if not isinstance(commit, bool):
+                return _tool_response(json.dumps({"success": False, "error": "commit must be a boolean"}), True)
+            res = _call_diagnostics_method("OrderPlaceBuildingJson", [x, z, commit])
+            return _tool_response(res)
+
+        elif name == "diagnostics_inspect_active_building_placement":
+            res = _call_diagnostics_method("InspectActiveBuildingPlacementJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_find_building_placement":
+            try:
+                raw_x = arguments.get("originX")
+                raw_z = arguments.get("originZ")
+                if (
+                    isinstance(raw_x, bool) or isinstance(raw_z, bool)
+                    or not isinstance(raw_x, (int, float))
+                    or not isinstance(raw_z, (int, float))
+                ):
+                    raise ValueError("originX and originZ must be finite numbers")
+                origin_x = float(raw_x)
+                origin_z = float(raw_z)
+                raw_radius = arguments.get("radiusCells", 8)
+                if isinstance(raw_radius, bool) or not isinstance(raw_radius, (int, float)):
+                    raise ValueError("radiusCells must be an integer from 0 to 12")
+                radius_number = float(raw_radius)
+                if not math.isfinite(origin_x) or not math.isfinite(origin_z):
+                    raise ValueError("originX and originZ must be finite numbers")
+                if not math.isfinite(radius_number) or not radius_number.is_integer():
+                    raise ValueError("radiusCells must be an integer from 0 to 12")
+                radius_cells = int(radius_number)
+                if radius_cells < 0 or radius_cells > 12:
+                    raise ValueError("radiusCells must be an integer from 0 to 12")
+            except (TypeError, ValueError, OverflowError) as exc:
+                return _tool_response(json.dumps({"found": False, "error": str(exc)}), True)
+
+            res = _call_diagnostics_method(
+                "FindBuildingPlacementJson", [origin_x, origin_z, radius_cells]
+            )
             return _tool_response(res)
 
         elif name == "diagnostics_order_unit_attack":

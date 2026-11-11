@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.15.0
+version: 1.16.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -305,3 +305,9 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 - d576 death-frame follow-up (2026-11-11): a first filtered probe on the off-screen walker had 3,134 Game-camera callbacks but zero renderer samples and 9,044 frustum rejections; census found no remaining observers after expiry. Focusing the camera on the disposable actor made a preflight idle probe visible/in-frustum. The retry captured 32 early `Action_Death` rows (8 each across four of five skinned batches), all stationary with death retirement pending, suspended-but-bound 8/8 mappings, and visible/in-frustum; all four batches had positive sampled vertex deltas. It stopped at 1.16 unscaled seconds, then helper, actor, and observers were absent. A successful probe stop plus a live component census establishes observer cleanup; callbacks alone do not establish sample visibility. This was diagnostic lethal damage, not natural combat or pixel/death-quality evidence. Summary and full rows: `artifacts/runtime-smoke/retarget-d576-death-pool-20261111/`.
 - In this pass the active scene was `Game`, progression mode `Default`, and the active stage resolved to native `StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit` with zero declared or runtime-bound loader AI profiles. Do not infer AI execution from the unit-card offer or registered profile census.
 - d576 factory-produced Walk pass (2026-11-11): after a level transition, an active `LoadingHider` remained in the `Game` scene. Move calls before invoking its `Iniciar` button through the EventSystem did not count as gameplay movement. After the opener cleared, native Move generated 32 filtered Walk rows across four renderer batches; all were visible/in-frustum with 8/8 mappings bound, and each batch had 7/8 positive comparable BakeMesh deltas. The fifth renderer was outside the probe cap. Evidence: `docs/research/RETARGET-D576-FACTORY-WALK-RUNTIME-2026-11-11.md`.
+
+### Native building-placement cell evidence (2026-11-11)
+
+- Prefer the no-argument `diagnostics_inspect_active_building_placement` tool when a blueprint ghost is active. It captures the ghost footprint and native preflight in one main-thread call, avoiding coordinate drift and all screenshot/Computer Use paths. `success=false` and `committed=false` are expected for diagnostics.
+- Read each `cellDiagnostics` row: `worldObject=Building` plus `occupiedByBuildingRampOrObstacle` proves occupied grid cells; `multiLayer` and `differentHeightLayer` identify local terrain-layer conflicts. Separate those local blockers from global refinery-distance or builder-spacing failures. Never infer the cause from the generic preview tint.
+- Runtime QA on Profile3, level 4, stage 0 found the active field-medic factory footprint over buildings at grid `(1,-7)`, `(2,-7)`, and `(2,-6)`. The read-only radius-12 search checked 313 candidates and found no location passing every native rule. No building was queued and credits were unchanged. This is evidence for that run and radius only.

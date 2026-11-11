@@ -964,6 +964,98 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the result of a native selected-blueprint placement preview or commit.
+        /// </summary>
+        public static string SerializeBuildingPlacementCommandResult(BuildingPlacementCommandResult result)
+        {
+            return Serialize(BuildingPlacementCommandView(result));
+        }
+
+        /// <summary>
+        /// Serializes a bounded, read-only nearby placement search and its best candidate diagnostics.
+        /// </summary>
+        public static string SerializeBuildingPlacementSearchResult(BuildingPlacementSearchResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["omittedCellDiagnosticCount"] = result.Candidate.OmittedCellDiagnosticCount,
+                ["found"] = result.Found,
+                ["originX"] = result.OriginX,
+                ["originZ"] = result.OriginZ,
+                ["radiusCells"] = result.RadiusCells,
+                ["candidatesChecked"] = result.CandidatesChecked,
+                ["message"] = result.Message ?? string.Empty,
+                ["candidate"] = BuildingPlacementCommandView(result.Candidate),
+            };
+            return Serialize(view);
+        }
+
+        private static Dictionary<string, object> BuildingPlacementCommandView(BuildingPlacementCommandResult result)
+        {
+            const int maxRows = 16;
+            IReadOnlyList<BuildingPlacementCellDiagnostic> diagnostics = result.CellDiagnostics;
+            int diagnosticCount = diagnostics != null ? diagnostics.Count : 0;
+            int rowCount = Math.Min(diagnosticCount, maxRows);
+            int omittedCount = result.OmittedCellDiagnosticCount + Math.Max(0, diagnosticCount - rowCount);
+            var cellRows = new List<Dictionary<string, object>>(rowCount);
+            for (int index = 0; index < rowCount; index++)
+            {
+                BuildingPlacementCellDiagnostic cell = diagnostics[index];
+                var reasons = new List<string>();
+                if (cell.BlockingReasons != null)
+                {
+                    for (int reasonIndex = 0; reasonIndex < cell.BlockingReasons.Count; reasonIndex++)
+                    {
+                        string reason = cell.BlockingReasons[reasonIndex];
+                        if (!string.IsNullOrEmpty(reason))
+                        {
+                            reasons.Add(reason);
+                        }
+                    }
+                }
+
+                cellRows.Add(new Dictionary<string, object>
+                {
+                    ["gridX"] = cell.GridX,
+                    ["gridY"] = cell.GridY,
+                    ["worldObject"] = cell.WorldObject ?? string.Empty,
+                    ["heightLayer"] = cell.HeightLayer ?? string.Empty,
+                    ["withinGrid"] = cell.WithinGrid,
+                    ["ground"] = cell.Ground,
+                    ["obstacle"] = cell.Obstacle,
+                    ["building"] = cell.Building,
+                    ["ramp"] = cell.Ramp,
+                    ["crystal"] = cell.Crystal,
+                    ["unit"] = cell.Unit,
+                    ["unitBlocksPlacement"] = cell.UnitBlocksPlacement,
+                    ["multiLayer"] = cell.MultiLayer,
+                    ["buildingInProgress"] = cell.BuildingInProgress,
+                    ["secondaryFogOccluded"] = cell.SecondaryFogOccluded,
+                    ["sameHeightLayerAsFootprint"] = cell.SameHeightLayerAsFootprint,
+                    ["blockingReasons"] = reasons,
+                });
+            }
+
+            return new Dictionary<string, object>
+            {
+                ["omittedCellDiagnosticCount"] = omittedCount,
+                ["success"] = result.Success,
+                ["committed"] = result.Committed,
+                ["entityId"] = result.EntityId ?? string.Empty,
+                ["cost"] = result.Cost,
+                ["balanceBefore"] = result.BalanceBefore,
+                ["worldX"] = result.WorldX,
+                ["worldY"] = result.WorldY,
+                ["worldZ"] = result.WorldZ,
+                ["cellCount"] = result.CellCount,
+                ["cellDiagnosticCount"] = rowCount,
+                ["method"] = "native-PlaceBuildings-coroutine",
+                ["message"] = result.Message ?? string.Empty,
+                ["cellDiagnostics"] = cellRows,
+            };
+        }
+
+        /// <summary>
         /// Serializes live match run progression, ascension/heat scaling, active relics,
         /// and offered blueprint reward pools. Omission counters are serialized before detail collections.
         /// </summary>
