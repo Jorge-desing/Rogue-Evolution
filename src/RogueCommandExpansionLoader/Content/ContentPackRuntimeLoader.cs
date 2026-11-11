@@ -1223,67 +1223,29 @@ namespace RogueCommandExpansionLoader.Content
                 object balancing = _gameBalancingAssetField != null ? _gameBalancingAssetField.GetValue(null) : null;
                 bool isDemo = balancing != null && _gameIsDemoField != null && (bool)_gameIsDemoField.GetValue(balancing);
 
-                List<LoadedUnit> matchedPoolCandidates = new List<LoadedUnit>();
-                List<LoadedUnit> generalCandidates = new List<LoadedUnit>();
-                List<LoadedUnit> fallbackCandidates = new List<LoadedUnit>();
+                var rewardCandidates = new List<GuaranteedModRewardSelectionCandidate>();
 
                 foreach (LoadedUnit unit in _units.Values)
                 {
-                    if (unit.IsProductionBuilding && !unit.IsStandaloneBuilding)
-                    {
-                        continue;
-                    }
-
-                    if (isDemo && _allowedForDemoField != null && !(bool)_allowedForDemoField.GetValue(unit.BalanceRow))
-                    {
-                        continue;
-                    }
-
                     int neededXp = 0;
                     if (unit.Definition != null && unit.Definition.neededExperienceLevel.HasValue)
                     {
                         neededXp = unit.Definition.neededExperienceLevel.Value;
                     }
 
-                    if (isStartingSelection)
-                    {
-                        bool isStartingEligible = (unit.Definition != null && unit.Definition.isAllowedAsStartingBlueprint) ||
-                                                  neededXp <= 0;
-                        if (!isStartingEligible)
-                        {
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        if (neededXp > currentXpLevel)
-                        {
-                            continue;
-                        }
-                    }
-
-                    fallbackCandidates.Add(unit);
-
-                    bool isExcluded = excludedProductIds != null &&
-                        (excludedProductIds.Contains(unit.Id) ||
-                         (!String.IsNullOrEmpty(unit.ProductionFactoryId) && excludedProductIds.Contains(unit.ProductionFactoryId)));
-
-                    if (isExcluded)
-                    {
-                        continue;
-                    }
-
-                    generalCandidates.Add(unit);
-
-                    if (!String.IsNullOrEmpty(poolId) && UnitMatchesPoolTheme(unit, poolId))
-                    {
-                        matchedPoolCandidates.Add(unit);
-                    }
+                    bool isAllowedForDemo = !isDemo || _allowedForDemoField == null ||
+                        (bool)_allowedForDemoField.GetValue(unit.BalanceRow);
+                    bool isAllowedAsStartingBlueprint = unit.Definition != null &&
+                        unit.Definition.isAllowedAsStartingBlueprint;
+                    string[] roles = unit.Definition == null ? null : unit.Definition.roles;
+                    rewardCandidates.Add(new GuaranteedModRewardSelectionCandidate(
+                        unit.Id, unit.ProductionFactoryId, neededXp, isAllowedAsStartingBlueprint,
+                        isAllowedForDemo, unit.IsProductionBuilding, unit.IsStandaloneBuilding, roles));
                 }
 
-                List<LoadedUnit> selectedList = matchedPoolCandidates.Count > 0
-                    ? matchedPoolCandidates
-                    : (generalCandidates.Count > 0 ? generalCandidates : fallbackCandidates);
+                List<GuaranteedModRewardSelectionCandidate> selectedList =
+                    GuaranteedModRewardSelectionPolicy.GetEligibleCandidates(
+                        rewardCandidates, poolId, isStartingSelection, currentXpLevel, isDemo, excludedProductIds);
 
                 if (selectedList.Count == 0)
                 {
@@ -1291,7 +1253,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 int index = new System.Random().Next(0, selectedList.Count);
-                modProductId = selectedList[index].Id;
+                modProductId = selectedList[index].ProductId;
                 return true;
             }
         }
@@ -1384,32 +1346,6 @@ namespace RogueCommandExpansionLoader.Content
                 return result;
             }
         }
-
-        private static bool UnitMatchesPoolTheme(LoadedUnit unit, string poolId)
-        {
-            if (unit == null || String.IsNullOrEmpty(poolId) || unit.Definition == null)
-            {
-                return false;
-            }
-
-            string[] roles = unit.Definition.roles;
-            if (roles == null || roles.Length == 0)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < roles.Length; i++)
-            {
-                string role = roles[i];
-                if (!String.IsNullOrEmpty(role) && poolId.IndexOf(role, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
 
         public void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result)
         {

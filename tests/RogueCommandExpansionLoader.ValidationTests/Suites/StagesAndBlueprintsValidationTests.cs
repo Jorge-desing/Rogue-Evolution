@@ -406,6 +406,18 @@ internal static partial class ValidationTestRunner
                     "A guaranteed mod card must register its row first and pass the active reward eligibility state.");
             }
 
+            var randomSlotCards = new List<string> { "native:one", "native:two", "native:three" };
+            if (!RuntimeHooks.EnsureGuaranteedModCardOption(randomSlotCards))
+            {
+                throw new InvalidOperationException("A valid native reward should receive one guaranteed mod product.");
+            }
+
+            int randomSlotModCount = randomSlotCards.Count(card => card == "sample:unit-b");
+            if (randomSlotCards.Count != 3 || randomSlotModCount != 1)
+            {
+                throw new InvalidOperationException("The random-slot path must replace exactly one of the existing card slots.");
+            }
+
             var mixedCards = new List<string> { "native:tank", "sample:unit-a", "native:scout" };
             bool injectedMixed = RuntimeHooks.EnsureGuaranteedModCardOption(mixedCards, forcedSlot: 0);
             if (injectedMixed || mixedCards[0] != "native:tank" || mixedCards[1] != "sample:unit-a")
@@ -427,6 +439,76 @@ internal static partial class ValidationTestRunner
             Game.CardsInDeck = new List<string>();
             Game.OpenCardRewards = new List<OpenReward>();
             MetaGame.Instance.CurrentExperienceLevel = 0;
+        }
+    }),
+    ("guaranteed reward selection prefers a matching pool theme then falls back to eligible mods", () =>
+    {
+        var vehicle = new GuaranteedModRewardSelectionCandidate(
+            "sample:vehicle", "sample:vehicle-factory", 0, false, true, false, false, new[] { "Vehicle", "Tank" });
+        var mech = new GuaranteedModRewardSelectionCandidate(
+            "sample:mech", "sample:mech-factory", 0, false, true, false, false, new[] { "Mech" });
+
+        List<GuaranteedModRewardSelectionCandidate> themed =
+            GuaranteedModRewardSelectionPolicy.GetEligibleCandidates(
+                new[] { vehicle, mech }, "BP_CheaperVehicles", false, 0, false, null);
+        if (themed.Count != 1 || themed[0].ProductId != "sample:vehicle")
+        {
+            throw new InvalidOperationException("A vehicle reward pool must prefer an eligible mod vehicle.");
+        }
+
+        List<GuaranteedModRewardSelectionCandidate> fallback =
+            GuaranteedModRewardSelectionPolicy.GetEligibleCandidates(
+                new[] { new GuaranteedModRewardSelectionCandidate(
+                    "sample:late-vehicle", "sample:late-vehicle-factory", 5, false, true, false, false, new[] { "Vehicle" }),
+                    mech }, "BP_CheaperVehicles", false, 2, false, null);
+        if (fallback.Count != 1 || fallback[0].ProductId != "sample:mech")
+        {
+            throw new InvalidOperationException("An ineligible thematic product must fall back to another XP-eligible mod unit.");
+        }
+
+        var demoOnlyCandidate = new GuaranteedModRewardSelectionCandidate(
+            "sample:demo-locked", "sample:demo-locked-factory", 0, true, false, false, false, new[] { "Robo" });
+        List<GuaranteedModRewardSelectionCandidate> demoEligible =
+            GuaranteedModRewardSelectionPolicy.GetEligibleCandidates(
+                new[] { vehicle, demoOnlyCandidate }, null, false, 0, true, null);
+        if (demoEligible.Count != 1 || demoEligible[0].ProductId != "sample:vehicle")
+        {
+            throw new InvalidOperationException("Demo mode must filter products that disallow demo eligibility.");
+        }
+    }),
+    ("guaranteed starting reward selection respects explicit and zero-XP eligibility", () =>
+    {
+        var zeroXp = new GuaranteedModRewardSelectionCandidate(
+            "sample:starter", "sample:starter-factory", 0, false, true, false, false, new[] { "Vehicle" });
+        var explicitlyAllowed = new GuaranteedModRewardSelectionCandidate(
+            "sample:allowed", "sample:allowed-factory", 4, true, true, false, false, new[] { "Mech" });
+        var locked = new GuaranteedModRewardSelectionCandidate(
+            "sample:locked", "sample:locked-factory", 1, false, true, false, false, new[] { "Robo" });
+
+        List<GuaranteedModRewardSelectionCandidate> starters =
+            GuaranteedModRewardSelectionPolicy.GetEligibleCandidates(
+                new[] { zeroXp, explicitlyAllowed, locked }, null, true, 0, false, null);
+        if (starters.Count != 2 || starters.Any(candidate => candidate.ProductId == "sample:locked") ||
+            !starters.Any(candidate => candidate.ProductId == "sample:starter") ||
+            !starters.Any(candidate => candidate.ProductId == "sample:allowed"))
+        {
+            throw new InvalidOperationException("Starting selection must allow explicit starts and zero-XP units only.");
+        }
+    }),
+    ("guaranteed reward selection never falls back to a product or factory already excluded", () =>
+    {
+        var productExcluded = new GuaranteedModRewardSelectionCandidate(
+            "sample:owned", "sample:owned-factory", 0, true, true, false, false, new[] { "Vehicle" });
+        var factoryExcluded = new GuaranteedModRewardSelectionCandidate(
+            "sample:new-product", "sample:owned-factory", 0, true, true, false, false, new[] { "Vehicle" });
+        var excluded = new HashSet<string>(StringComparer.Ordinal) { "sample:owned", "sample:owned-factory" };
+
+        List<GuaranteedModRewardSelectionCandidate> eligible =
+            GuaranteedModRewardSelectionPolicy.GetEligibleCandidates(
+                new[] { productExcluded, factoryExcluded }, "BP_CheaperVehicles", true, 0, false, excluded);
+        if (eligible.Count != 0)
+        {
+            throw new InvalidOperationException("An already-owned or already-offered mod product must not be reintroduced as fallback.");
         }
     }),
     ("random reward trace output is bounded", () =>

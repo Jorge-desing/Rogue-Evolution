@@ -1,7 +1,7 @@
 ---
 name: rogue-command-harmony-policy
 description: "BepInEx 5 + Harmony 2 patching policy for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). When creating or auditing Unity game plugins, Harmony patches, assembly identity checks, or IL2CPP/back-end decisions. [Política de BepInEx 5 + Harmony 2 para Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). Uso: plugins Unity, patches Harmony, verificación de identidad de ensamblados, decisiones backend IL2CPP]"
-version: 1.4.0
+version: 1.4.1
 license: MIT
 author: Hermes Agent
 metadata:
@@ -180,3 +180,9 @@ For live AI evidence, separate module registration from stage activation: a 23-m
 - The native `EntityController.Destroy(bool, EntityController)` entry hook still runs first for death-trigger setup and retarget suspension. Its exact CIL has one terminal `UnityEngine.Object.Destroy(UnityEngine.Object)` call; validate that unique terminal call and replace only its method operand with the same-signature loader callback. Preserve the original call opcode, stack shape, labels, and exception blocks. If the target, callback signature, or call count drifts, fail installation rather than allowing an unsafe patch.
 - The terminal callback holds destruction only when `DestroyHasBeenStarted`/`IsDestroyed`, a successful death trigger, the director, and a valid `Action_Death` clip/controller are present. Otherwise call native `UnityEngine.Object.Destroy` immediately. During the hold, disable gameplay behaviours/colliders and freeze physics while leaving Animator/director active; retire after clip duration adjusted for Animator speed plus the bounded grace interval. Increment `entityDestroyGameObjectTranspilerCount` when the callback runs and `deathVisualRetirementCount` only when a hold begins.
 - Live Profile2 evidence used direct diagnostic lethal damage to a disposable clone and observed the death clip exceed normalized time 1 before destruction. The clone Animator alone used `UnscaledTime` to progress while the match stayed at `timeScale=0`. This proves callback/retirement telemetry, not natural combat or rendered pixels: `artifacts/runtime-smoke/retarget-death-visual-cloud-20261110170654/death-hold-runtime-result.json`.
+
+### Guaranteed mod reward prefix (2026-11-11)
+
+- Resolve `ChooseCard.InstantiateCardsWithDelay(List<string>)` by the full instance/`IEnumerator`/single-`List<string>` shape. The prefix must preserve native initialization and mutate the existing list in place; do not replace the coroutine or change the card count.
+- `RuntimeHooks.InstantiateCardsWithDelayPrefix` delegates to `EnsureGuaranteedModCardOption`. Leave a natural offer intact if it already contains a mod product; otherwise choose one eligible product and replace one slot. Keep the pure policy separate from reflection so XP, starting, demo, role, and duplicate filters can be validated without game assemblies.
+- Live evidence for the current Release showed the prefix replacing `RoboClawBot` with `tactical-operations:command-relay` in slot 2. This confirms hook execution and a populated `CardNew`; renderer telemetry is not pixel evidence. Report a nonmatching pool role as general fallback, not a thematic match.

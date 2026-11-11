@@ -136,6 +136,8 @@
              Link="Runtime/RuntimeAgentCoordinator.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/ContentPackDefinition.cs"
              Link="Content/ContentPackDefinition.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Content/GuaranteedModRewardSelectionPolicy.cs"
+             Link="Content/GuaranteedModRewardSelectionPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayScaleCalibration.cs"
              Link="Content/VisualOverlayScaleCalibration.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/VisualOverlayOrientation.cs"
