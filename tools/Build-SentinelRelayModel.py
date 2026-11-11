@@ -58,7 +58,7 @@ def build() -> None:
             "--rig", "--animate",
             "--colliders", "--gameplay-json",
             "--bake-atlas", "--single-material", "--atlas-resolution", "2048",
-            "--target-budget", "6500",
+            "--target-budget", str(rmk.DEFAULT_FACE_BUDGET),
             "--multiview", "--render-icons",
             "--blend-path", "content/source-art/sentinel-relay.blend",
             "--fbx-path", "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SentinelRelay.fbx",

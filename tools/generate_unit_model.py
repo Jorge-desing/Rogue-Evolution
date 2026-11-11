@@ -966,7 +966,7 @@ def parse_args():
     parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
-    parser.add_argument("--target-budget", type=int, default=rmk.DEFAULT_FACE_BUDGET, help="Target face budget for profiling (default: 6000)")
+    parser.add_argument("--target-budget", type=int, default=rmk.DEFAULT_FACE_BUDGET, help=f"Target face budget for profiling (default: {rmk.DEFAULT_FACE_BUDGET})")
     parser.add_argument("--rts-budget", action="store_true", help="Use lower-detail preset variants for RTS camera polygon budgets")
     parser.add_argument("--model-scale", type=float, default=1.0, help="Uniformly scale authored vehicle geometry and sockets around the ground origin")
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
@@ -3654,7 +3654,7 @@ def main():
             "colliders": res.get("colliders", []),
             "budget_diagnostics": res.get("budget_diagnostics", {}),
             "face_budget_reduction": res.get("face_budget_reduction", {}),
-            "face_budget_limit": res.get("face_budget_limit", 6000),
+            "face_budget_limit": res.get("face_budget_limit", rmk.DEFAULT_FACE_BUDGET),
             "face_budget_passed": res.get("face_budget_passed", False),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)

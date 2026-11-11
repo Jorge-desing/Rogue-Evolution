@@ -210,7 +210,7 @@ def build() -> None:
             "--rig", "--animate",
             "--colliders", "--gameplay-json",
             "--bake-atlas", "--single-material", "--atlas-resolution", "2048",
-            "--target-budget", "6000",
+            "--target-budget", str(rmk.DEFAULT_FACE_BUDGET),
             "--multiview",
             "--blend-path", "content/source-art/gravitas-breaker.blend",
             "--fbx-path", "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/GravitasBreaker.fbx",

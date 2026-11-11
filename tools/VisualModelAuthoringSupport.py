@@ -54,7 +54,7 @@ def remove_objects(builder, predicate: Callable[[str], bool]) -> list[str]:
 
 def reduce_subpixel_details_to_budget(
     builder,
-    max_faces: int = 6000,
+    max_faces: int | None = None,
     max_dimension_m: float = 0.60,
 ) -> dict[str, Any]:
     """Apply RogueModelKit's shared, protected fitting simplification pass."""
@@ -62,7 +62,7 @@ def reduce_subpixel_details_to_budget(
 
     return rmk.reduce_subpixel_details_to_budget(
         builder.objects,
-        max_faces=max_faces,
+        max_faces=rmk.DEFAULT_FACE_BUDGET if max_faces is None else max_faces,
         max_dimension_m=max_dimension_m,
     )
 

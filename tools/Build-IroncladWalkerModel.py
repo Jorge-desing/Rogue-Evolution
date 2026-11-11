@@ -203,8 +203,10 @@ def build_ironclad_walker_model() -> None:
             "Ironclad Walker exceeds the approximate GatlingWalker envelope "
             f"(2.2 x 2.7 x 2.2 m): {bounds}"
         )
-    if diagnostics["total_polygons"] > 7500:
-        raise ValueError("Ironclad Walker exceeds the 7,500-face LOD0 profiling ceiling")
+    if diagnostics["total_polygons"] > rmk.DEFAULT_FACE_BUDGET:
+        raise ValueError(
+            f"Ironclad Walker exceeds the {rmk.DEFAULT_FACE_BUDGET:,}-face LOD0 profiling ceiling"
+        )
 
     result = builder.build_and_export(
         fbx_path=FBX_PATH,
@@ -215,7 +217,7 @@ def build_ironclad_walker_model() -> None:
         include_ik=True,
         include_animations=True,
         wear_level="factory_new",
-        target_budget=7500,
+        target_budget=rmk.DEFAULT_FACE_BUDGET,
         profile_budget=True,
         structural_wear_mask=True,
         unity_batch_names=True,

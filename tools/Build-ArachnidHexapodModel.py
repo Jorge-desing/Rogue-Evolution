@@ -197,7 +197,7 @@ def build():
         "--name", "ArachnidHexapod", "--preset", "arachnid_hexapod",
         "--primary-color", "#35495A", "--light-armor-color", "#788793",
         "--emissive-color", "#25B5C4", "--wear", "factory_new",
-        "--no-panel-lines", "--normal-intensity", "0.35", "--target-budget", "7500",
+        "--no-panel-lines", "--normal-intensity", "0.35", "--target-budget", str(rmk.DEFAULT_FACE_BUDGET),
         "--bake-atlas", "--single-material", "--atlas-resolution", "2048",
         "--structural-wear-mask", "--multiview",
         "--blend-path", "content/source-art/arachnid-hexapod.blend",

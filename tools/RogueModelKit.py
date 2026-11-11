@@ -18,7 +18,7 @@ import bpy, bmesh
 from mathutils import Vector, Euler, Quaternion, Matrix
 from mathutils.bvhtree import BVHTree
 
-DEFAULT_FACE_BUDGET = 6000
+DEFAULT_FACE_BUDGET = 10000
 _SURFACE_DEVIATION_BUDGETS: dict[int, float] = {}
 
 
