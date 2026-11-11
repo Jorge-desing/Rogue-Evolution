@@ -44,7 +44,21 @@ Hardflow 1.23.0 es una herramienta opcional para modelado geométrico manual de 
 .\tools\Start-BlenderWithHardflow.ps1
 ```
 
-El instalador verifica el SHA-256 de la release oficial y guarda la extensión, configuración y preferencias bajo `.tools/`; no modifica el perfil global de Blender. Usa Hardflow para cortes de placas, rejillas, pernos, cordones y conducciones. Blender y sus exportadores siguen siendo la autoridad del mesh/FBX; conserva la jerarquía, pivotes, sockets, `Color RGBA` y presupuestos del modelo. Los UVs y las texturas finales siguen el flujo existente con Blender y Material Maker; Hardflow no es requisito para los generadores headless ni para compilar packs.
+El instalador verifica el SHA-256 de la release oficial y guarda la extensión, configuración y preferencias bajo `.tools/`; no modifica el perfil global de Blender. Usa Hardflow para cortes de placas, rejillas, pernos, cordones y conducciones. Blender y sus exportadores siguen siendo la autoridad del mesh/FBX; conserva la jerarquía, pivotes, sockets, `Color RGBA` y el presupuesto geométrico dinámico. Los UVs y las texturas finales siguen el flujo existente con Blender y Material Maker; Hardflow no es requisito para los generadores headless ni para compilar packs.
+
+## Presupuesto dinámico de geometría
+
+Los vehículos, módulos visuales y estructuras comparten la política de [`content/source-art/model-budget-profile.json`](content/source-art/model-budget-profile.json). No hay un máximo universal de caras por modelo: la asignación por asset y LOD se deriva de triángulos visibles medidos, instancias previstas, fracción de pantalla y prioridad del rol. Los reportes conservan por separado las caras de Blender, los triángulos de Unity, los umbrales de LOD y el veredicto.
+
+El objetivo local es 60 FPS (16,67 ms por frame). Prefabs y paquetes exigen un perfil calibrado y rechazan assets que superen su asignación. La medición usa la misma resolución, cámara RTS y mezcla densa de escena, con al menos tres muestras de tiempo de frame p95 a dos cargas de triángulos distintas. Para compilar muestras reales:
+
+```powershell
+python -m tools.profile_model_budgets --profile content/source-art/model-budget-profile.json --samples artifacts/model-budget-measured-samples.json --output content/source-art/model-budget-profile.json
+```
+
+Cada muestra JSON registra `triangles` visibles y `p95FrameTimeMs` medidos en la misma cámara, resolución y mezcla de escena. Declara también las demandas de assets por escena en el perfil (`sourceFaces`, `sourceTriangles`, `maxVisibleInstances`, `screenHeightFraction`, `rolePriority` y tres `lodScreenHeights`).
+
+El perfil del checkout está marcado `uncalibrated`: aún no contiene mediciones de una escena de juego. Por eso los builds de prefab y paquetes se detienen hasta completar esa medición; no uses números sintéticos para habilitarlos. Unity cambia de LOD por tamaño en pantalla con las mallas ya exportadas; no genera geometría durante la partida. Para repetir el piloto Hardflow aislado, ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File tools/Run-GravitasBreakerHardflowPilot.ps1`; el builder de producción reproduce la receta con operaciones nativas de Blender.
 
 El script verifica SHA-256 y solo prepara Blender y UnityExplorer bajo `.tools/`. Runtime Unity Editor se prepara por separado con `./tools/Setup-BackendTools.ps1 -RuntimeUnityEditor`; también verifica SHA-256. Ninguno de estos scripts copia archivos al juego ni lo inicia. Los inspectores requieren BepInEx 5 Mono y se añaden a la instalación de Steam solo durante una prueba reversible, usando uno por perfil de prueba.
 

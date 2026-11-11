@@ -381,7 +381,7 @@ def main():
         armor: "armor", armor_light: "lightArmor", rubber: "rubber", wheel: "wheel",
         gunmetal: "gunmetal", warning: "warning", sensor: "arc"
     })
-    modelkit.export_unity_fbx(FBX_PATH, batched_objects + hardpoint_sockets, include_empties=True)
+    modelkit.export_unity_fbx(FBX_PATH, batched_objects + hardpoint_sockets, include_empties=True, generate_profiled_lods=True, asset_id="SkirmishStrikeBike")
     print("Created source model: {0}".format(BLEND_PATH))
     print("Created Unity model: {0}".format(FBX_PATH))
     print("Created preview: {0}".format(PREVIEW_PATH))

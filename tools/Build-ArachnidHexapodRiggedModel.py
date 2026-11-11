@@ -286,6 +286,7 @@ def build_arachnid_hexapod_rigged_model() -> None:
         include_empties=True,
         include_armature=True,
         bake_anim=True,
+        generate_profiled_lods=True, asset_id=UNIT_NAME,
     )
     print(f"Editable rigged Blender source: {RIGGED_BLEND}")
     print(f"Rigged animated Unity FBX: {FBX_PATH}")

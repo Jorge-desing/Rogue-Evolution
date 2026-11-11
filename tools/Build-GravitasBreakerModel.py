@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 from ActiveUnitVisualEnhancements import apply_wave34_details
+from gravitas_breaker_hardflow_recipe import apply_gravitas_breaker_details
 import RogueModelKit as rmk
 from VisualModelAuthoringSupport import (
     add_box,
@@ -96,6 +97,13 @@ def refine(builder) -> None:
         ],
         p.primary_armor,
     ))
+
+    hardflow_pilot = apply_gravitas_breaker_details(
+        builder.objects,
+        armor_material=p.primary_armor,
+        mechanical_material=p.gunmetal,
+    )
+    print("Gravitas Hardflow pilot geometry replay: " + json.dumps(hardflow_pilot, sort_keys=True))
 
     for side, tag in ((-1.0, "L"), (1.0, "R")):
         add_link(
@@ -210,7 +218,6 @@ def build() -> None:
             "--rig", "--animate",
             "--colliders", "--gameplay-json",
             "--bake-atlas", "--single-material", "--atlas-resolution", "2048",
-            "--target-budget", str(rmk.DEFAULT_FACE_BUDGET),
             "--multiview",
             "--blend-path", "content/source-art/gravitas-breaker.blend",
             "--fbx-path", "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/GravitasBreaker.fbx",

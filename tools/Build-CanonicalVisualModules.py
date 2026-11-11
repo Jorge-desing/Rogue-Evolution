@@ -145,8 +145,10 @@ def read_module_entries() -> list[dict[str, Any]]:
                     module_suffix = f"_{slot_id.lower()}" if len(module_declarations) > 1 else ""
                     module_name = f"RCLModule_{unit_slug}_{preset}{module_suffix}"
                     fbx_path = f"{MODULE_FBX_ROOT}/{module_name}.fbx"
+                    lod_fbx_path = f"{MODULE_FBX_ROOT}/{module_name}_LODs.fbx"
                     prefab_path = f"{MODULE_PREFAB_ROOT}/{module_name}.prefab"
                     fbx_file_path = f"unity/RogueCommandAssetAuthoring/{fbx_path}"
+                    lod_fbx_file_path = f"unity/RogueCommandAssetAuthoring/{lod_fbx_path}"
                     expected_asset_name = prefab_path.lower()
                     if asset_name.casefold() != expected_asset_name.casefold():
                         raise ValueError(
@@ -172,6 +174,8 @@ def read_module_entries() -> list[dict[str, Any]]:
                         "assetBundleName": bundle_name,
                         "fbxAssetPath": fbx_path,
                         "fbxFilePath": fbx_file_path,
+                        "lodFbxAssetPath": lod_fbx_path,
+                        "lodFbxFilePath": lod_fbx_file_path,
                         "prefabAssetPath": prefab_path,
                         # Unity serializes AssetBundle container keys in lowercase;
                         # runtime LoadAsset and bundle-reference validation use that exact key.
@@ -432,6 +436,7 @@ def place_in_collection(objects: list[bpy.types.Object], collection: bpy.types.C
 def build_all(entries: list[dict[str, Any]], force: bool) -> None:
     outputs = [SOURCE_BLEND]
     outputs.extend(ROOT / entry["fbxFilePath"] for entry in entries)
+    outputs.extend(ROOT / entry["lodFbxFilePath"] for entry in entries)
     if not force:
         existing = [str(path) for path in outputs if path.exists()]
         if existing:
@@ -439,7 +444,7 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
 
     rmk.clear_scene()
     root_collection = bpy.context.scene.collection
-    module_rows: list[tuple[dict[str, Any], list[bpy.types.Object]]] = []
+    module_rows: list[tuple[dict[str, Any], list[bpy.types.Object], dict[str, list[bpy.types.Object]], dict[str, Any]]] = []
     for index, entry in enumerate(entries):
         seed = int(hashlib.sha256(entry["variantId"].encode("utf-8")).hexdigest()[:8], 16)
         module_collection = bpy.data.collections.new(entry["moduleName"])
@@ -447,12 +452,13 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         created, armor_materials = build_module_geometry(entry, seed)
         if not created:
             raise RuntimeError(f"No geometry generated for {entry['variantId']}")
-        # Level 2 has an independent per-module budget; do not charge these
-        # visual-only parts against the owning Level 1 chassis limit.
+        # Module demand is charged as its own visible asset demand in the
+        # calibrated scene profile, separate from its owning chassis.
+        asset_budget = rmk.resolve_geometry_budget(entry["moduleName"])
         rmk.enforce_face_budget_before_export(
             created,
             entry["moduleName"],
-            max_faces=rmk.LEVEL2_MODULE_FACE_BUDGET,
+            asset_id=entry["moduleName"],
         )
         for obj in created:
             ensure_uv(obj)
@@ -470,31 +476,55 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
             smooth_by_angle=True,
             weighted_normals=True,
             unity_batch_names=True,
-            max_faces=rmk.LEVEL2_MODULE_FACE_BUDGET,
+            asset_id=entry["moduleName"],
         )
         if not combined:
             raise RuntimeError(f"Material batching produced no meshes for {entry['variantId']}")
         place_in_collection(combined, module_collection)
-        module_rows.append((entry, combined))
+        source_triangles = rmk.count_mesh_triangles(combined)
+        lod_ratios = rmk.lod_ratios_from_budget(asset_budget, source_triangles)
+        lod_dict = rmk.generate_lod_chain(
+            combined,
+            prefix=entry["moduleName"],
+            lod_levels=lod_ratios,
+        )
+        lod_stats = {}
+        for lod_name, lod_objects in lod_dict.items():
+            lod_collection = bpy.data.collections.new(entry["moduleName"] + "_" + lod_name)
+            module_collection.children.link(lod_collection)
+            place_in_collection(lod_objects, lod_collection)
+            faces = sum(len(obj.data.polygons) for obj in lod_objects if obj.type == "MESH")
+            triangles = rmk.count_mesh_triangles(lod_objects)
+            lod_stats[lod_name] = {"blenderFaces": faces, "unityTriangles": triangles}
+        entry["lodScreenHeights"] = [row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]]
+        entry["geometryStats"] = lod_stats
+        module_rows.append((entry, combined, lod_dict, asset_budget))
         print(f"[{index + 1:02d}/{len(entries):02d}] {entry['variantId']} -> {entry['slotId']} ({len(combined)} material batch(es))", flush=True)
 
     SOURCE_BLEND.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 
-    for entry, objects in module_rows:
+    for entry, objects, lod_dict, asset_budget in module_rows:
         fbx_path = ROOT / entry["fbxFilePath"]
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
         rmk.export_unity_fbx(fbx_path, objects, include_empties=False, include_armature=False, bake_anim=False)
         if not fbx_path.is_file() or fbx_path.stat().st_size <= 0:
             raise RuntimeError(f"Blender did not export a non-empty FBX: {fbx_path}")
+        lod_fbx_path = ROOT / entry["lodFbxFilePath"]
+        all_lod_objects = [
+            obj for lod_name in ("LOD1", "LOD2") for obj in lod_dict[lod_name]
+        ]
+        rmk.export_unity_fbx(lod_fbx_path, all_lod_objects, include_empties=False, include_armature=False, bake_anim=False)
+        if not lod_fbx_path.is_file() or lod_fbx_path.stat().st_size <= 0:
+            raise RuntimeError(f"Blender did not export a non-empty LOD FBX: {lod_fbx_path}")
 
     role_registry = json.loads(ROLE_REGISTRY_PATH.read_text(encoding="utf-8"))
     manifest = {
         "schemaVersion": 2,
         "sourceBlend": SOURCE_BLEND.relative_to(ROOT).as_posix(),
         "level1Authority": "Existing unit chassis geometry, functional hierarchy, rig, pivots, canonical sockets, LOD and PBR atlas.",
-        "level1ChassisFaceBudget": rmk.LEVEL1_CHASSIS_FACE_BUDGET,
-        "level2ModuleFaceBudgetPerModule": rmk.LEVEL2_MODULE_FACE_BUDGET,
+        "geometryBudgetPolicy": "scene-calibrated-per-asset-lod",
+        "geometryBudgetProfile": "content/source-art/model-budget-profile.json",
         "level2Contract": "Each listed GameObject is visual-only geometry attached to exactly one canonical hardpoint group; no gameplay components or balance changes.",
         "visualEngineeringRoleContract": role_registry.get("scope", ""),
         "modules": entries,

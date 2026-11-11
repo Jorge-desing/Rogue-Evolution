@@ -60,9 +60,13 @@ def reduce_subpixel_details_to_budget(
     """Apply RogueModelKit's shared, protected fitting simplification pass."""
     import RogueModelKit as rmk
 
+    target_faces = max_faces
+    if target_faces is None:
+        allocation = rmk.resolve_geometry_budget(builder.name)
+        target_faces = int(allocation["lods"][0]["targetFacesPerInstance"])
     return rmk.reduce_subpixel_details_to_budget(
         builder.objects,
-        max_faces=rmk.LEVEL1_CHASSIS_FACE_BUDGET if max_faces is None else max_faces,
+        max_faces=target_faces,
         max_dimension_m=max_dimension_m,
     )
 

@@ -269,7 +269,7 @@ def build_surge_arc_tank_model() -> None:
             builder.palette.emissive: "arc",
         },
     )
-    rmk.export_unity_fbx(FBX_PATH, export_batches + hardpoint_sockets, include_empties=True)
+    rmk.export_unity_fbx(FBX_PATH, export_batches + hardpoint_sockets, include_empties=True, generate_profiled_lods=True, asset_id=UNIT_NAME)
 
     print(f"Editable source: {BLEND_PATH}")
     print(f"Unity FBX: {FBX_PATH}")

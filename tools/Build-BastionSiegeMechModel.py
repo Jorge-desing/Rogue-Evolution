@@ -137,6 +137,7 @@ def build_model() -> None:
     rmk.export_unity_fbx(
         FBX_PATH, list(batched_meshes) + [armature] + sockets,
         include_empties=True, include_armature=True, bake_anim=True,
+        generate_profiled_lods=True, asset_id=UNIT_NAME,
     )
     print(f"Editable source: {SOURCE_BLEND}")
     print(f"Rigged animated Unity FBX: {FBX_PATH}")

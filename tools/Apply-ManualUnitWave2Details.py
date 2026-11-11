@@ -55,7 +55,7 @@ def apply_unit(unit_name: str, source_name: str, fbx_name: str, leg_type: str | 
     else:
         export_meshes = meshes
     empties = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY" and not obj.name.lower().startswith("preview")]
-    rmk.export_unity_fbx(fbx_path, export_meshes + [armature] + empties, include_empties=True, include_armature=True, bake_anim=True)
+    rmk.export_unity_fbx(fbx_path, export_meshes + [armature] + empties, include_empties=True, include_armature=True, bake_anim=True, generate_profiled_lods=True, asset_id=unit_name)
     print(f"{unit_name}: added {len(new_objects)} Wave 2/3/4 meshes; exported {fbx_path}")
 
 

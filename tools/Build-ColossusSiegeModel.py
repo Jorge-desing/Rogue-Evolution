@@ -365,7 +365,7 @@ def build_colossus_siege_model():
         warning_amber: "amber",
         sensor_cyan: "sensor",
     })
-    rmk.export_unity_fbx(FBX_PATH, export_batches + hardpoint_sockets, include_empties=True)
+    rmk.export_unity_fbx(FBX_PATH, export_batches + hardpoint_sockets, include_empties=True, generate_profiled_lods=True, asset_id="ColossusSiegePlatform")
 
     print(f"Created source model: {BLEND_PATH}")
     print(f"Created Unity model: {FBX_PATH}")

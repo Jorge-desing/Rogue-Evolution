@@ -162,6 +162,7 @@ namespace RogueCommandExpansion.Authoring
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
+            ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
             string artifactRoot = Path.GetFullPath(Path.Combine(repositoryRoot,
                 "artifacts", "canonical-two-level", "content-packs"));
             Directory.CreateDirectory(artifactRoot);

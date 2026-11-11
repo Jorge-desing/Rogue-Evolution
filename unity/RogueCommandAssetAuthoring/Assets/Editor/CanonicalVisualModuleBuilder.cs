@@ -36,6 +36,7 @@ namespace RogueCommandExpansion.Authoring
             public string variantId;
             public string assetBundleName;
             public string fbxAssetPath;
+            public string lodFbxAssetPath;
             public string prefabAssetPath;
             public string assetName;
             public string texturePrefix;
@@ -143,6 +144,7 @@ namespace RogueCommandExpansion.Authoring
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
+            ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
             string manifestPath = Path.Combine(repositoryRoot, ManifestRelativePath.Replace('/', Path.DirectorySeparatorChar));
             if (!File.Exists(manifestPath))
             {
@@ -184,7 +186,7 @@ namespace RogueCommandExpansion.Authoring
                     materials = BuildMaterials(entry, shader);
                     materialSets.Add(entry.preset, materials);
                 }
-                BuildPrefab(entry, materials);
+                BuildPrefab(entry, materials, repositoryRoot);
                 Debug.Log("[CanonicalVisualModuleBuilder] Built visual-only module " + (i + 1) + "/" +
                     manifest.modules.Length + ": " + entry.variantId + " at " + entry.prefabAssetPath + ".");
             }
@@ -598,6 +600,7 @@ namespace RogueCommandExpansion.Authoring
             if (entry == null || String.IsNullOrWhiteSpace(entry.moduleName) ||
                 String.IsNullOrWhiteSpace(entry.packName) || String.IsNullOrWhiteSpace(entry.variantId) ||
                 String.IsNullOrWhiteSpace(entry.assetBundleName) || String.IsNullOrWhiteSpace(entry.fbxAssetPath) ||
+                String.IsNullOrWhiteSpace(entry.lodFbxAssetPath) ||
                 String.IsNullOrWhiteSpace(entry.prefabAssetPath) || String.IsNullOrWhiteSpace(entry.assetName) ||
                 String.IsNullOrWhiteSpace(entry.texturePrefix) ||
                 String.IsNullOrWhiteSpace(entry.preset) ||
@@ -611,6 +614,7 @@ namespace RogueCommandExpansion.Authoring
             if (!seenPrefabPaths.Add(entry.prefabAssetPath) ||
                 !entry.prefabAssetPath.StartsWith(ModuleAssetRoot + "/Prefabs/", StringComparison.Ordinal) ||
                 !entry.fbxAssetPath.StartsWith(ModuleAssetRoot + "/Source/", StringComparison.Ordinal) ||
+                !entry.lodFbxAssetPath.StartsWith(ModuleAssetRoot + "/Source/", StringComparison.Ordinal) ||
                 !String.Equals(entry.assetName, entry.prefabAssetPath.ToLowerInvariant(), StringComparison.Ordinal))
             {
                 throw new InvalidDataException("Canonical module asset path is duplicated or outside VisualModules: " +
@@ -619,6 +623,8 @@ namespace RogueCommandExpansion.Authoring
 
             if (!File.Exists(Path.GetFullPath(Path.Combine(Directory.GetParent(Application.dataPath).FullName,
                 entry.fbxAssetPath.Replace('/', Path.DirectorySeparatorChar)))) ||
+                !File.Exists(Path.GetFullPath(Path.Combine(Directory.GetParent(Application.dataPath).FullName,
+                entry.lodFbxAssetPath.Replace('/', Path.DirectorySeparatorChar)))) ||
                 !File.Exists(Path.GetFullPath(Path.Combine(Directory.GetParent(Application.dataPath).FullName,
                 TextureFolder.Replace('/', Path.DirectorySeparatorChar), entry.texturePrefix + "_Albedo.png"))) ||
                 !File.Exists(Path.GetFullPath(Path.Combine(Directory.GetParent(Application.dataPath).FullName,
@@ -793,7 +799,7 @@ namespace RogueCommandExpansion.Authoring
             return material;
         }
 
-        private static void BuildPrefab(ModuleEntry entry, ModuleMaterials materials)
+        private static void BuildPrefab(ModuleEntry entry, ModuleMaterials materials, string repositoryRoot)
         {
             ModelImporter modelImporter = AssetImporter.GetAtPath(entry.fbxAssetPath) as ModelImporter;
             if (modelImporter == null)
@@ -807,9 +813,17 @@ namespace RogueCommandExpansion.Authoring
                 throw new InvalidDataException("Unity did not import module FBX as a GameObject: " + entry.fbxAssetPath);
             }
 
+            ModelImporter lodImporter = AssetImporter.GetAtPath(entry.lodFbxAssetPath) as ModelImporter;
+            GameObject lodAsset = AssetDatabase.LoadAssetAtPath<GameObject>(entry.lodFbxAssetPath);
+            if (lodImporter == null || lodAsset == null)
+            {
+                throw new InvalidDataException("Unity did not import module LOD FBX " + entry.lodFbxAssetPath);
+            }
+
             EnsureAssetFolder(Path.GetDirectoryName(entry.prefabAssetPath).Replace('\\', '/'));
             GameObject wrapper = new GameObject(entry.moduleName);
             GameObject modelInstance = null;
+            GameObject lodInstance = null;
             try
             {
                 modelInstance = UnityEngine.Object.Instantiate(modelAsset);
@@ -818,6 +832,12 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
+                lodInstance = UnityEngine.Object.Instantiate(lodAsset);
+                lodInstance.name = entry.moduleName + "_LODGeometry";
+                lodInstance.transform.SetParent(wrapper.transform, false);
+                lodInstance.transform.localPosition = Vector3.zero;
+                lodInstance.transform.localRotation = Quaternion.identity;
+                lodInstance.transform.localScale = Vector3.one;
                 StripNonVisualComponents(wrapper);
                 Renderer[] renderers = wrapper.GetComponentsInChildren<Renderer>(true);
                 if (renderers.Length == 0)
@@ -825,6 +845,22 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidDataException(entry.moduleName + " contains no imported renderers.");
                 }
                 AssignMaterials(renderers, materials, entry.moduleName);
+                Renderer[] lod0Renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                Renderer[] lod1Renderers = GetModuleLodRenderers(lodInstance, "LOD1");
+                Renderer[] lod2Renderers = GetModuleLodRenderers(lodInstance, "LOD2");
+                if (lod0Renderers.Length == 0 || lod1Renderers.Length == 0 || lod2Renderers.Length == 0)
+                {
+                    throw new InvalidDataException(entry.moduleName + " is missing a required LOD0/LOD1/LOD2 renderer group.");
+                }
+                float[] transitions = ModelGeometryBudgetProfile.GetLodTransitions(repositoryRoot, entry.moduleName);
+                LODGroup lodGroup = wrapper.AddComponent<LODGroup>();
+                lodGroup.SetLODs(new[]
+                {
+                    new LOD(transitions[0], lod0Renderers),
+                    new LOD(transitions[1], lod1Renderers),
+                    new LOD(transitions[2], lod2Renderers)
+                });
+                lodGroup.RecalculateBounds();
                 ValidateVisualOnlyPrefab(wrapper, entry.moduleName);
 
                 bool saved;
@@ -848,6 +884,21 @@ namespace RogueCommandExpansion.Authoring
                     UnityEngine.Object.DestroyImmediate(wrapper);
                 }
             }
+        }
+
+        private static Renderer[] GetModuleLodRenderers(GameObject root, string lodName)
+        {
+            Renderer[] all = root.GetComponentsInChildren<Renderer>(true);
+            var matching = new List<Renderer>();
+            string token = "_" + lodName + "_";
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] != null && all[i].gameObject.name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    matching.Add(all[i]);
+                }
+            }
+            return matching.ToArray();
         }
 
         private static void StripNonVisualComponents(GameObject root)

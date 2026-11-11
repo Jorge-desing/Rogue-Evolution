@@ -133,7 +133,6 @@ namespace RogueCommandExpansion.Authoring
 
         public static string BuildPrefabFromGameplayJson(string jsonFilePath)
         {
-            RogueCommandVisualSampleScaffolder.EnsureUrpAuthoringPipeline();
             GameplayMetadata meta = ParseGameplayJson(jsonFilePath);
             string unitName = meta.UnitName;
             if (string.IsNullOrEmpty(unitName))
@@ -141,6 +140,12 @@ namespace RogueCommandExpansion.Authoring
                 unitName = Path.GetFileNameWithoutExtension(jsonFilePath).Replace(".gameplay", "");
                 meta.UnitName = unitName;
             }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
+            ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
+            float[] lodTransitions = ModelGeometryBudgetProfile.GetLodTransitions(repositoryRoot, unitName);
+            RogueCommandVisualSampleScaffolder.EnsureUrpAuthoringPipeline();
 
             Debug.Log("[VehiclePrefabBuilder] Building prefab for unit: " + unitName + " (Archetype: " + meta.Archetype + ")");
 
@@ -156,6 +161,7 @@ namespace RogueCommandExpansion.Authoring
             {
                 throw new FileNotFoundException("Could not locate authored FBX model for unit: " + unitName);
             }
+            GameObject lodAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ModelFolder + "/" + unitName + "_LODs.fbx");
 
             // Create temporary hierarchy in scene
             string rootName = !string.IsNullOrEmpty(meta.VisualRootPath) ? meta.VisualRootPath : (unitName + "Visual");
@@ -174,10 +180,24 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
+                GameObject lodInstance = null;
+                if (lodAsset != null && lodAsset != modelAsset)
+                {
+                    lodInstance = PrefabUtility.InstantiatePrefab(lodAsset) as GameObject;
+                    if (lodInstance == null)
+                    {
+                        throw new InvalidOperationException("Failed to instantiate profile-driven LOD FBX for: " + unitName);
+                    }
+                    lodInstance.name = unitName + "LODGeometry";
+                    lodInstance.transform.SetParent(root.transform, false);
+                    lodInstance.transform.localPosition = Vector3.zero;
+                    lodInstance.transform.localRotation = Quaternion.identity;
+                    lodInstance.transform.localScale = Vector3.one;
+                }
 
                 // 1. Convert collision hull meshes (_COLLIDER) into real Unity BoxColliders and disable their visible renderers
                 int convertedColliderCount = 0;
-                Renderer[] allModelRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                Renderer[] allModelRenderers = root.GetComponentsInChildren<Renderer>(true);
                 foreach (Renderer r in allModelRenderers)
                 {
                     if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -203,7 +223,7 @@ namespace RogueCommandExpansion.Authoring
                 // 2. Assign Atlas material if available, or configure instancing on existing materials
                 if (atlasMaterial != null)
                 {
-                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
                     foreach (Renderer r in renderers)
                     {
                         if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -221,7 +241,7 @@ namespace RogueCommandExpansion.Authoring
                 else
                 {
                     // Ensure all materials have GPU instancing enabled
-                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
                     foreach (Renderer r in renderers)
                     {
                         if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -307,7 +327,7 @@ namespace RogueCommandExpansion.Authoring
                 SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName);
 
                 // 8. Setup LODGroup if LOD submeshes are detected
-                SetupLodGroupIfAvailable(root, modelInstance);
+                SetupLodGroupIfAvailable(root, modelInstance, lodInstance, lodTransitions);
 
                 // Save Prefab
                 string targetPrefabPath = PrefabFolder + "/" + unitName + "Visual.prefab";
@@ -318,7 +338,6 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidOperationException("Failed to save prefab asset at: " + targetPrefabPath);
                 }
 
-                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string absolutePrefabPath = Path.GetFullPath(Path.Combine(projectRoot, targetPrefabPath));
                 NormalizeEmptyUnityYamlStrings(absolutePrefabPath);
                 string metaPath = absolutePrefabPath + ".meta";
@@ -337,7 +356,11 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void SetupLodGroupIfAvailable(GameObject root, GameObject modelInstance)
+        private static void SetupLodGroupIfAvailable(
+            GameObject root,
+            GameObject modelInstance,
+            GameObject lodInstance,
+            float[] transitions)
         {
             Renderer[] lod0Renderers;
             Renderer[] lod1Renderers;
@@ -345,6 +368,44 @@ namespace RogueCommandExpansion.Authoring
             string failureReason;
             bool hasRequiredLods = TryGetLodRendererGroups(
                 modelInstance, out lod0Renderers, out lod1Renderers, out lod2Renderers, out failureReason);
+            if (hasRequiredLods && lod2Renderers.Length == 0)
+            {
+                hasRequiredLods = false;
+                failureReason = "the imported model has no LOD2 renderer group";
+            }
+
+            if (!hasRequiredLods && lodInstance != null)
+            {
+                Renderer[] primaryRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                var primaryLod0 = new List<Renderer>();
+                for (int i = 0; i < primaryRenderers.Length; i++)
+                {
+                    if (HasRenderableLodMesh(primaryRenderers[i]) &&
+                        primaryRenderers[i].name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        primaryLod0.Add(primaryRenderers[i]);
+                    }
+                }
+
+                Renderer[] discardedLod0;
+                string lodFailure;
+                if (TryGetLodRendererGroups(lodInstance, out discardedLod0, out lod1Renderers, out lod2Renderers, out lodFailure) &&
+                    primaryLod0.Count > 0 && lod2Renderers.Length > 0)
+                {
+                    for (int i = 0; i < discardedLod0.Length; i++)
+                    {
+                        discardedLod0[i].enabled = false;
+                    }
+                    lod0Renderers = primaryLod0.ToArray();
+                    RebindSkinnedLodRenderers(modelInstance, lod1Renderers, lod2Renderers);
+                    failureReason = null;
+                    hasRequiredLods = true;
+                }
+                else
+                {
+                    failureReason = "primary LOD0 and separate LOD1/LOD2 renderers are required; " + lodFailure;
+                }
+            }
 
             // Only construct LODGroup if LOD0 and LOD1 are both present and distinct.
             if (hasRequiredLods)
@@ -356,21 +417,68 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 var lodList = new List<LOD>();
-                lodList.Add(new LOD(0.50f, lod0Renderers));
-                lodList.Add(new LOD(0.20f, lod1Renderers));
+                lodList.Add(new LOD(transitions[0], lod0Renderers));
+                lodList.Add(new LOD(transitions[1], lod1Renderers));
 
                 if (lod2Renderers.Length > 0)
                 {
-                    lodList.Add(new LOD(0.05f, lod2Renderers));
+                    lodList.Add(new LOD(transitions[2], lod2Renderers));
                 }
 
                 lodGroup.SetLODs(lodList.ToArray());
                 lodGroup.RecalculateBounds();
             }
-            else if (lod0Renderers.Length > 0 || lod1Renderers.Length > 0 || lod2Renderers.Length > 0)
+            else
             {
-                Debug.LogWarning("[VehiclePrefabBuilder] Skipping LODGroup for " + modelInstance.name +
-                    ": " + failureReason + ".");
+                throw new InvalidDataException("Profile-driven LODGroup is incomplete for " + modelInstance.name + ": " + failureReason);
+            }
+        }
+
+        private static void RebindSkinnedLodRenderers(
+            GameObject primaryModel,
+            Renderer[] lod1Renderers,
+            Renderer[] lod2Renderers)
+        {
+            var bonesByName = new Dictionary<string, Transform>(StringComparer.Ordinal);
+            Transform[] primaryTransforms = primaryModel.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < primaryTransforms.Length; i++)
+            {
+                if (!bonesByName.ContainsKey(primaryTransforms[i].name))
+                {
+                    bonesByName.Add(primaryTransforms[i].name, primaryTransforms[i]);
+                }
+            }
+
+            Renderer[][] groups = { lod1Renderers, lod2Renderers };
+            for (int groupIndex = 0; groupIndex < groups.Length; groupIndex++)
+            {
+                for (int rendererIndex = 0; rendererIndex < groups[groupIndex].Length; rendererIndex++)
+                {
+                    SkinnedMeshRenderer skinned = groups[groupIndex][rendererIndex] as SkinnedMeshRenderer;
+                    if (skinned == null) continue;
+                    Transform[] sourceBones = skinned.bones;
+                    var reboundBones = new Transform[sourceBones.Length];
+                    for (int boneIndex = 0; boneIndex < sourceBones.Length; boneIndex++)
+                    {
+                        Transform rebound;
+                        if (sourceBones[boneIndex] == null || !bonesByName.TryGetValue(sourceBones[boneIndex].name, out rebound))
+                        {
+                            throw new InvalidDataException("LOD renderer " + skinned.name +
+                                " has a bone that is absent from the primary model.");
+                        }
+                        reboundBones[boneIndex] = rebound;
+                    }
+                    skinned.bones = reboundBones;
+                    if (skinned.rootBone != null)
+                    {
+                        Transform reboundRoot;
+                        if (!bonesByName.TryGetValue(skinned.rootBone.name, out reboundRoot))
+                        {
+                            throw new InvalidDataException("LOD renderer " + skinned.name + " has no matching root bone.");
+                        }
+                        skinned.rootBone = reboundRoot;
+                    }
+                }
             }
         }
 

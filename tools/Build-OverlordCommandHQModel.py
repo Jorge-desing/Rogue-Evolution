@@ -173,7 +173,7 @@ def build():
         "--primary-color", "#59634E", "--light-armor-color", "#A2A28A",
         "--emissive-color", "#76CFC1", "--camo", "none",
         "--wear", "factory_new", "--no-panel-lines", "--normal-intensity", "0.30",
-        "--target-budget", str(rmk.DEFAULT_FACE_BUDGET), "--bake-atlas", "--single-material",
+        "--bake-atlas", "--single-material",
         "--atlas-resolution", "2048", "--structural-wear-mask", "--multiview",
         "--blend-path", "content/source-art/overlord-command-hq.blend",
         "--fbx-path", "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/OverlordCommandHQ.fbx",

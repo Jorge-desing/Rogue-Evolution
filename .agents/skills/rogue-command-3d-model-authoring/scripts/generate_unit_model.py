@@ -74,7 +74,7 @@ Options:
     --sponsons                 Attach armored external side sponsons
     --dirt                     Bake procedural vertex ambient dirt/cavity shading (default: True)
     --locators                 Generate Unity locator sockets (default: True)
-    --lod                      Print the Level 1 chassis face cap and camera-aware LOD recommendations
+    --lod                      Print the calibrated scene allocation and camera-aware LOD recommendations
     --multiview                Render 4-perspective orthographic sheet (ISO, TOP, FRONT, SIDE)
     --out-dir <path>           Base output directory (default: repo root)
 """
@@ -697,8 +697,6 @@ PRESETS = {
         "wear": "factory_new",
         "nanite_dispenser": True,
         "hydraulic_hoses": True,
-        "aps_suite": True,
-        "tactical_markings": True,
     },
     "gravitas_breaker": {
         "archetype": "gravity_siege_breaker",
@@ -718,8 +716,6 @@ PRESETS = {
         "wear": "factory_new",
         "comms_mast": True,
         "drone_dock": True,
-        "rws_mount": True,
-        "stowage_kit": True,
     },
     "coastal_dreadnought": {
         "archetype": "amphibious_assault_tank",
@@ -957,7 +953,7 @@ def parse_args():
     parser.add_argument("--wear", default="field_tested", choices=["none", "pristine", "factory_new", "field_tested", "battle_hardened"], help="Procedural surface wear level")
     parser.add_argument("--structural-wear-mask", action="store_true", help="Keep convex-edge wear localized in vertex-color channel G, with flat and concave corners unmarked")
     parser.add_argument("--soot-intensity", type=float, default=1.0, help="Thermal soot intensity around muzzles and exhausts (0.0–2.0; default 1.0)")
-    parser.add_argument("--lods", action="store_true", help="Generate multi-level LOD chain (LOD0, LOD1, LOD2) and export _LODs.fbx")
+    parser.add_argument("--lods", action="store_true", default=True, help="Generate calibrated LOD0/LOD1/LOD2 geometry and export _LODs.fbx (always enabled for exports)")
     parser.add_argument("--colliders", action="store_true", help="Generate low-poly physics collision hulls")
     parser.add_argument("--gameplay-json", action="store_true", help="Export companion .gameplay.json specification")
     parser.add_argument("--wreckage", action="store_true", help="Export burned / dislodged turret wreckage variant")
@@ -970,10 +966,14 @@ def parse_args():
     parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
-    parser.add_argument("--target-budget", type=int, default=rmk.LEVEL1_CHASSIS_FACE_BUDGET, help=f"Level 1 chassis face budget for profiling (default: {rmk.LEVEL1_CHASSIS_FACE_BUDGET})")
+    parser.add_argument(
+        "--model-budget-profile",
+        default=str(rmk.MODEL_BUDGET_PROFILE_PATH),
+        help="Calibrated scene and LOD profile; exports fail closed if it is missing or uncalibrated",
+    )
     parser.add_argument("--rts-budget", action="store_true", help="Use lower-detail preset variants for RTS camera polygon budgets")
     parser.add_argument("--model-scale", type=float, default=1.0, help="Uniformly scale authored vehicle geometry and sockets around the ground origin")
-    parser.add_argument("--lod", action="store_true", help="Calculate Level 1 chassis polygon budget and recommend LOD reductions")
+    parser.add_argument("--lod", action="store_true", help="Report calibrated per-asset triangles and screen-space LOD thresholds")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
     parser.add_argument("--batch-all-archetypes", action="store_true", help="Batch generate all 42 archetypes into the output directory")
@@ -986,14 +986,6 @@ def parse_args():
     parser.add_argument("--card-path", default=None, help="Explicit 128x128 tactical card Sprite output file path")
 
     args = parser.parse_args(script_args)
-    if args.target_budget <= 0:
-        parser.error("--target-budget must be greater than zero")
-    if args.target_budget > rmk.LEVEL1_CHASSIS_FACE_BUDGET:
-        print(
-            f"Requested face budget {args.target_budget} exceeds the Level 1 chassis maximum; "
-            f"using {rmk.LEVEL1_CHASSIS_FACE_BUDGET}."
-        )
-        args.target_budget = rmk.LEVEL1_CHASSIS_FACE_BUDGET
 
     def option_was_supplied(option: str) -> bool:
         for argument in script_args:
@@ -1160,7 +1152,7 @@ def build_vehicle_model(
     colliders: bool = False,
     gameplay_json: bool = False,
     wreckage: bool = False,
-    target_budget: int = rmk.LEVEL1_CHASSIS_FACE_BUDGET,
+    budget_profile_path: Path | None = None,
     lod_diagnostics: bool = False,
     smooth_angle: float = 38.0,
     multiview: bool = False,
@@ -1215,9 +1207,6 @@ def build_vehicle_model(
     structural_wear_mask: bool = False,
     rts_budget: bool = False,
 ) -> dict:
-    if int(target_budget) <= 0:
-        raise ValueError("target_budget must be greater than zero")
-    target_budget = min(int(target_budget), rmk.LEVEL1_CHASSIS_FACE_BUDGET)
     rmk.clear_scene()
 
     if rts_budget and archetype == "mobile_sam_launcher":
@@ -2970,7 +2959,7 @@ def build_vehicle_model(
     if slat_armor:
         builder.add_slat_armor()
 
-    if era_bricks:
+    if era_bricks and archetype != "gravity_siege_breaker":
         builder.add_era_bricks()
 
     if camo_netting:
@@ -3028,14 +3017,13 @@ def build_vehicle_model(
         weighted_normals=weighted_normals,
         bake_vertex_dirt=dirt,
         include_locators=locators,
-        generate_lods=lods,
+        generate_lods=True,
         generate_colliders=colliders,
         wear_level=wear,
         soot_intensity=soot_intensity,
         gameplay_meta_path=gameplay_meta_path,
         wreckage_fbx_path=wreckage_fbx_path,
         damaged_fbx_path=damaged_fbx_path,
-        target_budget=target_budget,
         include_vfx_flash=vfx_flash,
         include_vfx_thruster=vfx_thruster,
         include_shield_bubble=shield_bubble,
@@ -3052,13 +3040,15 @@ def build_vehicle_model(
         wreckage_severity=wreckage_severity,
         structural_wear_mask=structural_wear_mask,
         unity_batch_names=(archetype == "heavy_crane_mech"),
+        budget_profile_path=budget_profile_path,
     )
 
     if lod_diagnostics:
-        print("\n--- LOD0 Face Cap & Camera-Aware LOD Diagnostics ---")
+        print("\n--- Calibrated Geometry & Camera-Aware LOD Diagnostics ---")
         true_triangles = res.get("profile_report", {}).get("total_triangles", res["total_polygons"])
         print(f"LOD0 (Current): {res['total_polygons']} faces / {true_triangles} triangles | {res['total_vertices']} verts (RTS Combat Camera)")
-        print(f"  Level 1 Chassis Maximum: {rmk.LEVEL1_CHASSIS_FACE_BUDGET} source faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of selected cap)")
+        print(f"  Profile verdict: {res.get('profile_report', {}).get('budget_verdict', 'unavailable')}")
+        print(f"  LOD transitions: {res.get('lod_screen_thresholds', {})}")
         print("LOD Recommendations:")
         print("  LOD1: Preserve the main silhouette and functional assemblies; simplify only details that disappear at its screen size.")
         print("  LOD2: Reduce sub-pixel greebles and repeated hardware while keeping role-defining weapon and mobility shapes readable.")
@@ -3128,6 +3118,7 @@ def build_structure_model(
     ram_prow: bool = False,
     weighted_normals: bool = True,
     structural_wear_mask: bool = False,
+    budget_profile_path: Path | None = None,
 ) -> dict:
     rmk.clear_scene()
 
@@ -3245,7 +3236,7 @@ def build_structure_model(
         fbx_path=fbx_file,
         blend_path=blend_file,
         preview_path=preview_file,
-        generate_lods=lods,
+        generate_lods=True,
         generate_colliders=colliders,
         gameplay_meta_path=gameplay_meta_path,
         render_icons=render_icons,
@@ -3258,6 +3249,7 @@ def build_structure_model(
         wear_level=wear,
         soot_intensity=soot_intensity,
         structural_wear_mask=structural_wear_mask,
+        budget_profile_path=budget_profile_path,
     )
 
     print("\n========================================================")
@@ -3437,7 +3429,7 @@ def main():
                 colliders=args.colliders,
                 gameplay_json=args.gameplay_json,
                 wreckage=args.wreckage,
-                target_budget=args.target_budget,
+                budget_profile_path=Path(args.model_budget_profile),
                 lod_diagnostics=args.lod,
                 smooth_angle=args.smooth_angle,
                 multiview=args.multiview,
@@ -3545,6 +3537,7 @@ def main():
             barrel_shroud=args.barrel_shroud,
             weighted_normals=args.weighted_normals,
             structural_wear_mask=args.structural_wear_mask,
+            budget_profile_path=Path(args.model_budget_profile),
         )
     else:
         res = build_vehicle_model(
@@ -3580,11 +3573,10 @@ def main():
             emissive_color=args.emissive_color,
             locators=args.locators,
             dirt=args.dirt,
-            lods=args.lods,
+            lods=True,
             colliders=args.colliders,
             gameplay_json=args.gameplay_json,
             wreckage=args.wreckage,
-            target_budget=args.target_budget,
             lod_diagnostics=args.lod,
             smooth_angle=args.smooth_angle,
             multiview=args.multiview,
@@ -3634,6 +3626,7 @@ def main():
             card_path=card_path,
             structural_wear_mask=args.structural_wear_mask or args.archetype == "heavy_crane_mech",
             rts_budget=args.rts_budget,
+            budget_profile_path=Path(args.model_budget_profile),
         )
 
     if args.report_json:
@@ -3658,7 +3651,9 @@ def main():
             "colliders": res.get("colliders", []),
             "budget_diagnostics": res.get("budget_diagnostics", {}),
             "face_budget_reduction": res.get("face_budget_reduction", {}),
-            "face_budget_limit": res.get("face_budget_limit", rmk.LEVEL1_CHASSIS_FACE_BUDGET),
+            "target_lod0_faces": res.get("target_lod0_faces"),
+            "target_lod0_triangles": res.get("target_lod0_triangles"),
+            "geometry_budget": res.get("geometry_budget", {}),
             "face_budget_passed": res.get("face_budget_passed", False),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)

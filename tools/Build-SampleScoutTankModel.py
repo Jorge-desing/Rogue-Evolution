@@ -137,7 +137,7 @@ def build() -> None:
     batched = rmk.batch_and_join_by_material(objects, prefix=UNIT_NAME, smooth_by_angle=True, weighted_normals=True, unity_batch_names=True)
     maps = rmk.bake_pbr_texture_atlas(batched, prefix=UNIT_NAME, output_dir=FBX_PATH.parent / "Textures", resolution=1024)
     rmk.create_single_material_atlas_model(batched, prefix=UNIT_NAME, texture_maps=maps, output_fbx_path=FBX_PATH.parent / f"{UNIT_NAME}_Atlas.fbx")
-    rmk.export_unity_fbx(FBX_PATH, list(batched) + [armature] + [o for o in bpy.context.scene.objects if o.type == "EMPTY"], include_empties=True, include_armature=True, bake_anim=True)
+    rmk.export_unity_fbx(FBX_PATH, list(batched) + [armature] + [o for o in bpy.context.scene.objects if o.type == "EMPTY"], include_empties=True, include_armature=True, bake_anim=True, generate_profiled_lods=True, asset_id=UNIT_NAME)
     print(f"Editable source: {BLEND_PATH}")
     print(f"Rigged FBX: {FBX_PATH}")
     print("Bone_Root translation is zero; rigid weights and four action clips validated.")
