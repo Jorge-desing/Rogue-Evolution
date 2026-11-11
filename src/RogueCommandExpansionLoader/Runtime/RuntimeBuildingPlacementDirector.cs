@@ -421,6 +421,16 @@ namespace RogueCommandExpansionLoader.Runtime
                 return diagnostics;
             }
 
+            List<EntityController> entityControllers;
+            try
+            {
+                entityControllers = RuntimeEntityKeyResolver.GetKnownLiveEntities(ExistingControllers.Instance);
+            }
+            catch
+            {
+                entityControllers = new List<EntityController>();
+            }
+
             string footprintHeightLayer = string.Empty;
             if (grid.IsWithinGrid(cells[0]))
             {
@@ -476,13 +486,60 @@ namespace RogueCommandExpansionLoader.Runtime
                     reasons.Add("nonGroundWorldObject:" + worldObject);
                 }
 
+                IReadOnlyList<BuildingPlacementOccupantDiagnostic> occupantEntities = withinGrid
+                    ? DescribeOccupantEntities(grid, cell, entityControllers)
+                    : Array.Empty<BuildingPlacementOccupantDiagnostic>();
+
                 diagnostics.Add(new BuildingPlacementCellDiagnostic(
                     cell.x, cell.y, worldObject, heightLayer, withinGrid, ground, obstacle, building, ramp,
                     crystal, unit, unitBlocksPlacement, multiLayer, buildingInProgress,
-                    secondaryFogOccluded, sameHeightLayerAsFootprint, reasons));
+                    secondaryFogOccluded, sameHeightLayerAsFootprint, reasons, occupantEntities));
             }
 
             return diagnostics;
+        }
+
+        private static IReadOnlyList<BuildingPlacementOccupantDiagnostic> DescribeOccupantEntities(
+            WorldGrid grid, Vector2Int cell, IReadOnlyList<EntityController> entities)
+        {
+            var occupants = new List<BuildingPlacementOccupantDiagnostic>();
+            if (grid == null || entities == null || entities.Count == 0)
+            {
+                return occupants;
+            }
+
+            for (int index = 0; index < entities.Count; index++)
+            {
+                EntityController entity = entities[index];
+                if (entity == null || entity.IsDestroyed || entity.DestroyHasBeenStarted)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    int gridSize = Math.Max(1, entity.GridSize);
+                    List<Vector2Int> entityCells = grid.CellsInSquareAround(entity.Position, gridSize);
+                    if (entityCells == null || !entityCells.Contains(cell))
+                    {
+                        continue;
+                    }
+
+                    int uniqueEntityId = entity.UniqueEntityId;
+                    string entityId = entity.EntityId ?? string.Empty;
+                    string entityKeyId = uniqueEntityId > 0 ? uniqueEntityId.ToString() : entityId;
+                    string gameObjectName = entity.gameObject != null ? entity.gameObject.name : entity.name;
+                    occupants.Add(new BuildingPlacementOccupantDiagnostic(
+                        entityId, entityKeyId, uniqueEntityId, gameObjectName,
+                        entity.IsBuilding, entity.IsUnit, gridSize));
+                }
+                catch
+                {
+                    // One stale entity must not suppress the remaining cell diagnostics.
+                }
+            }
+
+            return occupants;
         }
 
         private static EntityController FirstEngineer(ExistingControllers controllers)

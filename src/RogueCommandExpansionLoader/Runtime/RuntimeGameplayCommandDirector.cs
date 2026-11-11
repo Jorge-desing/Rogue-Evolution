@@ -61,7 +61,8 @@ namespace RogueCommandExpansionLoader.Runtime
             bool withinGrid, bool ground, bool obstacle, bool building, bool ramp,
             bool crystal, bool unit, bool unitBlocksPlacement, bool multiLayer,
             bool buildingInProgress, bool secondaryFogOccluded,
-            bool sameHeightLayerAsFootprint, IReadOnlyList<string> blockingReasons)
+            bool sameHeightLayerAsFootprint, IReadOnlyList<string> blockingReasons,
+            IReadOnlyList<BuildingPlacementOccupantDiagnostic> occupantEntities)
         {
             GridX = gridX;
             GridY = gridY;
@@ -80,6 +81,7 @@ namespace RogueCommandExpansionLoader.Runtime
             SecondaryFogOccluded = secondaryFogOccluded;
             SameHeightLayerAsFootprint = sameHeightLayerAsFootprint;
             BlockingReasons = blockingReasons ?? Array.Empty<string>();
+            OccupantEntities = occupantEntities ?? Array.Empty<BuildingPlacementOccupantDiagnostic>();
         }
 
         public int GridX { get; }
@@ -99,6 +101,34 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool SecondaryFogOccluded { get; }
         public bool SameHeightLayerAsFootprint { get; }
         public IReadOnlyList<string> BlockingReasons { get; }
+        public IReadOnlyList<BuildingPlacementOccupantDiagnostic> OccupantEntities { get; }
+    }
+
+    /// <summary>
+    /// Live native entity occupying a grid cell in a placement footprint.
+    /// </summary>
+    public readonly struct BuildingPlacementOccupantDiagnostic
+    {
+        public BuildingPlacementOccupantDiagnostic(
+            string entityId, string entityKeyId, int uniqueEntityId,
+            string gameObjectName, bool isBuilding, bool isUnit, int gridSize)
+        {
+            EntityId = entityId ?? string.Empty;
+            EntityKeyId = entityKeyId ?? string.Empty;
+            UniqueEntityId = uniqueEntityId;
+            GameObjectName = gameObjectName ?? string.Empty;
+            IsBuilding = isBuilding;
+            IsUnit = isUnit;
+            GridSize = gridSize;
+        }
+
+        public string EntityId { get; }
+        public string EntityKeyId { get; }
+        public int UniqueEntityId { get; }
+        public string GameObjectName { get; }
+        public bool IsBuilding { get; }
+        public bool IsUnit { get; }
+        public int GridSize { get; }
     }
 
     /// <summary>
@@ -2932,105 +2962,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
         private static EntityController FindEntityByKey(ExistingControllers existing, string key)
-
         {
-
-            if (existing == null || string.IsNullOrWhiteSpace(key))
-
-            {
-
-                return null;
-
-            }
-
-
-
-            var candidates = new List<EntityController>();
-
-            try
-
-            {
-
-                HashSet<EntityController> playerUnits = existing.PlayerUnits();
-
-                if (playerUnits != null) candidates.AddRange(playerUnits);
-
-                HashSet<EntityController> aiUnits = existing.AiUnits();
-
-                if (aiUnits != null) candidates.AddRange(aiUnits);
-
-                HashSet<EntityController> aiBuildings = existing.AiBuildings();
-
-                if (aiBuildings != null) candidates.AddRange(aiBuildings);
-
-                HashSet<EntityController> playerBuildings = existing.PlayerBuildings();
-
-                if (playerBuildings != null) candidates.AddRange(playerBuildings);
-
-                HashSet<EntityController> knownBuildings = existing.PlayerBuildingsKnownToAi();
-
-                if (knownBuildings != null) candidates.AddRange(knownBuildings);
-
-                EntityController hq = existing.EngineeringHq();
-
-                if (hq != null) candidates.Add(hq);
-
-                HashSet<EntityController> harvesters = existing.Harvesters;
-
-                if (harvesters != null) candidates.AddRange(harvesters);
-
-            }
-
-            catch
-
-            {
-
-                // Degrade gracefully
-
-            }
-
-
-
-            foreach (EntityController entity in candidates)
-
-            {
-
-                if (entity == null || entity.IsDestroyed || entity.DestroyHasBeenStarted)
-
-                {
-
-                    continue;
-
-                }
-
-
-
-                string id = entity.EntityId ?? string.Empty;
-
-                string name = entity.name ?? string.Empty;
-
-                string uniqueId = entity.UniqueEntityId > 0 ? entity.UniqueEntityId.ToString() : string.Empty;
-
-
-
-                if (string.Equals(id, key, StringComparison.OrdinalIgnoreCase) ||
-
-                    string.Equals(name, key, StringComparison.OrdinalIgnoreCase) ||
-
-                    (!string.IsNullOrEmpty(uniqueId) && string.Equals(uniqueId, key, StringComparison.OrdinalIgnoreCase)))
-
-                {
-
-                    return entity;
-
-                }
-
-            }
-
-
-
-            return null;
-
+            return RuntimeEntityKeyResolver.FindUniqueEntityByKey(existing, key);
         }
 
 
@@ -4174,7 +4107,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
 
-                string keyId = entity.EntityId ?? entity.name ?? entityId;
+                string keyId = entity.UniqueEntityId > 0
+                    ? entity.UniqueEntityId.ToString()
+                    : entity.EntityId ?? entity.name ?? entityId;
 
                 float health = entity.CurrentHealth;
 

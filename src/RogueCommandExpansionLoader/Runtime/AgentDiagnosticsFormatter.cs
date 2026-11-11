@@ -993,10 +993,12 @@ namespace RogueCommandExpansionLoader.Runtime
         private static Dictionary<string, object> BuildingPlacementCommandView(BuildingPlacementCommandResult result)
         {
             const int maxRows = 16;
+            const int maxOccupantRowsPerCell = 8;
             IReadOnlyList<BuildingPlacementCellDiagnostic> diagnostics = result.CellDiagnostics;
             int diagnosticCount = diagnostics != null ? diagnostics.Count : 0;
             int rowCount = Math.Min(diagnosticCount, maxRows);
             int omittedCount = result.OmittedCellDiagnosticCount + Math.Max(0, diagnosticCount - rowCount);
+            int omittedOccupantEntityCount = 0;
             var cellRows = new List<Dictionary<string, object>>(rowCount);
             for (int index = 0; index < rowCount; index++)
             {
@@ -1012,6 +1014,26 @@ namespace RogueCommandExpansionLoader.Runtime
                             reasons.Add(reason);
                         }
                     }
+                }
+
+                IReadOnlyList<BuildingPlacementOccupantDiagnostic> occupants = cell.OccupantEntities;
+                int occupantCount = occupants != null ? occupants.Count : 0;
+                int occupantRowCount = Math.Min(occupantCount, maxOccupantRowsPerCell);
+                omittedOccupantEntityCount += Math.Max(0, occupantCount - occupantRowCount);
+                var occupantRows = new List<Dictionary<string, object>>(occupantRowCount);
+                for (int occupantIndex = 0; occupantIndex < occupantRowCount; occupantIndex++)
+                {
+                    BuildingPlacementOccupantDiagnostic occupant = occupants[occupantIndex];
+                    occupantRows.Add(new Dictionary<string, object>
+                    {
+                        ["entityId"] = occupant.EntityId ?? string.Empty,
+                        ["entityKeyId"] = occupant.EntityKeyId ?? string.Empty,
+                        ["uniqueEntityId"] = occupant.UniqueEntityId,
+                        ["gameObjectName"] = occupant.GameObjectName ?? string.Empty,
+                        ["isBuilding"] = occupant.IsBuilding,
+                        ["isUnit"] = occupant.IsUnit,
+                        ["gridSize"] = occupant.GridSize,
+                    });
                 }
 
                 cellRows.Add(new Dictionary<string, object>
@@ -1032,6 +1054,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     ["buildingInProgress"] = cell.BuildingInProgress,
                     ["secondaryFogOccluded"] = cell.SecondaryFogOccluded,
                     ["sameHeightLayerAsFootprint"] = cell.SameHeightLayerAsFootprint,
+                    ["occupantEntities"] = occupantRows,
                     ["blockingReasons"] = reasons,
                 });
             }
@@ -1039,6 +1062,7 @@ namespace RogueCommandExpansionLoader.Runtime
             return new Dictionary<string, object>
             {
                 ["omittedCellDiagnosticCount"] = omittedCount,
+                ["omittedOccupantEntityCount"] = omittedOccupantEntityCount,
                 ["success"] = result.Success,
                 ["committed"] = result.Committed,
                 ["entityId"] = result.EntityId ?? string.Empty,

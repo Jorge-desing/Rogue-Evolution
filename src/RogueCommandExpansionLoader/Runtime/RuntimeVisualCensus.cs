@@ -1610,55 +1610,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         internal static EntityController FindEntityByKey(ExistingControllers existing, string key)
         {
-            if (existing == null || string.IsNullOrWhiteSpace(key)) return null;
-
-            var candidates = new List<EntityController>();
-            try
-            {
-                HashSet<EntityController> playerUnits = existing.PlayerUnits();
-                if (playerUnits != null) candidates.AddRange(playerUnits);
-
-                HashSet<EntityController> aiUnits = existing.AiUnits();
-                if (aiUnits != null) candidates.AddRange(aiUnits);
-
-                HashSet<EntityController> aiBuildings = existing.AiBuildings();
-                if (aiBuildings != null) candidates.AddRange(aiBuildings);
-
-                HashSet<EntityController> playerBuildings = existing.PlayerBuildings();
-                if (playerBuildings != null) candidates.AddRange(playerBuildings);
-
-                HashSet<EntityController> knownBuildings = existing.PlayerBuildingsKnownToAi();
-                if (knownBuildings != null) candidates.AddRange(knownBuildings);
-
-                EntityController hq = existing.EngineeringHq();
-                if (hq != null) candidates.Add(hq);
-
-                HashSet<EntityController> harvesters = existing.Harvesters;
-                if (harvesters != null) candidates.AddRange(harvesters);
-            }
-            catch
-            {
-                // Degrade gracefully
-            }
-
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                EntityController ec = candidates[i];
-                if (ec == null || ec.IsDestroyed || ec.DestroyHasBeenStarted) continue;
-
-                string id = ec.EntityId ?? string.Empty;
-                string name = ec.name ?? string.Empty;
-                string uniqueId = ec.UniqueEntityId > 0 ? ec.UniqueEntityId.ToString() : string.Empty;
-
-                if (string.Equals(id, key, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(name, key, StringComparison.OrdinalIgnoreCase) ||
-                    (!string.IsNullOrEmpty(uniqueId) && string.Equals(uniqueId, key, StringComparison.OrdinalIgnoreCase)))
-                {
-                    return ec;
-                }
-            }
-
-            return null;
+            return RuntimeEntityKeyResolver.FindUniqueEntityByKey(existing, key);
         }
     }
 }

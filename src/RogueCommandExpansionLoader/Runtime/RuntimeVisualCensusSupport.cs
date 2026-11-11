@@ -88,6 +88,11 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             if (unit == null) return string.Empty;
 
+            if (unit.UniqueEntityId > 0)
+            {
+                return unit.UniqueEntityId.ToString();
+            }
+
             try
             {
                 EntityKeyAccessor accessor = GetEntityKeyAccessor(unit.GetType());
