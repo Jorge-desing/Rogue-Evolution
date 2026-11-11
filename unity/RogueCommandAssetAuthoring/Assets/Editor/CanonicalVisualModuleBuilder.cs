@@ -16,6 +16,9 @@ namespace RogueCommandExpansion.Authoring
         private const string ModuleAssetRoot = "Assets/RogueCommandExpansionSample/VisualModules";
         private const string TextureFolder = ModuleAssetRoot + "/Textures";
         private const string MaterialFolder = ModuleAssetRoot + "/Materials";
+        private const string ServiceHatchGeometryPresetId = "service_hatch_recessed_v1";
+        private const string EraBrickGeometryPresetId = "era_brick_cassette_v1";
+        private const string BulwarkEraGeometryLayoutId = "bulwark_side_skirt_array_v1";
         private const string ManifestRelativePath = "content/source-art/canonical-visual-modules.json";
         private const float FactoryNewWearStrength = 0.55f;
         private const int ExpectedTextureResolution = 2048;
@@ -41,6 +44,8 @@ namespace RogueCommandExpansion.Authoring
             public string assetName;
             public string texturePrefix;
             public string preset;
+            public string geometryPreset;
+            public string geometryLayout;
             public string slotId;
             public string visualEngineeringRole;
         }
@@ -606,7 +611,8 @@ namespace RogueCommandExpansion.Authoring
                 String.IsNullOrWhiteSpace(entry.preset) ||
                 String.IsNullOrWhiteSpace(entry.visualEngineeringRole) ||
                 !IsCanonicalHardpointSlot(entry.slotId) ||
-                !IsVisualEngineeringRoleAllowedForSlot(entry.visualEngineeringRole, entry.slotId))
+                !IsVisualEngineeringRoleAllowedForSlot(entry.visualEngineeringRole, entry.slotId) ||
+                !IsGeometryPresetValid(entry))
             {
                 throw new InvalidDataException("Canonical module manifest contains an incomplete or incompatible visual engineering role entry.");
             }
@@ -637,6 +643,28 @@ namespace RogueCommandExpansion.Authoring
                 throw new FileNotFoundException("Canonical module FBX or one of its four PBR maps is missing: " +
                     entry.moduleName);
             }
+        }
+
+        private static bool IsGeometryPresetValid(ModuleEntry entry)
+        {
+            if (String.Equals(entry.visualEngineeringRole, "utility_sponson", StringComparison.Ordinal))
+            {
+                return String.Equals(entry.geometryPreset, ServiceHatchGeometryPresetId, StringComparison.Ordinal) &&
+                    String.IsNullOrEmpty(entry.geometryLayout);
+            }
+            if (String.Equals(entry.visualEngineeringRole, "armor_cassette", StringComparison.Ordinal))
+            {
+                if (!String.Equals(entry.geometryPreset, EraBrickGeometryPresetId, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+                bool isBulwarkEraVariant = String.Equals(entry.variantId,
+                    "tactical-operations:bulwark-siege-tank-battleship-tungsten", StringComparison.Ordinal);
+                return isBulwarkEraVariant
+                    ? String.Equals(entry.geometryLayout, BulwarkEraGeometryLayoutId, StringComparison.Ordinal)
+                    : String.IsNullOrEmpty(entry.geometryLayout);
+            }
+            return String.IsNullOrEmpty(entry.geometryPreset) && String.IsNullOrEmpty(entry.geometryLayout);
         }
 
         private static bool IsVisualEngineeringRoleAllowedForSlot(string role, string slot)

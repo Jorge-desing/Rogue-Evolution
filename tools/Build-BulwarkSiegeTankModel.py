@@ -11,6 +11,8 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 import RogueModelKit as rmk
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from bulwark_radiator_vent_recipe import apply_bulwark_radiator_vent
+from bulwark_contact_repair_recipe import apply_bulwark_contact_repairs
 from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
 from mathutils import Vector
 
@@ -41,9 +43,11 @@ def build_bulwark_siege_tank_model() -> None:
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
+    radiator_vent = apply_bulwark_radiator_vent(list(bpy.context.scene.objects))
     wave2_objects = apply_wave2_details(UNIT_NAME)
     wave34_objects = apply_wave34_details(UNIT_NAME)
-    if wave2_objects or wave34_objects:
+    contact_repairs = apply_bulwark_contact_repairs(list(bpy.context.scene.objects))
+    if radiator_vent["applied"] or wave2_objects or wave34_objects or contact_repairs["applied"]:
         bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
@@ -82,6 +86,9 @@ def build_bulwark_siege_tank_model() -> None:
         "Socket_GroundContact": Vector((0.0, 0.0, 0.0)),
         "Socket_EngineAudio": Vector((0.0, -1.35, 1.18)),
         "Socket_WeaponAudio": Vector((0.0, 1.765, 1.992)),
+        # The ERA Level 2 module contains both side-skirt arrays in the unit's
+        # local frame; the old socket sat inside the turret yaw bearing.
+        "Socket_Hardpoint_ERA": Vector((0.0, 0.0, 0.0)),
     }
     for socket_name, location in socket_positions.items():
         socket = bpy.data.objects.get(socket_name)

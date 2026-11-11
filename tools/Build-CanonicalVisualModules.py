@@ -15,7 +15,7 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import bpy
 from mathutils import Euler, Vector
@@ -25,6 +25,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import RogueModelKit as rmk  # noqa: E402
 from UnitPbrPresetRegistry import UNIT_PBR_REGISTRY  # noqa: E402
+from hard_surface_geometry_presets import (  # noqa: E402
+    ERA_BRICK_PRESET_ID,
+    GEOMETRY_PRESETS,
+    SERVICE_HATCH_PRESET_ID,
+    EraBrickConfig,
+    ServiceHatchConfig,
+)
 
 
 PRESET_SOURCE = ROOT / "tools" / "Prepare-MaterialMakerTacticalTemplate.py"
@@ -70,14 +77,14 @@ def resolve_preset(variant_id: str, unit_profile: Any) -> str:
     raise ValueError(f"No registered Material Maker preset matches Level 2 variant {variant_id!r}")
 
 
-def load_visual_engineering_roles() -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str], str]]:
+def load_visual_engineering_roles() -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
     registry = json.loads(ROLE_REGISTRY_PATH.read_text(encoding="utf-8"))
     definitions = registry.get("roleDefinitions")
     rows = registry.get("variantRoles")
     if not isinstance(definitions, dict) or not isinstance(rows, list):
         raise ValueError(f"Visual engineering role registry is incomplete: {ROLE_REGISTRY_PATH}")
 
-    roles_by_variant_slot: dict[tuple[str, str], str] = {}
+    roles_by_variant_slot: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
         variant_id = row.get("variantId")
         slot_id = row.get("slotId")
@@ -90,7 +97,13 @@ def load_visual_engineering_roles() -> tuple[dict[str, dict[str, Any]], dict[tup
         allowed_slots = definitions[role].get("allowedSlots") or []
         if slot_id not in allowed_slots:
             raise ValueError(f"Role {role!r} cannot mount at {slot_id!r}: {variant_id}")
-        roles_by_variant_slot[key] = role
+        layout = row.get("geometryLayout", "")
+        if layout not in {"", "bulwark_side_skirt_array_v1"}:
+            raise ValueError(f"Unknown canonical geometry layout {layout!r} for {variant_id} at {slot_id}")
+        if layout and (variant_id != "tactical-operations:bulwark-siege-tank-battleship-tungsten" or
+                       slot_id != "ERA" or role != "armor_cassette"):
+            raise ValueError(f"Geometry layout {layout!r} is reserved for the Bulwark ERA module")
+        roles_by_variant_slot[key] = row
 
     return definitions, roles_by_variant_slot
 
@@ -136,10 +149,23 @@ def read_module_entries() -> list[dict[str, Any]]:
                     if slot_id not in CANONICAL_SLOTS or not asset_name:
                         raise ValueError(f"Level 2 module requires a canonical slot and assetName: {variant['id']}")
                     role_key = (variant["id"], slot_id)
-                    visual_role = roles_by_variant_slot.get(role_key)
-                    if visual_role is None:
+                    role_row = roles_by_variant_slot.get(role_key)
+                    if role_row is None:
                         raise ValueError(f"No explicit visual engineering role for {variant['id']} at {slot_id}")
+                    visual_role = role_row["visualEngineeringRole"]
                     seen_roles.add(role_key)
+                    geometry_preset = role_row.get(
+                        "geometryPreset", role_definitions[visual_role].get("geometryPreset", ""))
+                    geometry_layout = role_row.get("geometryLayout", "")
+                    if geometry_preset and geometry_preset not in GEOMETRY_PRESETS:
+                        raise ValueError(
+                            f"Unknown hard-surface geometry preset {geometry_preset!r} "
+                            f"for {variant['id']} at {slot_id}"
+                        )
+                    if (visual_role == "armor_cassette") != (geometry_preset == ERA_BRICK_PRESET_ID):
+                        raise ValueError(f"ERA cassette roles must use {ERA_BRICK_PRESET_ID}: {variant['id']} at {slot_id}")
+                    if (visual_role == "utility_sponson") != (geometry_preset == SERVICE_HATCH_PRESET_ID):
+                        raise ValueError(f"Utility sponson roles must use {SERVICE_HATCH_PRESET_ID}: {variant['id']} at {slot_id}")
 
                     unit_slug = unit_id.split(":", 1)[1].replace("-", "_")
                     module_suffix = f"_{slot_id.lower()}" if len(module_declarations) > 1 else ""
@@ -168,6 +194,8 @@ def read_module_entries() -> list[dict[str, Any]]:
                         "variantId": variant["id"],
                         "level": 2,
                         "preset": preset,
+                        "geometryPreset": geometry_preset,
+                        "geometryLayout": geometry_layout,
                         "slotId": slot_id,
                         "visualEngineeringRole": visual_role,
                         "assetBundleId": bundle_id,
@@ -212,32 +240,49 @@ def make_materials(entry: dict[str, Any]) -> tuple[bpy.types.Material, bpy.types
     return armor, gunmetal, accent
 
 
-def build_armor_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int) -> list[bpy.types.Object]:
+HardflowBoolean = Callable[[bpy.types.Object, bpy.types.Object], str]
+HardflowBevel = Callable[[bpy.types.Object], None]
+
+
+def build_armor_module(
+    entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int,
+    *, hardflow_boolean_apply: HardflowBoolean | None = None,
+    hardflow_bevel: HardflowBevel | None = None,
+) -> list[bpy.types.Object]:
     prefix = entry["moduleName"]
-    rows = 2 + seed % 2
-    columns = 2 + (seed // 3) % 2
-    width = 0.19 + (seed % 3) * 0.025
-    depth = 0.13 + (seed % 2) * 0.02
-    objects = rmk.make_era_armor_tiles(
-        prefix,
-        (0.0, 0.0, 0.015),
-        rows=rows,
-        cols=columns,
-        tile_size=(width, depth, 0.065),
-        spacing=0.025,
-        slope_angle_deg=20.0 + (seed % 4) * 3.0,
-        tile_mat=armor,
-        bolt_mat=gunmetal,
-    )
-    rail_width = columns * width + (columns - 1) * 0.025 + 0.10
-    rail_length = rows * depth + (rows - 1) * 0.025 + 0.06
-    objects.append(rmk.make_box(prefix + "_CassetteBackplate", (rail_width, rail_length, 0.055),
-                                (0.0, 0.0, -0.055), gunmetal, bevel=0.018))
-    for x_sign in (-1.0, 1.0):
-        objects.append(rmk.make_rod(prefix + f"_RetentionRail_{'L' if x_sign < 0 else 'R'}",
-                                    (x_sign * rail_width * 0.47, -rail_length * 0.38, 0.005),
-                                    (x_sign * rail_width * 0.47, rail_length * 0.38, 0.005),
-                                    0.018, accent if seed % 5 == 0 else gunmetal, vertices=8))
+    if entry.get("geometryPreset") != ERA_BRICK_PRESET_ID:
+        raise ValueError(f"ERA role requires {ERA_BRICK_PRESET_ID}: {entry['variantId']}")
+    spacing = 0.025
+    if entry.get("geometryLayout") == "bulwark_side_skirt_array_v1":
+        # The side skirts are hull-fixed. Their contact recipe seats each
+        # backing plane at x=+/-1.311 m and leaves a 22 mm moving-belt gap.
+        positions = [(x_sign * 1.311, y, 0.40)
+                     for x_sign in (-1.0, 1.0) for y in (-0.92, 0.92)]
+        dimensions = (0.24, 0.12, 0.045)
+        normals = [(x_sign, 0.0, 0.0) for x_sign in (-1.0, 1.0) for _ in (-0.92, 0.92)]
+    else:
+        rows = 2 + seed % 2
+        columns = 2 + (seed // 3) % 2
+        width = 0.19 + (seed % 3) * 0.020
+        height = 0.125 + (seed % 2) * 0.015
+        step_x = width + spacing
+        step_y = height + spacing
+        positions = [((column - (columns - 1) * 0.5) * step_x,
+                      (row - (rows - 1) * 0.5) * step_y, 0.0)
+                     for row in range(rows) for column in range(columns)]
+        dimensions = (width, height, 0.052)
+        normals = [(0.0, 0.0, 1.0) for _ in positions]
+    objects: list[bpy.types.Object] = []
+    brick_family = hashlib.sha256(entry["variantId"].encode("utf-8")).hexdigest()[:8]
+    for index, (center, normal) in enumerate(zip(positions, normals), 1):
+        objects.extend(GEOMETRY_PRESETS[ERA_BRICK_PRESET_ID](
+            prefix=f"ERABrick_{brick_family}_B{index:02d}",
+            config=EraBrickConfig(center=center, normal=normal, size=dimensions),
+            armor_material=armor,
+            hardware_material=gunmetal,
+            hardflow_boolean_apply=hardflow_boolean_apply,
+            hardflow_bevel=hardflow_bevel,
+        ))
     return objects
 
 
@@ -378,13 +423,32 @@ def build_utility_sponson_module(entry: dict[str, Any], armor: Any, gunmetal: An
     if role != "utility_sponson":
         raise ValueError(f"Unsupported utility sponson role {role!r} for {entry['variantId']}")
 
+    size = (0.38 + (seed % 2) * 0.06, 0.74, 0.42 + (seed % 3) * 0.04)
+    location = Vector((0.0, 0.0, 0.0))
     objects = rmk.make_side_sponson_assembly(
         prefix, (0.0, 0.0, 0.0), side=1,
-        size=(0.38 + (seed % 2) * 0.06, 0.74, 0.42 + (seed % 3) * 0.04),
+        size=size,
         armor_mat=armor, strap_mat=gunmetal, accent_mat=accent,
     )
-    objects.append(rmk.make_box(prefix + "_ServiceAccessHatch", (0.24, 0.25, 0.06),
-                                (0.0, 0.0, 0.24), armor, bevel=0.014))
+    if entry.get("geometryPreset") != SERVICE_HATCH_PRESET_ID:
+        raise ValueError(f"Utility sponson requires the registered service hatch geometry preset: {entry['variantId']}")
+    pannier = next(obj for obj in objects if obj.name == prefix + "_PannierBody")
+    fuel_cap = next(obj for obj in objects if obj.name == prefix + "_FuelCap")
+    # Move the existing cap clear of the hatch while keeping it seated on the
+    # same pannier top; its radius is 40 mm and the left body margin stays >=20 mm.
+    fuel_cap.location.x = location.x - size[0] * 0.34
+    hatch_config = ServiceHatchConfig(
+        center_xy=(location.x + 0.05, location.y),
+        outer_size=(0.24, 0.28),
+        support_top_z=location.z + size[2] * 0.5,
+    )
+    objects.extend(GEOMETRY_PRESETS[SERVICE_HATCH_PRESET_ID](
+        prefix=prefix + "_ServiceHatch",
+        config=hatch_config,
+        armor_material=armor,
+        hardware_material=gunmetal,
+        cut_target=pannier,
+    ))
     for side in (-1.0, 1.0):
         objects.append(rmk.make_rod(prefix + f"_MountingStrut_{'L' if side < 0 else 'R'}",
                                     (side * 0.15, -0.27, -0.18), (side * 0.20, 0.27, -0.18),
@@ -392,11 +456,19 @@ def build_utility_sponson_module(entry: dict[str, Any], armor: Any, gunmetal: An
     return objects
 
 
-def build_module_geometry(entry: dict[str, Any], seed: int) -> tuple[list[bpy.types.Object], list[bpy.types.Material]]:
+def build_module_geometry(
+    entry: dict[str, Any], seed: int, *,
+    hardflow_boolean_apply: HardflowBoolean | None = None,
+    hardflow_bevel: HardflowBevel | None = None,
+) -> tuple[list[bpy.types.Object], list[bpy.types.Material]]:
     armor, gunmetal, accent = make_materials(entry)
     role = entry["visualEngineeringRole"]
     if role == "armor_cassette":
-        objects = build_armor_module(entry, armor, gunmetal, accent, seed)
+        objects = build_armor_module(
+            entry, armor, gunmetal, accent, seed,
+            hardflow_boolean_apply=hardflow_boolean_apply,
+            hardflow_bevel=hardflow_bevel,
+        )
     elif role in ("aps_sensor_suite", "aps_magnetic_shield"):
         objects = build_aps_module(entry, armor, gunmetal, accent, seed)
     elif role in ("fuel_drum_pair", "ordnance_carrier"):
@@ -527,6 +599,7 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         "geometryBudgetProfile": "content/source-art/model-budget-profile.json",
         "level2Contract": "Each listed GameObject is visual-only geometry attached to exactly one canonical hardpoint group; no gameplay components or balance changes.",
         "visualEngineeringRoleContract": role_registry.get("scope", ""),
+        "geometryPresetPolicy": "Optional geometry recipes are named separately from Material Maker PBR presets.",
         "modules": entries,
     }
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)

@@ -26,6 +26,7 @@ function Get-CanonicalVisualBuildInputState {
         'tools/Build-SurgeArcTankRiggedModel.py',
         'tools/CanonicalUnitHardpoints.py',
         'tools/VisualModelAuthoringSupport.py',
+        'tools/hard_surface_geometry_presets.py',
         'tools/CanonicalVisualBuildProvenance.ps1',
         'tools/Run-MaterialMakerBake.ps1',
         'tools/Prepare-MaterialMakerTacticalTemplate.py',
