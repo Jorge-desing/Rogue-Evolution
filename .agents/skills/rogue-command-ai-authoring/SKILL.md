@@ -158,3 +158,10 @@ The Hierarchical Utility-Blackboard Director coordinates macro strategy and micr
 - **Budgets Before Dispatch**: Consume retargeting and command budgets before native dispatch so failures cannot cause infinite retries.
 - **Counter-Battery**: Artillery detection requires `minAttackRange >= ThreatTriggerDistance`, not just a positive range.
 - **Squad Formation**: Only track mod-created captain links; never invoke `ReleaseAllCaptains` over native links.
+
+### Runtime profile-selection evidence
+
+- `GetAiModulesDiagnosticsJson` and registered-profile rows prove registry contents only. They do not prove the stage selected a profile or that its module ran.
+- Confirm the live stage/profile association with a stable stage, template, or profile ID before advancing a saved run. `BattlePreviewWidget.EnemyInfoText` is a localized display label; do not infer a `nativeTemplateId` or profile ID from the label without a verified mapping.
+- In `IntermissionScreen`, an unavailable AI director and zero AI roster/factory counts mean no battle runtime is being observed. If the target association remains unknown, stop before selecting another route node and report `UNKNOWN`.
+- Scheduled-build acceptance requires a `Game` scene with the target profile active, then observed build/queue evidence and an AI-produced unit whose `originEntityId` matches its registered factory. The 2026-11-11 Profile2 probe did not reach this evidence gate; see `artifacts/runtime-smoke/ai-scheduled-build-20261111T012405Z/live-ai-runtime-pass-summary.json`.
