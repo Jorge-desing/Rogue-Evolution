@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Valida perfiles AI de un pack contra el registro de módulos del loader.
 
-Refleja ``AiModuleRegistry.CreateDefault()`` y los parsers
-``*Parameters.TryParse`` de ``src/RogueCommandExpansionLoader/Modules/``.
+Lee los IDs de ``AiModuleRegistry.CreateDefault()`` y sincroniza las listas
+de parámetros/límites usadas por los parsers C# de
+``src/RogueCommandExpansionLoader/Modules/``.
 La función pura :func:`validate_ai_profiles` devuelve diagnósticos
 localizados; el CLI audita un pack o todo ``content/packs``.
 """
@@ -13,32 +14,10 @@ import json
 import sys
 from pathlib import Path
 
+from tools.ai_module_contracts import registered_ai_module_ids
 from tools.merge_content_packs import _as_dict, _as_list, _entity_key
 
-# 21 módulos registrados en AiModuleRegistry.CreateDefault().
-KNOWN_MODULES = {
-    "sample:trace-default",
-    "sample:scheduled-base-build",
-    "sample:reactive-base-defense",
-    "sample:harvester-raider",
-    "sample:siege-assault",
-    "sample:retreat-and-regroup",
-    "sample:harvester-escort",
-    "sample:patrol-and-intercept",
-    "sample:factory-reinforcement",
-    "sample:flanking-strike",
-    "sample:focus-fire",
-    "sample:construction-expansion",
-    "sample:tactical-regroup",
-    "sample:squad-formation",
-    "sample:tactical-skill-activation",
-    "sample:counter-battery",
-    "sample:skirmish-kiting",
-    "sample:support-repair",
-    "sample:wave-escalation",
-    "sample:threat-prioritization",
-    "sample:adaptive-commander",
-}
+KNOWN_MODULES = registered_ai_module_ids()
 
 MAX_MODULES_PER_PROFILE = 8
 
@@ -96,14 +75,26 @@ MODULE_PARAMS: dict[str, set[str]] = {
                                   "damagedStanceThreshold", "healthyStanceThreshold",
                                   "preferredLoadout", "commanderAffix",
                                   "adaptiveDoctrine", "auraType", "xpGrantPerPulse"},
+    "sample:tactical-director": {"baseIndex", "evalIntervalSeconds",
+                                 "engagementRadius", "defenseRadius",
+                                 "retreatHealthRatio", "maxProposalsPerUnit",
+                                 "enableSurvivalKiting", "enableBaseDefense",
+                                 "enableFocusTargeting", "enableFlanking",
+                                 "minFlankSpeed"},
+    "sample:squad-operations-director": {"baseIndex", "evalIntervalSeconds",
+                                         "supportRadius",
+                                         "counterBatteryMinRangeThreshold",
+                                         "enableSupportLogistics",
+                                         "enableCounterBattery",
+                                         "enableTacticalSkills"},
 }
 
 # Límites numéricos conocidos (name -> (min, max, entero)).
 PARAM_BOUNDS: dict[str, tuple[float, float, bool]] = {
     "baseIndex": (0, 31, True),
-    "intervalSeconds": (1, 300, False),
-    "maxSuccessfulBuilds": (1, 99, True),
-    "maxAttempts": (1, 99, True),
+    "intervalSeconds": (1, 600, False),
+    "maxSuccessfulBuilds": (1, 32, True),
+    "maxAttempts": (1, 128, True),
     "cooldownSeconds": (0.5, 300, False),
     "defenseRadiusCells": (1, 64, False),
     "maxResponders": (1, 4, True),
@@ -128,6 +119,32 @@ PARAM_BOUNDS: dict[str, tuple[float, float, bool]] = {
     "formationRadiusCells": (1, 64, False),
     "minManaRatio": (0.0, 1.0, False),
     "enemyTriggerRadiusCells": (1, 64, False),
+}
+
+# Overrides where a module has a narrower or differently signed bound than
+# the shared name-level fallback above.
+MODULE_PARAM_BOUNDS: dict[str, dict[str, tuple[float, float, bool]]] = {
+    "sample:scheduled-base-build": {
+        "baseIndex": (0, 31, True),
+        "intervalSeconds": (1, 600, False),
+        "maxSuccessfulBuilds": (1, 32, True),
+        "maxAttempts": (1, 128, True),
+    },
+    "sample:tactical-director": {
+        "baseIndex": (-1, 31, True),
+        "evalIntervalSeconds": (0.1, 10.0, False),
+        "engagementRadius": (5.0, 120.0, False),
+        "defenseRadius": (5.0, 60.0, False),
+        "retreatHealthRatio": (0.05, 0.80, False),
+        "maxProposalsPerUnit": (1, 4, True),
+        "minFlankSpeed": (3.0, 25.0, False),
+    },
+    "sample:squad-operations-director": {
+        "baseIndex": (-1, 31, True),
+        "evalIntervalSeconds": (0.20, 10.0, False),
+        "supportRadius": (5.0, 80.0, False),
+        "counterBatteryMinRangeThreshold": (8.0, 50.0, False),
+    },
 }
 
 
@@ -182,7 +199,7 @@ def validate_ai_profiles(pack: dict,
                         f"{pfx}: parámetro desconocido '{name}' para '{mid}'"
                     )
                     continue
-                bounds = PARAM_BOUNDS.get(name)
+                bounds = MODULE_PARAM_BOUNDS.get(mid, {}).get(name, PARAM_BOUNDS.get(name))
                 if bounds is None or value is None:
                     continue
                 lo, hi, is_int = bounds

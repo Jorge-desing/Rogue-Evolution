@@ -19,7 +19,7 @@ Authoritative directory of verified asset, pack, and research workflows for Rogu
 ## 1. Environment & Execution Guidelines
 
 - **Python Environment:** Run scripts via `.venv` with `PYTHONPATH=.venv/Lib/site-packages`. Never install dependencies globally into system Python.
-- **Import Contract:** `tests/python/` scripts load `tools/` modules via `load_tool_module()` (`tools/` is not a Python package).
+- **Import Contract:** From the repository root, run tools that import shared helpers with module syntax (`python -m tools.<module>`). The `tools/` directory is a Python namespace package; direct execution such as `python tools/validate_ai_modules.py` can fail to resolve `tools.*` imports. `tests/python/` loads tool files with `load_tool_module()`.
 - **Blender 4.5.14 LTS:** Authoritative geometry, UV, socket, LOD, and vertex-wear generator (`.tools/Blender-4.5.14/.../blender.exe`).
 - **Unity 2021.3.45f2:** Authoring project at `unity/RogueCommandAssetAuthoring/`. Standalone from user projects; preserve all `ProjectSettings`.
 - **Material Maker 1.7:** Authoritative PBR image generator (`tools/Run-MaterialMakerBake.ps1`). Outputs PNGs only.
@@ -38,7 +38,8 @@ Authoritative directory of verified asset, pack, and research workflows for Rogu
 | `tools/audit_content_references.py`| `<pack_dir> [--all] [--json]` | Detects dangling IDs, shared factories, and missing `en-US` strings |
 | `tools/clone_content_pack.py` | `--pack-dir <dir> --new-id <id>` | Re-prefixes namespaced IDs into a new isolated pack |
 | `tools/inspect_content_pack.py`| `<pack_dir> [--json]` | Summarizes factory-unit links, pools, and localizations |
-| `tools/validate_ai_modules.py` | `<pack_dir> [--all] [--json]` | Validates AI profiles against the 23-module registry |
+| `tools/validate_ai_modules.py` | `python -m tools.validate_ai_modules <pack_dir> [--all] [--json]` | Validates profiles against module IDs in the C# registry and the parameter mirror |
+| `tools/analyze_ai_profile_coverage.py` | `python -m tools.analyze_ai_profile_coverage <pack_dir> [--json]` | Checks AI product `unitId` references against the repository unit catalog, including cross-pack products |
 | `tools/analyze_blueprint_pools.py` | `<pack_dir> [--json]` | Scans stage blueprint pool coverage and fallback risks |
 | `tools/analyze_relic_synergy.py`| `<pack_dir> [--json]` | Cross-references relic `neededSystemTags` vs unit `offeredSystemTags` |
 | `tools/validate_native_templates.py`| `<pack_dir> [--json]` | Verifies `nativeTemplateId` values against native presets |
@@ -68,7 +69,13 @@ python tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion
 
 # Run complete loader registry audit
 python tools/validate_loader_registry.py --json
+
+# Audit all AI module IDs, parameters, and cross-pack roster references
+python -m tools.validate_ai_modules content/packs --all --json
+python -m tools.analyze_ai_profile_coverage content/packs/sample-reactive-ai --json
 ```
+
+AI `unitEntries` and `productionBuildingEntries` both use the produced product's `unitId`. The Python module ID source of truth is `AiModuleRegistry.CreateDefault()` via `tools/ai_module_contracts.py`; parameter keys and bounds must still be synchronized with each module's C# parser. Static audits do not prove that a profile is selected or its runtime behavior executes.
 
 ---
 

@@ -1,10 +1,10 @@
 """Analiza cobertura de perfiles AI en packs de contenido.
 
-Refleja ``ContentAiProfileDefinition`` y ``AiModuleRegistry`` (22 módulos
-registrados): cada perfil debe referenciar unidades/fábricas existentes,
-módulos registrados, etapas válidas y parámetros bien formados. La función
-pura :func:`analyze_ai_profile_coverage` devuelve un informe con conteos,
-perfiles huérfanos y problemas.
+Refleja ``ContentAiProfileDefinition`` y los IDs de
+``AiModuleRegistry.CreateDefault()``: cada perfil debe referenciar productos
+de unidad existentes y módulos registrados. Las referencias de pack único se
+pueden resolver contra el catálogo completo de unidades del CLI. La función
+pura :func:`analyze_ai_profile_coverage` devuelve conteos e incidencias.
 """
 from __future__ import annotations
 
@@ -13,30 +13,23 @@ import json
 from pathlib import Path
 from typing import Any
 
+from tools.ai_module_contracts import registered_ai_module_ids
 from tools.merge_content_packs import _as_dict, _as_list, _entity_key
 
-REGISTERED_AI_MODULES = {
-    "sample:adaptive-commander", "sample:construction-expansion",
-    "sample:counter-battery", "sample:factory-reinforcement",
-    "sample:flanking-strike", "sample:focus-fire", "sample:harvester-escort",
-    "sample:harvester-raider", "sample:patrol-and-intercept",
-    "sample:reactive-base-defense", "sample:retreat-and-regroup",
-    "sample:scheduled-base-build", "sample:siege-assault", "sample:skirmish-kiting",
-    "sample:squad-formation", "sample:support-repair", "sample:tactical-director",
-    "sample:tactical-regroup", "sample:tactical-skill-activation",
-    "sample:wave-escalation", "sample:threat-prioritization",
-    "sample:trace-default",
-}
+REGISTERED_AI_MODULES = registered_ai_module_ids()
 
 
-def analyze_ai_profile_coverage(pack: dict) -> dict[str, Any]:
+def analyze_ai_profile_coverage(
+    pack: dict,
+    known_unit_ids: set[str] | None = None,
+) -> dict[str, Any]:
     """Devuelve el informe de cobertura de perfiles AI del pack."""
     pack = _as_dict(pack)
     pack_id = pack.get("packId") if isinstance(pack.get("packId"), str) else None
     units = [u for u in _as_list(pack.get("units")) if isinstance(u, dict)]
     unit_ids = {_entity_key(u) for u in units if _entity_key(u)}
-    buildings = [b for b in _as_list(pack.get("buildings")) if isinstance(b, dict)]
-    building_ids = {_entity_key(b) for b in buildings if _entity_key(b)}
+    if known_unit_ids is None:
+        known_unit_ids = unit_ids
     stages = [s for s in _as_list(pack.get("stages")) if isinstance(s, dict)]
     stage_ids = {_entity_key(s) for s in stages if _entity_key(s)}
     profiles = [p for p in _as_list(pack.get("aiProfiles")) if isinstance(p, dict)]
@@ -55,18 +48,20 @@ def analyze_ai_profile_coverage(pack: dict) -> dict[str, Any]:
             if not isinstance(entry, dict):
                 issues.append(f"perfil '{pid}': unitEntry no es objeto")
                 continue
-            eid = entry.get("entityId")
-            if not (isinstance(eid, str) and eid in unit_ids):
-                issues.append(f"perfil '{pid}': unitEntry entityId no resuelve ('{eid}')")
+            unit_id = entry.get("unitId")
+            if not (isinstance(unit_id, str) and unit_id in known_unit_ids):
+                issues.append(f"perfil '{pid}': unitEntry unitId no resuelve ('{unit_id}')")
 
         # productionBuildingEntries.
         for entry in _as_list(profile.get("productionBuildingEntries")):
             if not isinstance(entry, dict):
                 issues.append(f"perfil '{pid}': productionBuildingEntry no es objeto")
                 continue
-            eid = entry.get("entityId")
-            if not (isinstance(eid, str) and eid in building_ids):
-                issues.append(f"perfil '{pid}': productionBuildingEntry entityId no resuelve ('{eid}')")
+            unit_id = entry.get("unitId")
+            if not (isinstance(unit_id, str) and unit_id in known_unit_ids):
+                issues.append(
+                    f"perfil '{pid}': productionBuildingEntry unitId no resuelve ('{unit_id}')"
+                )
 
         # Módulos.
         module_ids_seen: set[str] = set()
@@ -122,7 +117,20 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     path = _resolve_pack(Path(args.target))
     pack = json.loads(path.read_text(encoding="utf-8"))
-    report = analyze_ai_profile_coverage(pack)
+    known_unit_ids: set[str] = set()
+    packs_root = Path(__file__).resolve().parents[1] / "content" / "packs"
+    if packs_root.is_dir():
+        for pack_file in packs_root.glob("*/content.json"):
+            try:
+                registered_pack = json.loads(pack_file.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            for unit in _as_list(registered_pack.get("units")):
+                unit_id = _entity_key(unit)
+                if unit_id:
+                    known_unit_ids.add(unit_id)
+
+    report = analyze_ai_profile_coverage(pack, known_unit_ids=known_unit_ids)
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:

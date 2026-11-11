@@ -1,13 +1,13 @@
 # Content Loader Tools — guía de agente
 
-**Updated:** 2026-11-06
+**Updated:** 2026-11-10
 **Scope:** herramientas offline que mantienen `content.json` (content loader). No es diagnóstico clean-room ni BepInEx runtime: es validación local y edición de manifiestos.
 
 > **Regla de rutas:** la CLI se ejecuta como módulo desde la raíz del repo con el venv del proyecto:
 > ```text
 > PYTHONPATH="$PWD/.venv/Lib/site-packages:." .venv/Scripts/python.exe -B -m tools.<nombre> ...
 > ```
-> Los tests Python cargan los módulos con `load_tool_module()` (`tests/python/helpers.py`); `tools/` no es un paquete importable.
+> Los tests Python cargan los módulos con `load_tool_module()` (`tests/python/helpers.py`). `tools/` es un namespace package; su CLI debe invocarse con `python -m tools.<nombre>` desde la raíz. Ejecutar directamente `python tools/<nombre>.py` puede ocultar el namespace y romper imports `tools.*`.
 
 ## Catálogo de herramientas
 
@@ -20,13 +20,13 @@
 | `tools/migrate_content_pack.py` | `migrate_pack` | Normaliza legacy (schemaVersion, alias id, localizaciones objeto). |
 | `tools/scaffold_pack.py` | `generate_scaffold` | Pack esqueleto mínimo válido. |
 | `tools/inspect_content_pack.py` | `inspect_pack` | Resumen: conteos, fábrica→unidad, pools, módulos. |
-| `tools/validate_ai_modules.py` | `validate_ai_profiles` | vs los 21 módulos de `AiModuleRegistry` + bounds. |
+| `tools/validate_ai_modules.py` | `validate_ai_profiles` | IDs leídos desde `AiModuleRegistry.CreateDefault()` (23 módulos), parámetros y bounds sincronizados con sus parsers. |
 | `tools/analyze_blueprint_pools.py` | `analyze_stage_pools` | Scoping de pools por etapa, unidades huérfanas de fallback. |
 | `tools/analyze_relic_synergy.py` | `analyze_relic_synergy` | `neededSystemTags` vs `offeredSystemTags`, 26 `ChangeableValue`. |
 | `tools/validate_card_changes.py` | `validate_card_changes` | 26 `ChangeableValue` + operación/side finitos en unidades, reliquias y mejoras. |
 | `tools/analyze_factory_product_parity.py` | `analyze_factory_product_parity` | Mapeo 1:1 fábrica↔producto, rareza/nivel, huérfanas. |
 | `tools/analyze_upgrade_chains.py` | `analyze_upgrade_chains` | targetUnitId, nivel 0–100, costo ≥0, cardChanges válidos. |
-| `tools/analyze_ai_profile_coverage.py` | `analyze_ai_profile_coverage` | unitEntries/productionBuildingEntries, 22 módulos, etapas. |
+| `tools/analyze_ai_profile_coverage.py` | `analyze_ai_profile_coverage` | Producto por `unitId` en `unitEntries`/`productionBuildingEntries`, 23 módulos y refs cross-pack. |
 | `tools/export_unit_catalog.py` | `export_unit_catalog` | Catálogo compacto de unidades (rol, rareza, tech, costo, HP, velocidad, fábrica, etapas). |
 | `tools/check_stage_blueprint_filters.py` | `check_stage_blueprint_filters` | poolId, unitIds no vacíos/sin duplicados, resolución. |
 | `tools/validate_native_templates.py` | `validate_native_templates` | Allowlists de plantillas nativas (unidades/fábricas/etapas/paisajes/AI). |
@@ -45,6 +45,8 @@
 | `tools/check_pack_dependencies.py` | `defined_ids`/`external_references`/`analyze_dependencies` | Grafo de dependencias cross-pack (refs no resueltas). |
 | `tools/fingerprint_content_pack.py` | `fingerprint_pack`, `verify_fingerprint` | SHA-256 del JSON canónico; verificación de identidad. |
 | `tools/edit_content_pack.py` | ver editor abajo | Editor único de `content.json` (42 ops + batch). |
+
+AI `unitEntries` y `productionBuildingEntries` referencian ambos el ID de la unidad producida con `unitId`. Solo `sample:scheduled-base-build.parameters[].entityId` nombra una fábrica. `tools/ai_module_contracts.py` obtiene los IDs de la tabla C#; al añadir un módulo también hay que actualizar los nombres de parámetros y límites espejados en `validate_ai_modules.py`.
 
 ## Editor: `tools/edit_content_pack.py`
 

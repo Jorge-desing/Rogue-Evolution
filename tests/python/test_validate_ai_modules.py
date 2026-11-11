@@ -16,6 +16,32 @@ class ValidateAiModulesTests(unittest.TestCase):
         issues = VALIDATE.validate_ai_profiles(pack)
         self.assertEqual([], issues)
 
+    def test_registry_modules_missing_from_old_python_catalog_are_known(self) -> None:
+        pack = _valid_pack()
+        pack["aiProfiles"][0]["modules"] = [
+            {"moduleId": "sample:tactical-director", "parameters": [
+                {"name": "baseIndex", "value": "-1"},
+                {"name": "evalIntervalSeconds", "value": "0.1"},
+            ]},
+            {"moduleId": "sample:squad-operations-director", "parameters": [
+                {"name": "baseIndex", "value": "-1"},
+                {"name": "evalIntervalSeconds", "value": "0.2"},
+            ]},
+        ]
+        self.assertEqual([], VALIDATE.validate_ai_profiles(pack))
+
+    def test_scheduled_build_bounds_match_loader_parser(self) -> None:
+        pack = _valid_pack()
+        pack["aiProfiles"][0]["modules"] = [{
+            "moduleId": "sample:scheduled-base-build",
+            "parameters": [
+                {"name": "intervalSeconds", "value": "600"},
+                {"name": "maxSuccessfulBuilds", "value": "32"},
+                {"name": "maxAttempts", "value": "128"},
+            ],
+        }]
+        self.assertEqual([], VALIDATE.validate_ai_profiles(pack))
+
     def test_unknown_module_rejected(self) -> None:
         pack = _valid_pack()
         pack["aiProfiles"][0]["modules"].append(

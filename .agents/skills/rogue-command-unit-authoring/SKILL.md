@@ -24,7 +24,8 @@ Authoritative guide for creating and reviewing modded units, balance variants, f
 | **Visual Overlay** | Declares `visualAssetName` + `visualRootPath` in bundle | Overlays custom mesh onto native renderer subtree; retains native logic | Run `tools/validate_native_visual_roots.py`. Root must resolve to valid renderer subtree |
 | **Custom Prefab** | Full bundled balance asset, prefab, and card sprite | Script-free prefab; requires complete Unity scaffolding | Fail-closed if game-required components cannot be resolved |
 
-- **Factory Invariant:** Every added unit requires its own namespaced `productionBuilding` linking `factoryForEntityId` to the unit. Reward pools offer the factory's blueprint; AI rosters and stage manifests reference the produced unit.
+- **Factory Invariant:** Every added unit requires its own namespaced `productionBuilding` linking `factoryForEntityId` to the unit. Reward pools offer the factory's blueprint; AI `unitEntries` and `productionBuildingEntries` use `unitId` to reference the produced unit, never the factory. The `entityId` parameter on `sample:scheduled-base-build` is the explicit factory-ID exception.
+- **AI Cross-Pack Audit:** `python -m tools.validate_ai_modules content/packs --all --json` checks module and product references across packs. `python -m tools.analyze_ai_profile_coverage <pack_dir> --json` also resolves external products against the repository's declared unit catalog. Both are static checks and do not prove the AI profile or factory scheduler ran in-game.
 - **Fail-Closed Factory Registration:** If factory registration throws, remove the registered unit product row before rethrowing to prevent partial provider state.
 
 ---

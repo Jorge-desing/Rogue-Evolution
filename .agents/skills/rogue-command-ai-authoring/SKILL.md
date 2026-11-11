@@ -18,9 +18,9 @@ Use this skill when implementing an AI profile, adding a compiled module, or con
 - **Profile Scope & AI Rosters**:
   - Native templates MUST declare `scopeToReferencedStages: true` to generate an isolated `RCL_` alias over contiguous stage ranges.
   - Custom AI prefabs require reserved `RCL_` naming, active state, and a single `DefaultAiBehaviour`.
-  - `unitEntries` and `productionBuildingEntries` reference **produced unit IDs**, never factory IDs.
+  - `unitEntries` and `productionBuildingEntries` use `unitId` to reference **produced unit IDs**, never factory IDs. The `entityId` parameter of `sample:scheduled-base-build` is the factory ID.
   - Only units with `isAllowedForAi: true` and present in `stage.unitIds` may be added to AI rosters.
-  - Cross-pack load order is established by `unitEntries`; do not duplicate entries in `unitDependencies`.
+  - Cross-pack load order is established by `unitEntries` and `productionBuildingEntries`; do not duplicate entries in `unitDependencies`.
 - **Faction & Hostility Invariant (CRITICAL)**:
   - **NEVER mutate `IsControlledByPlayer` or `IsControlledByAi`**. These flags define hostility for native `IsEnemy()`.
   - Mutating them corrupts friend/foe detection game-wide. Module ownership MUST be tracked via internal state or command tags only.
@@ -140,6 +140,13 @@ The Hierarchical Utility-Blackboard Director coordinates macro strategy and micr
 5. **Registry Binding**: Register in `AiModuleRegistry.CreateDefault()`.
 6. **Schema Documentation**: Document parameters in `content/schema/README.md`.
 7. **Verification**: Run `dotnet build -c Release` and C# / Python test suites before committing.
+
+### AI Pack Audit Commands
+
+- Run `python -m tools.validate_ai_modules content/packs --all --json` to validate all pack profiles against compiled module IDs and their parameter contracts.
+- Run `python -m tools.analyze_ai_profile_coverage <pack-dir> --json` to check roster product IDs. Its CLI resolves cross-pack products against the repository's declared unit catalog; its pure function accepts `known_unit_ids` for isolated fixtures.
+- Module IDs are read from `AiModuleRegistry.CreateDefault()` by `tools/ai_module_contracts.py`, so do not maintain another Python module-ID list. If adding a module, still synchronize its accepted parameter names and bounds in the validator with its C# parser.
+- These commands are static content checks. They do not prove the AI profile was selected or its scheduler ran in a live match.
 
 ### Critical Pitfalls
 - **Combat Eligibility**: Require `IsControlledByAi`, `IsUnit`, `IsCombatUnit`, `CanAttackAndIsAttackEnabled`, and `CanMoveAndMovementIsEnabled`.
