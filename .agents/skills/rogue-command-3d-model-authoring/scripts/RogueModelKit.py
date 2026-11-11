@@ -18,7 +18,10 @@ import bpy, bmesh
 from mathutils import Vector, Euler, Quaternion, Matrix
 from mathutils.bvhtree import BVHTree
 
-DEFAULT_FACE_BUDGET = 10000
+LEVEL1_CHASSIS_FACE_BUDGET = 10000
+LEVEL2_MODULE_FACE_BUDGET = 2000
+# Backward-compatible alias for callers that author the primary chassis.
+DEFAULT_FACE_BUDGET = LEVEL1_CHASSIS_FACE_BUDGET
 _SURFACE_DEVIATION_BUDGETS: dict[int, float] = {}
 
 
@@ -82,7 +85,7 @@ def record_surface_deviation_m(obj: bpy.types.Object, deviation_m: float) -> flo
 
 def reduce_subpixel_details_to_budget(
     objects: Sequence[bpy.types.Object],
-    max_faces: int = DEFAULT_FACE_BUDGET,
+    max_faces: int = LEVEL1_CHASSIS_FACE_BUDGET,
     max_dimension_m: float = 0.60,
     max_surface_deviation_m: float = 0.02,
 ) -> Dict[str, Any]:
@@ -238,9 +241,9 @@ def reduce_subpixel_details_to_budget(
 def enforce_face_budget_before_export(
     objects: Sequence[bpy.types.Object],
     model_name: str,
-    max_faces: int = DEFAULT_FACE_BUDGET,
+    max_faces: int = LEVEL1_CHASSIS_FACE_BUDGET,
 ) -> Dict[str, Any]:
-    """Apply the safe fitting pass and reject exports that still exceed the cap."""
+    """Apply the safe fitting pass and reject this asset when it exceeds its cap."""
     reduction = reduce_subpixel_details_to_budget(objects, max_faces=max_faces)
     face_count = sum(
         len(obj.data.polygons)
@@ -251,7 +254,7 @@ def enforce_face_budget_before_export(
     )
     if face_count > max_faces:
         raise ValueError(
-            f"{model_name} exceeds the {max_faces}-face LOD0 limit "
+            f"{model_name} exceeds its {max_faces}-face asset limit "
             f"({face_count} faces after safe reduction; "
             f"{reduction['faces_removed']} removed). Redesign redundant or "
             "hidden geometry without simplifying role-defining forms."
@@ -7564,6 +7567,7 @@ def batch_and_join_by_material(
     weighted_normals: bool = True,
     normal_weight: int = 50,
     unity_batch_names: bool = False,
+    max_faces: int = LEVEL1_CHASSIS_FACE_BUDGET,
 ) -> list[bpy.types.Object]:
     """Combines modular kitbashed objects by material into unified meshes.
 
@@ -7575,7 +7579,7 @@ def batch_and_join_by_material(
     When `weighted_normals` is True, applies face-area weighted normals (`WEIGHTED_NORMAL`)
     so broad armor plates remain flat without shading pinch across 1-segment bevels.
     """
-    enforce_face_budget_before_export(objects, prefix)
+    enforce_face_budget_before_export(objects, prefix, max_faces=max_faces)
     material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
     preserved_objects: list[bpy.types.Object] = []
     # Rigged sample overlays are consumed as material batches under the
@@ -7984,14 +7988,14 @@ def generate_collision_hulls(
 def profile_model_budget_and_drawcalls(
     objects: Sequence[bpy.types.Object],
     prefix: str = "Unit",
-    target_budget: int = DEFAULT_FACE_BUDGET,
+    target_budget: int = LEVEL1_CHASSIS_FACE_BUDGET,
     lod_dict: Dict[str, list[bpy.types.Object]] | None = None,
 ) -> Dict[str, Any]:
     """Provides face-budget, true triangulation, and draw-call diagnostics by subsystem."""
     requested_target_budget = int(target_budget)
     if requested_target_budget <= 0:
         raise ValueError("target_budget must be greater than zero")
-    target_budget = min(requested_target_budget, DEFAULT_FACE_BUDGET)
+    target_budget = min(requested_target_budget, LEVEL1_CHASSIS_FACE_BUDGET)
 
     subsystems = {
         "Chassis & Hull": 0,
@@ -16166,7 +16170,7 @@ class RogueVehicleBuilder:
         damaged_fbx_path: Path | None = None,
         visual_root_path: str = "Vehicle",
         profile_budget: bool = True,
-        target_budget: int = DEFAULT_FACE_BUDGET,
+        target_budget: int = LEVEL1_CHASSIS_FACE_BUDGET,
         include_vfx_flash: bool = False,
         include_vfx_thruster: bool = False,
         include_shield_bubble: bool = False,
@@ -16202,7 +16206,7 @@ class RogueVehicleBuilder:
         requested_face_budget = int(target_budget)
         if requested_face_budget <= 0:
             raise ValueError("target_budget must be greater than zero")
-        face_budget_limit = min(requested_face_budget, DEFAULT_FACE_BUDGET)
+        face_budget_limit = min(requested_face_budget, LEVEL1_CHASSIS_FACE_BUDGET)
         face_reduction = reduce_subpixel_details_to_budget(
             self.objects,
             max_faces=face_budget_limit,
@@ -17245,7 +17249,7 @@ class RogueStructureBuilder:
         soot_intensity: float = 1.0,
         bake_vertex_shading: bool = True,
         structural_wear_mask: bool = False,
-        target_budget: int = DEFAULT_FACE_BUDGET,
+        target_budget: int = LEVEL1_CHASSIS_FACE_BUDGET,
     ) -> dict[str, Any]:
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -17259,7 +17263,7 @@ class RogueStructureBuilder:
         requested_face_budget = int(target_budget)
         if requested_face_budget <= 0:
             raise ValueError("target_budget must be greater than zero")
-        face_budget_limit = min(requested_face_budget, DEFAULT_FACE_BUDGET)
+        face_budget_limit = min(requested_face_budget, LEVEL1_CHASSIS_FACE_BUDGET)
         face_reduction = reduce_subpixel_details_to_budget(
             self.objects,
             max_faces=face_budget_limit,

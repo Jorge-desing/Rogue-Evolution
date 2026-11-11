@@ -2,6 +2,8 @@
   "schemaVersion": 2,
   "sourceBlend": "content/source-art/canonical-visual-modules.blend",
   "level1Authority": "Existing unit chassis geometry, functional hierarchy, rig, pivots, canonical sockets, LOD and PBR atlas.",
+  "level1ChassisFaceBudget": 10000,
+  "level2ModuleFaceBudgetPerModule": 2000,
   "level2Contract": "Each listed GameObject is visual-only geometry attached to exactly one canonical hardpoint group; no gameplay components or balance changes.",
   "visualEngineeringRoleContract": "Authoring-only visual engineering roles. These descriptions define visible mechanical form, not gameplay behavior.",
   "modules": [

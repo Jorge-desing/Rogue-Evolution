@@ -62,7 +62,7 @@ def reduce_subpixel_details_to_budget(
 
     return rmk.reduce_subpixel_details_to_budget(
         builder.objects,
-        max_faces=rmk.DEFAULT_FACE_BUDGET if max_faces is None else max_faces,
+        max_faces=rmk.LEVEL1_CHASSIS_FACE_BUDGET if max_faces is None else max_faces,
         max_dimension_m=max_dimension_m,
     )
 

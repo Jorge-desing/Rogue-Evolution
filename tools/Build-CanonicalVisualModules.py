@@ -447,7 +447,13 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         created, armor_materials = build_module_geometry(entry, seed)
         if not created:
             raise RuntimeError(f"No geometry generated for {entry['variantId']}")
-        rmk.enforce_face_budget_before_export(created, entry["moduleName"])
+        # Level 2 has an independent per-module budget; do not charge these
+        # visual-only parts against the owning Level 1 chassis limit.
+        rmk.enforce_face_budget_before_export(
+            created,
+            entry["moduleName"],
+            max_faces=rmk.LEVEL2_MODULE_FACE_BUDGET,
+        )
         for obj in created:
             ensure_uv(obj)
             rmk.apply_weighted_normals(obj, weight=60, keep_sharp=True, apply_modifier=True)
@@ -464,6 +470,7 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
             smooth_by_angle=True,
             weighted_normals=True,
             unity_batch_names=True,
+            max_faces=rmk.LEVEL2_MODULE_FACE_BUDGET,
         )
         if not combined:
             raise RuntimeError(f"Material batching produced no meshes for {entry['variantId']}")
@@ -486,6 +493,8 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         "schemaVersion": 2,
         "sourceBlend": SOURCE_BLEND.relative_to(ROOT).as_posix(),
         "level1Authority": "Existing unit chassis geometry, functional hierarchy, rig, pivots, canonical sockets, LOD and PBR atlas.",
+        "level1ChassisFaceBudget": rmk.LEVEL1_CHASSIS_FACE_BUDGET,
+        "level2ModuleFaceBudgetPerModule": rmk.LEVEL2_MODULE_FACE_BUDGET,
         "level2Contract": "Each listed GameObject is visual-only geometry attached to exactly one canonical hardpoint group; no gameplay components or balance changes.",
         "visualEngineeringRoleContract": role_registry.get("scope", ""),
         "modules": entries,

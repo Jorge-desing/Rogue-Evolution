@@ -5,6 +5,13 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-11 Level-Specific Model Budgets and Shape-Contact Rules
+
+- **Face budgets:** `tools/RogueModelKit.py` exposes `LEVEL1_CHASSIS_FACE_BUDGET = 10000` and `LEVEL2_MODULE_FACE_BUDGET = 2000`; `DEFAULT_FACE_BUDGET` remains a Level 1 compatibility alias. The canonical Level 2 module builder enforces its limit per module before export and through material batching. The manifest records both budgets. Do not sum Level 2 modules against the Level 1 chassis limit or against one shared module cap.
+- **Budget basis:** A read-only Blender 4.5.14 profile of the current 35 module source assets found a maximum of 1,270 faces per module. The 2,000 cap provides authoring headroom; this is static geometry evidence, not a performance or runtime claim.
+- **Geometry review:** The authoring skill now requires a pre-export contact pass from front, side, top, elevated RTS, and relevant motion views. Visible penetration fails review except inside concealed mounts, sealed joints, or articulated interfaces. Cylinders, caps, and rings must serve a named mechanical role; avoid decorative circular armor and repeated concentric stacks.
+- **Scope/evidence:** These changes update code checks, generated manifest metadata, and authoring documentation only; no model, FBX, PBR atlas, prefab, or AssetBundle was regenerated or promoted. No fleet-wide intersection audit or in-game appearance check was performed.
+
 ---
 
 ## 2026-11-11 Active Stage AI Association MCP Diagnostic

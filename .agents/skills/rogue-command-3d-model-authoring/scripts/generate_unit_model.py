@@ -74,7 +74,7 @@ Options:
     --sponsons                 Attach armored external side sponsons
     --dirt                     Bake procedural vertex ambient dirt/cavity shading (default: True)
     --locators                 Generate Unity locator sockets (default: True)
-    --lod                      Print the LOD0 face cap and camera-aware LOD recommendations
+    --lod                      Print the Level 1 chassis face cap and camera-aware LOD recommendations
     --multiview                Render 4-perspective orthographic sheet (ISO, TOP, FRONT, SIDE)
     --out-dir <path>           Base output directory (default: repo root)
 """
@@ -970,10 +970,10 @@ def parse_args():
     parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
-    parser.add_argument("--target-budget", type=int, default=rmk.DEFAULT_FACE_BUDGET, help=f"Target face budget for profiling (default: {rmk.DEFAULT_FACE_BUDGET})")
+    parser.add_argument("--target-budget", type=int, default=rmk.LEVEL1_CHASSIS_FACE_BUDGET, help=f"Level 1 chassis face budget for profiling (default: {rmk.LEVEL1_CHASSIS_FACE_BUDGET})")
     parser.add_argument("--rts-budget", action="store_true", help="Use lower-detail preset variants for RTS camera polygon budgets")
     parser.add_argument("--model-scale", type=float, default=1.0, help="Uniformly scale authored vehicle geometry and sockets around the ground origin")
-    parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
+    parser.add_argument("--lod", action="store_true", help="Calculate Level 1 chassis polygon budget and recommend LOD reductions")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
     parser.add_argument("--batch-all-archetypes", action="store_true", help="Batch generate all 42 archetypes into the output directory")
@@ -988,12 +988,12 @@ def parse_args():
     args = parser.parse_args(script_args)
     if args.target_budget <= 0:
         parser.error("--target-budget must be greater than zero")
-    if args.target_budget > rmk.DEFAULT_FACE_BUDGET:
+    if args.target_budget > rmk.LEVEL1_CHASSIS_FACE_BUDGET:
         print(
-            f"Requested face budget {args.target_budget} exceeds the project maximum; "
-            f"using {rmk.DEFAULT_FACE_BUDGET}."
+            f"Requested face budget {args.target_budget} exceeds the Level 1 chassis maximum; "
+            f"using {rmk.LEVEL1_CHASSIS_FACE_BUDGET}."
         )
-        args.target_budget = rmk.DEFAULT_FACE_BUDGET
+        args.target_budget = rmk.LEVEL1_CHASSIS_FACE_BUDGET
 
     def option_was_supplied(option: str) -> bool:
         for argument in script_args:
@@ -1160,7 +1160,7 @@ def build_vehicle_model(
     colliders: bool = False,
     gameplay_json: bool = False,
     wreckage: bool = False,
-    target_budget: int = rmk.DEFAULT_FACE_BUDGET,
+    target_budget: int = rmk.LEVEL1_CHASSIS_FACE_BUDGET,
     lod_diagnostics: bool = False,
     smooth_angle: float = 38.0,
     multiview: bool = False,
@@ -1217,7 +1217,7 @@ def build_vehicle_model(
 ) -> dict:
     if int(target_budget) <= 0:
         raise ValueError("target_budget must be greater than zero")
-    target_budget = min(int(target_budget), rmk.DEFAULT_FACE_BUDGET)
+    target_budget = min(int(target_budget), rmk.LEVEL1_CHASSIS_FACE_BUDGET)
     rmk.clear_scene()
 
     if rts_budget and archetype == "mobile_sam_launcher":
@@ -3058,7 +3058,7 @@ def build_vehicle_model(
         print("\n--- LOD0 Face Cap & Camera-Aware LOD Diagnostics ---")
         true_triangles = res.get("profile_report", {}).get("total_triangles", res["total_polygons"])
         print(f"LOD0 (Current): {res['total_polygons']} faces / {true_triangles} triangles | {res['total_vertices']} verts (RTS Combat Camera)")
-        print(f"  Project Maximum: {rmk.DEFAULT_FACE_BUDGET} source faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of selected cap)")
+        print(f"  Level 1 Chassis Maximum: {rmk.LEVEL1_CHASSIS_FACE_BUDGET} source faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of selected cap)")
         print("LOD Recommendations:")
         print("  LOD1: Preserve the main silhouette and functional assemblies; simplify only details that disappear at its screen size.")
         print("  LOD2: Reduce sub-pixel greebles and repeated hardware while keeping role-defining weapon and mobility shapes readable.")
@@ -3658,7 +3658,7 @@ def main():
             "colliders": res.get("colliders", []),
             "budget_diagnostics": res.get("budget_diagnostics", {}),
             "face_budget_reduction": res.get("face_budget_reduction", {}),
-            "face_budget_limit": res.get("face_budget_limit", rmk.DEFAULT_FACE_BUDGET),
+            "face_budget_limit": res.get("face_budget_limit", rmk.LEVEL1_CHASSIS_FACE_BUDGET),
             "face_budget_passed": res.get("face_budget_passed", False),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
