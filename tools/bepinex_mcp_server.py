@@ -27,7 +27,7 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.4.5"
+SERVER_VERSION = "1.4.6"
 GAME_PROCESS_NAME = "Rogue Command.exe"
 GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
@@ -2117,13 +2117,19 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         elif name == "diagnostics_start_renderer_frame_probe":
             entity_key_id = str(arguments.get("entityKeyId", "")).strip()
             renderer_filter = str(arguments.get("rendererNameContains", ""))
+            sample_clip_contains = arguments.get("sampleClipContains", "")
+            sample_movement_state = arguments.get("sampleMovementState", "any")
+            if not isinstance(sample_clip_contains, str):
+                return _tool_response(json.dumps({"success": False, "error": "sampleClipContains must be a string", "pixelCapture": False}), is_error=True)
+            if not isinstance(sample_movement_state, str) or sample_movement_state not in {"any", "moving", "stationary"}:
+                return _tool_response(json.dumps({"success": False, "error": "sampleMovementState must be any, moving, or stationary", "pixelCapture": False}), is_error=True)
             try:
                 sample_limit = int(arguments.get("sampleLimit", 12))
             except (TypeError, ValueError):
                 return _tool_response(json.dumps({"success": False, "error": "sampleLimit must be an integer", "pixelCapture": False}), is_error=True)
             res = _call_diagnostics_method(
                 "StartRendererFrameProbeJson",
-                [entity_key_id, renderer_filter, sample_limit],
+                [entity_key_id, renderer_filter, sample_limit, sample_clip_contains, sample_movement_state],
             )
             return _tool_response(res)
 
@@ -2170,6 +2176,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             if "moving" in required_evidence and "stationary" in required_evidence:
                 return _tool_response(json.dumps({"success": False, "error": "requiredEvidence cannot require both moving and stationary", "pixelCapture": False}), is_error=True)
             is_moving = True if "moving" in required_evidence else False if "stationary" in required_evidence else None
+            sample_movement_state = "moving" if is_moving is True else "stationary" if is_moving is False else "any"
 
             started_at = time.monotonic()
             deadline = started_at + timeout_seconds
@@ -2179,7 +2186,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             if deadline <= started_at:
                 return _tool_response(json.dumps({"success": False, "error": "automation request time budget is exhausted", "pixelCapture": False}), is_error=False)
 
-            start_raw = _call_diagnostics_method("StartRendererFrameProbeJson", [entity_key_id.strip(), "", 12])
+            start_raw = _call_diagnostics_method(
+                "StartRendererFrameProbeJson",
+                [entity_key_id.strip(), "", 12, active_clip_contains, sample_movement_state],
+            )
             start_result = _parse_renderer_probe_result(start_raw, "StartRendererFrameProbeJson")
             if start_result.get("success") is not True:
                 return _tool_response(json.dumps({
@@ -2259,6 +2269,37 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 condition_met = True
 
             probe_stopped = isinstance(stop_result, dict) and stop_result.get("success") is True
+            cleanup_verification: dict[str, Any] | None = None
+            if not probe_stopped:
+                try:
+                    remaining_raw = _call_http("scene:find_objects_with_component", params={
+                        "componentName": "RuntimeRendererFrameProbeBehaviour",
+                    })
+                    remaining_data = json.loads(remaining_raw) if isinstance(remaining_raw, str) else remaining_raw
+                    if isinstance(remaining_data, list):
+                        remaining_observers = remaining_data
+                        truncated = False
+                    elif isinstance(remaining_data, dict):
+                        remaining_observers = next((remaining_data.get(key) for key in ("items", "objects", "results") if isinstance(remaining_data.get(key), list)), None)
+                        truncated = bool(remaining_data.get("truncated", False))
+                    else:
+                        remaining_observers = None
+                        truncated = False
+                    if isinstance(remaining_observers, list) and not truncated:
+                        observer_count = len(remaining_observers)
+                        probe_stopped = observer_count == 0
+                        cleanup_verification = {
+                            "success": probe_stopped,
+                            "source": "live BepInEx component census",
+                            "observerComponent": "RuntimeRendererFrameProbeBehaviour",
+                            "remainingObserverCount": observer_count,
+                        }
+                except Exception as exc:
+                    cleanup_verification = {
+                        "success": False,
+                        "source": "live BepInEx component census",
+                        "error": str(exc),
+                    }
             timed_out = not condition_met and read_error is None and time.monotonic() >= deadline
             success = condition_met and probe_stopped
             response_payload = {
@@ -2283,6 +2324,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 },
                 "probe": final_probe,
                 "stopResult": stop_result,
+                "probeCleanupVerification": cleanup_verification,
                 "pixelCapture": False,
                 "computerUseRequired": False,
                 "evidenceBoundary": "structured Unity camera, Animator, retarget, visibility, and sampled BakeMesh telemetry; not pixel or rendered-appearance proof",
@@ -2291,7 +2333,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             if read_error is not None:
                 response_payload["readError"] = read_error
             if isinstance(stop_result, dict) and stop_result.get("success") is not True:
-                response_payload["stopError"] = stop_result.get("error", "renderer frame probe cleanup was not confirmed")
+                if probe_stopped:
+                    response_payload["stopWarning"] = stop_result.get("error", "stop token was unavailable; observer removal was verified by component census")
+                else:
+                    response_payload["stopError"] = stop_result.get("error", "renderer frame probe cleanup was not confirmed")
             return _tool_response(json.dumps(response_payload, indent=2), is_error=False)
 
         elif name == "diagnostics_get_loaded_unit_visual_audit":

@@ -2145,7 +2145,27 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public string StartRendererFrameProbeJson(string entityKeyId, string rendererNameContains = "", int sampleLimit = 12)
         {
-            return RuntimeRendererFrameProbe.StartJson(entityKeyId, rendererNameContains, sampleLimit);
+            return RuntimeRendererFrameProbe.StartJson(
+                entityKeyId,
+                rendererNameContains,
+                sampleLimit,
+                string.Empty,
+                "any");
+        }
+
+        public string StartRendererFrameProbeJson(
+            string entityKeyId,
+            string rendererNameContains,
+            int sampleLimit,
+            string sampleClipContains,
+            string sampleMovementState)
+        {
+            return RuntimeRendererFrameProbe.StartJson(
+                entityKeyId,
+                rendererNameContains,
+                sampleLimit,
+                sampleClipContains,
+                sampleMovementState);
         }
 
         public string ReadRendererFrameProbeJson(string token)

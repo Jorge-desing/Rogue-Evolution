@@ -141,3 +141,9 @@ AI `unitEntries` and `productionBuildingEntries` both use the produced product's
 - Call it before advancing a saved route for AI acceptance. It resolves the active `StageMap` entry against the captured progression sequence and the persisted `rclStageOrderV1` identity; custom stages return their qualified ID and declared `aiProfileIds`, while native stages return the native StageParameters asset ID. It never maps a localized preview label to an ID.
 - Read configured IDs (`declaredAiProfileIds`) separately from initialized loader-bound behaviours (`runtimeBoundAiProfiles`, counts, and status). Empty runtime bindings at intermission do not describe combat AI behavior. An unresolved stage identity is a stop condition, not a reason to guess from preview text.
 - Regenerate local schemas with `python tools/build_bepinex_mcp.py`. This creates the catalog but does not cause an already connected MCP host to reload it automatically.
+
+### Renderer frame capture filters and cleanup (MCP 1.4.6)
+
+- `diagnostics_start_renderer_frame_probe` accepts `sampleClipContains` and `sampleMovementState` (`any`, `moving`, `stationary`). Its C# diagnostic API filters camera frames before `BakeMesh` and before consuming the bounded sample cap; the wait tool maps `activeClipContains` and movement evidence to these filters.
+- Keep `tools/build_bepinex_mcp.py`, `tools/bepinex_mcp_server.py`, `LoaderDiagnosticsComponent.StartRendererFrameProbeJson`, and the generated 239-tool schema catalog synchronized. Re-run `python -m unittest tests.python.test_bepinex_mcp_diagnostics` and `python -m py_compile tools/build_bepinex_mcp.py tools/bepinex_mcp_server.py` when changing the contract.
+- Stop is idempotent while the stopped snapshot remains retained. The wait tool verifies an unavailable token through a complete `RuntimeRendererFrameProbeBehaviour` component census and does not claim success when observers remain or the census fails.

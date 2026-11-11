@@ -26,7 +26,12 @@ namespace RogueCommandExpansionLoader.Runtime
             new Dictionary<string, ProbeSession>(StringComparer.Ordinal);
         private static bool CameraCallbackAttached;
 
-        internal static string StartJson(string entityKeyId, string rendererNameContains, int sampleLimit)
+        internal static string StartJson(
+            string entityKeyId,
+            string rendererNameContains,
+            int sampleLimit,
+            string sampleClipContains,
+            string sampleMovementState)
         {
             if (string.IsNullOrWhiteSpace(entityKeyId))
             {
@@ -36,6 +41,16 @@ namespace RogueCommandExpansionLoader.Runtime
             int boundedSampleLimit = sampleLimit <= 0
                 ? DefaultSampleLimit
                 : Math.Max(MinSampleLimit, Math.Min(MaxSampleLimit, sampleLimit));
+            string boundedClipFilter = string.IsNullOrWhiteSpace(sampleClipContains)
+                ? string.Empty
+                : Clip(sampleClipContains.Trim(), 128);
+            string boundedMovementFilter = string.IsNullOrWhiteSpace(sampleMovementState)
+                ? "any"
+                : sampleMovementState.Trim().ToLowerInvariant();
+            if (boundedMovementFilter != "any" && boundedMovementFilter != "moving" && boundedMovementFilter != "stationary")
+            {
+                return SerializeError("sampleMovementState must be any, moving, or stationary.");
+            }
 
             EntityController entity;
             try
@@ -100,7 +115,13 @@ namespace RogueCommandExpansionLoader.Runtime
 
             string token = Guid.NewGuid().ToString("N");
             float startedAt = SafeUnscaledTime();
-            var session = new ProbeSession(token, entityKeyId.Trim(), boundedSampleLimit, startedAt);
+            var session = new ProbeSession(
+                token,
+                entityKeyId.Trim(),
+                boundedSampleLimit,
+                boundedClipFilter,
+                boundedMovementFilter,
+                startedAt);
             int selectedCount = Math.Min(MaxRenderersPerProbe, renderers.Count);
             session.OmittedRendererCount = Math.Max(0, renderers.Count - selectedCount);
             session.Renderers.Capacity = selectedCount;
@@ -173,9 +194,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 return SerializeError("Probe token was not found or has expired.");
             }
 
-            StopSession(session, SafeUnscaledTime());
+            if (session.Active)
+            {
+                StopSession(session, SafeUnscaledTime());
+            }
+
+            // Keep the bounded stopped snapshot briefly so cleanup can be retried idempotently
+            // and callers can still read the final result after observer removal.
             string result = SerializeSession(session, "stopped", false);
-            lock (Gate) Sessions.Remove(session.Token);
             return result;
         }
 
@@ -334,6 +360,20 @@ namespace RogueCommandExpansionLoader.Runtime
             return true;
         }
 
+        internal static bool MatchesSamplingFilter(ProbeSession session, ProbeRenderSample sample)
+        {
+            if (session == null || sample == null) return false;
+            if (session.SampleClipContains.Length > 0 &&
+                sample.ActiveClip.IndexOf(session.SampleClipContains, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                return false;
+            }
+
+            if (session.SampleMovementState == "moving" && !sample.IsMoving) return false;
+            if (session.SampleMovementState == "stationary" && sample.IsMoving) return false;
+            return true;
+        }
+
         internal static bool RecordSample(string token, int rendererIndex, ProbeRenderSample sample)
         {
             if (!TryGetSession(token, out ProbeSession session) || !session.Active ||
@@ -403,6 +443,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["omittedSampleCount"] = omittedSamples,
                 ["totalSampleCount"] = totalSamples,
                 ["rendererCount"] = session.Renderers.Count,
+                ["sampleClipContains"] = session.SampleClipContains,
+                ["sampleMovementState"] = session.SampleMovementState,
                 ["cameraRenderCallbackCount"] = session.CameraRenderCallbackCount,
                 ["gameCameraRenderCallbackCount"] = session.GameCameraRenderCallbackCount,
                 ["screenGameCameraRenderCallbackCount"] = session.ScreenGameCameraRenderCallbackCount,
@@ -467,6 +509,8 @@ namespace RogueCommandExpansionLoader.Runtime
             internal readonly string Token;
             internal readonly string EntityKeyId;
             internal readonly int SampleLimit;
+            internal readonly string SampleClipContains;
+            internal readonly string SampleMovementState;
             internal readonly float StartedAt;
             internal readonly List<RendererProbeRecord> Renderers = new List<RendererProbeRecord>();
             internal bool Active = true;
@@ -484,11 +528,19 @@ namespace RogueCommandExpansionLoader.Runtime
             internal int MissingObserverCount;
             internal float RemoveAfter;
 
-            internal ProbeSession(string token, string entityKeyId, int sampleLimit, float startedAt)
+            internal ProbeSession(
+                string token,
+                string entityKeyId,
+                int sampleLimit,
+                string sampleClipContains,
+                string sampleMovementState,
+                float startedAt)
             {
                 Token = token;
                 EntityKeyId = entityKeyId;
                 SampleLimit = sampleLimit;
+                SampleClipContains = sampleClipContains ?? string.Empty;
+                SampleMovementState = sampleMovementState ?? "any";
                 StartedAt = startedAt;
             }
         }
@@ -629,44 +681,30 @@ namespace RogueCommandExpansionLoader.Runtime
             if (string.IsNullOrEmpty(_token) || _renderer == null || camera == null ||
                 cameraFrustumPlanes == null || !RuntimeRendererFrameProbe.IsActive(_token)) return;
             int frame = Time.frameCount;
-            if (RuntimeRendererFrameProbe.TryGetSession(_token, out RuntimeRendererFrameProbe.ProbeSession session))
+            if (!RuntimeRendererFrameProbe.TryGetSession(_token, out RuntimeRendererFrameProbe.ProbeSession session) ||
+                _rendererIndex < 0 || _rendererIndex >= session.Renderers.Count) return;
+            RuntimeRendererFrameProbe.RendererProbeRecord record = session.Renderers[_rendererIndex];
+            if (record.LastSampleFrame == frame) return;
+
+            if (!_renderer.enabled || !_renderer.gameObject.activeInHierarchy)
             {
-                if (_rendererIndex < 0 || _rendererIndex >= session.Renderers.Count) return;
-                RuntimeRendererFrameProbe.RendererProbeRecord record = session.Renderers[_rendererIndex];
-                if (record.LastSampleFrame == frame) return;
-
-                if (!_renderer.enabled || !_renderer.gameObject.activeInHierarchy)
-                {
-                    session.InactiveRendererCount++;
-                    return;
-                }
-
-                if ((camera.cullingMask & (1 << _renderer.gameObject.layer)) == 0)
-                {
-                    session.LayerCulledRendererCount++;
-                    return;
-                }
-
-                if (!GeometryUtility.TestPlanesAABB(cameraFrustumPlanes, _renderer.bounds))
-                {
-                    session.FrustumRejectedRendererCount++;
-                    return;
-                }
-            }
-            else
-            {
+                session.InactiveRendererCount++;
                 return;
             }
 
-            if (!RuntimeRendererFrameProbe.TryBeginSample(_token, _rendererIndex)) return;
-            session.Renderers[_rendererIndex].LastSampleFrame = frame;
+            if ((camera.cullingMask & (1 << _renderer.gameObject.layer)) == 0)
+            {
+                session.LayerCulledRendererCount++;
+                return;
+            }
 
-            bool deltaAvailable;
-            int comparedVertexCount;
-            int sampledVertexCount;
-            float maximumDelta;
-            float meanDelta;
-            CaptureDeformationDelta(out deltaAvailable, out comparedVertexCount, out sampledVertexCount, out maximumDelta, out meanDelta);
+            if (!GeometryUtility.TestPlanesAABB(cameraFrustumPlanes, _renderer.bounds))
+            {
+                session.FrustumRejectedRendererCount++;
+                return;
+            }
+
+            record.LastSampleFrame = frame;
 
             var sample = new RuntimeRendererFrameProbe.ProbeRenderSample
             {
@@ -688,12 +726,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 RetargetPresent = _retarget != null,
                 RetargetBound = _retarget != null && _retarget.IsBound,
                 RetargetSuspended = _retarget != null && _retarget.IsSuspended,
-                BoundMappingCount = _retarget != null ? _retarget.BoundMappingCount : 0,
-                DeformationDeltaAvailable = deltaAvailable,
-                ComparedVertexCount = comparedVertexCount,
-                SampledVertexCount = sampledVertexCount,
-                MaximumLocalVertexDelta = maximumDelta,
-                MeanLocalVertexDelta = meanDelta
+                BoundMappingCount = _retarget != null ? _retarget.BoundMappingCount : 0
             };
 
             if (_animator != null)
@@ -716,6 +749,21 @@ namespace RogueCommandExpansionLoader.Runtime
                     // A controller may be tearing down while a destruction probe is recording.
                 }
             }
+
+            if (!RuntimeRendererFrameProbe.MatchesSamplingFilter(session, sample) ||
+                !RuntimeRendererFrameProbe.TryBeginSample(_token, _rendererIndex)) return;
+
+            bool deltaAvailable;
+            int comparedVertexCount;
+            int sampledVertexCount;
+            float maximumDelta;
+            float meanDelta;
+            CaptureDeformationDelta(out deltaAvailable, out comparedVertexCount, out sampledVertexCount, out maximumDelta, out meanDelta);
+            sample.DeformationDeltaAvailable = deltaAvailable;
+            sample.ComparedVertexCount = comparedVertexCount;
+            sample.SampledVertexCount = sampledVertexCount;
+            sample.MaximumLocalVertexDelta = maximumDelta;
+            sample.MeanLocalVertexDelta = meanDelta;
 
             RuntimeRendererFrameProbe.RecordSample(_token, _rendererIndex, sample);
         }

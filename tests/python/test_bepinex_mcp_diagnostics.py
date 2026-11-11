@@ -32,6 +32,8 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             ["entityKeyId"],
             schemas["diagnostics_start_renderer_frame_probe"]["required"],
         )
+        self.assertIn("sampleClipContains", schemas["diagnostics_start_renderer_frame_probe"]["properties"])
+        self.assertIn("sampleMovementState", schemas["diagnostics_start_renderer_frame_probe"]["properties"])
         self.assertEqual(
             ["Player", "AI"],
             schemas["diagnostics_spawn_entity"]["properties"]["side"]["enum"],
@@ -40,7 +42,13 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method):
             started = SERVER.execute_tool(
                 "diagnostics_start_renderer_frame_probe",
-                {"entityKeyId": "307", "rendererNameContains": "Body", "sampleLimit": 8},
+                {
+                    "entityKeyId": "307",
+                    "rendererNameContains": "Body",
+                    "sampleLimit": 8,
+                    "sampleClipContains": "Action_Walk",
+                    "sampleMovementState": "moving",
+                },
             )
             read = SERVER.execute_tool("diagnostics_read_renderer_frame_probe", {"token": "probe-token"})
             stopped = SERVER.execute_tool("diagnostics_stop_renderer_frame_probe", {"token": "probe-token"})
@@ -48,10 +56,14 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "diagnostics_start_renderer_frame_probe",
                 {"entityKeyId": "307", "sampleLimit": "eight"},
             )
+            invalid_filter = SERVER.execute_tool(
+                "diagnostics_start_renderer_frame_probe",
+                {"entityKeyId": "307", "sampleMovementState": "running"},
+            )
 
         self.assertEqual(
             [
-                ("StartRendererFrameProbeJson", ["307", "Body", 8]),
+                ("StartRendererFrameProbeJson", ["307", "Body", 8, "Action_Walk", "moving"]),
                 ("ReadRendererFrameProbeJson", ["probe-token"]),
                 ("StopRendererFrameProbeJson", ["probe-token"]),
             ],
@@ -61,6 +73,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertFalse(response["isError"])
             self.assertFalse(json.loads(response["content"][0]["text"])["pixelCapture"])
         self.assertTrue(invalid["isError"])
+        self.assertTrue(invalid_filter["isError"])
 
     def test_wait_for_renderer_frame_evidence_matches_distinct_frames_and_stops_probe(self) -> None:
         calls: list[tuple[str, list[object]]] = []
@@ -119,7 +132,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertFalse(payload["pixelCapture"])
         self.assertFalse(payload["computerUseRequired"])
         self.assertEqual([
-            ("StartRendererFrameProbeJson", ["254", "", 12]),
+            ("StartRendererFrameProbeJson", ["254", "", 12, "Action_Walk", "moving"]),
             ("ReadRendererFrameProbeJson", ["probe-token"]),
             ("StopRendererFrameProbeJson", ["probe-token"]),
         ], calls)
@@ -169,6 +182,54 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(payload["timedOut"])
         self.assertTrue(payload["probeStopped"])
         self.assertIn("StopRendererFrameProbeJson", calls)
+
+    def test_wait_confirms_observer_removal_when_stop_token_is_missing(self) -> None:
+        samples = []
+        for frame in (201, 202):
+            samples.append({
+                "frame": frame,
+                "cameraRenderCallbackObserved": True,
+                "cameraTargetTextureAssigned": False,
+                "rendererEnabled": True,
+                "rendererIsVisible": True,
+                "boundsIntersectsCameraFrustum": True,
+                "layerIncludedByCameraCullingMask": True,
+                "activeClip": "IroncladWalker_Action_Walk",
+                "isMoving": True,
+                "deformationDeltaAvailable": True,
+                "maximumLocalVertexDelta": 0.1,
+                "retargetPresent": True,
+                "retargetBound": True,
+                "retargetSuspended": False,
+                "boundMappingCount": 8,
+            })
+        probe = {"success": True, "status": "active", "token": "probe-token", "renderers": [{"name": "Body", "samples": samples}]}
+
+        def fake_diagnostics_method(method: str, _args: list[object] | None = None) -> str:
+            if method == "StartRendererFrameProbeJson":
+                return json.dumps({"success": True, "token": "probe-token"})
+            if method == "ReadRendererFrameProbeJson":
+                return json.dumps(probe)
+            if method == "StopRendererFrameProbeJson":
+                return json.dumps({"success": False, "error": "Probe token was not found or has expired."})
+            raise AssertionError(method)
+
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method), \
+                mock.patch.object(SERVER, "_call_http", return_value="[]"):
+            response = SERVER.execute_tool("diagnostics_wait_for_renderer_frame_evidence", {
+                "entityKeyId": "254",
+                "activeClipContains": "Action_Walk",
+                "requiredEvidence": ["moving", "deformation", "retargetBound", "visibleToCamera"],
+                "minimumMatchingFrames": 2,
+                "timeoutSeconds": 1,
+            })
+
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(payload["conditionMet"])
+        self.assertTrue(payload["probeStopped"])
+        self.assertTrue(payload["success"])
+        self.assertEqual(0, payload["probeCleanupVerification"]["remainingObserverCount"])
+        self.assertIn("stopWarning", payload)
 
     def test_wait_for_renderer_frame_evidence_rejects_invalid_thresholds_before_start(self) -> None:
         with mock.patch.object(SERVER, "_call_diagnostics_method") as bridge_call:
@@ -288,7 +349,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(payload["success"])
         self.assertEqual(3, payload["completedSteps"])
         self.assertEqual(("OrderUnitMoveJson", ["sample-native:assault-walker#254", -45.5, 90.0]), calls[1])
-        self.assertEqual(("StartRendererFrameProbeJson", ["sample-native:assault-walker#254", "", 12]), calls[2])
+        self.assertEqual(("StartRendererFrameProbeJson", ["sample-native:assault-walker#254", "", 12, "Action_Walk", "moving"]), calls[2])
         self.assertEqual(("StopRendererFrameProbeJson", ["probe-token"]), calls[-1])
         self.assertTrue(payload["results"][2]["result"]["conditionMet"])
         self.assertTrue(payload["results"][2]["result"]["probeStopped"])
@@ -1057,7 +1118,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "method": "initialize",
             "params": {"protocolVersion": "2024-11-05"},
         })
-        self.assertEqual("1.4.5", response["result"]["serverInfo"]["version"])
+        self.assertEqual("1.4.6", response["result"]["serverInfo"]["version"])
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
@@ -1556,7 +1617,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(392, total_props)
+        self.assertEqual(394, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()
