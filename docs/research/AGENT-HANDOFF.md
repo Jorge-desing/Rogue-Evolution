@@ -548,6 +548,13 @@ The repository equips 15 local skills under `.agents/skills/`:
 
 For texture work, use [PBR-TEXTURE-WORKFLOW.md](PBR-TEXTURE-WORKFLOW.md) as the shared handoff. Blender 4.5.14 remains the reproducible atlas baseline; Material Maker 1.7 is the required local authoring pass and is run headlessly by `tools/Run-MaterialMakerBake.ps1` with a temporary export target and rendering-device workaround, while ArmorPaint remains optional when its official binary is available to the user. External texture tools export images only, while Unity's existing builder remains responsible for importer settings and prefab material wiring. Prepare local copies with `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker`.
 
+### Optional Hardflow Vehicle Modeling
+
+- Hardflow 1.23.0 is staged from its official release ZIP with SHA-256 `5f4b2fe1eddfc3b4d0397d8052a8fbdfe8bf8f4292c0b8c6ff79bee00349b947` by `tools/Setup-Hardflow.ps1`. It installs into a project-local Blender extension profile under ignored `.tools/`; launch it with `tools/Start-BlenderWithHardflow.ps1` to keep the user's regular Blender preferences unchanged.
+- Use it for hand-authored hard-surface vehicle geometry such as armor cutouts, vents, bolt circles, welded seams, and routed cables. The primary Blender source, generated FBX, UVs, vertex wear, sockets, model budgets, and Material Maker texture contract remain authoritative. Hardflow is optional and is not imported by headless builders or pack validators.
+- The upstream manifest declares Blender 4.2+; the project is pinned to Blender 4.5.14 and setup verifies activation there. Extension availability/mesh smoke checks are local authoring evidence, not in-game render evidence.
+- Local Blender 4.5.14 validation installed Hardflow, repeated setup successfully, rejected an incorrect expected hash without altering the archive, and visually applied a rectangular boolean cut plus six vent slots to the temporary `TEMP_HARDFLOW_TEST_PLATE` in `artifacts/hardflow-smoke-20261110/HardflowSmoke.blend`. The saved single mesh has 68 vertices, 41 faces, no modifiers, and no non-manifold edges. This does not establish in-game appearance.
+
 ### Domain Technical Details
 
 #### 1. 3D Model Authoring & BMesh Vertex Shading

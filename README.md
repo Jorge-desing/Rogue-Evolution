@@ -37,6 +37,15 @@ Unity 2021.3.45f2 ya está instalado para compilar AssetBundles. Blender 4.5.14 
 .\tools\Setup-ContentAuthoringTools.ps1 -Blender -UnityExplorer
 ```
 
+Hardflow 1.23.0 es una herramienta opcional para modelado geométrico manual de vehículos. Instálala con el Blender fijado y su perfil aislado del proyecto:
+
+```powershell
+.\tools\Setup-Hardflow.ps1
+.\tools\Start-BlenderWithHardflow.ps1
+```
+
+El instalador verifica el SHA-256 de la release oficial y guarda la extensión, configuración y preferencias bajo `.tools/`; no modifica el perfil global de Blender. Usa Hardflow para cortes de placas, rejillas, pernos, cordones y conducciones. Blender y sus exportadores siguen siendo la autoridad del mesh/FBX; conserva la jerarquía, pivotes, sockets, `Color RGBA` y presupuestos del modelo. Los UVs y las texturas finales siguen el flujo existente con Blender y Material Maker; Hardflow no es requisito para los generadores headless ni para compilar packs.
+
 El script verifica SHA-256 y solo prepara Blender y UnityExplorer bajo `.tools/`. Runtime Unity Editor se prepara por separado con `./tools/Setup-BackendTools.ps1 -RuntimeUnityEditor`; también verifica SHA-256. Ninguno de estos scripts copia archivos al juego ni lo inicia. Los inspectores requieren BepInEx 5 Mono y se añaden a la instalación de Steam solo durante una prueba reversible, usando uno por perfil de prueba.
 
 Para preparar Material Maker 1.7 como herramienta PBR obligatoria, ejecuta desde la raíz del repositorio `powershell -File tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker`. El script verifica el SHA-256 publicado para la release y deja la aplicación en `.tools/MaterialMaker-1.7/`. El contrato de workflows está en `tools/material-maker/rogue-command-material-maker.json` y cubre `urp`, `blender`, `three_d` y `procedural`; valida su integridad con `python tools/validate_material_maker_config.py`. El bake automático se ejecuta con `powershell -File tools/Run-MaterialMakerBake.ps1 -Workflow urp` (o el workflow correspondiente); crea temporalmente el target y workaround de exportación, espera el dispositivo de render y restaura la configuración local al terminar. ArmorPaint se distribuye como binario portable con acceso de compra y permanece opcional; si ya tienes acceso, usa `-ArmorPaintArchivePath <ZIP-oficial>`. Ambos flujos se mantienen fuera del proyecto Unity y de la instalación del juego. Sigue [PBR-TEXTURE-WORKFLOW.md](docs/research/PBR-TEXTURE-WORKFLOW.md) y las dos skills PBR antes de integrar mapas.
