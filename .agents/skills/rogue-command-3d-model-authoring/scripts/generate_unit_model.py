@@ -3657,6 +3657,9 @@ def main():
             "lod_levels": res.get("lod_levels", {}),
             "colliders": res.get("colliders", []),
             "budget_diagnostics": res.get("budget_diagnostics", {}),
+            "face_budget_reduction": res.get("face_budget_reduction", {}),
+            "face_budget_limit": res.get("face_budget_limit", 6000),
+            "face_budget_passed": res.get("face_budget_passed", False),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report_data, indent=2), encoding="utf-8")

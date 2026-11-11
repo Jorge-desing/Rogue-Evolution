@@ -56,7 +56,7 @@ def reduce_subpixel_details_to_budget(
     builder,
     max_faces: int = 6000,
     max_dimension_m: float = 0.60,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Apply RogueModelKit's shared, protected fitting simplification pass."""
     import RogueModelKit as rmk
 
@@ -71,6 +71,7 @@ def simplify_low_value_bevel_details(
     builder,
     max_dimension_m: float = 0.60,
     angle_degrees: float = 28.0,
+    max_surface_deviation_m: float = 0.02,
     protected_name_tokens: Sequence[str] = (
         "Weapon", "Cannon", "Gun", "Gatling", "Howitzer", "Barrel", "Missile",
         "Launcher", "Drill", "Auger", "Nanite", "Sensor", "Optic", "Lens",
@@ -79,17 +80,25 @@ def simplify_low_value_bevel_details(
         "Wheel", "Track", "Tread", "Leg", "Foot", "Actuator", "Treads_Belt",
         "Turret_BaseShell",
     ),
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Collapse redundant bevel facets on small fittings, leaving primary forms intact.
 
     The generator bakes bevels into source meshes. Dissolving only low-angle edges
-    on sub-60 cm details removes extra bevel rings while retaining a crisp chamfer.
-    Primary armor, articulated rigs, colliders, authored surface data, and named
-    role-defining hardware are excluded so the pass cannot erase authored shading,
-    vertex wear, UV boundaries, or the unit silhouette.
+    on small details removes redundant bevel rings while retaining a crisp chamfer.
+    Each change is rejected if bidirectional sampled surface displacement exceeds
+    the meter tolerance. Primary armor, articulated rigs, colliders, authored
+    surface data, and named role-defining hardware are excluded so the pass cannot
+    erase vertex wear, UV boundaries, or the unit silhouette.
     """
+    import RogueModelKit as rmk
+
     changed_meshes = 0
     faces_removed = 0
+    geometry_rejections = 0
+    max_accepted_deviation_m = 0.0
+    max_rejected_deviation_m = 0.0
+    if max_surface_deviation_m < 0.0:
+        raise ValueError("max_surface_deviation_m cannot be negative")
     limit = math.radians(angle_degrees)
     protected_tokens = tuple(token.casefold() for token in protected_name_tokens)
 
@@ -115,28 +124,57 @@ def simplify_low_value_bevel_details(
 
         bm = bmesh.new()
         bm.from_mesh(obj.data)
-        old_count = len(bm.faces)
+        candidate_bm = bm.copy()
+        old_count = len(candidate_bm.faces)
         bmesh.ops.dissolve_limit(
-            bm,
+            candidate_bm,
             angle_limit=limit,
             use_dissolve_boundaries=False,
-            verts=list(bm.verts),
-            edges=list(bm.edges),
+            verts=list(candidate_bm.verts),
+            edges=list(candidate_bm.edges),
             delimit={"MATERIAL", "UV", "SHARP", "SEAM"},
         )
-        new_count = len(bm.faces)
+        new_count = len(candidate_bm.faces)
         if new_count < old_count:
-            bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
-            bm.to_mesh(obj.data)
-            obj.data.update()
-            changed_meshes += 1
-            faces_removed += old_count - new_count
+            world_scale = max(float(value) for value in obj.matrix_world.to_scale())
+            deviation_m = rmk.symmetric_bmesh_surface_deviation(
+                bm, candidate_bm, world_scale=world_scale,
+            )
+            accumulated_deviation_m = rmk.get_accumulated_surface_deviation_m(obj)
+            proposed_deviation_m = accumulated_deviation_m + deviation_m
+            if proposed_deviation_m <= max_surface_deviation_m:
+                bmesh.ops.recalc_face_normals(
+                    candidate_bm, faces=list(candidate_bm.faces),
+                )
+                candidate_bm.to_mesh(obj.data)
+                obj.data.update()
+                accumulated_deviation_m = rmk.record_surface_deviation_m(obj, deviation_m)
+                changed_meshes += 1
+                faces_removed += old_count - new_count
+                max_accepted_deviation_m = max(
+                    max_accepted_deviation_m, accumulated_deviation_m,
+                )
+            else:
+                geometry_rejections += 1
+                max_rejected_deviation_m = max(
+                    max_rejected_deviation_m, proposed_deviation_m,
+                )
+        candidate_bm.free()
         bm.free()
 
-    summary = {"changed_meshes": changed_meshes, "faces_removed": faces_removed}
+    summary = {
+        "changed_meshes": changed_meshes,
+        "faces_removed": faces_removed,
+        "geometry_rejections": geometry_rejections,
+        "max_surface_deviation_m": round(max_accepted_deviation_m, 6),
+        "max_rejected_deviation_m": round(max_rejected_deviation_m, 6),
+    }
     print(
         f"[visual-detail-budget] simplified {changed_meshes} small meshes; "
-        f"removed {faces_removed} redundant bevel faces"
+        f"removed {faces_removed} redundant bevel faces; "
+        f"rejected {geometry_rejections} changes above "
+        f"{max_surface_deviation_m:.3f} m "
+        f"(max rejected {max_rejected_deviation_m:.3f} m)"
     )
     return summary
 

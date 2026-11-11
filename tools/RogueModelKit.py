@@ -16,8 +16,10 @@ from typing import Any, Dict, Sequence, Tuple
 
 import bpy, bmesh
 from mathutils import Vector, Euler, Quaternion, Matrix
+from mathutils.bvhtree import BVHTree
 
 DEFAULT_FACE_BUDGET = 6000
+_SURFACE_DEVIATION_BUDGETS: dict[int, float] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -26,6 +28,7 @@ DEFAULT_FACE_BUDGET = 6000
 
 def clear_scene() -> None:
     """Clear all objects, meshes, materials, and lights from the current scene."""
+    _SURFACE_DEVIATION_BUDGETS.clear()
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
     for datablocks in (bpy.data.meshes, bpy.data.materials, bpy.data.cameras, bpy.data.lights):
@@ -34,23 +37,70 @@ def clear_scene() -> None:
                 datablocks.remove(datablock)
 
 
+def symmetric_bmesh_surface_deviation(
+    source: bmesh.types.BMesh,
+    candidate: bmesh.types.BMesh,
+    world_scale: float = 1.0,
+) -> float:
+    """Measure sampled bidirectional surface displacement between two meshes."""
+    def samples(bm: bmesh.types.BMesh) -> list[Vector]:
+        points = [vert.co.copy() for vert in bm.verts]
+        points.extend((edge.verts[0].co + edge.verts[1].co) * 0.5 for edge in bm.edges)
+        points.extend(face.calc_center_median() for face in bm.faces)
+        return points
+
+    def directed_distance(points: Sequence[Vector], tree: BVHTree) -> float:
+        maximum = 0.0
+        for point in points:
+            nearest = tree.find_nearest(point)
+            if nearest is None:
+                return float("inf")
+            maximum = max(maximum, float(nearest[3]))
+        return maximum
+
+    source_tree = BVHTree.FromBMesh(source)
+    candidate_tree = BVHTree.FromBMesh(candidate)
+    local_deviation = max(
+        directed_distance(samples(source), candidate_tree),
+        directed_distance(samples(candidate), source_tree),
+    )
+    return local_deviation * max(float(world_scale), 0.0)
+
+
+def get_accumulated_surface_deviation_m(obj: bpy.types.Object) -> float:
+    """Return geometry deviation already spent on this mesh during this build."""
+    return _SURFACE_DEVIATION_BUDGETS.get(int(obj.as_pointer()), 0.0)
+
+
+def record_surface_deviation_m(obj: bpy.types.Object, deviation_m: float) -> float:
+    """Add an accepted deviation step and return the accumulated upper bound."""
+    pointer = int(obj.as_pointer())
+    total = _SURFACE_DEVIATION_BUDGETS.get(pointer, 0.0) + max(float(deviation_m), 0.0)
+    _SURFACE_DEVIATION_BUDGETS[pointer] = total
+    return total
+
+
 def reduce_subpixel_details_to_budget(
     objects: Sequence[bpy.types.Object],
     max_faces: int = DEFAULT_FACE_BUDGET,
     max_dimension_m: float = 0.60,
-) -> Dict[str, int]:
+    max_surface_deviation_m: float = 0.02,
+) -> Dict[str, Any]:
     """Remove redundant bevel splits from small fittings when an asset exceeds its face cap.
 
     This deliberately leaves large forms, weapon systems, mobility, sensors, and
     articulated equipment untouched. Meshes with Color data, vertex groups or
     armature modifiers, material splits, or explicit sharp/seam edges are skipped
     because those boundaries must remain exact. UV boundaries are passed to the
-    dissolve operator. The bounded second stage reaches fittings up to 0.90 m; if
-    the model remains over budget, the export gate fails for a model-specific
-    redesign.
+    dissolve operator. Each candidate must stay within a symmetric, sampled
+    surface-distance budget, accumulated across passes. The bounded second stage
+    reaches fittings up to 1.20 m; if the model remains over budget, the export
+    gate fails for a model-specific redesign.
     """
     if max_faces <= 0:
         raise ValueError("max_faces must be greater than zero")
+    if max_surface_deviation_m < 0.0:
+        raise ValueError("max_surface_deviation_m cannot be negative")
 
     bpy.context.view_layer.update()
     mesh_objects = [
@@ -64,6 +114,9 @@ def reduce_subpixel_details_to_budget(
             "faces_after": initial_faces,
             "faces_removed": 0,
             "changed_meshes": 0,
+            "geometry_rejections": 0,
+            "max_surface_deviation_m": 0.0,
+            "max_rejected_deviation_m": 0.0,
         }
 
     protected_tokens = (
@@ -85,31 +138,48 @@ def reduce_subpixel_details_to_budget(
     )
     changed_names: set[str] = set()
     remaining_faces = initial_faces
+    geometry_rejections = 0
+    max_accepted_deviation_m = 0.0
+    max_rejected_deviation_m = 0.0
 
-    def dissolve_one(obj: bpy.types.Object, angle_degrees: float) -> int:
+    def dissolve_one(obj: bpy.types.Object, angle_degrees: float) -> tuple[int, float]:
         before = len(obj.data.polygons)
         bm = bmesh.new()
         bm.from_mesh(obj.data)
+        candidate_bm = bm.copy()
         bmesh.ops.dissolve_limit(
-            bm,
+            candidate_bm,
             angle_limit=math.radians(angle_degrees),
             use_dissolve_boundaries=False,
-            verts=list(bm.verts),
-            edges=list(bm.edges),
+            verts=list(candidate_bm.verts),
+            edges=list(candidate_bm.edges),
             delimit={"MATERIAL", "UV", "SHARP", "SEAM"},
         )
-        after = len(bm.faces)
+        after = len(candidate_bm.faces)
+        deviation_m = 0.0
+        accepted_deviation_m = get_accumulated_surface_deviation_m(obj)
         if after < before:
-            bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
-            bm.to_mesh(obj.data)
+            world_scale = max(float(value) for value in obj.matrix_world.to_scale())
+            deviation_m = symmetric_bmesh_surface_deviation(
+                bm, candidate_bm, world_scale=world_scale,
+            )
+            proposed_total_deviation_m = accepted_deviation_m + deviation_m
+            if proposed_total_deviation_m > max_surface_deviation_m:
+                candidate_bm.free()
+                bm.free()
+                return 0, proposed_total_deviation_m
+            bmesh.ops.recalc_face_normals(candidate_bm, faces=list(candidate_bm.faces))
+            candidate_bm.to_mesh(obj.data)
             obj.data.update()
+            deviation_m = record_surface_deviation_m(obj, deviation_m)
+        candidate_bm.free()
         bm.free()
-        return before - after
+        return before - after, deviation_m
 
     priority_tokens = ("bolt", "fastener", "rivet", "weld", "lug", "shackle", "hinge")
     for dimension_limit, stage_protected_tokens in (
         (max_dimension_m, protected_tokens),
-        (0.90, fallback_protected_tokens),
+        (1.20, fallback_protected_tokens),
     ):
         candidates = [
             obj for obj in mesh_objects
@@ -132,10 +202,14 @@ def reduce_subpixel_details_to_budget(
             for obj in candidates:
                 if remaining_faces <= max_faces:
                     break
-                removed = dissolve_one(obj, angle_degrees)
+                removed, deviation_m = dissolve_one(obj, angle_degrees)
                 if removed:
                     changed_names.add(obj.name)
                     remaining_faces -= removed
+                    max_accepted_deviation_m = max(max_accepted_deviation_m, deviation_m)
+                elif deviation_m > max_surface_deviation_m:
+                    geometry_rejections += 1
+                    max_rejected_deviation_m = max(max_rejected_deviation_m, deviation_m)
             if remaining_faces <= max_faces:
                 break
         if remaining_faces <= max_faces:
@@ -146,11 +220,17 @@ def reduce_subpixel_details_to_budget(
         "faces_after": remaining_faces,
         "faces_removed": initial_faces - remaining_faces,
         "changed_meshes": len(changed_names),
+        "geometry_rejections": geometry_rejections,
+        "max_surface_deviation_m": round(max_accepted_deviation_m, 6),
+        "max_rejected_deviation_m": round(max_rejected_deviation_m, 6),
     }
     print(
         f"[subpixel-face-budget] faces {initial_faces}->{remaining_faces} "
         f"(removed {initial_faces - remaining_faces}) across "
-        f"{len(changed_names)} small-detail meshes"
+        f"{len(changed_names)} small-detail meshes; "
+        f"{geometry_rejections} shape changes rejected at "
+        f"{max_surface_deviation_m:.3f} m tolerance "
+        f"(max rejected {max_rejected_deviation_m:.3f} m)"
     )
     return result
 
@@ -159,7 +239,7 @@ def enforce_face_budget_before_export(
     objects: Sequence[bpy.types.Object],
     model_name: str,
     max_faces: int = DEFAULT_FACE_BUDGET,
-) -> Dict[str, int]:
+) -> Dict[str, Any]:
     """Apply the safe fitting pass and reject exports that still exceed the cap."""
     reduction = reduce_subpixel_details_to_budget(objects, max_faces=max_faces)
     face_count = sum(
