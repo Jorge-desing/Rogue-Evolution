@@ -256,3 +256,7 @@ Para afirmar que una carta apareció, registra la oferta que realmente se render
 - **Sondas:** los componentes temporales `Rcl*Probe`, el helper `RclRuntimeTimeControl` y la acción temporal se retiraron. La lista final de componentes de `InGameMenuCanvas` contenía solo componentes del juego. Las salidas de validación están bajo `artifacts/`.
 
 Las notas de ejecución anteriores describen perfiles y procesos observados en sesiones pasadas. Para la siguiente aceptación que omita `FirstRun`, sigue el procedimiento QA aislado de arriba: registra el selector actual, usa un perfil QA sin run guardado y restaura el selector original después de cerrar el juego. No cambies a Profile 2 ni sobrescribas o elimines perfiles para volver a un estado limpio.
+
+## Opener `LoadingHider` tras la carga de nivel (2026-11-11)
+
+La escena `Game` puede estar activa con `Time.timeScale=1` mientras `LoadingHider` todavía tapa el mapa y espera el botón nativo `Iniciar`. Antes de interpretar órdenes Move, verifica el objeto y el estado `interactable` de su botón; actívalo por el EventSystem/UI nativo. Una orden emitida antes de despejar el opener no demuestra que la unidad haya empezado a moverse. En la pasada d576 de fábrica, el producto Walker solo se desplazó después de invocar ese botón. Informe: [RETARGET-D576-FACTORY-WALK-RUNTIME-2026-11-11.md](RETARGET-D576-FACTORY-WALK-RUNTIME-2026-11-11.md).
