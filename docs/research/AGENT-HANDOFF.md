@@ -1,9 +1,20 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
-**Updated:** 2026-11-10
+**Updated:** 2026-11-11
 **Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
+
+---
+
+## 2026-11-11 Active Stage AI Association MCP Diagnostic
+
+- **Bridge feature:** BepInEx MCP server 1.4.5 adds `diagnostics_get_active_stage_ai_association` to the default tool list and fast `match` snapshot. The endpoint resolves `StageMap.CurrentStage` against the loader's captured stage sequence and stable `rclStageOrderV1` marker; custom stages expose their qualified ID and stage-declared `aiProfileIds`, while native stages expose their native StageParameters asset identity. It separately reports initialized loader-bound AI profiles and instance counts. Unknown stage identity fails closed, and localized preview text is not used. The generated MCP catalog contains 239 tools; compact tool schemas are 90,163 bytes (under the 91,000-byte bound).
+- **Local validation:** Release build passed with 0 warnings and 0 errors; `py_compile` passed for `tools/build_bepinex_mcp.py` and `tools/bepinex_mcp_server.py`; the MCP catalog generated 239 schemas. No unit tests were run in this pass.
+- **In-game runtime evidence:** Through the local BepInEx MCP bridge, existing Profile2 resumed to `IntermissionScreen` at level 3, stage 0. The endpoint resolved `native:StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit` from `persisted_rclStageOrderV1`; the stage declared zero loader `aiProfileIds`, and the endpoint observed zero loader-bound AI profiles/instances. No route node was advanced and no Game-scene AI execution was measured. A zero binding count at intermission is not AI behavior evidence. Full result: `artifacts/runtime-smoke/active-stage-ai-association-20261111T0218Z/runtime-evidence.json`.
+- **Profile, Cloud, and exit:** The actual selector remained `2`; Profile2 `mainTutorialIsFinished` and `playerHasFinishedLevel1` remained true. Rogue Command exited through the bridge. The post-run checkpoint found an exact match across all profile files and the selector, with no changed, added, or missing files. Steam Cloud for the app was already disabled by the user (`enabledForApp=false`, account Cloud true); this pass made no Cloud setting changes. No screenshots or Computer Use were used.
+- **Deployment:** With the game closed, Release artifact and installed plugin match SHA-256 `a768d2935fd37127b63b879a6220bdef83e463a563ad74d8a093c79f7b6c3abe`. Pre-deploy backup/hash manifest: `artifacts/deployment-backups/active-stage-ai-association-20261111T021758Z/deployment-manifest.json`; backup hash was `48dcdda28eb9d5576d949f75c67f2d10a9b4c201e68deb2bd451b00ae224e837`.
+- **Skill/rule synchronization:** Updated AI authoring, clean-room diagnostics, game research, modding tools, Steam runtime validation, and `AGENTS.md` to document stable stage identity and the distinction between configured profile IDs and live loader-bound instances.
 
 ---
 

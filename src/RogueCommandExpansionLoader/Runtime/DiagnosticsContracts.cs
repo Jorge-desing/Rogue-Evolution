@@ -105,6 +105,71 @@ namespace RogueCommandExpansionLoader.Runtime
         public IReadOnlyList<string> AiProfileIds { get; private set; }
     }
 
+    /// <summary>
+    /// Stable active stage identity from the loader's StageMap sequence, plus the AI profile IDs
+    /// explicitly declared by a custom stage. Native localized preview labels are not identities.
+    /// </summary>
+    public sealed class ActiveStageAiAssociationDiagnostic
+    {
+        public ActiveStageAiAssociationDiagnostic(
+            bool stageIdentityResolved,
+            int stageMapIndex,
+            string stageId,
+            string packId,
+            string stageKind,
+            string identitySource,
+            string failureReason,
+            IEnumerable<string> declaredAiProfileIds)
+        {
+            StageIdentityResolved = stageIdentityResolved;
+            StageMapIndex = stageMapIndex;
+            StageId = stageId ?? string.Empty;
+            PackId = packId ?? string.Empty;
+            StageKind = stageKind ?? string.Empty;
+            IdentitySource = identitySource ?? string.Empty;
+            FailureReason = failureReason ?? string.Empty;
+
+            var profileIds = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            if (declaredAiProfileIds != null)
+            {
+                foreach (string profileId in declaredAiProfileIds)
+                {
+                    if (!String.IsNullOrWhiteSpace(profileId) && seen.Add(profileId))
+                    {
+                        profileIds.Add(profileId);
+                    }
+                }
+            }
+            DeclaredAiProfileIds = Array.AsReadOnly(profileIds.ToArray());
+        }
+
+        public bool StageIdentityResolved { get; private set; }
+        public int StageMapIndex { get; private set; }
+        public string StageId { get; private set; }
+        public string PackId { get; private set; }
+        public string StageKind { get; private set; }
+        public string IdentitySource { get; private set; }
+        public string FailureReason { get; private set; }
+        public IReadOnlyList<string> DeclaredAiProfileIds { get; private set; }
+
+        public static ActiveStageAiAssociationDiagnostic Unavailable(
+            string reason,
+            int stageMapIndex = -1,
+            string identitySource = "unknown")
+        {
+            return new ActiveStageAiAssociationDiagnostic(
+                false,
+                stageMapIndex,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                identitySource,
+                reason,
+                null);
+        }
+    }
+
     public sealed class AiProfileDiagnosticReport
     {
         public AiProfileDiagnosticReport(

@@ -165,3 +165,9 @@ The Hierarchical Utility-Blackboard Director coordinates macro strategy and micr
 - Confirm the live stage/profile association with a stable stage, template, or profile ID before advancing a saved run. `BattlePreviewWidget.EnemyInfoText` is a localized display label; do not infer a `nativeTemplateId` or profile ID from the label without a verified mapping.
 - In `IntermissionScreen`, an unavailable AI director and zero AI roster/factory counts mean no battle runtime is being observed. If the target association remains unknown, stop before selecting another route node and report `UNKNOWN`.
 - Scheduled-build acceptance requires a `Game` scene with the target profile active, then observed build/queue evidence and an AI-produced unit whose `originEntityId` matches its registered factory. The 2026-11-11 Profile2 probe did not reach this evidence gate; see `artifacts/runtime-smoke/ai-scheduled-build-20261111T012405Z/live-ai-runtime-pass-summary.json`.
+
+### Active stage association diagnostic
+
+- Use `diagnostics_get_active_stage_ai_association` to read the stable active stage ID before choosing a saved route node as an AI test. Custom-stage `declaredAiProfileIds` are configuration from the resolved stage definition; `runtimeBoundAiProfiles` and instance counts describe initialized loader-bound AI behaviours observed in the current scene.
+- Keep those fields separate. A native stage can have no loader-declared profile IDs, and an intermission with zero runtime bindings does not establish whether battle AI executes. The endpoint reports association and binding state, not tactical decisions, scheduler ticks, or production.
+- `identitySource` records whether identity came from the live progression sequence or persisted `rclStageOrderV1`. If `stageIdentityStatus` is unresolved, stop and report `UNKNOWN`; never substitute localized enemy preview text.

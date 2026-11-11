@@ -1,7 +1,7 @@
 ---
 name: rogue-command-clean-room-diagnostics
 description: "Clean-room in-game telemetry, diagnostic censuses, runtime gameplay command director, and BepInEx MCP bridge integration for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). [Diagnósticos runtime clean-room, censos de telemetría, director de comandos de gameplay y puente BepInEx MCP para Rogue Command]"
-version: 1.14.0
+version: 1.15.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -272,3 +272,10 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 - Require a stable live stage/template/profile identifier before treating a route as an AI test target. `BattlePreviewWidget.EnemyInfoText` is localized display text and may not map to `nativeTemplateId`; without a verified mapping, stop progression and label the association `UNKNOWN`.
 - In `IntermissionScreen`, zero director/roster/factory counts do not establish battle behavior. Continue evidence collection only after entering `Game` on a stage that is directly tied to the target profile, then capture its director, roster, scheduled-build events, queue, and produced-unit factory origin.
 - The 2026-11-11 Profile2 probe read `Patrulla Slime PCX` in the preview but had no stable stage/profile ID. It stopped before another route node; no scheduled build or AI production was observed. Evidence: `artifacts/runtime-smoke/ai-scheduled-build-20261111T012405Z/live-ai-runtime-pass-summary.json`.
+
+### Active stage AI association endpoint
+
+- `LoaderDiagnosticsComponent.GetActiveStageAiAssociationJson()` delegates stable identity resolution to `ContentPackRuntimeLoader.GetActiveStageAiAssociationDiagnostic()` and serializes the result through `AgentDiagnosticsFormatter.SerializeActiveStageAiAssociation()`. The local MCP tool is `diagnostics_get_active_stage_ai_association` (server 1.4.5); include it in schema generation and the `match` snapshot when changing bridge surfaces.
+- Resolve the current `StageMap` index against the captured loader progression sequence or persisted `rclStageOrderV1`. Return a qualified custom stage ID or native StageParameters asset ID. Fail closed with an explicit identity status/reason when sequence, index, or asset identity cannot be resolved. Do not use localized preview text.
+- Keep stage-declared profile IDs separate from initialized loader-bound profile IDs and instance counts. Put omission counters before collections in bounded JSON. A resolved association is configuration evidence; zero runtime bindings at intermission is not evidence of AI execution or absence of later combat behavior.
+- Runtime evidence from 2026-11-11: Profile2 resolved to native stage `native:StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit` at intermission, with no loader-declared IDs or loader-bound runtime profiles. The route was not advanced. See `artifacts/runtime-smoke/active-stage-ai-association-20261111T0218Z/runtime-evidence.json`.

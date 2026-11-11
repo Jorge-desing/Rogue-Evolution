@@ -1018,6 +1018,22 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Resolves the current StageMap identity and reports configured stage profile IDs beside
+        /// initialized live loader profile bindings, without using localized preview text.
+        /// </summary>
+        public string GetActiveStageAiAssociationJson()
+        {
+            ContentPackRuntimeLoader contentLoader = _provider as ContentPackRuntimeLoader;
+            ActiveStageAiAssociationDiagnostic stage = contentLoader != null
+                ? contentLoader.GetActiveStageAiAssociationDiagnostic()
+                : ActiveStageAiAssociationDiagnostic.Unavailable("stage_identity_provider_unavailable");
+            return AgentDiagnosticsFormatter.SerializeActiveStageAiAssociation(
+                stage,
+                SafeSnapshot(),
+                32);
+        }
+
+        /// <summary>
         /// Grants economy credits to a bank account (default: "Player") for live testing
         /// and balance calibration without GUI interaction.
         /// </summary>

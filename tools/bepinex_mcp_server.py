@@ -27,7 +27,7 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.4.4"
+SERVER_VERSION = "1.4.5"
 GAME_PROCESS_NAME = "Rogue Command.exe"
 GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
@@ -239,6 +239,7 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetPlayerRosterJson",
     "GetAiRosterJson",
     "GetRunProgressionCensusJson",
+    "GetActiveStageAiAssociationJson",
     "GetCombatStatusCensusJson",
     "GetProductionCensusJson",
     "GetEconomyMatchCensusJson",
@@ -1035,6 +1036,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                             "gameProcessState",
                             "gracefulPlayerExit",
                             "steamCloudStateAndPerAppToggle",
+                            "activeStageAiProfileAssociation",
                         ],
                     }
                     res = json.dumps(capabilities, indent=2)
@@ -1298,6 +1300,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
         elif name == "diagnostics_get_run_progression":
             res = _call_diagnostics_method("GetRunProgressionCensusJson")
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_active_stage_ai_association":
+            res = _call_diagnostics_method("GetActiveStageAiAssociationJson")
             return _tool_response(res)
 
         elif name == "diagnostics_grant_credits":
@@ -2793,7 +2799,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             preset = str(arguments.get("preset", "match")).lower().strip() or "match"
             presets = {
                 "gui": ["GetGuiStateJson", "GetGameTimeScaleJson", "GetCameraCensusJson", "GetRuntimeHooksStateJson"],
-                "match": ["GetSystemHealthJson", "GetMatchSummaryJson", "GetBattlefieldCensusJson", "GetRunProgressionCensusJson", "GetGameTimeScaleJson"],
+                "match": ["GetSystemHealthJson", "GetMatchSummaryJson", "GetBattlefieldCensusJson", "GetRunProgressionCensusJson", "GetActiveStageAiAssociationJson", "GetGameTimeScaleJson"],
                 "combat": ["GetBattlefieldCensusJson", "GetPlayerRosterJson", "GetAiRosterJson", "GetCombatStatusCensusJson", "GetUnitThreatAssessmentJson"],
                 "health": ["GetSystemHealthJson", "GetBaseIntegrityCensusJson", "GetProductionCensusJson", "GetAiDirectorCensusJson"],
             }

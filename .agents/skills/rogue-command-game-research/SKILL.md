@@ -61,6 +61,8 @@ For extending the loader's `LoaderDiagnosticsComponent` with agent-readable cens
 - Pure policy/DTO logic lives in testable formatters; bridge methods delegate and return JSON strings.
 - A process exit code 0 from the MCP server or Python wrapper is **not** functional success — inspect the JSON payload and verify the observable effect (see `rogue-command-clean-room-diagnostics` and `rogue-command-steam-runtime-validation`).
 
+For active AI-stage research, use `diagnostics_get_active_stage_ai_association` to resolve the current `StageMap` entry against the loader's progression sequence or persisted `rclStageOrderV1` marker. Treat custom stage `aiProfileIds` as declared configuration and runtime-bound profiles as a separate live observation. Native StageParameters identity is not a localized preview string. An unresolved identity remains `UNKNOWN`; zero loader-bound instances at intermission does not establish AI execution.
+
 ## References
 
 - [Live diagnostics bridge](references/live-diagnostics-bridge.md) — extending `LoaderDiagnosticsComponent` with censuses, getters, and command director methods.

@@ -325,6 +325,7 @@ namespace RogueCommandExpansionLoader.Content
         private bool _stageMapOrderFailureLogged;
         private object _stageMapSnapshotOwner;
         private List<object> _stageMapVisibleStages;
+        private string _stageMapIdentitySource = "unknown";
         private object _pendingStageMapSnapshotOwner;
         private string _pendingStageMapJson;
 
@@ -1530,6 +1531,7 @@ namespace RogueCommandExpansionLoader.Content
                 _pendingStageMapJson = null;
                 _stageMapSnapshotOwner = stageMap;
                 _stageMapVisibleStages = null;
+                _stageMapIdentitySource = "unknown";
                 List<object> visibleStages;
                 if (stageMap == null || !TryBuildVisibleStageSequence(out visibleStages))
                 {
@@ -1545,6 +1547,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 _stageMapVisibleStages = visibleStages;
+                _stageMapIdentitySource = "live_progression_sequence";
             }
         }
 
@@ -1554,6 +1557,9 @@ namespace RogueCommandExpansionLoader.Content
             {
                 _stageMapSnapshotOwner = stageMap;
                 _stageMapVisibleStages = null;
+                _stageMapIdentitySource = stageMap != null
+                    ? "persisted_stage_order_marker_pending"
+                    : "unknown";
                 if (stageMap == null)
                 {
                     _pendingStageMapSnapshotOwner = null;
@@ -1745,6 +1751,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 LogStageMapOrderFailure("A saved stage map has no valid loader stage-order marker; " +
                     "custom factories will be omitted from generic rewards for this map.");
+                _stageMapIdentitySource = "unknown";
                 ClearPendingStageMapOrder();
                 return false;
             }
@@ -1779,6 +1786,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 _stageMapSnapshotOwner = _pendingStageMapSnapshotOwner;
                 _stageMapVisibleStages = resolvedStages;
+                _stageMapIdentitySource = "persisted_rclStageOrderV1";
                 ClearPendingStageMapOrder();
                 return true;
             }
@@ -1787,6 +1795,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 LogStageMapOrderFailure("The saved stage-order marker did not resolve against the loaded content; " +
                     "custom factories will be omitted from generic rewards for this map.");
+                _stageMapIdentitySource = "unknown";
                 ClearPendingStageMapOrder();
             }
 
@@ -2021,6 +2030,127 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 scope.Entries.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Resolves the active StageMap index through the same runtime stage sequence used by
+        /// reward scoping. The sequence comes from the live progression or a successfully
+        /// resolved rclStageOrderV1 save marker; localized UI text is never consulted.
+        /// </summary>
+        public ActiveStageAiAssociationDiagnostic GetActiveStageAiAssociationDiagnostic()
+        {
+            lock (_gate)
+            {
+                if (!_runtimeContentReady)
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable("runtime_content_not_ready");
+                }
+
+                object stageMap;
+                IList levelMaps;
+                int stageMapIndex;
+                try
+                {
+                    stageMap = _gameStageMapField.GetValue(null);
+                    if (stageMap == null)
+                    {
+                        return ActiveStageAiAssociationDiagnostic.Unavailable("stage_map_unavailable");
+                    }
+
+                    stageMapIndex = (int)_stageMapCurrentStageProperty.GetValue(stageMap, null);
+                    levelMaps = _stageMapLevelMapsField.GetValue(stageMap) as IList;
+                }
+                catch
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable("stage_map_read_failed");
+                }
+
+                if (!System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner))
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        "stage_map_identity_sequence_not_captured",
+                        stageMapIndex,
+                        "unknown");
+                }
+
+                if (levelMaps == null || _stageMapVisibleStages == null ||
+                    levelMaps.Count != _stageMapVisibleStages.Count)
+                {
+                    string reason = System.Object.ReferenceEquals(stageMap, _pendingStageMapSnapshotOwner)
+                        ? "persisted_stage_order_marker_unresolved"
+                        : "stage_identity_sequence_unavailable";
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        reason,
+                        stageMapIndex,
+                        _stageMapIdentitySource);
+                }
+
+                if (stageMapIndex < 0 || stageMapIndex >= levelMaps.Count)
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        "stage_map_index_out_of_range",
+                        stageMapIndex,
+                        _stageMapIdentitySource);
+                }
+
+                object activeStage = BlueprintRewardStageResolver.ResolveVisibleStage(
+                    _stageMapVisibleStages,
+                    stageMapIndex);
+                if (activeStage == null)
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        "stage_identity_not_resolved",
+                        stageMapIndex,
+                        _stageMapIdentitySource);
+                }
+
+                for (int i = 0; i < _stages.Count; i++)
+                {
+                    LoadedStage loadedStage = _stages[i];
+                    if (loadedStage != null && loadedStage.Definition != null &&
+                        System.Object.ReferenceEquals(loadedStage.RuntimeStage, activeStage))
+                    {
+                        return new ActiveStageAiAssociationDiagnostic(
+                            true,
+                            stageMapIndex,
+                            loadedStage.Definition.id,
+                            loadedStage.PackId,
+                            "custom",
+                            _stageMapIdentitySource,
+                            string.Empty,
+                            loadedStage.Definition.aiProfileIds);
+                    }
+                }
+
+                try
+                {
+                    UnityEngine.Object stageParameters = _stageParametersField.GetValue(activeStage) as UnityEngine.Object;
+                    if (stageParameters == null || String.IsNullOrWhiteSpace(stageParameters.name))
+                    {
+                        return ActiveStageAiAssociationDiagnostic.Unavailable(
+                            "native_stage_asset_identity_unavailable",
+                            stageMapIndex,
+                            _stageMapIdentitySource);
+                    }
+
+                    return new ActiveStageAiAssociationDiagnostic(
+                        true,
+                        stageMapIndex,
+                        stageParameters.name,
+                        string.Empty,
+                        "native",
+                        _stageMapIdentitySource,
+                        string.Empty,
+                        null);
+                }
+                catch
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        "stage_asset_identity_read_failed",
+                        stageMapIndex,
+                        _stageMapIdentitySource);
+                }
             }
         }
 

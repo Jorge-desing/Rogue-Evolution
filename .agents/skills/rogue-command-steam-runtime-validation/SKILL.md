@@ -1,7 +1,7 @@
 ---
 name: rogue-command-steam-runtime-validation
 description: "Use when a Rogue Command claim needs live Steam evidence. Run a reversible, fail-closed validation session."
-version: 2.3.0
+version: 2.4.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -175,3 +175,9 @@ python tools/runtime_profile_checkpoint.py verify `
 - Navigate through the native RunSetup/story flow with BepInEx MCP. The run opener used a Unity `Selectable` at `RunSetup::RunOpenerStoryCanvas/CONTENTBackgroundImageEngineer/CONTENTTEXTStoryBoxEngineerHope/ConfirmButton`; use the exact accessibility-census path with `diagnostics_ui_click_text` for this class of control.
 - A preview label such as `Patrulla Slime PCX` is not a stable profile/template ID. If the live stage/profile link cannot be read, classify association as `UNKNOWN` and do not advance to another map node just to find a target profile.
 - After the game is closed, restore every backed-up Profile2 file and verify the all-profile checkpoint and original selector. This pass restored Profile2 byte-for-byte, kept tutorial flags true, and made no Cloud-setting change. It found no live AI director/roster/factory and did not prove scheduled construction. Evidence: `artifacts/runtime-smoke/ai-scheduled-build-20261111T012405Z/`.
+
+### Stable stage association read (2026-11-11)
+
+- Before advancing a saved route for an AI test, call `diagnostics_get_active_stage_ai_association`. Require `stageIdentityStatus=resolved` and record `qualifiedStageId` plus `identitySource`; do not infer an ID from localized preview text.
+- Record stage-declared IDs (`declaredAiProfileIds`) separately from initialized loader-bound runtime profiles and counts. A native stage with no loader-declared IDs and an intermission with zero runtime bindings do not establish combat AI behavior. Continue to the battle runtime gate only when a stage/profile target is directly resolved and the user-approved scenario requires progression.
+- The 2026-11-11 read resumed existing Profile2 with completed tutorial flags, stopped at intermission, and did not advance a route node. The stable stage resolved to native `StageParameters_Pools_Level1SimpleRoleChoiceWithPriceLimit`; no AI execution was measured. The full all-profile checkpoint matched exactly and Steam Cloud settings were not changed. Evidence: `artifacts/runtime-smoke/active-stage-ai-association-20261111T0218Z/runtime-evidence.json`.

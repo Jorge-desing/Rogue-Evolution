@@ -1,7 +1,7 @@
 ---
 name: rogue-command-modding-tools
 description: "Use Rogue Command tools for verified asset and pack work."
-version: 1.4.0
+version: 1.5.0
 license: MIT
 author: Hermes Agent
 metadata:
@@ -134,3 +134,10 @@ AI `unitEntries` and `productionBuildingEntries` both use the produced product's
 - Unity `Selectable` controls, including the RunSetup opener's `ConfirmButton`, use `diagnostics_ui_click_text` with the exact scene-qualified path from `diagnostics_get_ui_accessibility_census`; this performs the real EventSystem raycast/pointer sequence without screenshots or Computer Use.
 - Before confirming a new run, preserve a full profile checkpoint and read the overwrite dialog's exact title/body/confirm/cancel text. Afterward, close through BepInEx MCP, verify process exit, restore the active profile from its verified backup, and require an exact checkpoint match.
 - `diagnostics_get_ai_modules` and the loader audit are registry/readiness observations. For an AI runtime claim, first resolve a stable stage/template/profile ID. A localized `BattlePreviewWidget` enemy label alone cannot establish which profile is attached; stop and report `UNKNOWN` if no direct mapping exists. Profile2 evidence: `artifacts/runtime-smoke/ai-scheduled-build-20261111T012405Z/live-ai-runtime-pass-summary.json`.
+
+### Active stage AI association diagnostic
+
+- BepInEx MCP 1.4.5 adds `diagnostics_get_active_stage_ai_association` (239-tool schema catalog). It is also included in the fast `match` snapshot and runtime snapshot getter set.
+- Call it before advancing a saved route for AI acceptance. It resolves the active `StageMap` entry against the captured progression sequence and the persisted `rclStageOrderV1` identity; custom stages return their qualified ID and declared `aiProfileIds`, while native stages return the native StageParameters asset ID. It never maps a localized preview label to an ID.
+- Read configured IDs (`declaredAiProfileIds`) separately from initialized loader-bound behaviours (`runtimeBoundAiProfiles`, counts, and status). Empty runtime bindings at intermission do not describe combat AI behavior. An unresolved stage identity is a stop condition, not a reason to guess from preview text.
+- Regenerate local schemas with `python tools/build_bepinex_mcp.py`. This creates the catalog but does not cause an already connected MCP host to reload it automatically.

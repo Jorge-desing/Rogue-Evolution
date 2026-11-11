@@ -1019,6 +1019,96 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes stable StageMap identity and configured/live AI profile evidence separately.
+        /// Omission counters precede bounded profile collections.
+        /// </summary>
+        public static string SerializeActiveStageAiAssociation(
+            ActiveStageAiAssociationDiagnostic stage,
+            LoaderDiagnosticsSnapshot loaderSnapshot,
+            int maxProfiles = 32)
+        {
+            int limit = Math.Max(1, Math.Min(64, maxProfiles));
+            var configuredProfileIds = new List<string>();
+            int configuredProfileCount = stage != null && stage.DeclaredAiProfileIds != null
+                ? stage.DeclaredAiProfileIds.Count
+                : 0;
+            for (int i = 0; stage != null && stage.DeclaredAiProfileIds != null &&
+                i < stage.DeclaredAiProfileIds.Count && configuredProfileIds.Count < limit; i++)
+            {
+                string profileId = stage.DeclaredAiProfileIds[i];
+                if (!String.IsNullOrWhiteSpace(profileId))
+                {
+                    configuredProfileIds.Add(profileId);
+                }
+            }
+
+            var runtimeBoundProfiles = new List<Dictionary<string, object>>();
+            int runtimeBoundProfileCount = 0;
+            int runtimeBoundInstanceCount = 0;
+            IReadOnlyList<AiProfileDiagnosticReport> profiles = loaderSnapshot != null
+                ? loaderSnapshot.AiProfiles
+                : null;
+            if (profiles != null)
+            {
+                for (int i = 0; i < profiles.Count; i++)
+                {
+                    AiProfileDiagnosticReport profile = profiles[i];
+                    if (profile == null || profile.ActiveAiInstances <= 0)
+                    {
+                        continue;
+                    }
+
+                    runtimeBoundProfileCount++;
+                    runtimeBoundInstanceCount += profile.ActiveAiInstances;
+                    if (runtimeBoundProfiles.Count < limit)
+                    {
+                        runtimeBoundProfiles.Add(new Dictionary<string, object>
+                        {
+                            ["profileId"] = profile.ProfileId ?? string.Empty,
+                            ["packId"] = profile.PackId ?? string.Empty,
+                            ["activeAiInstances"] = profile.ActiveAiInstances,
+                        });
+                    }
+                }
+            }
+
+            bool identityResolved = stage != null && stage.StageIdentityResolved;
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "activeStageAiAssociation",
+                ["omittedConfiguredAiProfileCount"] = Math.Max(0, configuredProfileCount - configuredProfileIds.Count),
+                ["omittedRuntimeBoundProfileCount"] = Math.Max(0, runtimeBoundProfileCount - runtimeBoundProfiles.Count),
+                ["stageIdentityStatus"] = identityResolved ? "resolved" : "unknown",
+                ["stageMapIndex"] = stage != null ? stage.StageMapIndex : -1,
+                ["stageKind"] = stage != null ? stage.StageKind : string.Empty,
+                ["stageId"] = stage != null ? stage.StageId : string.Empty,
+                ["packId"] = stage != null ? stage.PackId : string.Empty,
+                ["qualifiedStageId"] = identityResolved
+                    ? (!String.IsNullOrWhiteSpace(stage.PackId)
+                        ? stage.PackId + ":" + stage.StageId
+                        : (String.Equals(stage.StageKind, "native", StringComparison.Ordinal)
+                            ? "native:" + stage.StageId
+                            : stage.StageId))
+                    : string.Empty,
+                ["identitySource"] = stage != null ? stage.IdentitySource : "unknown",
+                ["identityFailureReason"] = stage != null ? stage.FailureReason : "stage_identity_provider_unavailable",
+                ["declaredAssociationStatus"] = !identityResolved
+                    ? "unknown"
+                    : (configuredProfileCount > 0 ? "declared" : "none_declared"),
+                ["declaredAiProfileCount"] = configuredProfileCount,
+                ["declaredAiProfileIds"] = configuredProfileIds,
+                ["runtimeBindingStatus"] = profiles == null
+                    ? "unavailable"
+                    : (runtimeBoundProfileCount > 0 ? "bound" : "none_bound"),
+                ["runtimeBoundAiProfileCount"] = runtimeBoundProfileCount,
+                ["runtimeBoundAiInstanceCount"] = runtimeBoundInstanceCount,
+                ["runtimeBoundAiProfiles"] = runtimeBoundProfiles,
+                ["evidenceNote"] = "Configured IDs come from the resolved stage definition. Runtime counts include initialized loader-bound AI behaviours; zero runtime bindings do not negate a configured association.",
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the intermission level-select census. Field order is fixed
         /// by contract: counters (omittedNodeCount, nodeCount) come BEFORE the
         /// detail list (nodes) so bounded truncation never hides loss counts.

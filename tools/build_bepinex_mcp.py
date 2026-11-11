@@ -871,6 +871,11 @@ TOOL_SPECS = [
         "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
     },
     {
+        "name": "diagnostics_get_active_stage_ai_association",
+        "description": "Returns resolved StageMap ID, stage-declared AI profile IDs, and live initialized loader AI profile bindings. Read-only; no localized labels.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
         "name": "diagnostics_grant_credits",
         "description": "Grants economy credits to the player bank balance in-game via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
         "parameters": {
