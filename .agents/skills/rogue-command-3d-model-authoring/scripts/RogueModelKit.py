@@ -17,7 +17,7 @@ from typing import Any, Dict, Sequence, Tuple
 import bpy, bmesh
 from mathutils import Vector, Euler, Quaternion, Matrix
 
-DEFAULT_FACE_BUDGET = 7500
+DEFAULT_FACE_BUDGET = 6000
 
 
 # ---------------------------------------------------------------------------
@@ -741,112 +741,99 @@ def make_continuous_track_belt(
     y_pos: float = 0.0,
     track_sag: float = 0.0,
 ) -> bpy.types.Object:
-    """Creates a continuous articulated track belt with sloped front climb, rounded return idlers, and optional catenary sag."""
-    hw = width * 0.5
-    half_l = length * 0.5
-    approach_y = half_l * 0.68
-    front_apex_y = half_l * 0.98
+    """Create a hollow track ribbon that leaves the road-wheel bay open."""
+    half_width = width * 0.5
+    half_length = length * 0.5
+    front_approach_y = half_length * 0.68 + y_pos
+    rear_approach_y = -half_length * 0.72 + y_pos
+    front_apex_y = half_length * 0.98 + y_pos
+    rear_apex_y = -half_length * 0.98 + y_pos
     front_apex_z = ground_z + (height - ground_z) * 0.45
+    rear_apex_z = front_apex_z
+    front_top_y = half_length * 0.82 + y_pos
+    rear_top_y = -half_length * 0.80 + y_pos
 
-    rear_apex_y = -half_l * 0.98
-    rear_apex_z = ground_z + (height - ground_z) * 0.45
-    rear_approach_y = -half_l * 0.72
+    # Trace the outer belt path in the Y/Z plane, then inset it to create the
+    # belt thickness. Extruding that narrow ribbon over X leaves its center open.
+    outer = [
+        (rear_approach_y, ground_z),
+        (front_approach_y, ground_z),
+        (front_apex_y, front_apex_z),
+        (front_top_y, height),
+    ]
+    if track_sag > 0.001:
+        top_span = front_top_y - rear_top_y
+        outer.extend((
+            (rear_top_y + top_span * 0.67, height - track_sag * math.sin(math.pi * 0.67)),
+            (rear_top_y + top_span * 0.33, height - track_sag * math.sin(math.pi * 0.33)),
+        ))
+    outer.extend(((rear_top_y, height), (rear_apex_y, rear_apex_z)))
 
-    if track_sag <= 0.001:
-        vertices = [
-            # Ground contact run
-            (-hw, rear_approach_y + y_pos, ground_z),   # 0
-            ( hw, rear_approach_y + y_pos, ground_z),   # 1
-            ( hw, approach_y + y_pos, ground_z),        # 2
-            (-hw, approach_y + y_pos, ground_z),        # 3
-            # Front climb
-            ( hw, front_apex_y + y_pos, front_apex_z),  # 4
-            (-hw, front_apex_y + y_pos, front_apex_z),  # 5
-            # Front top curve
-            ( hw, half_l * 0.82 + y_pos, height),       # 6
-            (-hw, half_l * 0.82 + y_pos, height),       # 7
-            # Top return run
-            ( hw, -half_l * 0.80 + y_pos, height),      # 8
-            (-hw, -half_l * 0.80 + y_pos, height),      # 9
-            # Rear over curve
-            ( hw, rear_apex_y + y_pos, rear_apex_z),    # 10
-            (-hw, rear_apex_y + y_pos, rear_apex_z),    # 11
-        ]
+    twice_area = sum(
+        outer[index][0] * outer[(index + 1) % len(outer)][1]
+        - outer[(index + 1) % len(outer)][0] * outer[index][1]
+        for index in range(len(outer))
+    )
+    orientation = 1.0 if twice_area >= 0.0 else -1.0
+    inset = min(0.05, max(0.03, width * 0.10))
+    directions = []
+    normals = []
+    for index, point in enumerate(outer):
+        following = outer[(index + 1) % len(outer)]
+        dy = following[0] - point[0]
+        dz = following[1] - point[1]
+        edge_length = max(math.hypot(dy, dz), 1e-8)
+        directions.append((dy / edge_length, dz / edge_length))
+        normals.append((-orientation * dz / edge_length, orientation * dy / edge_length))
 
-        faces = [
-            (3, 2, 1, 0),        # Bottom ground run
-            (5, 4, 2, 3),        # Front approach climb
-            (7, 6, 4, 5),        # Front over-curve
-            (9, 8, 6, 7),        # Top return run
-            (11, 10, 8, 9),      # Rear over-curve
-            (0, 1, 10, 11),      # Rear under-curve
-            (0, 11, 9, 7, 5, 3), # Left side wall
-            (1, 2, 4, 6, 8, 10), # Right side wall
-        ]
-    else:
-        # Catenary Sag Track: 4 stations across top return run
-        y_top_front = half_l * 0.82 + y_pos
-        y_top_rear = -half_l * 0.80 + y_pos
-        top_span = y_top_front - y_top_rear
+    inner = []
+    for index, point in enumerate(outer):
+        previous = (index - 1) % len(outer)
+        d1, d2 = directions[previous], directions[index]
+        n1, n2 = normals[previous], normals[index]
+        p1 = (point[0] + n1[0] * inset, point[1] + n1[1] * inset)
+        p2 = (point[0] + n2[0] * inset, point[1] + n2[1] * inset)
+        denominator = d1[0] * d2[1] - d1[1] * d2[0]
+        if abs(denominator) < 1e-8:
+            inner.append((
+                point[0] + (n1[0] + n2[0]) * inset * 0.5,
+                point[1] + (n1[1] + n2[1]) * inset * 0.5,
+            ))
+            continue
+        distance = ((p2[0] - p1[0]) * d2[1] - (p2[1] - p1[1]) * d2[0]) / denominator
+        inner.append((p1[0] + distance * d1[0], p1[1] + distance * d1[1]))
 
-        sag_1 = height - track_sag * math.sin(math.pi * 0.67)
-        y_sag_1 = y_top_rear + top_span * 0.67
+    vertices = []
+    for (outer_y, outer_z), (inner_y, inner_z) in zip(outer, inner):
+        vertices.extend((
+            (x_pos - half_width, outer_y, outer_z),
+            (x_pos + half_width, outer_y, outer_z),
+            (x_pos - half_width, inner_y, inner_z),
+            (x_pos + half_width, inner_y, inner_z),
+        ))
 
-        sag_2 = height - track_sag * math.sin(math.pi * 0.33)
-        y_sag_2 = y_top_rear + top_span * 0.33
-
-        vertices = [
-            # Ground contact run
-            (-hw, rear_approach_y + y_pos, ground_z),   # 0
-            ( hw, rear_approach_y + y_pos, ground_z),   # 1
-            ( hw, approach_y + y_pos, ground_z),        # 2
-            (-hw, approach_y + y_pos, ground_z),        # 3
-            # Front climb
-            ( hw, front_apex_y + y_pos, front_apex_z),  # 4
-            (-hw, front_apex_y + y_pos, front_apex_z),  # 5
-            # Front top curve
-            ( hw, y_top_front, height),                 # 6
-            (-hw, y_top_front, height),                 # 7
-            # Sag station 1
-            ( hw, y_sag_1, sag_1),                      # 8
-            (-hw, y_sag_1, sag_1),                      # 9
-            # Sag station 2
-            ( hw, y_sag_2, sag_2),                      # 10
-            (-hw, y_sag_2, sag_2),                      # 11
-            # Top return rear point
-            ( hw, y_top_rear, height),                  # 12
-            (-hw, y_top_rear, height),                  # 13
-            # Rear over curve
-            ( hw, rear_apex_y + y_pos, rear_apex_z),    # 14
-            (-hw, rear_apex_y + y_pos, rear_apex_z),    # 15
-        ]
-
-        faces = [
-            (3, 2, 1, 0),                # Bottom ground run
-            (5, 4, 2, 3),                # Front approach climb
-            (7, 6, 4, 5),                # Front over-curve
-            (9, 8, 6, 7),                # Top return run front segment
-            (11, 10, 8, 9),              # Top return run mid catenary segment
-            (13, 12, 10, 11),            # Top return run rear segment
-            (15, 14, 12, 13),            # Rear over-curve
-            (0, 1, 14, 15),              # Rear under-curve
-            (0, 15, 13, 11, 9, 7, 5, 3), # Left side wall
-            (1, 2, 4, 6, 8, 10, 12, 14), # Right side wall
-        ]
+    faces = []
+    station_count = len(outer)
+    for index in range(station_count):
+        following = (index + 1) % station_count
+        base, next_base = index * 4, following * 4
+        faces.extend((
+            (base, next_base, next_base + 1, base + 1),
+            (base + 2, base + 3, next_base + 3, next_base + 2),
+            (base, next_base, next_base + 2, base + 2),
+            (base + 1, base + 3, next_base + 3, next_base + 1),
+        ))
 
     mesh = bpy.data.meshes.new(f"{name}_Mesh")
     mesh.from_pydata(vertices, [], faces)
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+    bm.to_mesh(mesh)
+    bm.free()
     mesh.update()
     obj = bpy.data.objects.new(name, mesh)
-    obj.location = (x_pos, 0.0, 0.0)
     bpy.context.collection.objects.link(obj)
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.mesh.normals_make_consistent(inside=False)
-    bpy.ops.object.mode_set(mode="OBJECT")
-    bpy.ops.object.transform_apply(location=True, rotation=False, scale=True)
     return finish_mesh(obj, tread_mat, 0.02)
 
 
@@ -878,7 +865,7 @@ def make_stepped_roadwheel(
         rotation=wheel_rot, vertices=max(8, vertices - 2), bevel=0.008
     ))
     # 3. Center hex axle cap
-    cap_offset = sign * (width * 0.5 + 0.018)
+    cap_offset = sign * (width * 0.5 + 0.024)
     objects.append(make_cylinder(
         f"{prefix}_AxleCap", radius * 0.32, 0.025,
         (loc_v.x + cap_offset, loc_v.y, loc_v.z), axle_mat,
@@ -923,7 +910,8 @@ def make_continuous_track_assembly(
 
     # 2. Stepped road wheels array along ground run
     half_l = length * 0.5
-    usable_l = half_l * 0.72
+    # Keep end road wheels clear of the tight front/rear return curves.
+    usable_l = half_l * 0.48
     step_y = (usable_l * 2.0) / (roadwheel_count - 1) if roadwheel_count > 1 else 0.0
     wheel_radius = (height - ground_z) * 0.34
     wheel_center_z = ground_z + wheel_radius + 0.02
@@ -7760,6 +7748,11 @@ def profile_model_budget_and_drawcalls(
     lod_dict: Dict[str, list[bpy.types.Object]] | None = None,
 ) -> Dict[str, Any]:
     """Provides face-budget, true triangulation, and draw-call diagnostics by subsystem."""
+    requested_target_budget = int(target_budget)
+    if requested_target_budget <= 0:
+        raise ValueError("target_budget must be greater than zero")
+    target_budget = min(requested_target_budget, DEFAULT_FACE_BUDGET)
+
     subsystems = {
         "Chassis & Hull": 0,
         "Turret & Cabin": 0,
@@ -7822,6 +7815,7 @@ def profile_model_budget_and_drawcalls(
         "total_vertices": total_verts,
         "materials_count": len(materials_used),
         "predicted_draw_calls": len(materials_used),
+        "requested_target_budget": requested_target_budget,
         "target_budget": target_budget,
         "budget_percentage": pct_of_budget,
         "subsystems": subsystems,
@@ -12650,19 +12644,25 @@ def apply_procedural_camouflage(
         tree.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
 
     elif c == "digital":
-        # Stepped orthogonal cellular grid (pixelated/voxel camo)
+        # Broad, irregular digital cells; using Voronoi distance here produces a
+        # repeated edge grid instead of filled camouflage patches.
         vor = tree.nodes.new("ShaderNodeTexVoronoi")
         vor.distance = "CHEBYCHEV"
-        vor.inputs["Scale"].default_value = 5.8 * max(0.1, scale)
-        vor.inputs["Randomness"].default_value = 0.0
+        vor.inputs["Scale"].default_value = 2.6 * max(0.1, scale)
+        vor.inputs["Randomness"].default_value = 0.92
+        to_gray = tree.nodes.new("ShaderNodeRGBToBW")
         ramp = tree.nodes.new("ShaderNodeValToRGB")
         ramp.color_ramp.interpolation = "CONSTANT"
         ramp.color_ramp.elements[0].position = 0.0
         ramp.color_ramp.elements[0].color = (*base_color, 1.0)
-        e1 = ramp.color_ramp.elements.new(0.46)
+        e1 = ramp.color_ramp.elements.new(0.34)
         e1.color = (*secondary_color, 1.0)
+        e2 = ramp.color_ramp.elements.new(0.67)
+        tertiary = accent_color or midpoint
+        e2.color = (*tertiary, 1.0)
         tree.links.new(tex_coord.outputs["Object"], vor.inputs["Vector"])
-        tree.links.new(vor.outputs["Distance"], ramp.inputs["Fac"])
+        tree.links.new(vor.outputs["Color"], to_gray.inputs["Color"])
+        tree.links.new(to_gray.outputs["Val"], ramp.inputs["Fac"])
         tree.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
 
     elif c == "tigerstripe":
@@ -15954,6 +15954,25 @@ class RogueVehicleBuilder:
         # object bounds stale until the dependency graph evaluates.
         bpy.context.view_layer.update()
         diagnostics = validate_model_mesh_quality(self.objects, allow_hover=self.is_hover)
+        source_face_count = sum(
+            len(obj.data.polygons)
+            for obj in self.objects
+            if obj is not None and obj.type == "MESH"
+        )
+        requested_face_budget = int(target_budget)
+        if requested_face_budget <= 0:
+            raise ValueError("target_budget must be greater than zero")
+        face_budget_limit = min(requested_face_budget, DEFAULT_FACE_BUDGET)
+        diagnostics["requested_face_budget"] = requested_face_budget
+        diagnostics["source_face_count"] = source_face_count
+        diagnostics["face_budget_limit"] = face_budget_limit
+        diagnostics["face_budget_passed"] = source_face_count <= face_budget_limit
+        if source_face_count > face_budget_limit:
+            raise ValueError(
+                f"{self.name} exceeds the {face_budget_limit}-face LOD0 limit "
+                f"({source_face_count} faces); reduce duplicate, hidden, or "
+                "redundant bevel geometry without changing role-defining forms."
+            )
 
         # 2. Smart UV Projection for lightmapping
         generate_lightmap_uvs(self.objects)

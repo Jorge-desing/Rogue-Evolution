@@ -74,7 +74,7 @@ Options:
     --sponsons                 Attach armored external side sponsons
     --dirt                     Bake procedural vertex ambient dirt/cavity shading (default: True)
     --locators                 Generate Unity locator sockets (default: True)
-    --lod                      Print low-poly triangle budget diagnostics and LOD recommendations
+    --lod                      Print the LOD0 face cap and camera-aware LOD recommendations
     --multiview                Render 4-perspective orthographic sheet (ISO, TOP, FRONT, SIDE)
     --out-dir <path>           Base output directory (default: repo root)
 """
@@ -697,8 +697,6 @@ PRESETS = {
         "wear": "factory_new",
         "nanite_dispenser": True,
         "hydraulic_hoses": True,
-        "aps_suite": True,
-        "tactical_markings": True,
     },
     "gravitas_breaker": {
         "archetype": "gravity_siege_breaker",
@@ -718,8 +716,6 @@ PRESETS = {
         "wear": "factory_new",
         "comms_mast": True,
         "drone_dock": True,
-        "rws_mount": True,
-        "stowage_kit": True,
     },
     "coastal_dreadnought": {
         "archetype": "amphibious_assault_tank",
@@ -924,7 +920,7 @@ def parse_args():
     parser.add_argument("--grav-dampener", action="store_true", help="Attach gyroscopic gravitational anchor and inertial dampener hub with counter-rotating magnetic rings and singularity core")
     parser.add_argument("--comms-mast", action="store_true", help="Attach telescopic communications & EW jamming mast with planar blade antenna fins, cross-dipole horns, and satcom dome")
     parser.add_argument("--ram-prow", action="store_true", help="Attach heavy angled V-shaped kinetic battering ram prow / cowcatcher bumper with towing shackles and hazard chevrons")
-    parser.add_argument("--weighted-normals", action=argparse.BooleanOptionalAction, default=True, help="Apply face-area weighted custom split normals to eliminate low-poly chamfer shading pinch (default: enabled)")
+    parser.add_argument("--weighted-normals", action=argparse.BooleanOptionalAction, default=True, help="Apply face-area weighted custom split normals to stabilize authored hard-surface highlights (default: enabled)")
     parser.add_argument("--smoke", action="store_true", help="Include multi-tube smoke discharger banks")
     parser.add_argument("--radar", action="store_true", help="Include command/recon radar dish")
     parser.add_argument("--sponsons", action="store_true", help="Include armored external side sponsons")
@@ -970,7 +966,7 @@ def parse_args():
     parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
-    parser.add_argument("--target-budget", type=int, default=rmk.DEFAULT_FACE_BUDGET, help="Target face budget for profiling (default: 7500)")
+    parser.add_argument("--target-budget", type=int, default=rmk.DEFAULT_FACE_BUDGET, help="Target face budget for profiling (default: 6000)")
     parser.add_argument("--rts-budget", action="store_true", help="Use lower-detail preset variants for RTS camera polygon budgets")
     parser.add_argument("--model-scale", type=float, default=1.0, help="Uniformly scale authored vehicle geometry and sockets around the ground origin")
     parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
@@ -986,6 +982,14 @@ def parse_args():
     parser.add_argument("--card-path", default=None, help="Explicit 128x128 tactical card Sprite output file path")
 
     args = parser.parse_args(script_args)
+    if args.target_budget <= 0:
+        parser.error("--target-budget must be greater than zero")
+    if args.target_budget > rmk.DEFAULT_FACE_BUDGET:
+        print(
+            f"Requested face budget {args.target_budget} exceeds the project maximum; "
+            f"using {rmk.DEFAULT_FACE_BUDGET}."
+        )
+        args.target_budget = rmk.DEFAULT_FACE_BUDGET
 
     def option_was_supplied(option: str) -> bool:
         for argument in script_args:
@@ -1207,6 +1211,9 @@ def build_vehicle_model(
     structural_wear_mask: bool = False,
     rts_budget: bool = False,
 ) -> dict:
+    if int(target_budget) <= 0:
+        raise ValueError("target_budget must be greater than zero")
+    target_budget = min(int(target_budget), rmk.DEFAULT_FACE_BUDGET)
     rmk.clear_scene()
 
     if rts_budget and archetype == "mobile_sam_launcher":
@@ -2959,7 +2966,7 @@ def build_vehicle_model(
     if slat_armor:
         builder.add_slat_armor()
 
-    if era_bricks:
+    if era_bricks and archetype != "gravity_siege_breaker":
         builder.add_era_bricks()
 
     if camo_netting:
@@ -3044,13 +3051,13 @@ def build_vehicle_model(
     )
 
     if lod_diagnostics:
-        print("\n--- Low-Poly Geometry Budget & LOD Diagnostics ---")
+        print("\n--- LOD0 Face Cap & Camera-Aware LOD Diagnostics ---")
         true_triangles = res.get("profile_report", {}).get("total_triangles", res["total_polygons"])
         print(f"LOD0 (Current): {res['total_polygons']} faces / {true_triangles} triangles | {res['total_vertices']} verts (RTS Combat Camera)")
-        print(f"  Target Face Budget: 1,500 - 7,500 faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of budget)")
+        print(f"  Project Maximum: {rmk.DEFAULT_FACE_BUDGET} source faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of selected cap)")
         print("LOD Recommendations:")
-        print(f"  LOD1 (~1,200 tris): Merge track cleats & road wheel rims into single cylinder silhouettes.")
-        print(f"  LOD2 (~500 tris): Collapse greebles, antennas, and multi-barrel clusters into convex hulls.")
+        print("  LOD1: Preserve the main silhouette and functional assemblies; simplify only details that disappear at its screen size.")
+        print("  LOD2: Reduce sub-pixel greebles and repeated hardware while keeping role-defining weapon and mobility shapes readable.")
         print("---------------------------------------------------\n")
 
     print("\n========================================================")

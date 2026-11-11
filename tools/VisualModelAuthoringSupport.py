@@ -52,6 +52,66 @@ def remove_objects(builder, predicate: Callable[[str], bool]) -> list[str]:
     return removed
 
 
+def simplify_low_value_bevel_details(
+    builder,
+    max_dimension_m: float = 0.60,
+    angle_degrees: float = 28.0,
+    protected_name_tokens: Sequence[str] = (
+        "Weapon", "Cannon", "Missile", "Nanite", "Sensor", "Optic", "Lens",
+        "Socket", "FirePoint", "Comms", "Mast", "Radar", "Antenna",
+        "Treads_Belt", "Turret_BaseShell",
+    ),
+) -> dict[str, int]:
+    """Collapse redundant bevel facets on small fittings, leaving primary forms intact.
+
+    The generator bakes bevels into source meshes.  Dissolving only low-angle edges
+    on sub-60 cm details removes extra bevel rings while retaining a crisp chamfer.
+    Primary armor, articulated rigs, colliders, and named role-defining hardware are
+    excluded so the pass cannot smooth away the unit silhouette or function.
+    """
+    changed_meshes = 0
+    faces_removed = 0
+    limit = math.radians(angle_degrees)
+    protected_tokens = tuple(token.casefold() for token in protected_name_tokens)
+
+    for obj in tuple(builder.objects):
+        if obj is None or obj.type != "MESH" or "_COLLIDER_" in obj.name:
+            continue
+        if any(token in obj.name.casefold() for token in protected_tokens):
+            continue
+        if max(float(axis) for axis in obj.dimensions) > max_dimension_m:
+            continue
+        if len(obj.data.polygons) < 20:
+            continue
+
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        old_count = len(bm.faces)
+        bmesh.ops.dissolve_limit(
+            bm,
+            angle_limit=limit,
+            use_dissolve_boundaries=False,
+            verts=list(bm.verts),
+            edges=list(bm.edges),
+            delimit={"MATERIAL"},
+        )
+        new_count = len(bm.faces)
+        if new_count < old_count:
+            bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+            bm.to_mesh(obj.data)
+            obj.data.update()
+            changed_meshes += 1
+            faces_removed += old_count - new_count
+        bm.free()
+
+    summary = {"changed_meshes": changed_meshes, "faces_removed": faces_removed}
+    print(
+        f"[visual-detail-budget] simplified {changed_meshes} small meshes; "
+        f"removed {faces_removed} redundant bevel faces"
+    )
+    return summary
+
+
 def set_material_color(material, color: Sequence[float], metallic=None, roughness=None) -> None:
     if material is None:
         return
@@ -101,7 +161,8 @@ def _make_mesh_object(name: str, vertices: Sequence[Sequence[float]],
 
 def add_loft_shell(builder, name: str, stations: Sequence[tuple[float, float, float, float]],
                     material, center_x: float = 0.0, exponent: float = 0.66,
-                    smooth: bool = True):
+                    smooth: bool = True, segments: int = 16, smooth_caps: bool = True,
+                    smooth_side_ends: bool = False):
     """Build a continuous rounded, tapered armor shell from horizontal sections.
 
     Stations are (z, half-width, front-y, rear-y), with the vehicle nose at +Y.
@@ -109,7 +170,7 @@ def add_loft_shell(builder, name: str, stations: Sequence[tuple[float, float, fl
     """
     if len(stations) < 2:
         raise ValueError(f"{name} needs at least two shell stations")
-    segments = 16
+    segments = max(8, int(segments))
     vertices = []
     for z, half_width, front_y, rear_y in stations:
         if half_width <= 0 or front_y <= rear_y:
@@ -131,6 +192,14 @@ def add_loft_shell(builder, name: str, stations: Sequence[tuple[float, float, fl
             n = (i + 1) % segments
             faces.append((a + i, a + n, b + n, b + i))
     obj = _make_mesh_object(name, vertices, faces, material, smooth=smooth)
+    if smooth:
+        if not smooth_caps:
+            for polygon in obj.data.polygons[:2]:
+                polygon.use_smooth = False
+        if smooth_side_ends:
+            for index, polygon in enumerate(obj.data.polygons[2:]):
+                angle = 2.0 * math.pi * ((index % segments) + 0.5) / segments
+                polygon.use_smooth = abs(math.cos(angle)) < 0.7071
     builder.objects.append(obj)
     return obj
 
@@ -245,7 +314,8 @@ def add_link(builder, name: str, start: Sequence[float], end: Sequence[float],
 
 
 def replace_link_mesh(obj, start: Sequence[float], end: Sequence[float], width: float,
-                      thickness: float, material):
+                      thickness: float, material, ring_segments: int = 8,
+                      exponent: float = 0.72, smooth: bool = True):
     a, b = Vector(start), Vector(end)
     axis = (b - a).normalized()
     side = Vector((0.0, 0.0, 1.0)).cross(axis)
@@ -254,14 +324,14 @@ def replace_link_mesh(obj, start: Sequence[float], end: Sequence[float], width: 
     side.normalize()
     normal = axis.cross(side).normalized()
     profile = ((0.0, 0.66), (0.12, 1.0), (0.78, 0.90), (1.0, 0.62))
-    ring_segments = 8
+    ring_segments = max(8, int(ring_segments))
     vertices = []
     for t, scale in profile:
         center = a.lerp(b, t)
         for i in range(ring_segments):
             ang = 2.0 * math.pi * i / ring_segments
-            x = math.copysign(abs(math.cos(ang)) ** 0.72, math.cos(ang)) * width * scale
-            y = math.copysign(abs(math.sin(ang)) ** 0.72, math.sin(ang)) * thickness * scale
+            x = math.copysign(abs(math.cos(ang)) ** exponent, math.cos(ang)) * width * scale
+            y = math.copysign(abs(math.sin(ang)) ** exponent, math.sin(ang)) * thickness * scale
             p = center + side * x + normal * y
             vertices.append(tuple(p))
     faces = [tuple(reversed(range(ring_segments))),
@@ -288,10 +358,10 @@ def replace_link_mesh(obj, start: Sequence[float], end: Sequence[float], width: 
     if old.users == 0:
         bpy.data.meshes.remove(old)
     for poly in mesh.polygons:
-        poly.use_smooth = True
+        poly.use_smooth = smooth
 
 
-def simplify_command_wheels(builder) -> int:
+def simplify_all_terrain_wheels(builder) -> int:
     """Keep eight rugged wheel silhouettes while removing tiny repeated lug detail."""
     tires = [o for o in builder.objects if o.type == "MESH" and o.name.endswith("_TireCarcass")]
     removed = remove_objects(builder, lambda n: "_TreadLug_" in n or "_LugBolt_" in n)
@@ -306,7 +376,9 @@ def simplify_command_wheels(builder) -> int:
             ang = 2.0 * math.pi * k / 8.0 + phase
             radial = Vector((0.0, math.sin(ang), math.cos(ang)))
             tangent = Vector((0.0, math.cos(ang), -math.sin(ang)))
-            center = c + radial * (radius + 0.012)
+            # The original tire carcass sits slightly above the ground plane; let
+            # the tread blocks make first contact without lowering the wheel pivot.
+            center = c + radial * (radius + 0.035)
             start = len(vertices)
             for xsign, tsign, rsign in ((-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1),
                                         (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)):

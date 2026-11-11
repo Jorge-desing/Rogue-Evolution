@@ -6,6 +6,8 @@ Use grounded, stylized military science-fiction realism. Models should carry bel
 
 The project native units are a gameplay and scale reference, not a shape limit. Preserve the role and recognition cues of a unit while developing its own stance, proportions, outline, and construction details. See [Design Guides Adapted](design-guides-adapted.md) for source findings and the adapted workflow.
 
+Before detailed modeling, compare the draft against the closest native or mod counterpart. Record which body-plan conventions it inherits and which role cues must remain. If the silhouette still follows a generic stock pattern, make two structurally different blockouts based on the unit's mobility and systems, then select the form with the clearest support, clearance, and RTS read. This local divergence pass creates originality through shape and function; surface noise and decorative add-ons do not substitute for it.
+
 ## Form design
 
 - Start with tactical role, mobility, primary weapon/system, and two or three silhouette cues.
@@ -67,6 +69,6 @@ Never replace vertex wear with texture AO or an external painter's vertex-color 
 
 ## LOD and delivery
 
-The current project profile uses 7,500 faces as an LOD0 profiling ceiling, not a quota or Unity limit. Record Blender face counts and Unity-exported triangles separately. Preserve the unit's primary silhouette and functional parts through LOD changes; simplify hidden and sub-pixel details first.
+The current project profile sets a strict maximum of 6,000 Blender source faces for LOD0, not a Unity limit or quota to fill. Record Blender face counts and Unity-exported triangles separately. Preserve the unit's primary silhouette and functional parts through LOD changes; simplify duplicates, hidden internals, redundant bevels, and sub-pixel details first.
 
 Keep Blender 4.5.14, Unity 2021.3.45f2, canonical unprefixed sockets, UVs, source hierarchy, rig/pivots, mesh Color RGBA, and the existing PBR/import contract intact. Validate the final FBX and bundle locally. A Blender preview or Unity import does not establish live in-game appearance.
