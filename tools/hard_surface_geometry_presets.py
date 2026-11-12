@@ -63,6 +63,17 @@ PLASMA_TORPEDO_MAGAZINE_V2_PRESET_ID = "plasma_torpedo_magazine_rack_v2"
 TACHYONIC_RADIATOR_ARRAY_V2_PRESET_ID = "tachyonic_radiator_array_v2"
 NANITE_REPAIR_DISPENSER_V2_PRESET_ID = "nanite_repair_dispenser_pod_v2"
 
+# Functional canonical Level 2 presets (Componentes funcionales de nivel 2)
+EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID = "excavation_drill_carbide_borer_v1"
+DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID = "docking_clamp_hydraulic_arm_v1"
+APU_TURBOGENERATOR_SPONSON_PRESET_ID = "apu_turbogenerator_sponson_v1"
+SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID = "smoke_grenade_salvo_discharger_v1"
+
+PLASMA_EXCAVATION_TORCH_PRESET_ID = "plasma_excavation_torch_v1"
+MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID = "magnetic_tractor_docking_clamp_v1"
+GRAVITON_RECOIL_ANCHOR_PRESET_ID = "graviton_recoil_anchor_v1"
+OPTRONIC_RECON_SENSOR_MAST_PRESET_ID = "optronic_recon_sensor_mast_v1"
+
 
 @dataclass(frozen=True)
 class ServiceHatchConfig:
@@ -3997,6 +4008,24 @@ from hard_surface_geometry_presets_v2 import (  # noqa: E402
     create_tachyonic_radiator_array_v2_preset,
     create_nanite_repair_dispenser_v2_preset,
 )
+from hard_surface_geometry_presets_functional import (  # noqa: E402
+    ApuTurbogeneratorSponsonConfig,
+    DockingClampHydraulicArmConfig,
+    ExcavationDrillCarbideBorerConfig,
+    GravitonRecoilAnchorConfig,
+    MagneticTractorDockingClampConfig,
+    OptronicReconSensorMastConfig,
+    PlasmaExcavationTorchConfig,
+    SmokeGrenadeSalvoDischargerConfig,
+    create_apu_turbogenerator_sponson_preset,
+    create_docking_clamp_hydraulic_arm_preset,
+    create_excavation_drill_carbide_borer_preset,
+    create_graviton_recoil_anchor_preset,
+    create_magnetic_tractor_docking_clamp_preset,
+    create_optronic_recon_sensor_mast_preset,
+    create_plasma_excavation_torch_preset,
+    create_smoke_grenade_salvo_discharger_preset,
+)
 
 
 GEOMETRY_PRESETS = {
@@ -4028,6 +4057,15 @@ GEOMETRY_PRESETS = {
     PLASMA_TORPEDO_MAGAZINE_V2_PRESET_ID: create_plasma_torpedo_magazine_v2_preset,
     TACHYONIC_RADIATOR_ARRAY_V2_PRESET_ID: create_tachyonic_radiator_array_v2_preset,
     NANITE_REPAIR_DISPENSER_V2_PRESET_ID: create_nanite_repair_dispenser_v2_preset,
+    # Functional Level 2 presets
+    EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID: create_excavation_drill_carbide_borer_preset,
+    DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID: create_docking_clamp_hydraulic_arm_preset,
+    APU_TURBOGENERATOR_SPONSON_PRESET_ID: create_apu_turbogenerator_sponson_preset,
+    SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID: create_smoke_grenade_salvo_discharger_preset,
+    PLASMA_EXCAVATION_TORCH_PRESET_ID: create_plasma_excavation_torch_preset,
+    MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID: create_magnetic_tractor_docking_clamp_preset,
+    GRAVITON_RECOIL_ANCHOR_PRESET_ID: create_graviton_recoil_anchor_preset,
+    OPTRONIC_RECON_SENSOR_MAST_PRESET_ID: create_optronic_recon_sensor_mast_preset,
 }
 
 PRESET_METADATA: dict[str, dict[str, str]] = {
@@ -4193,6 +4231,55 @@ PRESET_METADATA: dict[str, dict[str, str]] = {
         "slot": "Sponsons",
         "displayName": "Autonomous Nanite Hive Repair Dispenser v2",
         "engineeringRole": "repair_dispenser",
+    },
+    # Functional Level 2 presets metadata
+    EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID: {
+        "style": "contemporary_military",
+        "slot": "Sponsons",
+        "displayName": "Rotary Carbide Excavation Borer v1",
+        "engineeringRole": "excavation_drill",
+    },
+    DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID: {
+        "style": "contemporary_military",
+        "slot": "Sponsons",
+        "displayName": "Articulated Hydraulic Docking Clamp v1",
+        "engineeringRole": "docking_clamp",
+    },
+    APU_TURBOGENERATOR_SPONSON_PRESET_ID: {
+        "style": "contemporary_military",
+        "slot": "Sponsons",
+        "displayName": "Tactical APU Turbogenerator Sponson v1",
+        "engineeringRole": "power_containment",
+    },
+    SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID: {
+        "style": "contemporary_military",
+        "slot": "APS",
+        "displayName": "Multispectral Smoke Salvo Discharger Bank v1",
+        "engineeringRole": "aps_sensor_suite",
+    },
+    PLASMA_EXCAVATION_TORCH_PRESET_ID: {
+        "style": "futuristic_military",
+        "slot": "Sponsons",
+        "displayName": "Quantum Plasma Excavation Lance v1",
+        "engineeringRole": "excavation_drill",
+    },
+    MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID: {
+        "style": "futuristic_military",
+        "slot": "Sponsons",
+        "displayName": "Zero-G Magnetic Tractor Docking Clamp v1",
+        "engineeringRole": "docking_clamp",
+    },
+    GRAVITON_RECOIL_ANCHOR_PRESET_ID: {
+        "style": "futuristic_military",
+        "slot": "Sponsons",
+        "displayName": "Kinetic & Graviton Recoil Anchor Pod v1",
+        "engineeringRole": "utility_sponson",
+    },
+    OPTRONIC_RECON_SENSOR_MAST_PRESET_ID: {
+        "style": "futuristic_military",
+        "slot": "APS",
+        "displayName": "Optronic Recon & Radar Sensor Mast v1",
+        "engineeringRole": "aps_sensor_suite",
     },
 }
 

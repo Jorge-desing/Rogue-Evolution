@@ -48,6 +48,23 @@ from hard_surface_geometry_presets import (
     TACHYONIC_RADIATOR_ARRAY_V2_PRESET_ID,
     THERMAL_ARMORED_RADIATOR_PRESET_ID,
     THERMAL_ARMORED_RADIATOR_V2_PRESET_ID,
+    # Functional Level 2 presets
+    APU_TURBOGENERATOR_SPONSON_PRESET_ID,
+    DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID,
+    EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID,
+    GRAVITON_RECOIL_ANCHOR_PRESET_ID,
+    MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID,
+    OPTRONIC_RECON_SENSOR_MAST_PRESET_ID,
+    PLASMA_EXCAVATION_TORCH_PRESET_ID,
+    SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID,
+    ApuTurbogeneratorSponsonConfig,
+    DockingClampHydraulicArmConfig,
+    ExcavationDrillCarbideBorerConfig,
+    GravitonRecoilAnchorConfig,
+    MagneticTractorDockingClampConfig,
+    OptronicReconSensorMastConfig,
+    PlasmaExcavationTorchConfig,
+    SmokeGrenadeSalvoDischargerConfig,
     ApsHardkillRadarConfig,
     ApsHardkillRadarV2Config,
     ApsPhaseShieldConfig,
@@ -385,6 +402,58 @@ class TestHardSurfacePresetConfigs(unittest.TestCase):
         with self.assertRaises(ValueError):
             NaniteRepairDispenserV2Config(nozzle_count=0)
 
+    def test_excavation_drill_carbide_borer_config_valid_and_invalid(self) -> None:
+        cfg = ExcavationDrillCarbideBorerConfig(drill_base_radius=0.12, drill_tip_radius=0.04)
+        self.assertEqual(cfg.drill_base_radius, 0.12)
+        with self.assertRaises(ValueError):
+            ExcavationDrillCarbideBorerConfig(drill_base_radius=0.02, drill_tip_radius=0.05)
+        with self.assertRaises(ValueError):
+            ExcavationDrillCarbideBorerConfig(gearbox_radius=-0.1)
+
+    def test_docking_clamp_hydraulic_arm_config_valid_and_invalid(self) -> None:
+        cfg = DockingClampHydraulicArmConfig(arm_length=0.30, jaw_opening_deg=35.0)
+        self.assertEqual(cfg.arm_length, 0.30)
+        with self.assertRaises(ValueError):
+            DockingClampHydraulicArmConfig(arm_length=-0.2)
+        with self.assertRaises(ValueError):
+            DockingClampHydraulicArmConfig(normal=(0.0, 0.0, 0.0))
+
+    def test_apu_turbogenerator_sponson_config_valid_and_invalid(self) -> None:
+        cfg = ApuTurbogeneratorSponsonConfig(exhaust_diameter=0.08)
+        self.assertEqual(cfg.exhaust_diameter, 0.08)
+        with self.assertRaises(ValueError):
+            ApuTurbogeneratorSponsonConfig(cowl_size=(0.0, 0.2, 0.2))
+
+    def test_smoke_grenade_salvo_discharger_config_valid_and_invalid(self) -> None:
+        cfg = SmokeGrenadeSalvoDischargerConfig(tube_count=8)
+        self.assertEqual(cfg.tube_count, 8)
+        with self.assertRaises(ValueError):
+            SmokeGrenadeSalvoDischargerConfig(tube_count=5)
+
+    def test_plasma_excavation_torch_config_valid_and_invalid(self) -> None:
+        cfg = PlasmaExcavationTorchConfig(confinement_ring_count=3)
+        self.assertEqual(cfg.confinement_ring_count, 3)
+        with self.assertRaises(ValueError):
+            PlasmaExcavationTorchConfig(confinement_ring_count=1)
+
+    def test_magnetic_tractor_docking_clamp_config_valid_and_invalid(self) -> None:
+        cfg = MagneticTractorDockingClampConfig(tractor_dish_radius=0.09)
+        self.assertEqual(cfg.tractor_dish_radius, 0.09)
+        with self.assertRaises(ValueError):
+            MagneticTractorDockingClampConfig(tractor_dish_radius=-0.05)
+
+    def test_graviton_recoil_anchor_config_valid_and_invalid(self) -> None:
+        cfg = GravitonRecoilAnchorConfig(spike_length=0.28)
+        self.assertEqual(cfg.spike_length, 0.28)
+        with self.assertRaises(ValueError):
+            GravitonRecoilAnchorConfig(spike_length=0.0)
+
+    def test_optronic_recon_sensor_mast_config_valid_and_invalid(self) -> None:
+        cfg = OptronicReconSensorMastConfig(radar_disc_radius=0.08)
+        self.assertEqual(cfg.radar_disc_radius, 0.08)
+        with self.assertRaises(ValueError):
+            OptronicReconSensorMastConfig(mast_height=-0.1)
+
 
 class TestHardSurfacePresetRegistry(unittest.TestCase):
     """Test registry completeness and style/slot coverage."""
@@ -419,6 +488,15 @@ class TestHardSurfacePresetRegistry(unittest.TestCase):
             PLASMA_TORPEDO_MAGAZINE_V2_PRESET_ID,
             TACHYONIC_RADIATOR_ARRAY_V2_PRESET_ID,
             NANITE_REPAIR_DISPENSER_V2_PRESET_ID,
+            # Functional Level 2 presets
+            EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID,
+            DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID,
+            APU_TURBOGENERATOR_SPONSON_PRESET_ID,
+            SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID,
+            PLASMA_EXCAVATION_TORCH_PRESET_ID,
+            MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID,
+            GRAVITON_RECOIL_ANCHOR_PRESET_ID,
+            OPTRONIC_RECON_SENSOR_MAST_PRESET_ID,
         }
         self.assertEqual(set(GEOMETRY_PRESETS.keys()), expected)
         self.assertEqual(set(PRESET_METADATA.keys()), expected)
@@ -493,6 +571,14 @@ class TestHardSurfacePresetBlenderGeneration(unittest.TestCase):
             "    (hsg.PLASMA_TORPEDO_MAGAZINE_V2_PRESET_ID, hsg.PlasmaTorpedoMagazineV2Config(center=(4.5, 8.0, 0.0))),\n"
             "    (hsg.TACHYONIC_RADIATOR_ARRAY_V2_PRESET_ID, hsg.TachyonicRadiatorArrayV2Config(center=(6.0, 8.0, 0.0))),\n"
             "    (hsg.NANITE_REPAIR_DISPENSER_V2_PRESET_ID, hsg.NaniteRepairDispenserV2Config(center=(7.5, 8.0, 0.0))),\n"
+            "    (hsg.EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID, hsg.ExcavationDrillCarbideBorerConfig(center=(0.0, 10.0, 0.0))),\n"
+            "    (hsg.DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID, hsg.DockingClampHydraulicArmConfig(center=(1.5, 10.0, 0.0))),\n"
+            "    (hsg.APU_TURBOGENERATOR_SPONSON_PRESET_ID, hsg.ApuTurbogeneratorSponsonConfig(center=(3.0, 10.0, 0.0))),\n"
+            "    (hsg.SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID, hsg.SmokeGrenadeSalvoDischargerConfig(center=(4.5, 10.0, 0.0))),\n"
+            "    (hsg.PLASMA_EXCAVATION_TORCH_PRESET_ID, hsg.PlasmaExcavationTorchConfig(center=(6.0, 10.0, 0.0))),\n"
+            "    (hsg.MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID, hsg.MagneticTractorDockingClampConfig(center=(7.5, 10.0, 0.0))),\n"
+            "    (hsg.GRAVITON_RECOIL_ANCHOR_PRESET_ID, hsg.GravitonRecoilAnchorConfig(center=(9.0, 10.0, 0.0))),\n"
+            "    (hsg.OPTRONIC_RECON_SENSOR_MAST_PRESET_ID, hsg.OptronicReconSensorMastConfig(center=(10.5, 10.0, 0.0))),\n"
             "]\n"
             "for preset_id, config in presets_to_test:\n"
             "    creator = hsg.GEOMETRY_PRESETS[preset_id]\n"

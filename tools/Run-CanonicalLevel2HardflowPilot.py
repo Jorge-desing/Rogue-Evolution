@@ -113,36 +113,36 @@ def setup_lighting_and_cameras() -> dict[str, bpy.types.Object]:
     fill.rotation_euler = (math.radians(55.0), math.radians(-15.0), math.radians(-125.0))
 
     cameras = {}
-    # 1. Isometric contemporary camera (focused on Y = +1.6 row)
-    bpy.ops.object.camera_add(location=(0.0, -3.2, 4.2), rotation=(math.radians(52.0), 0.0, 0.0))
+    # 1. Isometric contemporary camera (focused on Y = +1.6 and +3.2 rows)
+    bpy.ops.object.camera_add(location=(0.0, -4.2, 5.2), rotation=(math.radians(52.0), 0.0, 0.0))
     cam_contemp = bpy.context.object
     cam_contemp.name = "Cam_Contemporary_Iso"
     cam_contemp.data.type = "PERSP"
-    cam_contemp.data.lens = 32.0
+    cam_contemp.data.lens = 28.0
     cameras["contemporary_iso"] = cam_contemp
 
-    # 2. Isometric futuristic camera (focused on Y = -1.6 row)
-    bpy.ops.object.camera_add(location=(0.0, -6.4, 4.0), rotation=(math.radians(52.0), 0.0, 0.0))
+    # 2. Isometric futuristic camera (focused on Y = -1.6 and -3.2 rows)
+    bpy.ops.object.camera_add(location=(0.0, -7.4, 5.0), rotation=(math.radians(52.0), 0.0, 0.0))
     cam_future = bpy.context.object
     cam_future.name = "Cam_Futuristic_Iso"
     cam_future.data.type = "PERSP"
-    cam_future.data.lens = 32.0
+    cam_future.data.lens = 28.0
     cameras["futuristic_iso"] = cam_future
 
     # 3. Top orthographic camera
-    bpy.ops.object.camera_add(location=(0.0, 0.0, 12.0), rotation=(0.0, 0.0, 0.0))
+    bpy.ops.object.camera_add(location=(0.0, 0.0, 14.0), rotation=(0.0, 0.0, 0.0))
     cam_top = bpy.context.object
     cam_top.name = "Cam_All_Top"
     cam_top.data.type = "ORTHO"
-    cam_top.data.ortho_scale = 10.5
+    cam_top.data.ortho_scale = 13.5
     cameras["all_top"] = cam_top
 
     # 4. Front elevation camera
-    bpy.ops.object.camera_add(location=(0.0, -9.0, 2.2), rotation=(math.radians(78.0), 0.0, 0.0))
+    bpy.ops.object.camera_add(location=(0.0, -11.5, 2.8), rotation=(math.radians(78.0), 0.0, 0.0))
     cam_front = bpy.context.object
     cam_front.name = "Cam_All_Front"
     cam_front.data.type = "PERSP"
-    cam_front.data.lens = 35.0
+    cam_front.data.lens = 32.0
     cameras["all_front"] = cam_front
 
     return cameras
@@ -252,7 +252,54 @@ def run_pilot(use_hardflow: bool = False, render_previews: bool = False) -> dict
         ),
         (
             hsg.COAXIAL_SERVICE_CONNECTOR_PRESET_ID,
-            hsg.CoaxialServiceConnectorConfig(center=(0.0, -3.2, 0.0)),
+            hsg.CoaxialServiceConnectorConfig(center=(0.0, -4.8, 0.0)),
+            mat_future_armor,
+        ),
+    ]
+
+    # Functional Canonical Presets (Contemporary & Futuristic)
+    functional_contemporary_specs = [
+        (
+            hsg.EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID,
+            hsg.ExcavationDrillCarbideBorerConfig(center=(-2.25, 3.2, 0.0)),
+            mat_armor,
+        ),
+        (
+            hsg.DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID,
+            hsg.DockingClampHydraulicArmConfig(center=(-0.75, 3.2, 0.0)),
+            mat_armor,
+        ),
+        (
+            hsg.APU_TURBOGENERATOR_SPONSON_PRESET_ID,
+            hsg.ApuTurbogeneratorSponsonConfig(center=(0.75, 3.2, 0.0)),
+            mat_armor,
+        ),
+        (
+            hsg.SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID,
+            hsg.SmokeGrenadeSalvoDischargerConfig(center=(2.25, 3.2, 0.0)),
+            mat_armor,
+        ),
+    ]
+
+    functional_futuristic_specs = [
+        (
+            hsg.PLASMA_EXCAVATION_TORCH_PRESET_ID,
+            hsg.PlasmaExcavationTorchConfig(center=(-2.25, -3.2, 0.0)),
+            mat_future_armor,
+        ),
+        (
+            hsg.MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID,
+            hsg.MagneticTractorDockingClampConfig(center=(-0.75, -3.2, 0.0)),
+            mat_future_armor,
+        ),
+        (
+            hsg.GRAVITON_RECOIL_ANCHOR_PRESET_ID,
+            hsg.GravitonRecoilAnchorConfig(center=(0.75, -3.2, 0.0)),
+            mat_future_armor,
+        ),
+        (
+            hsg.OPTRONIC_RECON_SENSOR_MAST_PRESET_ID,
+            hsg.OptronicReconSensorMastConfig(center=(2.25, -3.2, 0.0)),
             mat_future_armor,
         ),
     ]
@@ -260,6 +307,8 @@ def run_pilot(use_hardflow: bool = False, render_previews: bool = False) -> dict
     all_specs = [
         ("contemporary", contemporary_specs),
         ("futuristic", futuristic_specs),
+        ("functional_contemporary", functional_contemporary_specs),
+        ("functional_futuristic", functional_futuristic_specs),
     ]
 
     preset_reports = {}
@@ -325,6 +374,24 @@ def run_pilot(use_hardflow: bool = False, render_previews: bool = False) -> dict
             elif preset_id in (hsg.NANITE_REPAIR_DISPENSER_PRESET_ID, hsg.NANITE_REPAIR_DISPENSER_V2_PRESET_ID):
                 muzzle_loc = Vector(config.center) + Vector((0.0, 0.24, 0.15))
                 soot_intensity = 0.50
+            elif preset_id == hsg.EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID:
+                muzzle_loc = Vector(config.center) + Vector((0.0, -0.32, 0.12))
+                soot_intensity = 0.65
+            elif preset_id == hsg.APU_TURBOGENERATOR_SPONSON_PRESET_ID:
+                exhaust_locs = [Vector(config.center) + Vector((0.10, -0.15, 0.20))]
+                soot_intensity = 0.85
+            elif preset_id == hsg.SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID:
+                muzzle_loc = Vector(config.center) + Vector((0.0, 0.05, 0.18))
+                soot_intensity = 0.80
+            elif preset_id == hsg.PLASMA_EXCAVATION_TORCH_PRESET_ID:
+                muzzle_loc = Vector(config.center) + Vector((0.0, -0.28, 0.14))
+                soot_intensity = 0.60
+            elif preset_id == hsg.GRAVITON_RECOIL_ANCHOR_PRESET_ID:
+                exhaust_locs = [
+                    Vector(config.center) + Vector((-0.16, 0.0, 0.14)),
+                    Vector(config.center) + Vector((0.16, 0.0, 0.14)),
+                ]
+                soot_intensity = 0.55
 
             rmk.bake_advanced_vertex_shading(
                 objects,
