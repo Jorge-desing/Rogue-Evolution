@@ -26,10 +26,12 @@ sys.path.insert(0, str(ROOT / "tools"))
 import RogueModelKit as rmk  # noqa: E402
 from UnitPbrPresetRegistry import UNIT_PBR_REGISTRY  # noqa: E402
 from hard_surface_geometry_presets import (  # noqa: E402
+    COAXIAL_SERVICE_CONNECTOR_PRESET_ID,
     ERA_BRICK_PRESET_ID,
     GEOMETRY_PRESETS,
     SERVICE_HATCH_PRESET_ID,
     EraBrickConfig,
+    CoaxialServiceConnectorConfig,
     ServiceHatchConfig,
 )
 
@@ -166,6 +168,20 @@ def read_module_entries() -> list[dict[str, Any]]:
                         raise ValueError(f"ERA cassette roles must use {ERA_BRICK_PRESET_ID}: {variant['id']} at {slot_id}")
                     if (visual_role == "utility_sponson") != (geometry_preset == SERVICE_HATCH_PRESET_ID):
                         raise ValueError(f"Utility sponson roles must use {SERVICE_HATCH_PRESET_ID}: {variant['id']} at {slot_id}")
+                    is_gravitas_power_cell = (
+                        variant["id"] == "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy" and
+                        slot_id == "Sponsons" and visual_role == "power_containment"
+                    )
+                    if geometry_preset == COAXIAL_SERVICE_CONNECTOR_PRESET_ID and not is_gravitas_power_cell:
+                        raise ValueError(
+                            f"{COAXIAL_SERVICE_CONNECTOR_PRESET_ID} is reserved for the Gravitas Breaker "
+                            f"power-containment sponson: {variant['id']} at {slot_id}"
+                        )
+                    if is_gravitas_power_cell and geometry_preset != COAXIAL_SERVICE_CONNECTOR_PRESET_ID:
+                        raise ValueError(
+                            f"Gravitas Breaker power-containment sponson requires "
+                            f"{COAXIAL_SERVICE_CONNECTOR_PRESET_ID}"
+                        )
 
                     unit_slug = unit_id.split(":", 1)[1].replace("-", "_")
                     module_suffix = f"_{slot_id.lower()}" if len(module_declarations) > 1 else ""
@@ -355,7 +371,11 @@ def build_drill_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent:
     return objects
 
 
-def build_engineering_sponson_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int) -> list[bpy.types.Object]:
+def build_engineering_sponson_module(
+    entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int,
+    *, hardflow_boolean_apply: HardflowBoolean | None = None,
+    hardflow_bevel: HardflowBevel | None = None,
+) -> list[bpy.types.Object]:
     prefix = entry["moduleName"]
     role = entry["visualEngineeringRole"]
     if role == "repair_dispenser":
@@ -384,9 +404,12 @@ def build_engineering_sponson_module(entry: dict[str, Any], armor: Any, gunmetal
 
     base = rmk.make_box(prefix + "_PowerCellArmorCase", (0.68, 0.62, 0.46),
                         (0.0, -0.02, 0.0), armor, bevel=0.05)
+    base["rcl_canonical_component_role"] = "gravitas_power_containment_case"
     objects = [base]
-    objects.append(rmk.make_box(prefix + "_ServicePanel", (0.46, 0.08, 0.26),
-                                (0.0, 0.31, 0.0), gunmetal, bevel=0.014))
+    service_panel = rmk.make_box(prefix + "_ServicePanel", (0.46, 0.08, 0.26),
+                                 (0.0, 0.31, 0.0), gunmetal, bevel=0.014)
+    service_panel["rcl_canonical_component_role"] = "gravitas_power_containment_service_panel"
+    objects.append(service_panel)
     ring_count = 2 + seed % 2
     for index in range(ring_count):
         y = -0.20 + index * 0.20
@@ -395,12 +418,31 @@ def build_engineering_sponson_module(entry: dict[str, Any], armor: Any, gunmetal
                                       material=accent if index == ring_count - 1 else gunmetal,
                                       rotation=(math.pi / 2.0, 0.0, 0.0), major_segments=16, minor_segments=8))
     for x_sign in (-1.0, 1.0):
-        objects.append(rmk.make_rod(prefix + f"_CoolantFeed_{'L' if x_sign < 0 else 'R'}",
+        coolant_feed = rmk.make_rod(prefix + f"_CoolantFeed_{'L' if x_sign < 0 else 'R'}",
                                     (x_sign * 0.26, 0.31, -0.13),
                                     (x_sign * 0.34, -0.32, -0.13),
-                                    0.028, gunmetal, vertices=8))
-        objects.append(rmk.make_box(prefix + f"_ContainmentBrace_{'L' if x_sign < 0 else 'R'}",
-                                    (0.075, 0.48, 0.38), (x_sign * 0.35, -0.02, 0.0), armor, bevel=0.014))
+                                    0.028, gunmetal, vertices=8)
+        coolant_feed["rcl_canonical_component_role"] = "gravitas_power_containment_coolant_feed"
+        objects.append(coolant_feed)
+        containment_brace = rmk.make_box(prefix + f"_ContainmentBrace_{'L' if x_sign < 0 else 'R'}",
+                                         (0.075, 0.48, 0.38), (x_sign * 0.35, -0.02, 0.0), armor, bevel=0.014)
+        containment_brace["rcl_canonical_component_role"] = "gravitas_power_containment_brace"
+        objects.append(containment_brace)
+    if entry.get("geometryPreset") == COAXIAL_SERVICE_CONNECTOR_PRESET_ID:
+        if (entry.get("variantId") != "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy" or
+                role != "power_containment" or entry.get("slotId") != "Sponsons"):
+            raise ValueError(f"{COAXIAL_SERVICE_CONNECTOR_PRESET_ID} is reserved for the Gravitas power module")
+        connector_objects = GEOMETRY_PRESETS[COAXIAL_SERVICE_CONNECTOR_PRESET_ID](
+            prefix=prefix + "_ServicePort",
+            config=CoaxialServiceConnectorConfig(center=(0.0, 0.31, 0.0)),
+            armor_material=gunmetal,
+            hardware_material=gunmetal,
+            accent_material=accent,
+            backing_panel=service_panel,
+            hardflow_boolean_apply=hardflow_boolean_apply,
+            hardflow_bevel=hardflow_bevel,
+        )
+        objects.extend(connector_objects)
     return objects
 
 
@@ -476,7 +518,11 @@ def build_module_geometry(
     elif role == "excavation_drill":
         objects = build_drill_module(entry, armor, gunmetal, accent, seed)
     elif role in ("thermal_radiator", "heavy_flak_battery", "repair_dispenser", "power_containment"):
-        objects = build_engineering_sponson_module(entry, armor, gunmetal, accent, seed)
+        objects = build_engineering_sponson_module(
+            entry, armor, gunmetal, accent, seed,
+            hardflow_boolean_apply=hardflow_boolean_apply,
+            hardflow_bevel=hardflow_bevel,
+        )
     elif role in ("docking_clamp", "utility_sponson"):
         objects = build_utility_sponson_module(entry, armor, gunmetal, accent, seed)
     else:

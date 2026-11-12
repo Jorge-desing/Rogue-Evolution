@@ -85,7 +85,7 @@
     {"variantId": "tactical-operations:field-medic-rover-nanite-repair-chitin", "slotId": "Sponsons", "visualEngineeringRole": "repair_dispenser"},
     {"variantId": "tactical-operations:sentinel-relay-stealth-void-composite", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
     {"variantId": "tactical-operations:sentinel-relay-beryllium-mirror-hull", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy", "slotId": "Sponsons", "visualEngineeringRole": "power_containment"},
+    {"variantId": "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy", "slotId": "Sponsons", "visualEngineeringRole": "power_containment", "geometryPreset": "coaxial_service_connector_recessed_v1"},
     {"variantId": "tactical-operations:gravitas-breaker-cryogenic-fuel-shroud", "slotId": "FuelDrums", "visualEngineeringRole": "fuel_drum_pair"},
     {"variantId": "tactical-operations:command-relay-beryllium-mirror-hull", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
     {"variantId": "tactical-operations:command-relay-cyber-nanoweave", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"}

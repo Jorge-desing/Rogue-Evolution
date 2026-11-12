@@ -18,6 +18,7 @@ namespace RogueCommandExpansion.Authoring
         private const string MaterialFolder = ModuleAssetRoot + "/Materials";
         private const string ServiceHatchGeometryPresetId = "service_hatch_recessed_v1";
         private const string EraBrickGeometryPresetId = "era_brick_cassette_v1";
+        private const string CoaxialServiceConnectorGeometryPresetId = "coaxial_service_connector_recessed_v1";
         private const string BulwarkEraGeometryLayoutId = "bulwark_side_skirt_array_v1";
         private const string ManifestRelativePath = "content/source-art/canonical-visual-modules.json";
         private const float FactoryNewWearStrength = 0.55f;
@@ -647,6 +648,16 @@ namespace RogueCommandExpansion.Authoring
 
         private static bool IsGeometryPresetValid(ModuleEntry entry)
         {
+            if (String.Equals(entry.visualEngineeringRole, "power_containment", StringComparison.Ordinal))
+            {
+                bool isGravitasPowerVariant = String.Equals(entry.variantId,
+                    "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy", StringComparison.Ordinal) &&
+                    String.Equals(entry.slotId, "Sponsons", StringComparison.Ordinal);
+                return isGravitasPowerVariant
+                    ? String.Equals(entry.geometryPreset, CoaxialServiceConnectorGeometryPresetId, StringComparison.Ordinal) &&
+                        String.IsNullOrEmpty(entry.geometryLayout)
+                    : String.IsNullOrEmpty(entry.geometryPreset) && String.IsNullOrEmpty(entry.geometryLayout);
+            }
             if (String.Equals(entry.visualEngineeringRole, "utility_sponson", StringComparison.Ordinal))
             {
                 return String.Equals(entry.geometryPreset, ServiceHatchGeometryPresetId, StringComparison.Ordinal) &&
