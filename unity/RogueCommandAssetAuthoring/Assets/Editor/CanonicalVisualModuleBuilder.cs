@@ -36,6 +36,7 @@ namespace RogueCommandExpansion.Authoring
             public int schemaVersion;
             public GeometryPresetBinding[] geometryPresetBindings;
             public GeometryLayoutBinding[] geometryLayouts;
+            public VariantRoleBinding[] variantRoles;
         }
 
         [Serializable]
@@ -56,6 +57,16 @@ namespace RogueCommandExpansion.Authoring
             public string slotId;
             public string visualEngineeringRole;
             public string requiredGeometryPresetId;
+        }
+
+        [Serializable]
+        private sealed class VariantRoleBinding
+        {
+            public string variantId;
+            public string slotId;
+            public string visualEngineeringRole;
+            public string geometryPreset;
+            public string geometryLayout;
         }
 
         [Serializable]
@@ -207,11 +218,22 @@ namespace RogueCommandExpansion.Authoring
             {
                 throw new InvalidDataException("Canonical visual module manifest is stale relative to its geometry preset registry.");
             }
+            if (manifest.modules.Length != geometryPresetRegistry.variantRoles.Length)
+            {
+                throw new InvalidDataException("Canonical visual module manifest must contain exactly one entry for every variant/slot assignment.");
+            }
 
             var seenPrefabPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenVariantSlots = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < manifest.modules.Length; i++)
             {
-                ValidateEntry(manifest.modules[i], seenPrefabPaths, geometryPresetRegistry);
+                ModuleEntry entry = manifest.modules[i];
+                ValidateEntry(entry, seenPrefabPaths, geometryPresetRegistry);
+                if (!seenVariantSlots.Add(entry.variantId + "\n" + entry.slotId))
+                {
+                    throw new InvalidDataException("Canonical visual module manifest duplicates a variant/slot assignment: " +
+                        entry.variantId + " / " + entry.slotId);
+                }
             }
 
             Shader shader = Shader.Find(ShaderName);
@@ -701,7 +723,7 @@ namespace RogueCommandExpansion.Authoring
         {
             if (registry == null || registry.schemaVersion != 2 ||
                 registry.geometryPresetBindings == null || registry.geometryPresetBindings.Length == 0 ||
-                registry.geometryLayouts == null)
+                registry.geometryLayouts == null || registry.variantRoles == null || registry.variantRoles.Length == 0)
             {
                 return false;
             }
@@ -733,7 +755,103 @@ namespace RogueCommandExpansion.Authoring
                     return false;
                 }
             }
+
+            var variantRoleKeys = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < registry.variantRoles.Length; i++)
+            {
+                VariantRoleBinding assignment = registry.variantRoles[i];
+                if (assignment == null || String.IsNullOrWhiteSpace(assignment.variantId) ||
+                    !IsCanonicalHardpointSlot(assignment.slotId) ||
+                    String.IsNullOrWhiteSpace(assignment.visualEngineeringRole) ||
+                    String.IsNullOrWhiteSpace(assignment.geometryPreset) ||
+                    !variantRoleKeys.Add(assignment.variantId + "\n" + assignment.slotId) ||
+                    !IsVariantRoleBindingValid(assignment, registry))
+                {
+                    return false;
+                }
+            }
             return true;
+        }
+
+        private static bool IsVariantRoleBindingValid(VariantRoleBinding assignment, GeometryPresetRegistry registry)
+        {
+            GeometryPresetBinding binding = null;
+            for (int i = 0; i < registry.geometryPresetBindings.Length; i++)
+            {
+                if (String.Equals(registry.geometryPresetBindings[i].geometryPresetId,
+                    assignment.geometryPreset, StringComparison.Ordinal))
+                {
+                    binding = registry.geometryPresetBindings[i];
+                    break;
+                }
+            }
+            if (binding == null || !String.Equals(binding.slotId, assignment.slotId, StringComparison.Ordinal))
+                return false;
+
+            bool roleAllowed = false;
+            for (int i = 0; i < binding.visualEngineeringRoles.Length; i++)
+            {
+                if (String.Equals(binding.visualEngineeringRoles[i], assignment.visualEngineeringRole,
+                    StringComparison.Ordinal))
+                {
+                    roleAllowed = true;
+                    break;
+                }
+            }
+            if (!roleAllowed) return false;
+
+            if (binding.allowedVariantIds != null && binding.allowedVariantIds.Length > 0)
+            {
+                bool variantAllowed = false;
+                for (int i = 0; i < binding.allowedVariantIds.Length; i++)
+                {
+                    if (String.Equals(binding.allowedVariantIds[i], assignment.variantId, StringComparison.Ordinal))
+                    {
+                        variantAllowed = true;
+                        break;
+                    }
+                }
+                if (!variantAllowed) return false;
+            }
+
+            GeometryLayoutBinding requiredLayout = null;
+            for (int i = 0; i < registry.geometryLayouts.Length; i++)
+            {
+                GeometryLayoutBinding layout = registry.geometryLayouts[i];
+                if (String.Equals(layout.variantId, assignment.variantId, StringComparison.Ordinal) &&
+                    String.Equals(layout.slotId, assignment.slotId, StringComparison.Ordinal))
+                {
+                    if (requiredLayout != null) return false;
+                    requiredLayout = layout;
+                }
+            }
+
+            if (String.IsNullOrEmpty(assignment.geometryLayout)) return requiredLayout == null;
+            return requiredLayout != null &&
+                String.Equals(requiredLayout.geometryLayoutId, assignment.geometryLayout, StringComparison.Ordinal) &&
+                String.Equals(requiredLayout.visualEngineeringRole, assignment.visualEngineeringRole, StringComparison.Ordinal) &&
+                String.Equals(requiredLayout.requiredGeometryPresetId, assignment.geometryPreset, StringComparison.Ordinal);
+        }
+
+        private static bool IsGeometryPresetAssignmentValid(ModuleEntry entry, GeometryPresetRegistry registry)
+        {
+            VariantRoleBinding assignment = null;
+            for (int i = 0; i < registry.variantRoles.Length; i++)
+            {
+                VariantRoleBinding candidate = registry.variantRoles[i];
+                if (String.Equals(candidate.variantId, entry.variantId, StringComparison.Ordinal) &&
+                    String.Equals(candidate.slotId, entry.slotId, StringComparison.Ordinal))
+                {
+                    if (assignment != null) return false;
+                    assignment = candidate;
+                }
+            }
+
+            return assignment != null &&
+                String.Equals(assignment.visualEngineeringRole, entry.visualEngineeringRole, StringComparison.Ordinal) &&
+                String.Equals(assignment.geometryPreset, entry.geometryPreset, StringComparison.Ordinal) &&
+                String.Equals(assignment.geometryLayout ?? String.Empty, entry.geometryLayout ?? String.Empty,
+                    StringComparison.Ordinal);
         }
 
         private static bool IsGeometryPresetValid(ModuleEntry entry, GeometryPresetRegistry registry)
@@ -748,7 +866,8 @@ namespace RogueCommandExpansion.Authoring
                     break;
                 }
             }
-            if (binding == null || !String.Equals(binding.slotId, entry.slotId, StringComparison.Ordinal)) return false;
+            if (binding == null || !String.Equals(binding.slotId, entry.slotId, StringComparison.Ordinal) ||
+                !IsGeometryPresetAssignmentValid(entry, registry)) return false;
 
             bool roleAllowed = false;
             for (int i = 0; i < binding.visualEngineeringRoles.Length; i++)

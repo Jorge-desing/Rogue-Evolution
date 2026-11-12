@@ -187,8 +187,11 @@ def create_armor_access_panel_preset(*, prefix, config: ArmorAccessPanelConfig, 
     base = c.box("BackingPlate", (pw, pd, ph), (0, 0, ph * 0.5), armor_material, 0.003)
     # Boolean-cut service pocket plus drain slots.
     c.cut(base, "PocketCutter", (pw * 0.62, pd * 0.58, ph * 0.5), (0, 0, ph * 0.95))
-    cover = c.box("CoverPlate", (pw * 0.56, pd * 0.52, ph * 0.22), (0, 0, ph * 0.70 + ph * 0.11),
-                  armor_material, 0.002)
+    cover_height = ph * 0.22
+    cover_bottom = ph * 0.70
+    cover_top = cover_bottom + cover_height
+    cover = c.box("CoverPlate", (pw * 0.56, pd * 0.52, cover_height),
+                  (0, 0, cover_bottom + cover_height * 0.5), armor_material, 0.002)
     for i in range(config.slot_count):
         x = (i / (config.slot_count - 1) - 0.5) * pw * 0.40
         c.cut(cover, f"DrainSlotCutter_{i}", (0.010, pd * 0.12, ph * 0.12), (x, -pd * 0.18, ph * 0.92))
@@ -209,11 +212,50 @@ def create_armor_access_panel_preset(*, prefix, config: ArmorAccessPanelConfig, 
                                 hardware_material, rotation=c.rotation, vertices=6))
     _bolt_rect(c, "FrameBolt", hx * 0.88, hy * 0.82, ph + 0.004, config.fastener_radius * 0.8,
                hardware_material)
-    # Hinge barrel and ground strap.
-    c.rod("HingeBarrel", (-pw * 0.30, hy + 0.006, ph + 0.012), (pw * 0.30, hy + 0.006, ph + 0.012),
+    # The hinge sits on the cover edge. Both leaves and the knuckle links overlap
+    # their mounting surfaces so the barrel is mechanically tied to the hatch.
+    cover_edge_y = pd * 0.26
+    hinge_y = cover_edge_y + 0.006
+    hinge_z = ph + 0.006
+    c.box("HingeCoverLeaf", (pw * 0.50, pd * 0.08, 0.004),
+          (0, pd * 0.22, cover_top + 0.002), hardware_material, 0.001)
+    c.box("HingeBaseLeaf", (pw * 0.50, pd * 0.10, 0.004),
+          (0, pd * 0.35, ph + 0.002), hardware_material, 0.001)
+    c.rod("HingeBarrel", (-pw * 0.30, hinge_y, hinge_z), (pw * 0.30, hinge_y, hinge_z),
           0.008, hardware_material, vertices=10)
-    _cable_run(c, "GroundStrap", [(hx * 0.9, -hy * 0.9, z), (hx * 1.05, -hy * 0.9, ph + 0.03),
-                                  (hx * 1.05, -hy * 0.6, ph + 0.03)], 0.004, hardware_material)
+    for index, x in enumerate((-pw * 0.20, 0.0, pw * 0.20)):
+        c.rod(f"HingeKnuckle_{index}", (x - pw * 0.045, hinge_y, hinge_z),
+              (x + pw * 0.045, hinge_y, hinge_z), 0.010, hardware_material, vertices=10)
+        c.rod(f"HingeCoverLink_{index}", (x, pd * 0.255, cover_top + 0.004),
+              (x, hinge_y, hinge_z), 0.003, hardware_material)
+        c.rod(f"HingeBaseLink_{index}", (x, pd * 0.31, ph + 0.004),
+              (x, hinge_y, hinge_z), 0.003, hardware_material)
+        for side in (-1.0, 1.0):
+            c.add(rmk.make_cylinder(
+                f"{prefix}_HingeCoverBolt_{index}_{int(side)}", config.fastener_radius * 0.62, 0.004,
+                c.w((x + side * pw * 0.035, pd * 0.20, cover_top + 0.006)), hardware_material,
+                rotation=c.rotation, vertices=6))
+            c.add(rmk.make_cylinder(
+                f"{prefix}_HingeBaseBolt_{index}_{int(side)}", config.fastener_radius * 0.62, 0.004,
+                c.w((x + side * pw * 0.035, pd * 0.35, ph + 0.008)), hardware_material,
+                rotation=c.rotation, vertices=6))
+
+    # A short ground braid bridges the recessed cover to the surrounding plate.
+    # Its lugs overlap each surface and the cable ends terminate inside the lugs.
+    cover_lug = (pw * 0.22, -pd * 0.18)
+    plate_lug = (pw * 0.40, -pd * 0.38)
+    c.box("GroundStrapCoverLug", (pw * 0.10, pd * 0.08, 0.004),
+          (cover_lug[0], cover_lug[1], cover_top + 0.002), hardware_material, 0.001)
+    c.box("GroundStrapPlateLug", (pw * 0.10, pd * 0.08, 0.004),
+          (plate_lug[0], plate_lug[1], ph + 0.002), hardware_material, 0.001)
+    for index, (lug_x, lug_y, top_z) in enumerate(((cover_lug[0], cover_lug[1], cover_top + 0.004),
+                                                   (plate_lug[0], plate_lug[1], ph + 0.004))):
+        c.add(rmk.make_cylinder(f"{prefix}_GroundStrapLugBolt_{index}", config.fastener_radius * 0.60,
+                                0.003, c.w((lug_x, lug_y, top_z + 0.0015)), hardware_material,
+                                rotation=c.rotation, vertices=6))
+    _cable_run(c, "GroundStrap", [(cover_lug[0], cover_lug[1], cover_top + 0.004),
+                                  (pw * 0.33, -pd * 0.28, ph + 0.004),
+                                  (plate_lug[0], plate_lug[1], ph + 0.004)], 0.003, hardware_material)
     return _finish(c, ARMOR_ACCESS_PANEL_PRESET_ID, "contemporary_military", "Sponsons",
                    (base, cover, boss))
 
@@ -241,16 +283,38 @@ def create_engine_deck_louver_grille_preset(*, prefix, config: EngineDeckLouverG
                               rotation=(c.rotation.x, c.rotation.y + math.radians(30.0), c.rotation.z))
         c.add(louver)
     for k in (-1.0, 1.0):
-        c.box(f"MeshBar_{int(k)}", (pw * 0.80, 0.006, 0.006), (0, k * pd * 0.18, ph + 0.003),
+        bar_y = k * pd * 0.18
+        c.box(f"MeshBar_{int(k)}", (pw * 0.92, 0.006, 0.006), (0, bar_y, ph + 0.003),
               hardware_material, 0.0008)
+        # The slot field ends at x ~= 0.409 * panel width. These end shoes sit
+        # outboard of the openings and fuse the anti-debris bar to solid deck.
+        for side in (-1.0, 1.0):
+            shoe_x = side * pw * 0.44
+            c.box(f"MeshBarSupport_{int(k)}_{int(side)}", (pw * 0.06, pd * 0.045, 0.006),
+                  (shoe_x, bar_y, ph + 0.003), hardware_material, 0.001)
+            c.add(rmk.make_cylinder(f"{prefix}_MeshBarBolt_{int(k)}_{int(side)}",
+                                    config.fastener_radius * 0.65, 0.004,
+                                    c.w((shoe_x, bar_y, ph + 0.008)), hardware_material,
+                                    rotation=c.rotation, vertices=6))
     frame_z = ph + 0.003
     _bolt_rect(c, "FrameBolt", pw * 0.46, pd * 0.44, frame_z, config.fastener_radius, hardware_material,
                per_side=4)
     for s, (a, b) in enumerate((((-pw * .5, -pd * .5, frame_z), (pw * .5, -pd * .5, frame_z)),
                                 ((-pw * .5, pd * .5, frame_z), (pw * .5, pd * .5, frame_z)))):
         _weld_bead(c, f"SeamWeld{s}", a, b, 0.0032, hardware_material)
-    _cable_run(c, "HydraulicHose", [(pw * 0.50, -pd * 0.30, ph * 0.6), (pw * 0.58, -pd * 0.30, ph + 0.05),
-                                    (pw * 0.58, 0.0, ph + 0.07), (pw * 0.50, pd * 0.28, ph + 0.03)],
+    # Both ends of the service hose terminate at visible, supported fittings.
+    inlet = (pw * 0.50, -pd * 0.30, ph * 0.6)
+    outlet = (pw * 0.50, pd * 0.28, ph + 0.03)
+    c.rod("HydraulicHoseInletGland", (pw * 0.44, inlet[1], inlet[2]),
+          (pw * 0.54, inlet[1], inlet[2]), 0.014, hardware_material)
+    c.rod("HydraulicHoseInletCollar", (pw * 0.50, inlet[1], inlet[2]),
+          (pw * 0.54, inlet[1], inlet[2]), 0.016, hardware_material)
+    c.box("HydraulicHoseOutletMount", (pw * 0.12, pd * 0.12, 0.026),
+          (pw * 0.44, pd * 0.28, ph + 0.013), hardware_material, 0.002)
+    c.box("HydraulicHoseOutletSaddle", (pw * 0.06, pd * 0.08, 0.008),
+          (pw * 0.48, pd * 0.28, ph + 0.030), hardware_material, 0.001)
+    _cable_run(c, "HydraulicHose", [inlet, (pw * 0.58, -pd * 0.30, ph + 0.05),
+                                    (pw * 0.58, 0.0, ph + 0.07), outlet],
                0.009, hardware_material, hardware_material)
     return _finish(c, ENGINE_DECK_LOUVER_GRILLE_PRESET_ID, "contemporary_military", "Sponsons",
                    (deck,))
@@ -285,12 +349,16 @@ def create_composite_hex_vent_panel_preset(*, prefix, config: CompositeHexVentPa
             c.box(f"BaffleBack_{r}_{q}", (pitch * 0.7, pitch * 0.7, 0.003), (x, y, 0.0015), hardware_material, 0.0)
     _bolt_circle(c, "FlushRingBolt", min(pw, pd) * 0.46, ph + 0.002, config.bolt_circle_count * 2,
                  config.fastener_radius * 0.7, hardware_material)
-    c.box("SeamLightGuide", (pw * 0.9, 0.008, 0.004), (0, -pd * 0.46, ph + 0.003), accent, 0.001)
-    c.box("SeamLightGuideB", (pw * 0.9, 0.008, 0.004), (0, pd * 0.46, ph + 0.003), accent, 0.001)
+    for side in (-1.0, 1.0):
+        guide_y = side * pd * 0.46
+        c.cut(plate, f"LightGuideChannel_{int(side)}", (pw * 0.90, 0.012, 0.004),
+              (0, guide_y, ph - 0.001))
+        c.box(f"SeamLightGuide_{int(side)}", (pw * 0.88, 0.008, 0.004),
+              (0, guide_y, ph - 0.001), accent, 0.001)
     _weld_bead(c, "LaserWeld", (-pw * 0.42, -pd * 0.36, ph + 0.0015), (pw * 0.42, -pd * 0.36, ph + 0.0015), 0.0016,
                hardware_material, beads=18)
-    _cable_run(c, "FibreTrunk", [(-pw * 0.44, pd * 0.36, ph + 0.006), (-pw * 0.44, -pd * 0.10, ph + 0.006),
-                                 (-pw * 0.30, -pd * 0.26, ph + 0.006), (pw * 0.30, -pd * 0.26, ph + 0.006)],
+    _cable_run(c, "FibreTrunk", [(-pw * 0.44, pd * 0.36, ph + 0.005), (-pw * 0.44, -pd * 0.10, ph + 0.005),
+                                 (-pw * 0.30, -pd * 0.26, ph + 0.005), (pw * 0.30, -pd * 0.26, ph + 0.005)],
                0.005, hardware_material, hardware_material)
     return _finish(c, COMPOSITE_HEX_VENT_PANEL_PRESET_ID, "futuristic_military", "Sponsons",
                    (plate,))
