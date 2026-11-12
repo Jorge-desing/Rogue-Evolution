@@ -184,70 +184,70 @@ def run_pilot(use_hardflow: bool = False, render_previews: bool = False) -> dict
     mat_accent = rmk.make_material("Pilot_OpticAccent", (0.12, 0.72, 0.88), metallic=0.52, roughness=0.24,
                                   emission_color=(0.12, 0.72, 0.88), emission_strength=0.8)
 
-    # Contemporary Military Presets (6 canonical Level 2 presets)
+    # Contemporary Military Presets v2 (6 canonical Level 2 presets)
     contemporary_specs = [
         (
-            hsg.APS_HARDKILL_RADAR_PRESET_ID,
-            hsg.ApsHardkillRadarConfig(center=(-3.75, 1.6, 0.0)),
+            hsg.APS_HARDKILL_RADAR_V2_PRESET_ID,
+            hsg.ApsHardkillRadarV2Config(center=(-3.75, 1.6, 0.0)),
             mat_armor,
         ),
         (
-            hsg.FUEL_AUX_JERRYCAN_RACK_PRESET_ID,
-            hsg.FuelAuxJerrycanRackConfig(center=(-2.25, 1.6, 0.0)),
+            hsg.FUEL_AUX_JERRYCAN_RACK_V2_PRESET_ID,
+            hsg.FuelAuxJerrycanRackV2Config(center=(-2.25, 1.6, 0.0)),
             mat_armor,
         ),
         (
-            hsg.SLAT_ARMOR_SCREEN_PRESET_ID,
-            hsg.SlatArmorScreenConfig(center=(-0.75, 1.6, 0.0)),
+            hsg.SLAT_ARMOR_SCREEN_V2_PRESET_ID,
+            hsg.SlatArmorScreenV2Config(center=(-0.75, 1.6, 0.0)),
             mat_armor,
         ),
         (
-            hsg.ORDNANCE_MINE_DISPENSER_PRESET_ID,
-            hsg.OrdnanceMineDispenserConfig(center=(0.75, 1.6, 0.0)),
+            hsg.ORDNANCE_MINE_DISPENSER_V2_PRESET_ID,
+            hsg.OrdnanceMineDispenserV2Config(center=(0.75, 1.6, 0.0)),
             mat_armor,
         ),
         (
-            hsg.THERMAL_ARMORED_RADIATOR_PRESET_ID,
-            hsg.ThermalArmoredRadiatorConfig(center=(2.25, 1.6, 0.0)),
+            hsg.THERMAL_ARMORED_RADIATOR_V2_PRESET_ID,
+            hsg.ThermalArmoredRadiatorV2Config(center=(2.25, 1.6, 0.0)),
             mat_armor,
         ),
         (
-            hsg.AUTOCANNON_REMOTE_SPONSON_PRESET_ID,
-            hsg.AutocannonRemoteSponsonConfig(center=(3.75, 1.6, 0.0)),
+            hsg.AUTOCANNON_REMOTE_SPONSON_V2_PRESET_ID,
+            hsg.AutocannonRemoteSponsonV2Config(center=(3.75, 1.6, 0.0)),
             mat_armor,
         ),
     ]
 
-    # Futuristic Military Presets, including the Gravitas service-port detail.
+    # Futuristic Military Presets v2, including the Gravitas service-port detail.
     futuristic_specs = [
         (
-            hsg.APS_PHASE_SHIELD_PRESET_ID,
-            hsg.ApsPhaseShieldConfig(center=(-3.75, -1.6, 0.0)),
+            hsg.APS_PHASE_SHIELD_V2_PRESET_ID,
+            hsg.ApsPhaseShieldV2Config(center=(-3.75, -1.6, 0.0)),
             mat_future_armor,
         ),
         (
-            hsg.PLASMA_CONTAINMENT_CELL_PRESET_ID,
-            hsg.PlasmaContainmentCellConfig(center=(-2.25, -1.6, 0.0)),
+            hsg.PLASMA_CONTAINMENT_CELL_V2_PRESET_ID,
+            hsg.PlasmaContainmentCellV2Config(center=(-2.25, -1.6, 0.0)),
             mat_future_armor,
         ),
         (
-            hsg.STEALTH_HEX_REACTIVE_TILE_PRESET_ID,
-            hsg.StealthHexReactiveTileConfig(center=(-0.75, -1.6, 0.0)),
+            hsg.STEALTH_HEX_REACTIVE_TILE_V2_PRESET_ID,
+            hsg.StealthHexReactiveTileV2Config(center=(-0.75, -1.6, 0.0)),
             mat_future_armor,
         ),
         (
-            hsg.PLASMA_TORPEDO_MAGAZINE_PRESET_ID,
-            hsg.PlasmaTorpedoMagazineConfig(center=(0.75, -1.6, 0.0)),
+            hsg.PLASMA_TORPEDO_MAGAZINE_V2_PRESET_ID,
+            hsg.PlasmaTorpedoMagazineV2Config(center=(0.75, -1.6, 0.0)),
             mat_future_armor,
         ),
         (
-            hsg.TACHYONIC_RADIATOR_ARRAY_PRESET_ID,
-            hsg.TachyonicRadiatorArrayConfig(center=(2.25, -1.6, 0.0)),
+            hsg.TACHYONIC_RADIATOR_ARRAY_V2_PRESET_ID,
+            hsg.TachyonicRadiatorArrayV2Config(center=(2.25, -1.6, 0.0)),
             mat_future_armor,
         ),
         (
-            hsg.NANITE_REPAIR_DISPENSER_PRESET_ID,
-            hsg.NaniteRepairDispenserConfig(center=(3.75, -1.6, 0.0)),
+            hsg.NANITE_REPAIR_DISPENSER_V2_PRESET_ID,
+            hsg.NaniteRepairDispenserV2Config(center=(3.75, -1.6, 0.0)),
             mat_future_armor,
         ),
         (
@@ -297,32 +297,32 @@ def run_pilot(use_hardflow: bool = False, render_previews: bool = False) -> dict
             soot_intensity = 0.0
             muzzle_loc = None
             exhaust_locs = None
-            if preset_id == hsg.APS_HARDKILL_RADAR_PRESET_ID:
+            if preset_id in (hsg.APS_HARDKILL_RADAR_PRESET_ID, hsg.APS_HARDKILL_RADAR_V2_PRESET_ID):
                 muzzle_loc = Vector(config.center) + Vector((0.0, 0.16, 0.28))
                 soot_intensity = 0.85
-            elif preset_id == hsg.ORDNANCE_MINE_DISPENSER_PRESET_ID:
+            elif preset_id in (hsg.ORDNANCE_MINE_DISPENSER_PRESET_ID, hsg.ORDNANCE_MINE_DISPENSER_V2_PRESET_ID):
                 muzzle_loc = Vector(config.center) + Vector((0.0, 0.22, 0.25))
                 soot_intensity = 0.75
-            elif preset_id == hsg.AUTOCANNON_REMOTE_SPONSON_PRESET_ID:
+            elif preset_id in (hsg.AUTOCANNON_REMOTE_SPONSON_PRESET_ID, hsg.AUTOCANNON_REMOTE_SPONSON_V2_PRESET_ID):
                 muzzle_loc = Vector(config.center) + Vector((0.0, 0.42, 0.20))
                 soot_intensity = 0.90
-            elif preset_id == hsg.PLASMA_CONTAINMENT_CELL_PRESET_ID:
+            elif preset_id in (hsg.PLASMA_CONTAINMENT_CELL_PRESET_ID, hsg.PLASMA_CONTAINMENT_CELL_V2_PRESET_ID):
                 exhaust_locs = [
                     Vector(config.center) + Vector((-0.135, -0.132, 0.475)),
                     Vector(config.center) + Vector((-0.135, 0.132, 0.475)),
                 ]
                 soot_intensity = 0.70
-            elif preset_id == hsg.PLASMA_TORPEDO_MAGAZINE_PRESET_ID:
+            elif preset_id in (hsg.PLASMA_TORPEDO_MAGAZINE_PRESET_ID, hsg.PLASMA_TORPEDO_MAGAZINE_V2_PRESET_ID):
                 exhaust_locs = [
                     Vector(config.center) + Vector((0.0, -0.18, 0.16)),
                 ]
                 soot_intensity = 0.75
-            elif preset_id == hsg.TACHYONIC_RADIATOR_ARRAY_PRESET_ID:
+            elif preset_id in (hsg.TACHYONIC_RADIATOR_ARRAY_PRESET_ID, hsg.TACHYONIC_RADIATOR_ARRAY_V2_PRESET_ID):
                 exhaust_locs = [
                     Vector(config.center) + Vector((0.08, 0.0, 0.18)),
                 ]
                 soot_intensity = 0.45
-            elif preset_id == hsg.NANITE_REPAIR_DISPENSER_PRESET_ID:
+            elif preset_id in (hsg.NANITE_REPAIR_DISPENSER_PRESET_ID, hsg.NANITE_REPAIR_DISPENSER_V2_PRESET_ID):
                 muzzle_loc = Vector(config.center) + Vector((0.0, 0.24, 0.15))
                 soot_intensity = 0.50
 
