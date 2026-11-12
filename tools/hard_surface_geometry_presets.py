@@ -68,11 +68,19 @@ EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID = "excavation_drill_carbide_borer_v1"
 DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID = "docking_clamp_hydraulic_arm_v1"
 APU_TURBOGENERATOR_SPONSON_PRESET_ID = "apu_turbogenerator_sponson_v1"
 SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID = "smoke_grenade_salvo_discharger_v1"
+CIWS_ROTARY_POINT_DEFENSE_PRESET_ID = "ciws_rotary_point_defense_sponson_v1"
+REINFORCED_FUEL_DRUM_DROP_RACK_PRESET_ID = "reinforced_fuel_drum_drop_rack_v1"
+FIELD_ENGINEERING_CRANE_WINCH_PRESET_ID = "field_engineering_crane_winch_sponson_v1"
+MULTISPECTRAL_COUNTERMEASURE_JAMMER_PRESET_ID = "multispectral_countermeasure_jammer_v1"
 
 PLASMA_EXCAVATION_TORCH_PRESET_ID = "plasma_excavation_torch_v1"
 MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID = "magnetic_tractor_docking_clamp_v1"
 GRAVITON_RECOIL_ANCHOR_PRESET_ID = "graviton_recoil_anchor_v1"
 OPTRONIC_RECON_SENSOR_MAST_PRESET_ID = "optronic_recon_sensor_mast_v1"
+QUAD_PULSE_LASER_CIWS_PRESET_ID = "quad_pulse_laser_ciws_sponson_v1"
+CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID = "cryo_fusion_cell_containment_rack_v1"
+NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID = "nanofabrication_repair_projector_sponson_v1"
+FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID = "flux_deflection_shield_projector_v1"
 
 
 @dataclass(frozen=True)
@@ -4010,20 +4018,36 @@ from hard_surface_geometry_presets_v2 import (  # noqa: E402
 )
 from hard_surface_geometry_presets_functional import (  # noqa: E402
     ApuTurbogeneratorSponsonConfig,
+    CiwsRotaryPointDefenseConfig,
+    CryoFusionCellContainmentRackConfig,
     DockingClampHydraulicArmConfig,
     ExcavationDrillCarbideBorerConfig,
+    FieldEngineeringCraneWinchConfig,
+    FluxDeflectionShieldProjectorConfig,
     GravitonRecoilAnchorConfig,
     MagneticTractorDockingClampConfig,
+    MultispectralCountermeasureJammerConfig,
+    NanofabricationRepairProjectorConfig,
     OptronicReconSensorMastConfig,
     PlasmaExcavationTorchConfig,
+    QuadPulseLaserCiwsConfig,
+    ReinforcedFuelDrumDropRackConfig,
     SmokeGrenadeSalvoDischargerConfig,
     create_apu_turbogenerator_sponson_preset,
+    create_ciws_rotary_point_defense_preset,
+    create_cryo_fusion_cell_containment_rack_preset,
     create_docking_clamp_hydraulic_arm_preset,
     create_excavation_drill_carbide_borer_preset,
+    create_field_engineering_crane_winch_preset,
+    create_flux_deflection_shield_projector_preset,
     create_graviton_recoil_anchor_preset,
     create_magnetic_tractor_docking_clamp_preset,
+    create_multispectral_countermeasure_jammer_preset,
+    create_nanofabrication_repair_projector_preset,
     create_optronic_recon_sensor_mast_preset,
     create_plasma_excavation_torch_preset,
+    create_quad_pulse_laser_ciws_preset,
+    create_reinforced_fuel_drum_drop_rack_preset,
     create_smoke_grenade_salvo_discharger_preset,
 )
 
@@ -4062,10 +4086,18 @@ GEOMETRY_PRESETS = {
     DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID: create_docking_clamp_hydraulic_arm_preset,
     APU_TURBOGENERATOR_SPONSON_PRESET_ID: create_apu_turbogenerator_sponson_preset,
     SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID: create_smoke_grenade_salvo_discharger_preset,
+    CIWS_ROTARY_POINT_DEFENSE_PRESET_ID: create_ciws_rotary_point_defense_preset,
+    REINFORCED_FUEL_DRUM_DROP_RACK_PRESET_ID: create_reinforced_fuel_drum_drop_rack_preset,
+    FIELD_ENGINEERING_CRANE_WINCH_PRESET_ID: create_field_engineering_crane_winch_preset,
+    MULTISPECTRAL_COUNTERMEASURE_JAMMER_PRESET_ID: create_multispectral_countermeasure_jammer_preset,
     PLASMA_EXCAVATION_TORCH_PRESET_ID: create_plasma_excavation_torch_preset,
     MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID: create_magnetic_tractor_docking_clamp_preset,
     GRAVITON_RECOIL_ANCHOR_PRESET_ID: create_graviton_recoil_anchor_preset,
     OPTRONIC_RECON_SENSOR_MAST_PRESET_ID: create_optronic_recon_sensor_mast_preset,
+    QUAD_PULSE_LASER_CIWS_PRESET_ID: create_quad_pulse_laser_ciws_preset,
+    CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID: create_cryo_fusion_cell_containment_rack_preset,
+    NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID: create_nanofabrication_repair_projector_preset,
+    FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID: create_flux_deflection_shield_projector_preset,
 }
 
 PRESET_METADATA: dict[str, dict[str, str]] = {
@@ -4280,6 +4312,54 @@ PRESET_METADATA: dict[str, dict[str, str]] = {
         "slot": "APS",
         "displayName": "Optronic Recon & Radar Sensor Mast v1",
         "engineeringRole": "aps_sensor_suite",
+    },
+    CIWS_ROTARY_POINT_DEFENSE_PRESET_ID: {
+        "style": "contemporary_military",
+        "slot": "Sponsons",
+        "displayName": "Rotary 20mm Gatling CIWS Sponson v1",
+        "engineeringRole": "heavy_flak_battery",
+    },
+    REINFORCED_FUEL_DRUM_DROP_RACK_PRESET_ID: {
+        "style": "contemporary_military",
+        "slot": "FuelDrums",
+        "displayName": "Dual Reinforced Fuel Drum Drop Rack v1",
+        "engineeringRole": "fuel_drum_pair",
+    },
+    FIELD_ENGINEERING_CRANE_WINCH_PRESET_ID: {
+        "style": "contemporary_military",
+        "slot": "Sponsons",
+        "displayName": "Combat Engineering Crane & Winch Sponson v1",
+        "engineeringRole": "repair_dispenser",
+    },
+    MULTISPECTRAL_COUNTERMEASURE_JAMMER_PRESET_ID: {
+        "style": "contemporary_military",
+        "slot": "APS",
+        "displayName": "Multispectral Active Jammer & MAWS Mast v1",
+        "engineeringRole": "aps_magnetic_shield",
+    },
+    QUAD_PULSE_LASER_CIWS_PRESET_ID: {
+        "style": "futuristic_military",
+        "slot": "Sponsons",
+        "displayName": "Quad Convergent Pulse Laser CIWS Sponson v1",
+        "engineeringRole": "heavy_flak_battery",
+    },
+    CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID: {
+        "style": "futuristic_military",
+        "slot": "FuelDrums",
+        "displayName": "Cryogenic Fusion Fuel Cell Containment Rack v1",
+        "engineeringRole": "fuel_drum_pair",
+    },
+    NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID: {
+        "style": "futuristic_military",
+        "slot": "Sponsons",
+        "displayName": "Coherent Nanofabrication Repair Projector v1",
+        "engineeringRole": "repair_dispenser",
+    },
+    FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID: {
+        "style": "futuristic_military",
+        "slot": "APS",
+        "displayName": "Magnetohydrodynamic Flux Deflection Projector v1",
+        "engineeringRole": "aps_magnetic_shield",
     },
 }
 

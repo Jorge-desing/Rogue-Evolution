@@ -252,7 +252,7 @@ def run_pilot(use_hardflow: bool = False, render_previews: bool = False) -> dict
         ),
         (
             hsg.COAXIAL_SERVICE_CONNECTOR_PRESET_ID,
-            hsg.CoaxialServiceConnectorConfig(center=(0.0, -4.8, 0.0)),
+            hsg.CoaxialServiceConnectorConfig(center=(0.0, -6.4, 0.0)),
             mat_future_armor,
         ),
     ]
@@ -279,6 +279,26 @@ def run_pilot(use_hardflow: bool = False, render_previews: bool = False) -> dict
             hsg.SmokeGrenadeSalvoDischargerConfig(center=(2.25, 3.2, 0.0)),
             mat_armor,
         ),
+        (
+            hsg.CIWS_ROTARY_POINT_DEFENSE_PRESET_ID,
+            hsg.CiwsRotaryPointDefenseConfig(center=(-2.25, 4.8, 0.0)),
+            mat_armor,
+        ),
+        (
+            hsg.REINFORCED_FUEL_DRUM_DROP_RACK_PRESET_ID,
+            hsg.ReinforcedFuelDrumDropRackConfig(center=(-0.75, 4.8, 0.0)),
+            mat_armor,
+        ),
+        (
+            hsg.FIELD_ENGINEERING_CRANE_WINCH_PRESET_ID,
+            hsg.FieldEngineeringCraneWinchConfig(center=(0.75, 4.8, 0.0)),
+            mat_armor,
+        ),
+        (
+            hsg.MULTISPECTRAL_COUNTERMEASURE_JAMMER_PRESET_ID,
+            hsg.MultispectralCountermeasureJammerConfig(center=(2.25, 4.8, 0.0)),
+            mat_armor,
+        ),
     ]
 
     functional_futuristic_specs = [
@@ -300,6 +320,26 @@ def run_pilot(use_hardflow: bool = False, render_previews: bool = False) -> dict
         (
             hsg.OPTRONIC_RECON_SENSOR_MAST_PRESET_ID,
             hsg.OptronicReconSensorMastConfig(center=(2.25, -3.2, 0.0)),
+            mat_future_armor,
+        ),
+        (
+            hsg.QUAD_PULSE_LASER_CIWS_PRESET_ID,
+            hsg.QuadPulseLaserCiwsConfig(center=(-2.25, -4.8, 0.0)),
+            mat_future_armor,
+        ),
+        (
+            hsg.CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID,
+            hsg.CryoFusionCellContainmentRackConfig(center=(-0.75, -4.8, 0.0)),
+            mat_future_armor,
+        ),
+        (
+            hsg.NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID,
+            hsg.NanofabricationRepairProjectorConfig(center=(0.75, -4.8, 0.0)),
+            mat_future_armor,
+        ),
+        (
+            hsg.FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID,
+            hsg.FluxDeflectionShieldProjectorConfig(center=(2.25, -4.8, 0.0)),
             mat_future_armor,
         ),
     ]

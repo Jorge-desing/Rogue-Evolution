@@ -50,20 +50,36 @@ from hard_surface_geometry_presets import (
     THERMAL_ARMORED_RADIATOR_V2_PRESET_ID,
     # Functional Level 2 presets
     APU_TURBOGENERATOR_SPONSON_PRESET_ID,
+    CIWS_ROTARY_POINT_DEFENSE_PRESET_ID,
+    CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID,
     DOCKING_CLAMP_HYDRAULIC_ARM_PRESET_ID,
     EXCAVATION_DRILL_CARBIDE_BORER_PRESET_ID,
+    FIELD_ENGINEERING_CRANE_WINCH_PRESET_ID,
+    FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID,
     GRAVITON_RECOIL_ANCHOR_PRESET_ID,
     MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID,
+    MULTISPECTRAL_COUNTERMEASURE_JAMMER_PRESET_ID,
+    NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID,
     OPTRONIC_RECON_SENSOR_MAST_PRESET_ID,
     PLASMA_EXCAVATION_TORCH_PRESET_ID,
+    QUAD_PULSE_LASER_CIWS_PRESET_ID,
+    REINFORCED_FUEL_DRUM_DROP_RACK_PRESET_ID,
     SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID,
     ApuTurbogeneratorSponsonConfig,
+    CiwsRotaryPointDefenseConfig,
+    CryoFusionCellContainmentRackConfig,
     DockingClampHydraulicArmConfig,
     ExcavationDrillCarbideBorerConfig,
+    FieldEngineeringCraneWinchConfig,
+    FluxDeflectionShieldProjectorConfig,
     GravitonRecoilAnchorConfig,
     MagneticTractorDockingClampConfig,
+    MultispectralCountermeasureJammerConfig,
+    NanofabricationRepairProjectorConfig,
     OptronicReconSensorMastConfig,
     PlasmaExcavationTorchConfig,
+    QuadPulseLaserCiwsConfig,
+    ReinforcedFuelDrumDropRackConfig,
     SmokeGrenadeSalvoDischargerConfig,
     ApsHardkillRadarConfig,
     ApsHardkillRadarV2Config,
@@ -474,6 +490,70 @@ class TestHardSurfacePresetConfigs(unittest.TestCase):
         with self.assertRaises(ValueError):
             EraBrickConfig(center=(0.0, 0.0, 0.0), normal=(0.0, 0.0, 1.0), size=(-0.2, 0.1, 0.05))
 
+    def test_ciws_rotary_point_defense_config_valid_and_invalid(self) -> None:
+        cfg = CiwsRotaryPointDefenseConfig(barrel_length=0.40)
+        self.assertEqual(cfg.barrel_length, 0.40)
+        with self.assertRaises(ValueError):
+            CiwsRotaryPointDefenseConfig(barrel_length=-0.1)
+        with self.assertRaises(ValueError):
+            CiwsRotaryPointDefenseConfig(elevation_deg=95.0)
+
+    def test_reinforced_fuel_drum_drop_rack_config_valid_and_invalid(self) -> None:
+        cfg = ReinforcedFuelDrumDropRackConfig(drum_radius=0.12)
+        self.assertEqual(cfg.drum_radius, 0.12)
+        with self.assertRaises(ValueError):
+            ReinforcedFuelDrumDropRackConfig(rack_size=(0.20, 0.20, 0.20))
+        with self.assertRaises(ValueError):
+            ReinforcedFuelDrumDropRackConfig(drum_radius=-0.05)
+
+    def test_field_engineering_crane_winch_config_valid_and_invalid(self) -> None:
+        cfg = FieldEngineeringCraneWinchConfig(boom_luff_deg=35.0)
+        self.assertEqual(cfg.boom_luff_deg, 35.0)
+        with self.assertRaises(ValueError):
+            FieldEngineeringCraneWinchConfig(boom_luff_deg=-10.0)
+        with self.assertRaises(ValueError):
+            FieldEngineeringCraneWinchConfig(turntable_radius=0.0)
+
+    def test_multispectral_countermeasure_jammer_config_valid_and_invalid(self) -> None:
+        cfg = MultispectralCountermeasureJammerConfig(jammer_height=0.25)
+        self.assertEqual(cfg.jammer_height, 0.25)
+        with self.assertRaises(ValueError):
+            MultispectralCountermeasureJammerConfig(jammer_base_radius=0.01, jammer_tip_radius=0.05)
+        with self.assertRaises(ValueError):
+            MultispectralCountermeasureJammerConfig(normal=(0.0, 0.0, 0.0))
+
+    def test_quad_pulse_laser_ciws_config_valid_and_invalid(self) -> None:
+        cfg = QuadPulseLaserCiwsConfig(barrel_length=0.35)
+        self.assertEqual(cfg.barrel_length, 0.35)
+        with self.assertRaises(ValueError):
+            QuadPulseLaserCiwsConfig(capacitor_fin_count=1)
+        with self.assertRaises(ValueError):
+            QuadPulseLaserCiwsConfig(elevation_deg=-30.0)
+
+    def test_cryo_fusion_cell_containment_rack_config_valid_and_invalid(self) -> None:
+        cfg = CryoFusionCellContainmentRackConfig(cell_radius=0.11)
+        self.assertEqual(cfg.cell_radius, 0.11)
+        with self.assertRaises(ValueError):
+            CryoFusionCellContainmentRackConfig(bulkhead_size=(0.20, 0.10, 0.10))
+        with self.assertRaises(ValueError):
+            CryoFusionCellContainmentRackConfig(decoupling_latch_count=1)
+
+    def test_nanofabrication_repair_projector_config_valid_and_invalid(self) -> None:
+        cfg = NanofabricationRepairProjectorConfig(arm_length=0.30)
+        self.assertEqual(cfg.arm_length, 0.30)
+        with self.assertRaises(ValueError):
+            NanofabricationRepairProjectorConfig(arm_length=-0.2)
+        with self.assertRaises(ValueError):
+            NanofabricationRepairProjectorConfig(nozzle_radius=0.0)
+
+    def test_flux_deflection_shield_projector_config_valid_and_invalid(self) -> None:
+        cfg = FluxDeflectionShieldProjectorConfig(field_guide_angle_deg=40.0)
+        self.assertEqual(cfg.field_guide_angle_deg, 40.0)
+        with self.assertRaises(ValueError):
+            FluxDeflectionShieldProjectorConfig(field_guide_angle_deg=10.0)
+        with self.assertRaises(ValueError):
+            FluxDeflectionShieldProjectorConfig(base_radius=0.0)
+
 
 class TestHardSurfacePresetRegistry(unittest.TestCase):
     """Test registry completeness and style/slot coverage."""
@@ -517,6 +597,14 @@ class TestHardSurfacePresetRegistry(unittest.TestCase):
             MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID,
             GRAVITON_RECOIL_ANCHOR_PRESET_ID,
             OPTRONIC_RECON_SENSOR_MAST_PRESET_ID,
+            CIWS_ROTARY_POINT_DEFENSE_PRESET_ID,
+            REINFORCED_FUEL_DRUM_DROP_RACK_PRESET_ID,
+            FIELD_ENGINEERING_CRANE_WINCH_PRESET_ID,
+            MULTISPECTRAL_COUNTERMEASURE_JAMMER_PRESET_ID,
+            QUAD_PULSE_LASER_CIWS_PRESET_ID,
+            CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID,
+            NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID,
+            FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID,
         }
         self.assertEqual(set(GEOMETRY_PRESETS.keys()), expected)
         self.assertEqual(set(PRESET_METADATA.keys()), expected)
@@ -610,6 +698,14 @@ class TestHardSurfacePresetBlenderGeneration(unittest.TestCase):
             "    (hsg.OPTRONIC_RECON_SENSOR_MAST_PRESET_ID, hsg.OptronicReconSensorMastConfig(center=(10.5, 10.0, 0.0))),\n"
             "    (hsg.SERVICE_HATCH_PRESET_ID, hsg.ServiceHatchConfig(center_xy=(0.0, 0.0), outer_size=(0.4, 0.3), support_top_z=0.5)),\n"
             "    (hsg.ERA_BRICK_PRESET_ID, hsg.EraBrickConfig(center=(0.0, 0.0, 0.0), normal=(0.0, 0.0, 1.0))),\n"
+            "    (hsg.CIWS_ROTARY_POINT_DEFENSE_PRESET_ID, hsg.CiwsRotaryPointDefenseConfig(center=(0.0, 12.0, 0.0))),\n"
+            "    (hsg.REINFORCED_FUEL_DRUM_DROP_RACK_PRESET_ID, hsg.ReinforcedFuelDrumDropRackConfig(center=(1.5, 12.0, 0.0))),\n"
+            "    (hsg.FIELD_ENGINEERING_CRANE_WINCH_PRESET_ID, hsg.FieldEngineeringCraneWinchConfig(center=(3.0, 12.0, 0.0))),\n"
+            "    (hsg.MULTISPECTRAL_COUNTERMEASURE_JAMMER_PRESET_ID, hsg.MultispectralCountermeasureJammerConfig(center=(4.5, 12.0, 0.0))),\n"
+            "    (hsg.QUAD_PULSE_LASER_CIWS_PRESET_ID, hsg.QuadPulseLaserCiwsConfig(center=(6.0, 12.0, 0.0))),\n"
+            "    (hsg.CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID, hsg.CryoFusionCellContainmentRackConfig(center=(7.5, 12.0, 0.0))),\n"
+            "    (hsg.NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID, hsg.NanofabricationRepairProjectorConfig(center=(9.0, 12.0, 0.0))),\n"
+            "    (hsg.FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID, hsg.FluxDeflectionShieldProjectorConfig(center=(10.5, 12.0, 0.0))),\n"
             "]\n"
             "for preset_id, config in presets_to_test:\n"
             "    creator = hsg.GEOMETRY_PRESETS[preset_id]\n"
