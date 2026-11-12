@@ -103,11 +103,6 @@ def refine(builder):
             add_link(builder, f"ArachnidHexapodHydraulicRod_{side}{fore}",
                      (sx * 1.30, fy * 1.34, 0.84), (sx * 1.72, fy * 1.66, 1.05),
                      0.022, 0.020, p.wheel_rim)
-    for side, sx in (("L", -1.0), ("R", 1.0)):
-        add_link(builder, f"ArachnidHexapodHydraulicRam_M{side}",
-                 (sx * 1.18, 0.0, 0.91), (sx * 1.65, 0.0, 1.08),
-                 0.052, 0.040, p.gunmetal)
-
     # Replace round stick-like links with broad, tapered armored limbs while
     # preserving canonical names so the four driven legs remain rig-bindable.
     for obj in builder.objects:

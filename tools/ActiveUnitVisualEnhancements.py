@@ -142,9 +142,9 @@ ACTIVE_UNIT_WAVE34_PROFILES = {
         "gusset_locations": [(-0.82, -0.48, 2.28), (0.82, -0.48, 2.28)],
     },
     "ArachnidHexapod": {
-        "features": {"missile_mounts", "gussets"},
-        "missile_location": (0.0, -0.06, 1.58),
-        "gusset_locations": [(-0.86, -0.45, 1.58), (0.86, -0.45, 1.58)],
+        # The authored six-cell cradle provides the launcher support; omit the
+        # generic cross-axle and unsupported side gussets for this silhouette.
+        "features": set(),
     },
     "OverlordCommandHQ": {
         "features": {"drive_axles", "gatling_mounts", "radar_mount", "antenna_collar", "smoke_brackets", "gussets"},

@@ -66,3 +66,4 @@ The handoff contains the current layout, verified commands, evidence boundaries,
 - Interpret per-cell `worldObject`, `multiLayer`, `sameHeightLayerAsFootprint`, and `blockingReasons` before acting. Separate local blockers (building, ramp, obstacle, mixed layer) from global native requirements. Bounded search failure does not authorize forcing construction.
 
 - In 3D model builders, audit the final object set after all shared detail waves; an initial cleanup does not prevent a later wave from recreating buried or inapplicable hardware. Add turret rings and weapon trunnions only when the asset has the matching rotating or elevating assembly.
+- On quadruped rigs, ensure each hydraulic rod resolves to the same intended moving leg chain as its actuator; a missed role token silently falls back to `Bone_Hull`. Remove a generic axle or brace if its host or clearance is unsupported by the authored assembly.

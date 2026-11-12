@@ -11746,7 +11746,7 @@ def assign_rigid_mesh_weights(
                 elif any(k in clean_name for k in ("Thigh", "Femur", "Hip")):
                     target_bone = f"Bone_Thigh_{tag_found}"
 
-            if target_bone is None and ("HydraulicRam" in clean_name or "HipActuator" in clean_name or "Piston" in clean_name):
+            if target_bone is None and ("HydraulicRam" in clean_name or "HydraulicRod" in clean_name or "HipActuator" in clean_name or "Piston" in clean_name):
                 if tag_found is None:
                     for cand, norm in [
                         ("FL", "FL"), ("FR", "FR"), ("RL", "RL"), ("RR", "RR"),
