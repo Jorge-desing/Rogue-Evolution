@@ -79,7 +79,7 @@
     {"variantId": "tactical-operations:salvage-hauler-minefield-ordnance-carrier", "slotId": "FuelDrums", "visualEngineeringRole": "ordnance_carrier"},
     {"variantId": "tactical-operations:skyguard-sam-solar-flare-radiation-shield", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
     {"variantId": "tactical-operations:skyguard-sam-longshot-sniper-camo", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
-    {"variantId": "tactical-operations:bulwark-siege-tank-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryLayout": "bulwark_side_skirt_array_v1"},
+    {"variantId": "tactical-operations:bulwark-siege-tank-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1", "geometryLayout": "bulwark_side_skirt_array_v1"},
     {"variantId": "tactical-operations:bulwark-siege-tank-minefield-ordnance-carrier", "slotId": "FuelDrums", "visualEngineeringRole": "ordnance_carrier"},
     {"variantId": "tactical-operations:arc-lance-walker-plasma-arc-containment", "slotId": "Sponsons", "visualEngineeringRole": "power_containment"},
     {"variantId": "tactical-operations:field-medic-rover-nanite-repair-chitin", "slotId": "Sponsons", "visualEngineeringRole": "repair_dispenser"},
