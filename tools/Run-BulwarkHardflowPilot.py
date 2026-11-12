@@ -11,6 +11,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 import sys
@@ -38,7 +39,10 @@ from hard_surface_geometry_presets import (  # noqa: E402
 
 
 SOURCE_BLEND = ROOT / "content/source-art/bulwarksiegetank.blend"
-BACKUP_MANIFEST = ROOT / "artifacts/bulwark-source-backups/20261111T181840Z/manifest.json"
+BACKUP_MANIFEST = Path(os.environ.get(
+    "RCL_BULWARK_BACKUP_MANIFEST",
+    str(ROOT / "artifacts/bulwark-source-backups/20261111T181840Z/manifest.json"),
+))
 SIDE_ERA_LAYOUT_ID = "bulwark_side_skirt_array_v1"
 
 
@@ -219,6 +223,10 @@ def _build_candidate(
     output: Path, *, use_hardflow: bool, source_replay_output: Path | None = None,
 ) -> dict[str, object]:
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND), load_ui=False)
+    front_era_names_before = sorted(
+        obj.name for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and obj.name.startswith("BulwarkSiegeTankArmor_GlacisERA_")
+    )
     era_socket = bpy.data.objects.get("Socket_Hardpoint_ERA")
     if era_socket is None or era_socket.type != "EMPTY":
         raise RuntimeError("Bulwark source is missing its canonical Socket_Hardpoint_ERA empty")
@@ -232,14 +240,15 @@ def _build_candidate(
         hardflow_bevel=bevel_callback,
         hardflow_boolean_apply=boolean_callback,
     )
-    front_era_shells = [
-        obj for obj in bpy.context.scene.objects
-        if obj.type == "MESH"
-        and obj.name.startswith("BulwarkSiegeTankArmor_GlacisERA_")
-        and obj.name.endswith("_CassetteShell")
-    ]
-    if len(front_era_shells) != 6:
-        raise RuntimeError(f"Expected to preserve six frontal ERA cassettes; found {len(front_era_shells)}")
+    front_era_names_after = sorted(
+        obj.name for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and obj.name.startswith("BulwarkSiegeTankArmor_GlacisERA_")
+    )
+    if front_era_names_after != front_era_names_before:
+        raise RuntimeError(
+            "Bulwark side ERA pilot changed frontal armor; "
+            f"before={front_era_names_before!r}, after={front_era_names_after!r}"
+        )
     repeat = apply_bulwark_contact_repairs(
         list(bpy.context.scene.objects),
         hardflow_bevel=bevel_callback,
@@ -270,7 +279,12 @@ def _build_candidate(
         "wave2AddedObjectCount": len(wave2),
         "wave34AddedObjectCount": len(wave34),
         "contactRecipe": contact,
-        "frontEraCassetteCount": len(front_era_shells),
+        "frontGlacisEraPreserved": {
+            "before": front_era_names_before,
+            "after": front_era_names_after,
+            "unchanged": True,
+            "newCassettesAdded": 0,
+        },
         "sourceReplay": ({"candidate": str(source_replay_output),
                           "candidateSha256": source_replay_hash,
                           "includesLevel2SideModule": False}
@@ -305,15 +319,21 @@ def _surface_comparison(native_blend: Path, hardflow_blend: Path) -> dict[str, o
     )
     results: list[dict[str, object]] = []
     bpy.ops.wm.open_mainfile(filepath=str(native_blend), load_ui=False)
-    era_shell_names = sorted(
+    front_era_shell_names = sorted(
+        obj.name for obj in bpy.data.objects
+        if obj.type == "MESH"
+        and obj.name.startswith("BulwarkSiegeTankArmor_GlacisERA_")
+        and obj.name.endswith("_CassetteShell")
+    )
+    side_era_shell_names = sorted(
         obj.name for obj in bpy.data.objects
         if obj.type == "MESH"
         and obj.name.endswith("_CassetteShell")
-        and (obj.name.startswith("BulwarkSiegeTankArmor_GlacisERA_")
-             or obj.name.startswith("ERABrick_a2e0f471_B"))
+        and obj.name.startswith("ERABrick_a2e0f471_B")
     )
-    if len(era_shell_names) != 10:
-        raise RuntimeError(f"Expected six frontal and four side ERA cassette shells; found {era_shell_names!r}")
+    if len(side_era_shell_names) != 4:
+        raise RuntimeError(f"Expected four Level 2 side ERA cassette shells; found {side_era_shell_names!r}")
+    era_shell_names = sorted((*front_era_shell_names, *side_era_shell_names))
     focus_names = (*fixed_focus_names, *era_shell_names)
     native = {name: _evaluated_geometry(bpy.data.objects[name]) for name in focus_names}
     bpy.ops.wm.open_mainfile(filepath=str(hardflow_blend), load_ui=False)
@@ -440,7 +460,7 @@ def main() -> None:
         "schemaVersion": 1,
         "geometryPresets": [SERVICE_HATCH_PRESET_ID, ERA_BRICK_PRESET_ID],
         "geometryLayout": SIDE_ERA_LAYOUT_ID,
-        "recipeId": "bulwark-visible-supports-v13-side-mounts",
+        "recipeId": "bulwark-visible-supports-v14-side-only-era",
         "hardflow": {"version": "1.23.0", "blenderVersion": bpy.app.version_string,
                      "enabledInProjectProfile": True,
                      "operations": ["Exact access-hatch rebate Boolean", "two face-seam Booleans per ERA cassette",

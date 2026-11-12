@@ -21,14 +21,13 @@ from bulwark_radiator_vent_recipe import seat_bulwark_radiator_assembly
 from hard_surface_geometry_presets import (
     ERA_BRICK_PRESET_ID,
     SERVICE_HATCH_PRESET_ID,
-    EraBrickConfig,
     ServiceHatchConfig,
     apply_service_hatch_to_existing_parts,
-    create_era_brick_preset,
 )
 
 
-RECIPE_ID = "bulwark-visible-supports-v13-side-mounts"
+RECIPE_ID = "bulwark-visible-supports-v14-side-only-era"
+LEGACY_RECIPE_IDS = {"bulwark-visible-supports-v13-side-mounts"}
 SCENE_MARKER = "rcl_bulwark_visible_supports_recipe"
 DETAIL_MARKER = "rcl_bulwark_visible_supports_detail"
 UNIT_PREFIX = "BulwarkSiegeTank"
@@ -378,7 +377,8 @@ def _contact_beam(name: str, support: bpy.types.Object, target: bpy.types.Object
 
 def _replay_validate(objects: list[bpy.types.Object]) -> dict[str, object]:
     scene = bpy.context.scene
-    if scene.get(SCENE_MARKER) == RECIPE_ID:
+    prior_recipe_id = scene.get(SCENE_MARKER)
+    if prior_recipe_id == RECIPE_ID:
         expected = scene.get("rcl_bulwark_visible_supports_expected_details", [])
         missing = [name for name in expected if bpy.data.objects.get(name) is None]
         if missing:
@@ -389,7 +389,42 @@ def _replay_validate(objects: list[bpy.types.Object]) -> dict[str, object]:
             "idempotentReplay": True,
             "addedDetailObjects": list(expected),
         }
-    partial = [obj.name for obj in objects if obj.get(DETAIL_MARKER) == RECIPE_ID]
+    if prior_recipe_id in LEGACY_RECIPE_IDS:
+        expected = scene.get("rcl_bulwark_visible_supports_expected_details", [])
+        missing = [name for name in expected if bpy.data.objects.get(name) is None]
+        if missing:
+            raise ValueError("Legacy Bulwark support marker has missing objects: " + ", ".join(missing[:12]))
+        unexpected = [obj.name for obj in objects
+                      if obj.get(DETAIL_MARKER) in LEGACY_RECIPE_IDS and obj.name not in expected]
+        if unexpected:
+            raise ValueError("Legacy Bulwark recipe has untracked detail objects: " + ", ".join(unexpected[:12]))
+
+        preserved_front = sorted(name for name in expected
+                                 if name.startswith(f"{UNIT_PREFIX}Armor_GlacisERA_"))
+        removed_legacy_details = []
+        for name in expected:
+            obj = bpy.data.objects.get(name)
+            if name in preserved_front:
+                if DETAIL_MARKER in obj:
+                    del obj[DETAIL_MARKER]
+                continue
+            removed_legacy_details.append(name)
+            bpy.data.objects.remove(obj, do_unlink=True)
+
+        del scene[SCENE_MARKER]
+        if "rcl_bulwark_visible_supports_expected_details" in scene:
+            del scene["rcl_bulwark_visible_supports_expected_details"]
+        bpy.context.view_layer.update()
+        return {
+            "recipeId": RECIPE_ID,
+            "applied": None,
+            "idempotentReplay": False,
+            "migratedFrom": prior_recipe_id,
+            "preservedFrontEraObjects": preserved_front,
+            "removedLegacyDetails": removed_legacy_details,
+        }
+    partial = [obj.name for obj in objects if obj.get(DETAIL_MARKER) == RECIPE_ID or
+               obj.get(DETAIL_MARKER) in LEGACY_RECIPE_IDS]
     if partial:
         raise ValueError("Partial Bulwark contact repair objects exist without the scene marker: " + ", ".join(partial[:12]))
     return {"recipeId": RECIPE_ID, "applied": None, "idempotentReplay": False}
@@ -408,9 +443,15 @@ def apply_bulwark_contact_repairs(
     place. New hardpoint details are created with UVMap and RGBA Color data.
     """
     objects = list(objects) if objects is not None else list(bpy.context.scene.objects)
+    front_era_names_before = sorted(
+        obj.name for obj in objects
+        if obj.type == "MESH" and obj.name.startswith(f"{UNIT_PREFIX}Armor_GlacisERA_")
+    )
     prior = _replay_validate(objects)
     if prior["applied"] is False:
         return prior
+    if prior.get("migratedFrom"):
+        objects = list(bpy.context.scene.objects)
 
     scene = bpy.context.scene
     upper = _object(objects, "BulwarkSiegeTankArmor_UpperDeck")
@@ -449,7 +490,8 @@ def apply_bulwark_contact_repairs(
 
         skirt_min, skirt_max = _bounds(skirt)
         fender_min, fender_max = _bounds(fender)
-        hanger_x = (skirt_min.x + skirt_max.x) * 0.5
+        skirt_outer_x = skirt_max.x if sign > 0.0 else skirt_min.x
+        hanger_x = skirt_outer_x + sign * 0.0305
         hanger_width = skirt_max.x - skirt_min.x
         skirt_top = skirt_max.z
         hanger_bottom = skirt_top - 0.001
@@ -457,20 +499,47 @@ def apply_bulwark_contact_repairs(
         if hanger_top - hanger_bottom < 0.02:
             raise RuntimeError(f"{side} ArmorSkirt has no measurable support gap to its FenderTop")
         fender_outer_x = fender_max.x if sign > 0.0 else fender_min.x
-        start_x = fender_outer_x - sign * 0.030
+        # Keep the structural hangers on the exterior face of the track loop.
+        # The former 30 mm inboard offset put the hanger center inside the
+        # moving belt even though a point-sampled gap check reported clearance.
+        start_x = fender_outer_x + sign * 0.031
         start = Vector((start_x, 0.0, hanger_top - 0.001))
         end = Vector((hanger_x, 0.0, hanger_bottom))
         hangers = []
+        belt_geometry = _mesh_geometry(belt)
+        belt_tree = _tree(belt_geometry)
         for index, y in enumerate((-0.85, 0.0, 0.85), 1):
             hanger = _beam(
                 f"{UNIT_PREFIX}Armor_SkirtHanger_{side}_{index}",
                 Vector((start.x, y, start.z)), Vector((end.x, y, end.z)),
-                width=0.040, height=0.080, material=metal, bevel=0.003,
+                width=0.060, height=0.080, material=metal, bevel=0.003,
                 hardflow_bevel=hardflow_bevel,
             )
             generated.append(hanger)
             hanger_to_skirt = _surface_gap(hanger, skirt)
             hanger_to_fender = _surface_gap(hanger, fender)
+            hanger_geometry = _mesh_geometry(hanger)
+            hanger_belt_intersections = _tree(hanger_geometry).overlap(belt_tree)
+            hanger_to_belt = _surface_gap(hanger, belt)
+            if hanger_belt_intersections:
+                intersection_samples = []
+                for hanger_triangle, belt_triangle in hanger_belt_intersections[:4]:
+                    hanger_center = sum((hanger_geometry[0][vertex]
+                                         for vertex in hanger_geometry[1][hanger_triangle]), Vector()) / 3.0
+                    belt_center = sum((belt_geometry[0][vertex]
+                                       for vertex in belt_geometry[1][belt_triangle]), Vector()) / 3.0
+                    intersection_samples.append({
+                        "hangerTriangleCenter": list(hanger_center),
+                        "beltTriangleCenter": list(belt_center),
+                    })
+                raise RuntimeError(
+                    f"{hanger.name} intersects the moving track belt in "
+                    f"{len(hanger_belt_intersections)} triangle pairs; samples={intersection_samples!r}"
+                )
+            if hanger_to_belt < 0.020:
+                raise RuntimeError(
+                    f"{hanger.name} has only {hanger_to_belt * 1000.0:.3f} mm moving-belt clearance"
+                )
             if max(hanger_to_skirt, hanger_to_fender) > 0.002:
                 raise RuntimeError(
                     f"{hanger.name} misses its side supports: skirt={hanger_to_skirt * 1000.0:.3f} mm, "
@@ -483,7 +552,8 @@ def apply_bulwark_contact_repairs(
                 "lowerSeat": list((end.x, y, end.z)),
                 "skirtGapMm": hanger_to_skirt * 1000.0,
                 "fenderGapMm": hanger_to_fender * 1000.0,
-                "trackGapMm": _surface_gap(hanger, belt) * 1000.0,
+                "trackClearanceMm": hanger_to_belt * 1000.0,
+                "trackIntersectionTrianglePairs": len(hanger_belt_intersections),
             })
             skirt_bolt = _cylinder(
                 f"{UNIT_PREFIX}Armor_SkirtHangerBolt_{side}_{index}_Skirt",
@@ -498,7 +568,7 @@ def apply_bulwark_contact_repairs(
             fender_bolt = _cylinder(
                 f"{UNIT_PREFIX}Armor_SkirtHangerBolt_{side}_{index}_Fender",
                 0.009, 0.012,
-                (start.x, y, hanger_top + 0.005),
+                (fender_outer_x + sign * 0.005, y, hanger_top + 0.005),
                 metal,
                 vertices=10,
                 bevel=0.001,
@@ -529,80 +599,6 @@ def apply_bulwark_contact_repairs(
         "eraCassetteCountInLevel2Module": 4,
     })
 
-    # Keep the six front-glacis cassettes as an authored Level 1 armor detail.
-    # Each backing plane is oriented to the actual upper or lower Hull facet;
-    # the Level 2 module adds a separate bilateral side-skirt array.
-    front_hull = _object(objects, "BulwarkSiegeTankArmor_Hull")
-    front_hull_tree = _tree(_mesh_geometry(front_hull))
-    obstacle_trees = [
-        (neighbor, _tree(_mesh_geometry(neighbor)))
-        for neighbor in objects
-        if neighbor is not front_hull and neighbor.type == "MESH" and not neighbor.name.startswith("Preview")
-    ]
-    front_era = []
-    for row_name, z in (("Lower", 0.52), ("Upper", 0.70)):
-        for column, x in enumerate((-0.24, 0.0, 0.24), 1):
-            hit = front_hull_tree.ray_cast(Vector((x, 2.0, z)), Vector((0.0, -1.0, 0.0)), 1.0)
-            if not hit or hit[0] is None or hit[1] is None:
-                raise RuntimeError(f"No front Hull support face for ERA {row_name} row column {column}")
-            support_point = hit[0].copy()
-            support_normal = hit[1].normalized()
-            if support_normal.dot(Vector((0.0, 1.0, 0.0))) < 0.0:
-                support_normal.negate()
-            prefix = f"{UNIT_PREFIX}Armor_GlacisERA_{row_name}_{column}"
-            brick_objects = create_era_brick_preset(
-                prefix=prefix,
-                config=EraBrickConfig(
-                    center=tuple(support_point),
-                    normal=tuple(support_normal),
-                    size=(0.205, 0.118, 0.050),
-                    backing_overhang=0.010,
-                    backing_thickness=0.009,
-                    seam_width=0.0035,
-                    seam_depth=0.0025,
-                    edge_margin=0.010,
-                    corner_bevel=0.005,
-                    fastener_radius=0.0055,
-                ),
-                armor_material=armor,
-                hardware_material=metal,
-                hardflow_boolean_apply=hardflow_boolean_apply,
-                hardflow_bevel=hardflow_bevel,
-            )
-            generated.extend(brick_objects)
-            backing = next(obj for obj in brick_objects if "_BackingPlate" in obj.name)
-            support_fit = _contact_face_clearance(backing, front_hull, -support_normal)
-            if (support_fit["sampleCount"] == 0 or support_fit["missCount"] or
-                    support_fit["maxAbsFitErrorMm"] > 1.0):
-                raise RuntimeError(
-                    f"{prefix} backing plate does not conform to the front Hull: "
-                    f"max {support_fit['maxAbsFitErrorMm']:.3f} mm, misses "
-                    f"{support_fit['missCount']}/{support_fit['sampleCount']}"
-                )
-            for obj in brick_objects:
-                part_tree = _tree(_mesh_geometry(obj))
-                for neighbor, neighbor_tree in obstacle_trees:
-                    if part_tree.overlap(neighbor_tree):
-                        raise RuntimeError(f"{obj.name} intersects neighboring Bulwark part {neighbor.name}")
-            front_era.append({
-                "prefix": prefix,
-                "row": row_name,
-                "column": column,
-                "supportPoint": list(support_point),
-                "supportNormal": list(support_normal),
-                "supportTriangle": int(hit[2]),
-                "backingSeatFit": support_fit,
-                "meshObjectCount": len(brick_objects),
-                "preset": ERA_BRICK_PRESET_ID,
-            })
-    moved.append({
-        "assembly": "GlacisERACassetteArray",
-        "geometryPreset": ERA_BRICK_PRESET_ID,
-        "cassetteCount": len(front_era),
-        "brickLayout": "two rows of three, each backing plane conformed to its measured Hull facet",
-        "bricks": front_era,
-    })
-
     # Keep the hull-bound hatch within a shallow deck pocket. The panel is
     # fitted to the inside of its existing coaming and the X hinge axis sits
     # on the upper rear edge, so it opens from a seated position without a lift.
@@ -629,7 +625,9 @@ def apply_bulwark_contact_repairs(
     latch_corners = [hatch_latch.matrix_world @ Vector(corner) for corner in hatch_latch.bound_box]
     latch_center = sum(latch_corners, Vector()) / len(latch_corners)
     hatch_latch.scale.x *= 0.66
-    hatch_latch.location.x = latch_center.x + 0.170
+    # Seat the dog latch on the panel's starboard edge. The former fixed
+    # +170 mm offset placed the existing latch fully outside the hatch plate.
+    hatch_latch.location.x = plate_max.x - hatch_latch.dimensions.x * 0.5
     hatch_latch.location.y = latch_center.y
     hatch_latch.location.z = deck_top + hatch_latch.dimensions.z * 0.5
     bpy.context.view_layer.update()
@@ -1095,6 +1093,15 @@ def apply_bulwark_contact_repairs(
 
     bpy.context.view_layer.update()
     expected_names = [obj.name for obj in generated]
+    front_era_names_after = sorted(
+        obj.name for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and obj.name.startswith(f"{UNIT_PREFIX}Armor_GlacisERA_")
+    )
+    if front_era_names_after != front_era_names_before:
+        raise RuntimeError(
+            "The side-only ERA support recipe must preserve the existing frontal armor exactly; "
+            f"before={front_era_names_before!r}, after={front_era_names_after!r}"
+        )
     scene[SCENE_MARKER] = RECIPE_ID
     scene["rcl_bulwark_visible_supports_expected_details"] = expected_names
     report = {
@@ -1103,6 +1110,12 @@ def apply_bulwark_contact_repairs(
         "idempotentReplay": False,
         "hardflowBevelProvided": hardflow_bevel is not None,
         "hardflowBooleanProvided": hardflow_boolean_apply is not None,
+        "frontGlacisEraPreserved": {
+            "before": front_era_names_before,
+            "after": front_era_names_after,
+            "unchanged": True,
+            "newCassettesAdded": 0,
+        },
         "targetBounds": {
             "UpperDeckBefore": [list(upper_bounds[0]), list(upper_bounds[1])],
             "UpperDeckAfter": [list(upper_bounds_after[0]), list(upper_bounds_after[1])],

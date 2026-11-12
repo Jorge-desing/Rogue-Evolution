@@ -43,24 +43,33 @@ class ModelBudgetPolicyTests(unittest.TestCase):
 
     def test_runtime_capture_is_normalized_for_profile_calibration(self):
         report = {
-            "schema": "rogue-command/runtime-geometry-sample/v2",
+            "schema": "rogue-command/runtime-geometry-sample/v3",
             "status": "complete",
             "captureStartedUtc": "2026-11-11T00:00:00Z",
             "scene": "Game",
             "unityVersion": "2021.3.45f2",
             "camera": {
                 "name": "Main Camera", "pixelWidth": 1920, "pixelHeight": 1080,
+                "cameraType": "Game", "usesRenderTexture": False,
                 "fieldOfView": 26.0, "orthographic": False, "orthographicSize": 42.0,
+                "aspect": 1920.0 / 1080.0, "cullingMask": -1,
                 "position": [0.0, 10.0, 20.0], "rotationEuler": [45.0, 0.0, 0.0],
             },
             "capture": {
                 "requestedFrames": 120,
                 "sampleCount": 120,
                 "timeScaleAtStart": 1.0,
+                "timeScaleStayedPositive": True,
+                "cameraStable": True,
+                "geometryLoadStable": True,
+                "geometryStabilityChecks": 4,
+                "geometrySignature": 123456789,
+                "candidateMeshRenderers": 5,
                 "frameIntervalMetric": "UnityEngine.Time.unscaledDeltaTime",
                 "frameIntervalUnit": "ms",
                 "geometryMetric": "cameraFrustumMeshTriangles",
                 "countedMeshRenderers": 5,
+                "unsupportedMeshRenderers": 0,
             },
             "summary": {"cameraFrustumMeshTriangles": 185_000},
             "fitSample": {
@@ -78,7 +87,7 @@ class ModelBudgetPolicyTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["triangles"], 185_000)
         self.assertEqual(rows[0]["p95UnscaledFrameIntervalMs"], 13.5)
-        self.assertEqual(rows[0]["measurementSource"], "runtime-model-budget-probe-v2")
+        self.assertEqual(rows[0]["measurementSource"], "runtime-model-budget-probe-v3")
         self.assertEqual(rows[0]["unityVersion"], "2021.3.45f2")
 
         different_view = json.loads(json.dumps(report))
@@ -89,9 +98,58 @@ class ModelBudgetPolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(ModelBudgetError, "one scene, camera pose"):
                 _read_samples(path)
 
+        unstable_load = json.loads(json.dumps(report))
+        unstable_load["capture"]["geometryLoadStable"] = False
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "unstable.json"
+            path.write_text(json.dumps(unstable_load), encoding="utf-8")
+            with self.assertRaisesRegex(ModelBudgetError, "camera, or geometry load changed"):
+                _read_samples(path)
+
+    def test_runtime_capture_rejects_missing_or_inconsistent_geometry_signature(self):
+        report = {
+            "schema": "rogue-command/runtime-geometry-sample/v3",
+            "status": "complete",
+            "captureStartedUtc": "2026-11-11T00:00:00Z",
+            "scene": "Game",
+            "unityVersion": "2021.3.45f2",
+            "camera": {
+                "name": "Main Camera", "pixelWidth": 1920, "pixelHeight": 1080,
+                "cameraType": "Game", "usesRenderTexture": False,
+                "fieldOfView": 26.0, "orthographic": False, "orthographicSize": 42.0,
+                "aspect": 1920.0 / 1080.0, "cullingMask": -1,
+                "position": [0.0, 10.0, 20.0], "rotationEuler": [45.0, 0.0, 0.0],
+            },
+            "capture": {
+                "requestedFrames": 120, "sampleCount": 120, "timeScaleAtStart": 1.0,
+                "timeScaleStayedPositive": True, "cameraStable": True, "geometryLoadStable": True,
+                "geometryStabilityChecks": 4, "geometrySignature": 123456789,
+                "candidateMeshRenderers": 5, "countedMeshRenderers": 5, "unsupportedMeshRenderers": 0,
+                "frameIntervalMetric": "UnityEngine.Time.unscaledDeltaTime", "frameIntervalUnit": "ms",
+                "geometryMetric": "cameraFrustumMeshTriangles",
+            },
+            "summary": {"cameraFrustumMeshTriangles": 185_000},
+            "fitSample": {"triangles": 185_000, "p95UnscaledFrameIntervalMs": 13.5, "calibrationReady": True},
+            "frameIntervalsMs": [13.5] * 120,
+        }
+        invalid_reports = []
+        missing_signature = json.loads(json.dumps(report))
+        del missing_signature["capture"]["geometrySignature"]
+        invalid_reports.append((missing_signature, "stability check metadata is invalid"))
+        unreconciled_census = json.loads(json.dumps(report))
+        unreconciled_census["capture"]["candidateMeshRenderers"] = 6
+        invalid_reports.append((unreconciled_census, "does not reconcile candidate"))
+
+        for index, (invalid, message) in enumerate(invalid_reports):
+            with self.subTest(index=index), tempfile.TemporaryDirectory() as temp_dir:
+                path = Path(temp_dir) / "capture.json"
+                path.write_text(json.dumps(invalid), encoding="utf-8")
+                with self.assertRaisesRegex(ModelBudgetError, message):
+                    _read_samples(path)
+
     def test_runtime_capture_rejects_paused_or_incomplete_runs(self):
         report = {
-            "schema": "rogue-command/runtime-geometry-sample/v2",
+            "schema": "rogue-command/runtime-geometry-sample/v3",
             "status": "complete",
             "scene": "Game",
             "camera": {"name": "Main Camera", "pixelWidth": 1920, "pixelHeight": 1080},
@@ -118,7 +176,7 @@ class ModelBudgetPolicyTests(unittest.TestCase):
             path.write_text(json.dumps({"samples": [
                 {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 10.0},
             ]}), encoding="utf-8")
-            with self.assertRaisesRegex(ModelBudgetError, "schema-v2 runtime report"):
+            with self.assertRaisesRegex(ModelBudgetError, "schema-v3 runtime report"):
                 _read_samples(path)
 
     def test_project_profile_keeps_the_required_sixty_fps_target(self):

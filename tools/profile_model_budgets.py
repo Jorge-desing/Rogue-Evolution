@@ -20,7 +20,7 @@ def _read_samples(path: Path) -> list[dict[str, object]]:
         value = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ModelBudgetError(f"cannot read calibration sample file: {path}") from exc
-    if isinstance(value, dict) and value.get("schema") == "rogue-command/runtime-geometry-sample/v2":
+    if isinstance(value, dict) and value.get("schema") == "rogue-command/runtime-geometry-sample/v3":
         reports = [value]
     elif isinstance(value, dict) and "reports" in value:
         reports = value.get("reports")
@@ -29,7 +29,7 @@ def _read_samples(path: Path) -> list[dict[str, object]]:
     elif isinstance(value, list):
         reports = value
     else:
-        raise ModelBudgetError("calibration input must be a schema-v2 runtime report or a {reports: [...]} object")
+        raise ModelBudgetError("calibration input must be a schema-v3 runtime report or a {reports: [...]} object")
     if not reports or not all(isinstance(report, dict) for report in reports):
         raise ModelBudgetError("runtime capture reports must be a nonempty array of objects")
     rows = [_sample_from_runtime_capture(report, path) for report in reports]
@@ -47,8 +47,8 @@ def _read_samples(path: Path) -> list[dict[str, object]]:
 
 def _sample_from_runtime_capture(report: object, path: Path) -> dict[str, object]:
     """Validate one complete, unpaused runtime capture and extract its fit row."""
-    if not isinstance(report, dict) or report.get("schema") != "rogue-command/runtime-geometry-sample/v2":
-        raise ModelBudgetError(f"{path}: runtime report schema must be rogue-command/runtime-geometry-sample/v2")
+    if not isinstance(report, dict) or report.get("schema") != "rogue-command/runtime-geometry-sample/v3":
+        raise ModelBudgetError(f"{path}: runtime report schema must be rogue-command/runtime-geometry-sample/v3")
     capture = report.get("capture")
     camera = report.get("camera")
     sample = report.get("fitSample")
@@ -72,6 +72,8 @@ def _sample_from_runtime_capture(report: object, path: Path) -> dict[str, object
         interval = float(sample["p95UnscaledFrameIntervalMs"])
         field_of_view = float(camera["fieldOfView"])
         orthographic_size = float(camera["orthographicSize"])
+        camera_aspect = float(camera["aspect"])
+        camera_culling_mask = int(camera["cullingMask"])
         camera_position = tuple(float(component) for component in camera["position"])
         camera_rotation = tuple(float(component) for component in camera["rotationEuler"])
     except (KeyError, TypeError, ValueError) as exc:
@@ -91,10 +93,31 @@ def _sample_from_runtime_capture(report: object, path: Path) -> dict[str, object
         raise ModelBudgetError(f"{path}: fitSample p95 does not match the captured frame intervals")
     if not math.isfinite(time_scale) or time_scale <= 0.0:
         raise ModelBudgetError(f"{path}: paused or timeScale-zero captures cannot calibrate performance")
+    if (capture.get("timeScaleStayedPositive") is not True or capture.get("cameraStable") is not True or
+            capture.get("geometryLoadStable") is not True):
+        raise ModelBudgetError(f"{path}: capture is not eligible because time scale, camera, or geometry load changed")
+    try:
+        stability_checks = int(capture["geometryStabilityChecks"])
+        geometry_signature = int(capture["geometrySignature"])
+        candidate_renderers = int(capture["candidateMeshRenderers"])
+        counted_renderers = int(capture["countedMeshRenderers"])
+        unsupported_renderers = int(capture["unsupportedMeshRenderers"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ModelBudgetError(f"{path}: runtime geometry stability check metadata is invalid") from exc
+    if stability_checks < math.ceil(sample_count / 30):
+        raise ModelBudgetError(f"{path}: runtime capture has too few periodic geometry stability checks")
+    if geometry_signature == 0:
+        raise ModelBudgetError(f"{path}: runtime capture is missing its renderer-set stability signature")
+    if (candidate_renderers <= 0 or counted_renderers <= 0 or unsupported_renderers < 0 or
+            counted_renderers + unsupported_renderers != candidate_renderers):
+        raise ModelBudgetError(f"{path}: runtime geometry census does not reconcile candidate, counted, and unsupported renderers")
+    if camera.get("cameraType") != "Game" or camera.get("usesRenderTexture") is not False:
+        raise ModelBudgetError(f"{path}: runtime capture must use a Game camera rendering to the display")
     if (pixel_width <= 0 or pixel_height <= 0 or not report.get("scene") or not camera.get("name") or
             len(camera_position) != 3 or len(camera_rotation) != 3):
         raise ModelBudgetError(f"{path}: runtime capture needs a scene, camera pose, and positive resolution")
     if (triangles <= 0 or not math.isfinite(field_of_view) or not math.isfinite(orthographic_size) or
+            not math.isfinite(camera_aspect) or camera_aspect <= 0.0 or
             not all(math.isfinite(value) for value in camera_position + camera_rotation) or not interval > 0.0):
         raise ModelBudgetError(f"{path}: runtime capture needs positive camera-frustum triangles and frame interval")
     summary = report.get("summary")
@@ -113,6 +136,10 @@ def _sample_from_runtime_capture(report: object, path: Path) -> dict[str, object
         field_of_view,
         bool(camera.get("orthographic")),
         orthographic_size,
+        camera_aspect,
+        camera_culling_mask,
+        camera.get("cameraType"),
+        camera.get("usesRenderTexture"),
         camera_position,
         camera_rotation,
     )
@@ -128,7 +155,7 @@ def _sample_from_runtime_capture(report: object, path: Path) -> dict[str, object
         "unityVersion": report.get("unityVersion", ""),
         "timeScaleAtStart": time_scale,
         "sampleCount": sample_count,
-        "measurementSource": "runtime-model-budget-probe-v2",
+        "measurementSource": "runtime-model-budget-probe-v3",
     }
 
 
@@ -158,7 +185,7 @@ def compile_profile(profile_path: Path, samples_path: Path | None = None) -> dic
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, default=Path("content/source-art/model-budget-profile.json"))
-    parser.add_argument("--samples", type=Path, help="Complete schema-v2 runtime report or JSON object {reports:[report,...]}")
+    parser.add_argument("--samples", type=Path, help="Complete schema-v3 runtime report or JSON object {reports:[report,...]}")
     parser.add_argument("--output", type=Path, required=True, help="Compiled profile JSON output path")
     args = parser.parse_args(argv)
     try:
