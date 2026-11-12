@@ -101,6 +101,17 @@ namespace RogueCommandExpansionLoader.Runtime
             _eligibleExclusiveUnitIds = eligible;
         }
 
+        public IReadOnlyList<string> UnitIds
+        {
+            get
+            {
+                var result = new string[_unitIds.Count];
+                _unitIds.CopyTo(result);
+                Array.Sort(result, StringComparer.Ordinal);
+                return Array.AsReadOnly(result);
+            }
+        }
+
         internal void AddEligibleExclusiveUnitIds(HashSet<string> destination)
         {
             foreach (string unitId in _eligibleExclusiveUnitIds)
@@ -118,7 +129,7 @@ namespace RogueCommandExpansionLoader.Runtime
     {
         private readonly object _gate = new object();
         private readonly Dictionary<string, BlueprintPoolScopeRegistration> _byId =
-            new Dictionary<string, BlueprintPoolScopeRegistration>(StringComparer.Ordinal);
+            new Dictionary<string, BlueprintPoolScopeRegistration>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<object, BlueprintPoolScopeRegistration> _byReference =
             new Dictionary<object, BlueprintPoolScopeRegistration>(ReferenceComparer.Instance);
         private readonly Dictionary<string, string> _localizationAliases =
@@ -151,12 +162,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 for (int i = 0; i < batch.Count; i++)
                 {
                     BlueprintPoolScopeRegistration registration = batch[i];
-                    _byId.Add(registration.PoolId, registration);
-                    _byReference.Add(registration.Pool, registration);
+                    _byId[registration.PoolId] = registration;
+                    _byReference[registration.Pool] = registration;
                     _ordered.Add(registration);
                     if (!String.IsNullOrWhiteSpace(registration.SourcePoolId))
                     {
-                        _localizationAliases.Add(registration.PoolId, registration.SourcePoolId);
+                        string effectiveSource = registration.SourcePoolId;
+                        string rootSource;
+                        if (_localizationAliases.TryGetValue(effectiveSource, out rootSource) &&
+                            !String.IsNullOrWhiteSpace(rootSource))
+                        {
+                            effectiveSource = rootSource;
+                        }
+
+                        _localizationAliases[registration.PoolId] = effectiveSource;
                     }
                 }
             }
@@ -170,6 +189,14 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public bool ContainsPool(object pool)
+        {
+            lock (_gate)
+            {
+                return pool != null && _byReference.ContainsKey(pool);
+            }
+        }
+
         public bool TryGetSourcePoolLocalizationId(string poolId, out string sourcePoolId)
         {
             lock (_gate)
@@ -177,6 +204,16 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (!String.IsNullOrEmpty(poolId) && _localizationAliases.TryGetValue(poolId, out sourcePoolId))
                 {
                     return true;
+                }
+
+                BlueprintPoolScopeRegistration registration;
+                if (!String.IsNullOrEmpty(poolId) && _byId.TryGetValue(poolId, out registration))
+                {
+                    if (!String.IsNullOrWhiteSpace(registration.SourcePoolId))
+                    {
+                        sourcePoolId = registration.SourcePoolId;
+                        return true;
+                    }
                 }
             }
 
@@ -219,6 +256,17 @@ namespace RogueCommandExpansionLoader.Runtime
         public bool AllowsModUnitInPool(object pool, string unitId)
         {
             return AllowsModUnitInPool(pool, unitId, false, true, false, true);
+        }
+
+        public bool AllowsModUnitInSourcePool(object pool, string sourcePoolId, string unitId)
+        {
+            lock (_gate)
+            {
+                BlueprintPoolScopeRegistration registration;
+                return pool != null &&
+                       _byReference.TryGetValue(pool, out registration) &&
+                       registration.ContainsUnitInSourcePool(sourcePoolId, unitId);
+            }
         }
 
         /// <summary>

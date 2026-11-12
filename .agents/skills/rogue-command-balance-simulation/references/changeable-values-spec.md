@@ -4,38 +4,48 @@ This reference details the 26 canonical attributes defined in `EntityBalancingSt
 
 ## 1. The 26 Canonical Enum Attributes
 
-| Enum Index | Enum Identifier | TSV Header | `content.json` Override | Type | Unit | Description |
-|:---|:---|:---|:---|:---|:---|:---|
-| 0 | `Cost` | `cost` | `cost` | `float` | Credits | Mineral/credit cost to produce or construct. |
-| 1 | `ProductionDuration` | `productionDuration` | `productionDuration` | `float` | Seconds | Time required by a factory to produce one instance. |
-| 2 | `MaxCapacity` | `maxCapacity` | `maxCapacity` | `int` | Supply | Army supply cost consumed while the unit is alive. |
-| 3 | `MaxHealth` | `maxHealth` | `maxHealth` | `float` | Hit Points | Base structural durability before destruction. |
-| 4 | `MaxShield` | `maxShield` | `maxShield` | `float` | Charges | Discrete hit-absorbing shield charges (not a second HP bar). |
-| 5 | `MaxMana` | `maxMana` | `maxMana` | `float` | Energy | Capacity for active skills and tactical abilities. |
-| 6 | `MaxRank` | `maxRank` | `maxRank` | `int` | Level | Maximum veterancy rank reachable through combat. |
-| 7 | `MoveSpeed` | `moveSpeed` | `moveSpeed` | `float` | m/s | Maximum translational movement velocity on terrain. |
-| 8 | `SightRadius` | `sightRadius` | `sightRadius` | `float` | Meters | Fog-of-war vision reveal radius. |
-| 9 | `Damage1` | `damage1` | `damage1` | `float` | HP / hit | Primary weapon unmitigated payload per projectile. |
-| 10 | `Attack1Cooldown` | `attackCooldown` | `attackCooldown` | `float` | Seconds | Delay between consecutive primary weapon discharges. |
-| 11 | `Damage2` | `damage2` | `damage2` | `float` | HP / hit | Secondary weapon unmitigated payload per projectile. |
-| 12 | `Attack2Cooldown` | `attack2Cooldown` | `attack2Cooldown` | `float` | Seconds | Delay between consecutive secondary weapon discharges. |
-| 13 | `WeaponRange` | `weaponRange` | `weaponRange` | `float` | Meters | Maximum engagement distance to target center. |
-| 14 | `EffectRadius1` | `effectRadius1` | `effectRadius1` | `float` | Meters | Primary blast splash radius for area-of-effect damage. |
-| 15 | `EffectRadius2` | `effectRadius2` | `effectRadius2` | `float` | Meters | Secondary blast splash radius. |
-| 16 | `SkillRange` | `skillRange` | `skillRange` | `float` | Meters | Maximum cast range for active abilities. |
-| 17 | `HealAmount1` | `healAmount1` | `healAmount1` | `float` | HP | Primary repair/healing output per cycle. |
-| 18 | `HealAmount2` | `healAmount2` | `healAmount2` | `float` | HP | Secondary repair/healing output. |
-| 19 | `GainCreditsAmount` | `gainCreditsAmount` | `gainCreditsAmount` | `float` | Credits | Bounties or economic yield generated. |
-| 20 | `SkillManaCost` | `skillManaCost` | `skillManaCost` | `float` | Energy | Energy deducted upon activating special skill. |
-| 21 | `Duration1` | `duration1` | `duration1` | `float` | Seconds | Primary buff/effect duration. |
-| 22 | `SpawnTtl` | `spawnTtl` | `spawnTtl` | `float` | Seconds | Time-to-live before automatic expiration (summons/drones). |
-| 23 | `ManaRechargePerSecond`| `manaRechargePerSecond`| `manaRechargePerSecond`| `float` | Energy/s | Passive energy regeneration rate. |
-| 24 | `MaxArmor` | `maxArmor` | `maxArmor` | `float` | Points | Maximum replenishable armor rating cap. |
-| 25 | `ArmorProtection` | `armorProtection` | `armorProtection` | `float` | Flat reduction | Direct subtraction from incoming unmitigated damage. |
+Static inspection of the pinned Rogue Command 1.0.9 `EntityBalancingStore.GetOriginalIntValue` and `GetOriginalValueAsFloat` shows that these members do not all share the same storage type or source field. `customBalance` keys use the exact `ChangeableValue` name; the row-source column is the actual field read by the native getter.
+
+| Enum Index | `ChangeableValue` / `customBalance` key | Native base source | Storage | Notes |
+|:---:|:---|:---|:---:|:---|
+| 0 | `Cost` | `EntityBalancingParameters.cost` | `Int32` | Credits. |
+| 1 | `ProductionDuration` | `EntityBalancingParameters.productionDuration` | `Single` | Seconds. |
+| 2 | `MaxCapacity` | `EntityBalancingParameters.maxCapacity` | `Int32` | Native capacity value. |
+| 3 | `MaxHealth` | `EntityBalancingParameters.maxHealth` | `Int32` | Base health. |
+| 4 | `MaxShield` | `EntityBalancingParameters.maxShield` | `Int32` | Discrete shield charges. |
+| 5 | `MaxMana` | `EntityBalancingParameters.maxMana` | `Int32` | Base mana capacity. |
+| 6 | `MaxRank` | `EntityBalancingParameters.maxRank` | `Int32` | Maximum rank. |
+| 7 | `MoveSpeed` | `EntityBalancingParameters.moveSpeed` | `Single` | Maximum translational speed. |
+| 8 | `SightRadius` | `EntityBalancingParameters.sightRadius` | `Int32` | Native sight-radius value. |
+| 9 | `Damage1` | `EntityBalancingParameters.damage1` | `Single` | Primary damage value. |
+| 10 | `Damage2` | `EntityBalancingParameters.damage2` | `Single` | Secondary damage value. |
+| 11 | `WeaponRange` | `EntityBalancingParameters.weaponRange` | `Single` | Weapon range. |
+| 12 | `Attack1Cooldown` | `EntityBalancingParameters.attackCooldown` | `Single` | Primary cooldown; field name is not `attack1Cooldown`. |
+| 13 | `Attack2Cooldown` | `EntityBalancingParameters.attack2Cooldown` | `Single` | Secondary cooldown. |
+| 14 | `EffectRadius1` | `EntityBalancingParameters.effectRadius1` | `Single` | Primary effect radius. |
+| 15 | `EffectRadius2` | `EntityBalancingParameters.effectRadius2` | `Single` | Secondary effect radius. |
+| 16 | `SkillRange` | `EntityBalancingParameters.skillRange` | `Int32` | Native skill-range value. |
+| 17 | `HealAmount1` | `EntityBalancingParameters.healAmount1` | `Single` | Primary healing amount. |
+| 18 | `HealAmount2` | `EntityBalancingParameters.healAmount2` | `Single` | Secondary healing amount. |
+| 19 | `GainCreditsAmount` | `EntityBalancingParameters.gainCreditsAmount` | `Single` | Credit yield. |
+| 20 | `SkillManaCost` | `EntityBalancingParameters.skillManaCost` | `Single` | Skill cost. |
+| 21 | `Duration1` | `EntityBalancingParameters.duration1` | `Single` | Primary duration. |
+| 22 | `SpawnTtl` | `EntityBalancingParameters.duration2` | `Single` | Native mapping uses `duration2`, not `spawnTtl`. |
+| 23 | `ManaRechargePerSecond` | `GameBalancingStore.ManaRechargePerSecond` | `Single` | Global source; not a per-unit row field. |
+| 24 | `MaxArmor` | `EntityBalancingParameters.maxArmor` | `Single` | Maximum replenishable armor. |
+| 25 | `ArmorProtection` | `EntityBalancingParameters.armorProtection` | `Single` | Flat damage subtraction. |
+
+The per-unit `customBalance` contract supports only the 25 row-backed entries above; it excludes global `ManaRechargePerSecond`. `Attack1Cooldown` and `SpawnTtl` require explicit field mappings and must not be derived by simple casing rules.
+
+## 2. Per-unit row overrides and native caches
+
+The loader applies `customBalance` and structured `movement.moveSpeed` values to the incoming `EntityBalancingParameters` row before it is registered. It does not seed `ChangeableIntValueCache` or `ChangeableFloatValueCache` with final stat values. In the pinned game, `EntityBalancingStore.InvalidateCache` clears those caches; subsequent getters recalculate from the row and then apply relic, upgrade, in-game card, and meta-progression `CardChangeScriptableObject` deltas. Directly inserting a final value into the cache is therefore transient and bypasses those native modifiers. This describes static inspection plus local validation, not in-game consumption evidence.
+
+Integer-backed `ChangeableValue` entries have an additional native precision bound. Static inspection of `CalculateResultingIntValue` shows it widens the row's `Int32` to `Single`, applies card deltas in `Single`, then calls `MathHelper.RoundToInt`. Therefore the loader caps integer-backed custom and raw balance overrides at `2^24` (`16,777,216`), the largest contiguous integer range exactly representable by `Single`; `16,777,217` becomes `16,777,216` at the native conversion. The DTO still uses `double` so JSON parsing does not silently round the value before validation. This is static inspection corroborated by local regression tests, not proof of an in-game unit consuming an override.
 
 ---
 
-## 2. Reverse-Engineered Damage Mitigation Rules
+## 3. Reverse-Engineered Damage Mitigation Rules
 
 Direct inspection of `EntityController.TakeDamage(float amount, EntityController attacker, Vector3 damageSourcePosition, bool bypassShield = false)` in `Assembly-CSharp.dll` confirms:
 
@@ -63,7 +73,7 @@ this.CurrentHealth -= damageAfterArmor;
 
 ---
 
-## 3. Weapon & Attack Types
+## 4. Weapon & Attack Types
 
 `attackType` in Rogue Command defines targeting delivery:
 - `None`: Unarmed or passive support.

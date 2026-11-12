@@ -13,7 +13,7 @@ namespace RogueCommandExpansionLoader.Runtime
     public sealed class BalanceOverride
     {
         public string EntityId { get; set; }
-        public Dictionary<string, float> Parameters { get; set; }
+        public Dictionary<string, double> Parameters { get; set; }
     }
 
     public interface IRuntimeContentProvider
@@ -34,7 +34,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         IEnumerable<object> GetEntityParameterRows();
 
-        /// <summary>Returns balance overrides for existing entities defined in content packs.</summary>
+        /// <summary>Returns per-unit values to apply to incoming balance rows before registration.</summary>
         IEnumerable<BalanceOverride> GetBalanceOverrides();
 
         /// <summary>Resolves a localized name or description for a registered mod unit.</summary>
@@ -56,6 +56,28 @@ namespace RogueCommandExpansionLoader.Runtime
         LoaderDiagnosticsSnapshot GetDiagnosticsSnapshot();
     }
 
+    internal static class RuntimeContentPreparationPolicy
+    {
+        public static bool ShouldRefreshNativeUnitIds(bool runtimeContentReady, bool loadingTaskExists)
+        {
+            return !runtimeContentReady && !loadingTaskExists;
+        }
+    }
+
+    internal static class BundleFallbackPolicy
+    {
+        /// <summary>
+        /// The loader never silently substitutes a different bundle for a declared one unless
+        /// an explicit, non-empty fallback path is configured. The default game/mod
+        /// configuration provides no global fallback, so a missing declared bundle fails closed.
+        /// </summary>
+        public static bool ShouldAttemptFallback(bool bundleFileMissing, string configuredFallbackPath)
+        {
+            return bundleFileMissing && !String.IsNullOrWhiteSpace(configuredFallbackPath);
+        }
+    }
+
+
     /// <summary>Optional bridge for localized ability text on mod units.</summary>
     public interface IUnitSkillLocalizationRuntimeProvider
     {
@@ -68,6 +90,12 @@ namespace RogueCommandExpansionLoader.Runtime
         bool TryGetRelicLocalization(string relicId, bool description, out string value);
     }
 
+    /// <summary>Optional bridge for native card upgrade names and descriptions.</summary>
+    public interface IUpgradeLocalizationRuntimeProvider
+    {
+        bool TryGetUpgradeLocalization(string upgradeId, bool description, out string value);
+    }
+
     /// <summary>
     /// Optional bridge for a stage-owned procedural landscape. The returned scope is temporary
     /// and must be ended from a Harmony finalizer so game collections are restored after failures.
@@ -76,6 +104,30 @@ namespace RogueCommandExpansionLoader.Runtime
     {
         IDisposable BeginStageLandscapeScope(object stage);
         bool TryGetLandscapeLocalization(string localizationId, out string value);
+    }
+
+    public readonly struct PrespawnQuota
+    {
+        public PrespawnQuota(string entityId, int quota, bool isBuilding, string factoryId = null)
+        {
+            EntityId = entityId;
+            Quota = quota;
+            IsBuilding = isBuilding;
+            FactoryId = factoryId;
+        }
+
+        public string EntityId { get; }
+        public int Quota { get; }
+        public bool IsBuilding { get; }
+        public string FactoryId { get; }
+    }
+
+    /// <summary>
+    /// Optional bridge providing pre-spawning quotas to warm EntityFactory pools and eliminate combat frame hitches.
+    /// </summary>
+    public interface IPrespawnRuntimeProvider
+    {
+        IEnumerable<PrespawnQuota> GetPrespawnQuotas();
     }
 
     public interface IStageFallbackRuntimeProvider
@@ -144,6 +196,33 @@ namespace RogueCommandExpansionLoader.Runtime
         bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal);
 
         void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result);
+    }
+
+    /// <summary>
+    /// Optional bridge for guaranteeing that at least one valid mod card appears in card reward screens.
+    /// </summary>
+    public interface IGuaranteedModCardRewardProvider
+    {
+        bool IsModUnitProduct(string productId);
+
+        bool TryGetGuaranteedModRewardProduct(
+            string poolId,
+            bool isStartingSelection,
+            int currentXpLevel,
+            ICollection<string> excludedProductIds,
+            out string modProductId);
+    }
+
+    /// <summary>
+    /// Optional bridge providing registered mod production building IDs that qualify for global blueprint rolls.
+    /// </summary>
+    public interface IGlobalBlueprintCandidateProvider
+    {
+        IEnumerable<string> GetEligibleBlueprintFactories(
+            int rarity,
+            bool? startingBlueprints,
+            bool demoBlueprintsOnly,
+            int? maxNeededExperienceLevel);
     }
 
     /// <summary>

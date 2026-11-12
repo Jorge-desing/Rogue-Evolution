@@ -1,13 +1,17 @@
 ---
 name: rogue-command-vfx-authoring
-description: "Author, configure, and validate ParticleSystems, muzzle flashes, damage smoke/fire, and URP shaders for Rogue Command."
+description: "Author and validate Rogue Command particle VFX in URP."
+metadata:
+  hermes:
+    tags: [Rogue Command, Unity, VFX, ParticleSystem, URP]
+    related_skills: [rogue-command-3d-model-authoring, rogue-command-assetbundle-authoring, rogue-command-animation-authoring]
 ---
 
 # Rogue Command VFX Authoring
 
-Use this skill when creating, modifying, or reviewing Visual Effects (VFX), particle systems, weapon muzzle flashes, damage degradation effects, and URP shaders for Rogue Command vehicles and units.
+Use this skill to author, integrate, or review particle effects and visual feedback for Rogue Command units. The Unity authoring project targets Unity 2021.3.45f2 and URP. AssetBundles contain serialized Unity assets, not new gameplay code; static inspection and editor builds do not prove effects appear in a Steam-launched match.
 
-Read `AGENTS.md`, `references/native-vfx-integration-points.md`, `references/urp-particle-shaders-guide.md`, and `references/vfx-prefab-recipe-book.md` before authoring particle assets in Unity.
+For Unity particle authoring, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `README.md`, `unity/RogueCommandAssetAuthoring/README.md`, and `references/native-vfx-integration-points.md`, `references/urp-particle-shaders-guide.md`, and `references/vfx-prefab-recipe-book.md`.
 
 ---
 
@@ -23,52 +27,50 @@ Read `AGENTS.md`, `references/native-vfx-integration-points.md`, `references/urp
 
 ## 2. Core Technical Rules & Native Hooks
 
-1. **Automatic Muzzle Flash Hook (`ShootProjectile`)**:
+1. **Automatic Muzzle Flash Hook & BFS Safeguard (`ShootProjectile`)**:
    - The native engine iterates `firePointsTransform` children at startup.
    - If a child has sub-children, it automatically caches `child.GetChild(0).GetComponent<ParticleSystem>()` and calls `.Play()` upon firing.
-   - **Rule**: Place your muzzle flash `ParticleSystem` as **child index 0** under each individual firepoint transform. Set `playOnAwake = false` and `looping = false`. No custom C# code is needed.
+   - **Rule**: Place your muzzle flash `ParticleSystem` as **child index 0** (`FirePoint_0`) under `Socket_MuzzlePrimary`. Set `playOnAwake = false` and `looping = false`.
+   - **Loader Safeguard (`EnsureMuzzleFlashHierarchy`)**: If an imported model lacks child particle emitters under a declared firepoint, `ContentPackRuntimeLoader` executes a recursive BFS to discover or synthesize a lightweight particle emitter on `FirePoint_0`, preventing unhandled `NullReferenceException` crashes during native `ShootProjectile.Init()`.
 
 2. **Damage Smoke & Fire Anchors (`RuntimeVisualDirector`)**:
    - The loader visual director attaches smoke when `HealthRatio <= 0.50f` and fire when `HealthRatio <= 0.25f`.
    - Provide explicit transform sockets named `Socket_DamageSmoke` (e.g. over the engine exhaust deck) and `Socket_DamageFire` (near fuel tanks/turret ring).
-   - If sockets are missing, the director falls back to emitting particles from the vehicle's ground center.
+   - A missing socket may make the fallback mount at the entity root. It only applies if `RuntimeVisualDirector` attaches to that entity; do not imply every native/custom prefab receives the modded effect. Authored emitters bind only when the socket role is unique and exactly one descendant `ParticleSystem` exists.
 
-3. **URP Shader Compatibility**:
+3. **URP Shader Compatibility & Runtime Fallback**:
    - Rogue Command runs on the Universal Render Pipeline.
    - Use `Universal Render Pipeline/Particles/Unlit` (or `Simple Lit`). Built-in pipeline shaders (`Particles/Standard Surface`, `Standard`) will render pink/broken.
-   - Always check **Enable GPU Instancing** on particle materials and `ParticleSystemRenderer`.
+   - Enable GPU instancing only when the chosen shader and renderer support it. The flag makes a renderer eligible; it does not prove batching or fewer draw calls.
+   - A distributable bundle must include its required shader/material dependencies; do not assume the game's built-in shader assets satisfy a modded bundle.
+   - **Runtime Fallback (`ApplyFallbackVisualMaterial`)**: In-game fallback handler automatically inspects imported materials and replaces null or unsupported shaders with native `Shader Graphs/EntityColorShader` or `Universal Render Pipeline/Lit` to prevent pink material artifacts.
 
 4. **Performance Safeguards**:
-   - Cap max particles at $\le 250$ per vehicle to avoid micro-hitches during 100+ unit engagements.
-   - Enable **Soft Particles** (`_SoftParticlesEnabled = 1.0f`) to prevent harsh intersection lines with terrain.
-   - Use `Simulation Space = World` for smoke and dust trails so particles trail naturally as vehicles drive.
+   - Treat 250 max particles per vehicle as a local authoring ceiling, not an engine-enforced limit; the reference recipes suggest roughly 15 per muzzle flash, 40 damage smoke, and 30 damage fire.
+   - Bound bursts, emission, and particle lifetimes; consider sub-emitters, simultaneous effects, and how many vehicles can emit at once. The current validator does not measure total formation cost comprehensively.
+   - Choose soft particles and simulation space per effect. World space preserves trails as the vehicle moves; local space keeps effects attached. Do not force the same setting on every emitter.
 
 ---
 
 ## 3. VFX Validation Tool
 
-Use `tools/validate_vfx_assets.py` (mirrored in `scripts/validate_vfx_assets.py` within this skill) to audit visual assets:
+Use `tools/validate_vfx_assets.py` as the CLI entry point. A copy exists at `scripts/validate_vfx_assets.py` in this skill; compare it with the root tool before relying on a behavior, because copies can drift. Run from the repository root through the project environment (explicit `PYTHONPATH` avoids globally visible Hermes package shadowing):
 
-```powershell
-# Audit all visual prefabs in the Unity authoring project
-.venv\Scripts\python.exe tools/validate_vfx_assets.py
-
-# Audit a compiled content pack bundle
-.venv\Scripts\python.exe tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion
-
-# Audit a specific model gameplay metadata file
-.venv\Scripts\python.exe tools/validate_vfx_assets.py --metadata artifacts/CombatTank.gameplay.json
-
-# Audit a specific prefab with JSON output
-.venv\Scripts\python.exe tools/validate_vfx_assets.py --prefab unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/ScoutTankVisual.prefab --json
+```text
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_vfx_assets.py --prefab unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/ScoutTankVisual.prefab --json")
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion --json")
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/sample-native-expansion")
 ```
+
+Use `--help` for current options. The VFX validator's prefab checks are name-based; its bundle checks inspect root visual prefab names/sockets, but do not inspect each serialized `ParticleSystem`, material shader, or native firepoint binding. It applies weapon/damage socket expectations generically, so non-combat factory visual prefabs may receive irrelevant missing-socket flags. A non-critical exit code/score is not proof of correct wiring, rendering, quality, or performance.
 
 ---
 
 ## 4. Authoring Workflow
 
-1. **Select Recipe**: Choose a verified parameter template from `references/vfx-prefab-recipe-book.md`.
-2. **Setup Hierarchy**: Place the emitter under the canonical socket (`Socket_MuzzlePrimary`, `Socket_DamageSmoke`, `Socket_DamageFire`) in Blender or Unity.
-3. **Assign Material**: Use `Universal Render Pipeline/Particles/Unlit` with Additive (for flashes/arcs) or Alpha Blended (for smoke/dust).
-4. **Run Validator**: Execute `validate_vfx_assets.py` to confirm socket names, particle limits, and URP shader compliance.
-5. **Rebuild Bundle**: Rebuild the AssetBundle using the project's Unity batchmode exporter and run `validate_content_bundle_references.py`.
+1. **Trace the consumer**: For native muzzle discovery or reflected bindings, verify the complete current game identity tuple (game version, Unity version, `Assembly-CSharp.dll` SHA-256, MVID); inspect the builder/runtime hierarchy rather than inferring from a socket label.
+2. **Select a recipe**: Choose a suitable template from `references/vfx-prefab-recipe-book.md`, then tune it for effect scale and role.
+3. **Preserve hierarchy**: Reuse existing canonical sockets; keep the muzzle `ParticleSystem` at child index 0 under each native firepoint. Avoid duplicate socket roles; damage sockets should contain exactly one intended emitter if relying on the authored binding.
+4. **Configure rendering and cost**: Choose URP shader/blend mode and local/world simulation space per effect. Bound emission, lifetime, and max particles; stage one focal effect and keep support effects subordinate at RTS zoom.
+5. **Audit and rebuild**: Run the VFX and bundle-reference validators, interpret their documented limits, and rebuild through the pinned Unity project builder when the bundle is in scope.
+6. **Report evidence**: Distinguish static inspection, local Unity build/validation, and Steam-launched in-game observation; do not claim runtime rendering from a validator or bundle build.

@@ -13,11 +13,13 @@ namespace RogueCommandExpansionLoader.Modules
         public int InterceptRadiusCells;
         public float ScanIntervalSeconds;
         public int MaxPatrolUnits;
+        public string PatrolMode;
     }
 
     internal static class PatrolAndInterceptParameterParser
     {
         internal const string ModuleId = "sample:patrol-and-intercept";
+        private const string DefaultPatrolMode = "AttackMove";
 
         public static bool TryParse(ContentModuleParameter[] parameters,
             out PatrolAndInterceptSettings settings, out string diagnostic)
@@ -35,7 +37,7 @@ namespace RogueCommandExpansionLoader.Modules
                 }
                 if (parameter.name != "baseIndex" && parameter.name != "patrolRadiusCells" &&
                     parameter.name != "interceptRadiusCells" && parameter.name != "scanIntervalSeconds" &&
-                    parameter.name != "maxPatrolUnits")
+                    parameter.name != "maxPatrolUnits" && parameter.name != "patrolMode")
                 {
                     diagnostic = "Unknown parameter '" + parameter.name + "' for module " + ModuleId + ".";
                     return false;
@@ -61,13 +63,24 @@ namespace RogueCommandExpansionLoader.Modules
             if (!TryInt(values, "maxPatrolUnits", 3, 1, 8, out maxUnits))
                 return Fail("maxPatrolUnits must be an integer between 1 and 8.", out diagnostic);
 
+            string patrolMode;
+            if (!values.TryGetValue("patrolMode", out patrolMode))
+            {
+                patrolMode = DefaultPatrolMode;
+            }
+            else if (patrolMode != "AttackMove" && patrolMode != "Native")
+            {
+                return Fail("patrolMode must be AttackMove or Native.", out diagnostic);
+            }
+
             settings = new PatrolAndInterceptSettings
             {
                 BaseIndex = baseIndex,
                 PatrolRadiusCells = patrolRadius,
                 InterceptRadiusCells = interceptRadius,
                 ScanIntervalSeconds = scanInterval,
-                MaxPatrolUnits = maxUnits
+                MaxPatrolUnits = maxUnits,
+                PatrolMode = patrolMode
             };
             diagnostic = null;
             return true;
@@ -100,6 +113,8 @@ namespace RogueCommandExpansionLoader.Modules
 
     internal static class PatrolAndInterceptWaypointResolver
     {
+        internal const int MaximumNativePatrolWaypoints = 8;
+
         public static bool TrySelectNearest(Vector2Int currentCell, IList<Vector2Int> waypointCells,
             int radiusCells, out int waypointIndex)
         {
@@ -132,6 +147,63 @@ namespace RogueCommandExpansionLoader.Modules
             }
 
             return waypointIndex >= 0;
+        }
+
+        public static int SelectNearestRoute(Vector2Int currentCell, IList<Vector2Int> waypointCells,
+            int radiusCells, int[] selectedIndices)
+        {
+            if (waypointCells == null || selectedIndices == null || selectedIndices.Length == 0 ||
+                radiusCells < 1 || radiusCells > 32)
+            {
+                return 0;
+            }
+
+            int routeLimit = Math.Min(MaximumNativePatrolWaypoints, selectedIndices.Length);
+            long maximumDistanceSquared = (long)radiusCells * radiusCells;
+            int selectedCount = 0;
+            while (selectedCount < routeLimit)
+            {
+                int nearestIndex = -1;
+                long nearestDistanceSquared = Int64.MaxValue;
+                for (int i = 0; i < waypointCells.Count; i++)
+                {
+                    Vector2Int cell = waypointCells[i];
+                    long deltaX = (long)cell.x - currentCell.x;
+                    long deltaY = (long)cell.y - currentCell.y;
+                    if (Math.Abs(deltaX) > radiusCells || Math.Abs(deltaY) > radiusCells) continue;
+
+                    long distanceSquared = deltaX * deltaX + deltaY * deltaY;
+                    if (distanceSquared == 0 || distanceSquared > maximumDistanceSquared) continue;
+
+                    bool alreadySelected = false;
+                    for (int selected = 0; selected < selectedCount; selected++)
+                    {
+                        Vector2Int selectedCell = waypointCells[selectedIndices[selected]];
+                        if (selectedCell.x == cell.x && selectedCell.y == cell.y)
+                        {
+                            alreadySelected = true;
+                            break;
+                        }
+                    }
+                    if (alreadySelected) continue;
+
+                    bool precedesTie = nearestIndex >= 0 &&
+                        (cell.x < waypointCells[nearestIndex].x ||
+                         (cell.x == waypointCells[nearestIndex].x &&
+                          (cell.y < waypointCells[nearestIndex].y ||
+                           (cell.y == waypointCells[nearestIndex].y && i < nearestIndex))));
+                    if (distanceSquared > nearestDistanceSquared ||
+                        (distanceSquared == nearestDistanceSquared && !precedesTie)) continue;
+
+                    nearestIndex = i;
+                    nearestDistanceSquared = distanceSquared;
+                }
+
+                if (nearestIndex < 0) break;
+                selectedIndices[selectedCount++] = nearestIndex;
+            }
+
+            return selectedCount;
         }
     }
 }

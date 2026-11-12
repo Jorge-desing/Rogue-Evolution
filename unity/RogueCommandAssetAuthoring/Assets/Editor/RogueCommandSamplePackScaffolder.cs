@@ -295,10 +295,10 @@ namespace RogueCommandExpansion.Authoring
 
                 Directory.CreateDirectory(packBundlesDir);
 
-                // Build using ChunkBasedCompression (LZ4)
+                // Build using ChunkBasedCompression (LZ4) with deterministic force rebuild.
                 AssetBundleManifest manifest = BuildPipeline.BuildAssetBundles(
                     packBundlesDir,
-                    BuildAssetBundleOptions.ChunkBasedCompression,
+                    BuildAssetBundleOptions.ChunkBasedCompression | BuildAssetBundleOptions.ForceRebuildAssetBundle,
                     BuildTarget.StandaloneWindows64);
 
                 if (manifest == null)
@@ -328,6 +328,8 @@ namespace RogueCommandExpansion.Authoring
 
                 AssetDatabase.Refresh();
 
+                ValidateBuiltBundles(packBundlesDir);
+
                 string msg = "Sample expansion bundles and manifest generated at: " + packBundlesDir;
                 Debug.Log("[SamplePackScaffolder] " + msg);
 
@@ -348,6 +350,40 @@ namespace RogueCommandExpansion.Authoring
                 {
                     EditorUtility.DisplayDialog("Bundle Build Error", exception.Message, "OK");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Reopens the built sample bundle and logs its asset count/size,
+        /// rejecting empty or unloadable bundles. Mirrors the post-build
+        /// validation used by the Tactical/Visual scaffolders.
+        /// </summary>
+        private static void ValidateBuiltBundles(string packBundlesDir)
+        {
+            string bundlePath = Path.Combine(packBundlesDir, SampleBundleName);
+            if (!File.Exists(bundlePath) || new FileInfo(bundlePath).Length == 0)
+            {
+                throw new InvalidDataException("Built sample bundle is missing or empty: " + bundlePath);
+            }
+            AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
+            if (bundle == null)
+            {
+                throw new InvalidDataException("Built sample bundle could not be reopened: " + bundlePath);
+            }
+            try
+            {
+                string[] assetNames = bundle.GetAllAssetNames();
+                if (assetNames == null || assetNames.Length == 0)
+                {
+                    throw new InvalidDataException("Built sample bundle contains no assets: " + SampleBundleName);
+                }
+                long bytes = new FileInfo(bundlePath).Length;
+                Debug.Log("[SamplePackScaffolder] Built bundle '" + SampleBundleName + "' (" +
+                    assetNames.Length + " assets, " + bytes + " bytes).");
+            }
+            finally
+            {
+                bundle.Unload(true);
             }
         }
 

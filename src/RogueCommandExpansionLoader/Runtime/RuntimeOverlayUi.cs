@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
+using BepInEx.Configuration;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
     /// <summary>
     /// In-game diagnostic overlay and mod inspector for Rogue Command Expansion Loader.
-    /// Provides an accessible, high-contrast dark UI (accessible via F8 or screen badge)
-    /// to inspect loaded packs, units, stages, AI modules, and runtime logs.
+    /// Provides the high-contrast inspector via configurable Inspector.ToggleKey (F8 by default) or the screen badge, for inspecting loaded packs, units, stages, AI modules, and runtime logs.
     /// </summary>
     public sealed class RuntimeOverlayUi : MonoBehaviour
     {
@@ -19,6 +19,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private RuntimePatchInstallationResult _patchResult;
         private string _compatibilityError;
         private Action<string> _logWarning;
+        private ConfigEntry<KeyboardShortcut> _toggleShortcut;
 
         private bool _isOpen;
         private bool _watermarkVisible = true;
@@ -65,14 +66,69 @@ namespace RogueCommandExpansionLoader.Runtime
             IRuntimeContentProvider provider,
             string pluginVersion,
             RuntimePatchInstallationResult patchResult,
+            ConfigFile config,
             string compatibilityError = null,
             Action<string> logWarning = null)
         {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
             _provider = provider;
-            _pluginVersion = pluginVersion ?? "1.19.0";
+            _pluginVersion = pluginVersion ?? "1.20.10";
             _patchResult = patchResult;
             _compatibilityError = compatibilityError;
             _logWarning = logWarning;
+            _toggleShortcut = config.Bind("Inspector", "ToggleKey", new KeyboardShortcut(KeyCode.F8),
+                "Toggle the loader inspector. Supports a key with optional modifier keys.");
+        }
+
+        /// <summary>Live open/closed state, readable by an agent without a visual capture.</summary>
+        public bool IsOpen => _isOpen;
+
+        /// <summary>Currently bound toggle shortcut, readable by an agent without a visual capture.</summary>
+        public string ToggleShortcutText => GetToggleShortcutText();
+
+        /// <summary>Currently selected inspector tab, readable by an agent without a visual capture.</summary>
+        public int SelectedTab => _selectedTab;
+
+        /// <summary>Whether the corner watermark is drawn, readable by an agent without a visual capture.</summary>
+        public bool WatermarkVisible => _watermarkVisible;
+
+        /// <summary>Whether the GUI was disabled after a rendering exception, readable by an agent.</summary>
+        public bool IsGuiDisabled => _guiDisabled;
+
+        /// <summary>Whether the GUI failure has already been reported to the log, readable by an agent.</summary>
+        public bool IsGuiFailureReported => _guiFailureReported;
+
+        /// <summary>Active log filter text, readable by an agent without a visual capture.</summary>
+        public string LogFilter => _logFilter ?? string.Empty;
+
+        /// <summary>Reported plugin version, readable by an agent without a visual capture.</summary>
+        public string PluginVersion => _pluginVersion ?? string.Empty;
+
+        /// <summary>Compatibility error text, empty when the loader is compatible, readable by an agent.</summary>
+        public string CompatibilityError => _compatibilityError ?? string.Empty;
+
+        /// <summary>Whether the runtime patch install succeeded, readable by an agent without a visual capture.</summary>
+        public bool IsPatchResultSuccess => _patchResult != null && _patchResult.Success;
+
+        /// <summary>Runtime patch installation message, readable by an agent without a visual capture.</summary>
+        public string PatchResultMessage => _patchResult != null ? _patchResult.Message : string.Empty;
+
+        /// <summary>Sets inspector visibility programmatically (bridge control).</summary>
+        public void SetOpen(bool open)
+        {
+            _isOpen = open;
+        }
+
+        /// <summary>Selects inspector tab programmatically (bridge control).</summary>
+        public void SetSelectedTab(int tab)
+        {
+            int clamped;
+            GuiControlPolicy.TryClampTab(tab, out clamped);
+            _selectedTab = clamped;
         }
 
         private void Update()
@@ -83,15 +139,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 _nextSnapshotRefresh = Time.unscaledTime + 1f;
             }
 
-            if (Input.GetKeyDown(KeyCode.F8) || Input.GetKeyDown(KeyCode.F10))
-            {
-                _isOpen = !_isOpen;
-            }
-
-            if (_isOpen && Input.GetKeyDown(KeyCode.Escape))
-            {
-                _isOpen = false;
-            }
+            bool closePressed = Input.GetKeyDown(KeyCode.Escape);
+            _isOpen = InspectorTogglePolicy.Resolve(
+                _isOpen,
+                _toggleShortcut != null && _toggleShortcut.Value.IsDown(),
+                closePressed);
         }
 
         private void OnGUI()
@@ -146,6 +198,11 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private string GetToggleShortcutText()
+        {
+            return _toggleShortcut == null ? "F8" : _toggleShortcut.Value.ToString();
+        }
+
         private void DrawWatermark()
         {
             float width = 230f;
@@ -156,7 +213,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
             bool isHealthy = _compatibilityError == null && (_patchResult == null || _patchResult.Success);
             string statusDot = isHealthy ? "[OK]" : "[ERR]";
-            string text = "RCL v" + _pluginVersion + " " + statusDot + " | F8: Inspector";
+            string text = "RCL v" + _pluginVersion + " " + statusDot + " | " + GetToggleShortcutText() + ": Inspector";
 
             Color origColor = GUI.backgroundColor;
             GUI.backgroundColor = isHealthy ? new Color(0.12f, 0.16f, 0.23f, 0.92f) : new Color(0.35f, 0.10f, 0.10f, 0.95f);
@@ -259,7 +316,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Rect footerRect = new Rect(x + 16, y + WindowHeight - 38, WindowWidth - 32, 28);
             GUILayout.BeginArea(footerRect);
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Atajos: F8/F10 para alternar • Esc para cerrar", _styleLabelMuted);
+            GUILayout.Label("Atajos: " + GetToggleShortcutText() + " para alternar • Esc para cerrar", _styleLabelMuted);
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Cerrar", _styleTabInactive, GUILayout.Width(80), GUILayout.Height(24)))
             {
@@ -338,7 +395,7 @@ namespace RogueCommandExpansionLoader.Runtime
             for (int i = 0; i < snapshot.Packs.Count; i++)
             {
                 PackDiagnosticReport pack = snapshot.Packs[i];
-                BeginCard(pack.PackId + " [" + pack.FolderName + "]");
+                BeginCard(pack.PackId + " [" + pack.FolderName + "]", IdentifierColorPolicy.Resolve(pack.PackId));
 
                 GUILayout.BeginHorizontal();
                 if (pack.IsLoaded)
@@ -386,6 +443,13 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 GUILayout.Label("Prefab Resource Key: " + unit.PrefabKey, _styleLabelMuted);
                 GUILayout.Label("Sprite Card Key: " + unit.ImageKey, _styleLabelMuted);
+                GUILayout.Label(UnitVariantDiagnosticsFormatter.FormatVariantCount(unit), _styleLabelMuted);
+
+                string mechanicsSummary = RuntimeUnitMechanicsDirector.FormatMechanicsSummary(unit.UnitId);
+                if (!string.IsNullOrEmpty(mechanicsSummary))
+                {
+                    GUILayout.Label("Mecanicas activas: " + mechanicsSummary, _styleLabelSuccess);
+                }
 
                 EndCard();
                 GUILayout.Space(6);
@@ -453,6 +517,16 @@ namespace RogueCommandExpansionLoader.Runtime
         private void DrawDiagnosticsTab(LoaderDiagnosticsSnapshot snapshot)
         {
             GUILayout.Space(8);
+            if (snapshot != null)
+            {
+                DrawUnitEligibilityDiagnostics(snapshot);
+                DrawUnitFactoryDiagnostics(snapshot);
+                DrawStagePoolScopeDiagnostics(snapshot);
+                DrawAiProfileStageRangeDiagnostics(snapshot);
+                DrawUnitAssetResolutionDiagnostics(snapshot);
+                DrawUnitLocalizationCoverageDiagnostics(snapshot);
+            }
+
             GUILayout.BeginHorizontal();
             GUILayout.Label("Filtro:", _styleLabelRegular, GUILayout.Width(45));
             _logFilter = GUILayout.TextField(_logFilter, _styleFilterField, GUILayout.Width(220));
@@ -463,6 +537,29 @@ namespace RogueCommandExpansionLoader.Runtime
             GUILayout.EndHorizontal();
 
             GUILayout.Space(8);
+
+            LoaderLogBurstSummary latestLog = LoaderLogBurstSummaryPolicy.Create(
+                snapshot == null ? null : snapshot.RecentLogs);
+            if (latestLog != null)
+            {
+                BeginCard("Actividad reciente");
+                GUIStyle latestStyle = _styleLogEntry;
+                if (latestLog.DisplayText.IndexOf("desactivado", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    latestLog.DisplayText.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    latestLog.DisplayText.IndexOf("fail", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    latestStyle = _styleLabelError;
+                }
+                else if (latestLog.DisplayText.IndexOf("warning", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         latestLog.DisplayText.IndexOf("advertencia", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    latestStyle = _styleLabelWarning;
+                }
+
+                GUILayout.Label(latestLog.DisplayText, latestStyle);
+                EndCard();
+                GUILayout.Space(6);
+            }
 
             if (snapshot == null || snapshot.RecentLogs.Count == 0)
             {
@@ -499,12 +596,150 @@ namespace RogueCommandExpansionLoader.Runtime
             EndCard();
         }
 
+        private void DrawUnitFactoryDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.UnitFactories.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Relaciones unidad-fabrica (" + snapshot.UnitFactories.Count + ")");
+            for (int i = 0; i < snapshot.UnitFactories.Count; i++)
+            {
+                UnitFactoryDiagnosticReport report = snapshot.UnitFactories[i];
+                GUIStyle style = String.IsNullOrWhiteSpace(report.FactoryId)
+                    ? _styleLabelMuted
+                    : (report.IsLoaded ? _styleLabelSuccess : _styleLabelError);
+                GUILayout.Label(LoaderDiagnosticsFormatter.FormatUnitFactory(report), style);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawStagePoolScopeDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.StagePoolScopes.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Alcance registrado por pool (" + snapshot.StagePoolScopes.Count + ")");
+            for (int i = 0; i < snapshot.StagePoolScopes.Count; i++)
+            {
+                StagePoolScopeDiagnosticReport report = snapshot.StagePoolScopes[i];
+                GUIStyle style = report.CandidateIds.Count > 0 ? _styleLabelRegular : _styleLabelMuted;
+                GUILayout.Label(LoaderDiagnosticsFormatter.FormatStagePoolScope(report), style);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawAiProfileStageRangeDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.AiProfileStageRanges.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Rangos de etapas por perfil IA (" + snapshot.AiProfileStageRanges.Count + ")");
+            for (int i = 0; i < snapshot.AiProfileStageRanges.Count; i++)
+            {
+                AiProfileStageRangeDiagnosticReport report = snapshot.AiProfileStageRanges[i];
+                GUILayout.Label(
+                    LoaderDiagnosticsFormatter.FormatAiProfileStageRange(report),
+                    report.IsContiguous ? _styleLabelSuccess : _styleLabelError);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawUnitEligibilityDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.UnitEligibilities.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Elegibilidad de unidades (" + snapshot.UnitEligibilities.Count + ")");
+            for (int i = 0; i < snapshot.UnitEligibilities.Count; i++)
+            {
+                UnitEligibilityDiagnosticReport report = snapshot.UnitEligibilities[i];
+                GUILayout.Label(
+                    LoaderDiagnosticsFormatter.FormatUnitEligibility(report),
+                    report.IsResolved ? _styleLabelRegular : _styleLabelWarning);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawUnitAssetResolutionDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.UnitAssetResolutions.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Resolución de recursos de unidades (" + snapshot.UnitAssetResolutions.Count + ")");
+            for (int i = 0; i < snapshot.UnitAssetResolutions.Count; i++)
+            {
+                UnitAssetResolutionDiagnosticReport report = snapshot.UnitAssetResolutions[i];
+                UnitAssetResolutionSeverity severity =
+                    LoaderUnitDiagnosticsBuilder.GetAssetResolutionSeverity(report);
+                GUIStyle style = severity == UnitAssetResolutionSeverity.Error
+                    ? _styleLabelError
+                    : (severity == UnitAssetResolutionSeverity.Warning
+                        ? _styleLabelWarning
+                        : (severity == UnitAssetResolutionSeverity.Muted
+                            ? _styleLabelMuted
+                            : _styleLabelSuccess));
+                GUILayout.Label(LoaderDiagnosticsFormatter.FormatUnitAssetResolution(report), style);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
+        private void DrawUnitLocalizationCoverageDiagnostics(LoaderDiagnosticsSnapshot snapshot)
+        {
+            if (snapshot.UnitLocalizationCoverage.Count == 0)
+            {
+                return;
+            }
+
+            BeginCard("Cobertura de localización de unidades (" + snapshot.UnitLocalizationCoverage.Count + ")");
+            for (int i = 0; i < snapshot.UnitLocalizationCoverage.Count; i++)
+            {
+                UnitLocalizationCoverageDiagnosticReport report = snapshot.UnitLocalizationCoverage[i];
+                GUIStyle style = report.HasEnglish
+                    ? _styleLabelSuccess
+                    : (report.HasNativeTemplate ? _styleLabelRegular : _styleLabelWarning);
+                GUILayout.Label(LoaderDiagnosticsFormatter.FormatUnitLocalizationCoverage(report), style);
+            }
+            EndCard();
+            GUILayout.Space(6);
+        }
+
         private void BeginCard(string title)
+        {
+            BeginCard(title, null);
+        }
+
+        private void BeginCard(string title, UnityEngine.Color? accent)
         {
             GUILayout.BeginVertical(_styleCard);
             if (!string.IsNullOrEmpty(title))
             {
-                GUILayout.Label(title, _styleCardTitle);
+                if (accent.HasValue)
+                {
+                    Color previous = GUI.color;
+                    GUI.color = accent.Value;
+                    GUILayout.Label(title, _styleCardTitle);
+                    GUI.color = previous;
+                }
+                else
+                {
+                    GUILayout.Label(title, _styleCardTitle);
+                }
+
                 GUILayout.Space(4);
             }
         }

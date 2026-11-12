@@ -133,7 +133,6 @@ namespace RogueCommandExpansion.Authoring
 
         public static string BuildPrefabFromGameplayJson(string jsonFilePath)
         {
-            RogueCommandVisualSampleScaffolder.EnsureUrpAuthoringPipeline();
             GameplayMetadata meta = ParseGameplayJson(jsonFilePath);
             string unitName = meta.UnitName;
             if (string.IsNullOrEmpty(unitName))
@@ -141,6 +140,12 @@ namespace RogueCommandExpansion.Authoring
                 unitName = Path.GetFileNameWithoutExtension(jsonFilePath).Replace(".gameplay", "");
                 meta.UnitName = unitName;
             }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
+            ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
+            float[] lodTransitions = ModelGeometryBudgetProfile.GetLodTransitions(repositoryRoot, unitName);
+            RogueCommandVisualSampleScaffolder.EnsureUrpAuthoringPipeline();
 
             Debug.Log("[VehiclePrefabBuilder] Building prefab for unit: " + unitName + " (Archetype: " + meta.Archetype + ")");
 
@@ -156,6 +161,7 @@ namespace RogueCommandExpansion.Authoring
             {
                 throw new FileNotFoundException("Could not locate authored FBX model for unit: " + unitName);
             }
+            GameObject lodAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ModelFolder + "/" + unitName + "_LODs.fbx");
 
             // Create temporary hierarchy in scene
             string rootName = !string.IsNullOrEmpty(meta.VisualRootPath) ? meta.VisualRootPath : (unitName + "Visual");
@@ -174,10 +180,24 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
+                GameObject lodInstance = null;
+                if (lodAsset != null && lodAsset != modelAsset)
+                {
+                    lodInstance = PrefabUtility.InstantiatePrefab(lodAsset) as GameObject;
+                    if (lodInstance == null)
+                    {
+                        throw new InvalidOperationException("Failed to instantiate profile-driven LOD FBX for: " + unitName);
+                    }
+                    lodInstance.name = unitName + "LODGeometry";
+                    lodInstance.transform.SetParent(root.transform, false);
+                    lodInstance.transform.localPosition = Vector3.zero;
+                    lodInstance.transform.localRotation = Quaternion.identity;
+                    lodInstance.transform.localScale = Vector3.one;
+                }
 
                 // 1. Convert collision hull meshes (_COLLIDER) into real Unity BoxColliders and disable their visible renderers
                 int convertedColliderCount = 0;
-                Renderer[] allModelRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                Renderer[] allModelRenderers = root.GetComponentsInChildren<Renderer>(true);
                 foreach (Renderer r in allModelRenderers)
                 {
                     if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -203,7 +223,7 @@ namespace RogueCommandExpansion.Authoring
                 // 2. Assign Atlas material if available, or configure instancing on existing materials
                 if (atlasMaterial != null)
                 {
-                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
                     foreach (Renderer r in renderers)
                     {
                         if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -221,7 +241,7 @@ namespace RogueCommandExpansion.Authoring
                 else
                 {
                     // Ensure all materials have GPU instancing enabled
-                    Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
                     foreach (Renderer r in renderers)
                     {
                         if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -289,12 +309,15 @@ namespace RogueCommandExpansion.Authoring
                 // Existing FBX sockets always win; this search must remain recursive to avoid
                 // duplicate transforms and ambiguous runtime role bindings.
                 EnsureCanonicalVfxSockets(root, modelInstance);
+                EnsureTurretAndRadarSockets(root, modelInstance);
+                EnsureCanonicalHardpointSockets(root, modelInstance);
 
                 // Scaffold muzzle-flash particles (FirePoint_0 child 0) and calibrated 3D mono AudioSources.
                 // Damage sockets stay clean: RuntimeVisualDirector spawns smoke/fire dynamically.
                 EnsureCanonicalVfxAndAudioComponents(root);
 
                 // 5. Mount Detached Modular Attachments (ERA, APS, Sponson, FuelDrums) if present
+                EnsureCanonicalHardpointGroups(root);
                 MountModularAttachmentsIfAvailable(root, unitName);
 
                 // 6. Mount Damaged Variant Model (<Name>_Damaged.fbx) if present
@@ -304,7 +327,7 @@ namespace RogueCommandExpansion.Authoring
                 SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName);
 
                 // 8. Setup LODGroup if LOD submeshes are detected
-                SetupLodGroupIfAvailable(root, modelInstance);
+                SetupLodGroupIfAvailable(root, modelInstance, lodInstance, lodTransitions);
 
                 // Save Prefab
                 string targetPrefabPath = PrefabFolder + "/" + unitName + "Visual.prefab";
@@ -315,7 +338,6 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidOperationException("Failed to save prefab asset at: " + targetPrefabPath);
                 }
 
-                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
                 string absolutePrefabPath = Path.GetFullPath(Path.Combine(projectRoot, targetPrefabPath));
                 NormalizeEmptyUnityYamlStrings(absolutePrefabPath);
                 string metaPath = absolutePrefabPath + ".meta";
@@ -325,6 +347,7 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 Debug.Log("[VehiclePrefabBuilder] Successfully created prefab: " + targetPrefabPath);
+                ValidateSavedPrefab(targetPrefabPath, unitName);
                 return targetPrefabPath;
             }
             finally
@@ -333,7 +356,11 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static void SetupLodGroupIfAvailable(GameObject root, GameObject modelInstance)
+        private static void SetupLodGroupIfAvailable(
+            GameObject root,
+            GameObject modelInstance,
+            GameObject lodInstance,
+            float[] transitions)
         {
             Renderer[] lod0Renderers;
             Renderer[] lod1Renderers;
@@ -341,6 +368,44 @@ namespace RogueCommandExpansion.Authoring
             string failureReason;
             bool hasRequiredLods = TryGetLodRendererGroups(
                 modelInstance, out lod0Renderers, out lod1Renderers, out lod2Renderers, out failureReason);
+            if (hasRequiredLods && lod2Renderers.Length == 0)
+            {
+                hasRequiredLods = false;
+                failureReason = "the imported model has no LOD2 renderer group";
+            }
+
+            if (!hasRequiredLods && lodInstance != null)
+            {
+                Renderer[] primaryRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                var primaryLod0 = new List<Renderer>();
+                for (int i = 0; i < primaryRenderers.Length; i++)
+                {
+                    if (HasRenderableLodMesh(primaryRenderers[i]) &&
+                        primaryRenderers[i].name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        primaryLod0.Add(primaryRenderers[i]);
+                    }
+                }
+
+                Renderer[] discardedLod0;
+                string lodFailure;
+                if (TryGetLodRendererGroups(lodInstance, out discardedLod0, out lod1Renderers, out lod2Renderers, out lodFailure) &&
+                    primaryLod0.Count > 0 && lod2Renderers.Length > 0)
+                {
+                    for (int i = 0; i < discardedLod0.Length; i++)
+                    {
+                        discardedLod0[i].enabled = false;
+                    }
+                    lod0Renderers = primaryLod0.ToArray();
+                    RebindSkinnedLodRenderers(modelInstance, lod1Renderers, lod2Renderers);
+                    failureReason = null;
+                    hasRequiredLods = true;
+                }
+                else
+                {
+                    failureReason = "primary LOD0 and separate LOD1/LOD2 renderers are required; " + lodFailure;
+                }
+            }
 
             // Only construct LODGroup if LOD0 and LOD1 are both present and distinct.
             if (hasRequiredLods)
@@ -352,21 +417,68 @@ namespace RogueCommandExpansion.Authoring
                 }
 
                 var lodList = new List<LOD>();
-                lodList.Add(new LOD(0.50f, lod0Renderers));
-                lodList.Add(new LOD(0.20f, lod1Renderers));
+                lodList.Add(new LOD(transitions[0], lod0Renderers));
+                lodList.Add(new LOD(transitions[1], lod1Renderers));
 
                 if (lod2Renderers.Length > 0)
                 {
-                    lodList.Add(new LOD(0.05f, lod2Renderers));
+                    lodList.Add(new LOD(transitions[2], lod2Renderers));
                 }
 
                 lodGroup.SetLODs(lodList.ToArray());
                 lodGroup.RecalculateBounds();
             }
-            else if (lod0Renderers.Length > 0 || lod1Renderers.Length > 0 || lod2Renderers.Length > 0)
+            else
             {
-                Debug.LogWarning("[VehiclePrefabBuilder] Skipping LODGroup for " + modelInstance.name +
-                    ": " + failureReason + ".");
+                throw new InvalidDataException("Profile-driven LODGroup is incomplete for " + modelInstance.name + ": " + failureReason);
+            }
+        }
+
+        private static void RebindSkinnedLodRenderers(
+            GameObject primaryModel,
+            Renderer[] lod1Renderers,
+            Renderer[] lod2Renderers)
+        {
+            var bonesByName = new Dictionary<string, Transform>(StringComparer.Ordinal);
+            Transform[] primaryTransforms = primaryModel.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < primaryTransforms.Length; i++)
+            {
+                if (!bonesByName.ContainsKey(primaryTransforms[i].name))
+                {
+                    bonesByName.Add(primaryTransforms[i].name, primaryTransforms[i]);
+                }
+            }
+
+            Renderer[][] groups = { lod1Renderers, lod2Renderers };
+            for (int groupIndex = 0; groupIndex < groups.Length; groupIndex++)
+            {
+                for (int rendererIndex = 0; rendererIndex < groups[groupIndex].Length; rendererIndex++)
+                {
+                    SkinnedMeshRenderer skinned = groups[groupIndex][rendererIndex] as SkinnedMeshRenderer;
+                    if (skinned == null) continue;
+                    Transform[] sourceBones = skinned.bones;
+                    var reboundBones = new Transform[sourceBones.Length];
+                    for (int boneIndex = 0; boneIndex < sourceBones.Length; boneIndex++)
+                    {
+                        Transform rebound;
+                        if (sourceBones[boneIndex] == null || !bonesByName.TryGetValue(sourceBones[boneIndex].name, out rebound))
+                        {
+                            throw new InvalidDataException("LOD renderer " + skinned.name +
+                                " has a bone that is absent from the primary model.");
+                        }
+                        reboundBones[boneIndex] = rebound;
+                    }
+                    skinned.bones = reboundBones;
+                    if (skinned.rootBone != null)
+                    {
+                        Transform reboundRoot;
+                        if (!bonesByName.TryGetValue(skinned.rootBone.name, out reboundRoot))
+                        {
+                            throw new InvalidDataException("LOD renderer " + skinned.name + " has no matching root bone.");
+                        }
+                        skinned.rootBone = reboundRoot;
+                    }
+                }
             }
         }
 
@@ -487,13 +599,19 @@ namespace RogueCommandExpansion.Authoring
                 if (attAsset != null)
                 {
                     Transform socket = FindTransformRecursive(root.transform, "Socket_Hardpoint_" + socketType);
-                    Transform parentTransform = socket != null
-                        ? GetOrCreateAttachmentGroup(root, socketType)
-                        : root.transform;
                     if (socket == null)
                     {
                         Debug.LogWarning("[VehiclePrefabBuilder] No Socket_Hardpoint_" + socketType +
-                            " found for " + attFileName + "; mounting it at the visual root.");
+                            " found for " + attFileName + "; the attachment was skipped.");
+                        continue;
+                    }
+
+                    Transform parentTransform = GetOrCreateAttachmentGroup(root, socket, socketType);
+                    if (parentTransform == null)
+                    {
+                        Debug.LogWarning("[VehiclePrefabBuilder] Could not resolve a unique RCL_AttachmentGroup_" +
+                            socketType + " under Socket_Hardpoint_" + socketType + "; the attachment was skipped.");
+                        continue;
                     }
 
                     GameObject attInstance = PrefabUtility.InstantiatePrefab(attAsset) as GameObject;
@@ -506,6 +624,140 @@ namespace RogueCommandExpansion.Authoring
                     }
                 }
             }
+        }
+
+        private static void EnsureCanonicalHardpointGroups(GameObject root)
+        {
+            if (root == null) return;
+            string[] socketTypes = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            for (int i = 0; i < socketTypes.Length; i++)
+            {
+                string socketName = "Socket_Hardpoint_" + socketTypes[i];
+                Transform socket = FindTransformRecursive(root.transform, socketName);
+                if (socket == null) continue;
+
+                int socketCount = 0;
+                Transform[] all = root.GetComponentsInChildren<Transform>(true);
+                for (int j = 0; j < all.Length; j++)
+                {
+                    if (string.Equals(all[j].name, socketName, StringComparison.OrdinalIgnoreCase)) socketCount++;
+                }
+                if (socketCount != 1)
+                {
+                    Debug.LogWarning("[VehiclePrefabBuilder] Expected one " + socketName +
+                        " but found " + socketCount + "; no attachment group was created.");
+                    continue;
+                }
+
+                GetOrCreateAttachmentGroup(root, socket, socketTypes[i]);
+            }
+        }
+
+        internal static void EnsureCanonicalHardpointSockets(GameObject root, GameObject model)
+        {
+            if (root == null || model == null) return;
+            string[] socketTypes = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            Bounds modelBounds = CalculateModelBounds(root, model);
+            Vector3 center = modelBounds.center;
+            Vector3 extents = modelBounds.extents;
+            Transform turret = FindTransformRecursive(root.transform, "Socket_TurretPivot");
+
+            for (int i = 0; i < socketTypes.Length; i++)
+            {
+                string socketName = "Socket_Hardpoint_" + socketTypes[i];
+                Transform existing = FindCanonicalHardpointSocket(root.transform, socketName, out int count);
+                if (count > 1)
+                {
+                    Debug.LogWarning("[VehiclePrefabBuilder] Found " + count + " transforms for " + socketName +
+                        "; preserving the authored hierarchy and leaving this hardpoint unavailable.");
+                    continue;
+                }
+                if (existing != null) continue;
+
+                Vector3 localPosition;
+                switch (socketTypes[i])
+                {
+                    case "ERA":
+                        localPosition = turret != null
+                            ? turret.localPosition + new Vector3(0f, 0.40f, 0.10f)
+                            : center + new Vector3(0f, extents.y * 0.55f, extents.z * 0.28f);
+                        break;
+                    case "APS":
+                        localPosition = turret != null
+                            ? turret.localPosition + new Vector3(0.35f, -0.35f, 0.40f)
+                            : center + new Vector3(extents.x * 0.38f, extents.y * 0.55f, 0f);
+                        break;
+                    case "Sponsons":
+                        localPosition = center + new Vector3(extents.x * 0.48f, 0f, 0f);
+                        break;
+                    default:
+                        localPosition = center + new Vector3(0f, -extents.y * 0.30f, -extents.z * 0.45f);
+                        break;
+                }
+
+                GameObject socketObject = new GameObject(socketName);
+                socketObject.transform.SetParent(root.transform, false);
+                socketObject.transform.localPosition = localPosition;
+                socketObject.transform.localRotation = Quaternion.identity;
+                socketObject.transform.localScale = Vector3.one;
+            }
+        }
+
+        private static Transform FindCanonicalHardpointSocket(Transform root, string socketName, out int count)
+        {
+            count = 0;
+            Transform match = null;
+            if (root == null) return null;
+            Transform[] all = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                string currentName = all[i].name ?? string.Empty;
+                if (!string.Equals(currentName, socketName, StringComparison.OrdinalIgnoreCase) &&
+                    !currentName.EndsWith("_" + socketName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                count++;
+                match = all[i];
+            }
+
+            if (count == 1 && match != null && !string.Equals(match.name, socketName, StringComparison.Ordinal))
+            {
+                match.name = socketName;
+            }
+            return count == 1 ? match : null;
+        }
+
+        private static Bounds CalculateModelBounds(GameObject root, GameObject model)
+        {
+            Renderer[] renderers = model.GetComponentsInChildren<Renderer>(true);
+            bool hasBounds = false;
+            Bounds bounds = new Bounds(root.transform.position, Vector3.one);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null || !renderer.enabled ||
+                    renderer.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    renderer is ParticleSystemRenderer)
+                {
+                    continue;
+                }
+
+                Bounds rendererBounds = renderer.bounds;
+                Vector3 localCenter = root.transform.InverseTransformPoint(rendererBounds.center);
+                Vector3 localSize = rendererBounds.size;
+                if (!hasBounds)
+                {
+                    bounds = new Bounds(localCenter, localSize);
+                    hasBounds = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(new Bounds(localCenter, localSize));
+                }
+            }
+            return bounds;
         }
 
         private static Transform FindTransformRecursive(Transform parent, string name)
@@ -588,6 +840,71 @@ namespace RogueCommandExpansion.Authoring
             EnsureSocketIfMissing(root.transform, "Socket_EngineAudio", engine);
             EnsureSocketIfMissing(root.transform, "Socket_WeaponAudio", muzzle);
             EnsureSocketIfMissing(root.transform, "Socket_GroundCenter", ground);
+        }
+
+        /// <summary>
+        /// Guarantees turret/radar sockets that EnsureCanonicalVfxSockets does not add.
+        /// Recursive missing-check avoids duplicate transforms (UniqueSocketRoleBinding).
+        /// </summary>
+        private static void EnsureTurretAndRadarSockets(GameObject root, GameObject modelInstance)
+        {
+            if (root == null || modelInstance == null) return;
+            Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+            if (renderers == null || renderers.Length == 0) return;
+            Bounds worldBounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null) worldBounds.Encapsulate(renderers[i].bounds);
+            }
+            Vector3 min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+            Vector3 max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            for (int corner = 0; corner < 8; corner++)
+            {
+                Vector3 worldCorner = new Vector3(
+                    (corner & 1) == 0 ? worldBounds.min.x : worldBounds.max.x,
+                    (corner & 2) == 0 ? worldBounds.min.y : worldBounds.max.y,
+                    (corner & 4) == 0 ? worldBounds.min.z : worldBounds.max.z);
+                Vector3 localCorner = root.transform.InverseTransformPoint(worldCorner);
+                min = Vector3.Min(min, localCorner);
+                max = Vector3.Max(max, localCorner);
+            }
+            Vector3 size = max - min;
+            if (size.sqrMagnitude < 1e-6f) return;
+            Vector3 center = (min + max) * 0.5f;
+            Vector3 turretPivot = new Vector3(center.x, Mathf.Lerp(min.y, max.y, 0.72f), center.z + size.z * 0.10f);
+            EnsureSocketIfMissing(root.transform, "Socket_TurretPivot", turretPivot);
+            Transform pivot = FindTransformRecursive(root.transform, "Socket_TurretPivot");
+            if (pivot != null && FindTransformRecursive(root.transform, "Socket_TurretPitch") == null)
+            {
+                GameObject pitch = new GameObject("Socket_TurretPitch");
+                pitch.transform.SetParent(pivot, false);
+                pitch.transform.localPosition = Vector3.zero;
+                pitch.transform.localRotation = Quaternion.identity;
+                pitch.transform.localScale = Vector3.one;
+            }
+            Vector3 radar = new Vector3(center.x - size.x * 0.22f, Mathf.Lerp(min.y, max.y, 0.85f), min.z + size.z * 0.30f);
+            Vector3 antenna = new Vector3(center.x + size.x * 0.22f, Mathf.Lerp(min.y, max.y, 0.80f), min.z + size.z * 0.30f);
+            EnsureSocketIfMissing(root.transform, "Socket_RadarMast", radar);
+            EnsureSocketIfMissing(root.transform, "Socket_Antenna", antenna);
+        }
+
+        private static void ValidateSavedPrefab(string prefabPath, string unitName)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                Debug.LogWarning("[VehiclePrefabBuilder] Could not reload prefab for validation: " + prefabPath);
+                return;
+            }
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            int enabled = 0;
+            foreach (Renderer r in renderers) if (r != null && r.enabled) enabled++;
+            Animator animator = prefab.GetComponent<Animator>();
+            string animatorState = animator == null ? "none" :
+                ((animator.avatar != null && animator.avatar.isValid) ? "valid" : "invalid") +
+                "/controller " + (animator.runtimeAnimatorController != null ? "present" : "missing");
+            Debug.Log("[VehiclePrefabBuilder] " + unitName + " prefab OK: renderers=" + renderers.Length +
+                " (enabled " + enabled + "), animator=" + animatorState);
         }
 
         private const string VfxMaterialFolder = MaterialFolder + "/VFX";
@@ -734,18 +1051,54 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static Transform GetOrCreateAttachmentGroup(GameObject root, string socketType)
+        private static Transform GetOrCreateAttachmentGroup(GameObject root, Transform socket, string socketType)
         {
+            if (root == null || socket == null) return null;
             string groupName = "RCL_AttachmentGroup_" + socketType;
-            Transform group = root.transform.Find(groupName);
-            if (group != null) return group;
+            Transform group = null;
+            Transform[] all = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (!string.Equals(all[i].name, groupName, StringComparison.OrdinalIgnoreCase)) continue;
+                if (group != null && group != all[i]) return null;
+                group = all[i];
+            }
+
+            if (group != null)
+            {
+                if (group.parent != socket) ReparentAttachmentGroupPreservingChildren(root.transform, group, socket);
+                return group;
+            }
 
             GameObject groupObject = new GameObject(groupName);
-            groupObject.transform.SetParent(root.transform, false);
+            groupObject.transform.SetParent(socket, false);
             groupObject.transform.localPosition = Vector3.zero;
             groupObject.transform.localRotation = Quaternion.identity;
             groupObject.transform.localScale = Vector3.one;
             return groupObject.transform;
+        }
+
+        private static void ReparentAttachmentGroupPreservingChildren(
+            Transform visualRoot,
+            Transform group,
+            Transform socket)
+        {
+            var children = new List<Transform>();
+            while (group.childCount > 0)
+            {
+                Transform child = group.GetChild(0);
+                children.Add(child);
+                child.SetParent(visualRoot, true);
+            }
+
+            group.SetParent(socket, false);
+            group.localPosition = Vector3.zero;
+            group.localRotation = Quaternion.identity;
+            group.localScale = Vector3.one;
+            for (int i = 0; i < children.Count; i++)
+            {
+                if (children[i] != null) children[i].SetParent(group, true);
+            }
         }
 
         private static void MountDamagedVariantIfAvailable(GameObject root, string unitName, Material atlasMaterial)
@@ -798,6 +1151,18 @@ namespace RogueCommandExpansion.Authoring
             string unitName,
             bool preferWalkForMovement = false)
         {
+            // Imported FBX files may carry an Animator of their own. The prefab must
+            // have exactly one controller owner on the visual root; two Animators can
+            // fight over the same rigid bones and make FireRecoil appear frozen.
+            Animator[] importedAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+            foreach (Animator importedAnimator in importedAnimators)
+            {
+                if (importedAnimator != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(importedAnimator);
+                }
+            }
+
             SkinnedMeshRenderer smr = modelInstance.GetComponentInChildren<SkinnedMeshRenderer>(true);
             bool hasBones = false;
             foreach (Transform t in modelInstance.GetComponentsInChildren<Transform>(true))
@@ -835,6 +1200,7 @@ namespace RogueCommandExpansion.Authoring
                 {
                     animator = root.AddComponent<Animator>();
                 }
+                animator.applyRootMotion = false;
 
                 Animator modelAnimator = modelAsset.GetComponent<Animator>();
                 if (importedAvatar != null)
@@ -867,7 +1233,12 @@ namespace RogueCommandExpansion.Authoring
                         controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
                     }
 
-                    ConfigureAnimationController(controller, animationClips, preferWalkForMovement);
+                    ConfigureAnimationController(
+                        controller,
+                        animationClips,
+                        preferWalkForMovement,
+                        modelInstance,
+                        unitName);
 
                     animator.runtimeAnimatorController = controller;
                 }
@@ -877,27 +1248,59 @@ namespace RogueCommandExpansion.Authoring
         private static void ConfigureAnimationController(
             AnimatorController controller,
             List<AnimationClip> clips,
-            bool preferWalkForMovement)
+            bool preferWalkForMovement,
+            GameObject modelInstance,
+            string unitName)
         {
             if (controller == null || clips == null || clips.Count == 0 || controller.layers.Length == 0) return;
 
             AnimatorStateMachine stateMachine = controller.layers[0].stateMachine;
-            AnimationClip idleClip = FindAnimationClip(clips, "Idle") ?? clips[0];
+            // Rebuild this generated graph instead of accumulating stale short-name
+            // states from previous imports. The old graph could leave a Death or
+            // legacy Walk state as the movement destination, making attack clips and
+            // locomotion look static even though the FBX contained valid curves.
+            foreach (ChildAnimatorState child in stateMachine.states)
+            {
+                if (child.state != null)
+                {
+                    stateMachine.RemoveState(child.state);
+                }
+            }
+            foreach (AnimatorStateTransition transition in stateMachine.anyStateTransitions)
+            {
+                stateMachine.RemoveAnyStateTransition(transition);
+            }
+
+            AnimationClip idleClip = FindAnimationClipByPriority(clips, "Action_Idle", "Idle") ?? clips[0];
             AnimationClip driveClip = preferWalkForMovement
-                ? FindAnimationClip(clips, "Walk") ?? FindAnimationClip(clips, "Drive")
-                : FindAnimationClip(clips, "Drive") ?? FindAnimationClip(clips, "Walk");
-            AnimationClip fireClip = FindAnimationClip(clips, "FireRecoil") ?? FindAnimationClip(clips, "Fire");
-            AnimationClip deathClip = FindAnimationClip(clips, "Death");
+                ? FindAnimationClipByPriority(clips, "Action_Walk", "Action_Drive", "Walk", "Drive")
+                : FindAnimationClipByPriority(clips, "Action_Drive", "Action_Walk", "Drive", "Walk");
+            AnimationClip fireClip = FindAnimationClipByPriority(clips, "Action_FireRecoil", "FireRecoil", "Fire");
+            AnimationClip deathClip = FindAnimationClipByPriority(clips, "Action_Death", "Death");
+            if (fireClip != null && !HasBodyDrivenFireRecoilClip(fireClip))
+            {
+                AnimationClip generatedClip = CreateBodyDrivenFireRecoilClip(
+                    controller,
+                    fireClip,
+                    modelInstance,
+                    unitName);
+                if (generatedClip != null)
+                {
+                    clips.Remove(fireClip);
+                    clips.Add(generatedClip);
+                    fireClip = generatedClip;
+                }
+            }
+            if (fireClip != null && !HasBodyDrivenFireRecoilClip(fireClip))
+            {
+                throw new InvalidDataException(
+                    controller.name + " FireRecoil must animate a body/pelvis position curve plus a weapon or turret curve.");
+            }
 
             AnimatorState idleState = GetOrCreateAnimationState(stateMachine, idleClip);
             AnimatorState driveState = driveClip != null ? GetOrCreateAnimationState(stateMachine, driveClip) : null;
             AnimatorState fireState = fireClip != null ? GetOrCreateAnimationState(stateMachine, fireClip) : null;
             AnimatorState deathState = deathClip != null ? GetOrCreateAnimationState(stateMachine, deathClip) : null;
-
-            foreach (AnimationClip clip in clips)
-            {
-                GetOrCreateAnimationState(stateMachine, clip);
-            }
 
             stateMachine.defaultState = idleState;
 
@@ -917,6 +1320,14 @@ namespace RogueCommandExpansion.Authoring
             if (fireState != null && idleState != null && hasFireParameter)
             {
                 EnsureAnyStateTriggerTransition(stateMachine, fireState, "RCL_Fire");
+                // Add the conditioned locomotion exit before the fallback idle exit.
+                // Unity evaluates transitions in serialized order; this prevents a
+                // shot from interrupting a moving unit and leaving it in a static pose.
+                if (driveState != null && driveState != fireState && hasMovementParameter)
+                {
+                    EnsureExitTransitionWithCondition(
+                        fireState, driveState, "RCL_IsMoving", AnimatorConditionMode.If);
+                }
                 EnsureExitTransition(fireState, idleState);
             }
 
@@ -929,9 +1340,245 @@ namespace RogueCommandExpansion.Authoring
             AssetDatabase.SaveAssets();
         }
 
-        private static AnimationClip FindAnimationClip(List<AnimationClip> clips, string nameFragment)
+        private static AnimationClip FindAnimationClipByPriority(
+            List<AnimationClip> clips,
+            params string[] nameFragments)
         {
-            return clips.Find(clip => clip != null && clip.name.IndexOf(nameFragment, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (clips == null || nameFragments == null) return null;
+            for (int fragmentIndex = 0; fragmentIndex < nameFragments.Length; fragmentIndex++)
+            {
+                string fragment = nameFragments[fragmentIndex];
+                if (string.IsNullOrEmpty(fragment)) continue;
+                foreach (AnimationClip clip in clips)
+                {
+                    if (clip == null) continue;
+                    string clipName = clip.name ?? string.Empty;
+                    if (string.Equals(clipName, fragment, StringComparison.OrdinalIgnoreCase) ||
+                        clipName.EndsWith("|" + fragment, StringComparison.OrdinalIgnoreCase) ||
+                        clipName.EndsWith(fragment, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return clip;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static bool HasBodyDrivenFireRecoilClip(AnimationClip clip)
+        {
+            if (clip == null) return false;
+            bool bodyPosition = false;
+            bool weaponMotion = false;
+            EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(clip);
+            foreach (EditorCurveBinding binding in bindings)
+            {
+                string path = binding.path ?? string.Empty;
+                string property = binding.propertyName ?? string.Empty;
+                bool positionCurve = property.IndexOf("LocalPosition", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool rotationCurve = property.IndexOf("LocalRotation", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    property.IndexOf("Euler", StringComparison.OrdinalIgnoreCase) >= 0;
+                AnimationCurve curve = AnimationUtility.GetEditorCurve(clip, binding);
+                bool dynamicCurve = HasMeaningfulCurveVariation(curve);
+                if ((path.IndexOf("Bone_Hull", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     path.IndexOf("Bone_Pelvis", StringComparison.OrdinalIgnoreCase) >= 0) &&
+                    positionCurve && dynamicCurve)
+                {
+                    bodyPosition = true;
+                }
+                if (((path.IndexOf("Bone_BarrelRecoil", StringComparison.OrdinalIgnoreCase) >= 0 && positionCurve) ||
+                     (path.IndexOf("Bone_TurretPitch", StringComparison.OrdinalIgnoreCase) >= 0 && rotationCurve)) &&
+                    dynamicCurve)
+                {
+                    weaponMotion = true;
+                }
+            }
+
+            return bodyPosition && weaponMotion;
+        }
+
+        private static bool HasMeaningfulCurveVariation(AnimationCurve curve)
+        {
+            if (curve == null || curve.length < 2) return false;
+            float first = curve.keys[0].value;
+            for (int index = 1; index < curve.length; index++)
+            {
+                if (Mathf.Abs(curve.keys[index].value - first) > 0.0001f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string FindAnimationCurvePath(
+            AnimationClip clip,
+            string boneName,
+            string propertyToken)
+        {
+            if (clip == null) return string.Empty;
+            foreach (EditorCurveBinding binding in AnimationUtility.GetCurveBindings(clip))
+            {
+                if ((binding.path ?? string.Empty).IndexOf(boneName, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                if ((binding.propertyName ?? string.Empty).IndexOf(propertyToken, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return binding.path ?? string.Empty;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static Transform ResolveAnimationTransform(
+            GameObject modelInstance,
+            string animationPath,
+            string boneName)
+        {
+            if (modelInstance == null) return null;
+            if (!string.IsNullOrEmpty(animationPath))
+            {
+                Transform direct = modelInstance.transform.Find(animationPath);
+                if (direct != null) return direct;
+            }
+
+            return FindTransformRecursive(modelInstance.transform, boneName);
+        }
+
+        private static AnimationCurve CreateRecoilCurve(
+            float frameRate,
+            float[] offsets,
+            float baseValue)
+        {
+            var keys = new Keyframe[offsets.Length];
+            for (int index = 0; index < offsets.Length; index++)
+            {
+                keys[index] = new Keyframe(
+                    new[] { 0f, 1f, 2f, 4f, 8f, 11f, 14f }[index] / frameRate,
+                    baseValue + offsets[index]);
+            }
+
+            return new AnimationCurve(keys);
+        }
+
+        private static void SetRecoilVectorCurves(
+            AnimationClip clip,
+            string path,
+            Vector3 baseline,
+            float[] xOffsets,
+            float[] yOffsets,
+            float[] zOffsets,
+            float frameRate)
+        {
+            clip.SetCurve(path, typeof(Transform), "m_LocalPosition.x",
+                CreateRecoilCurve(frameRate, xOffsets, baseline.x));
+            clip.SetCurve(path, typeof(Transform), "m_LocalPosition.y",
+                CreateRecoilCurve(frameRate, yOffsets, baseline.y));
+            clip.SetCurve(path, typeof(Transform), "m_LocalPosition.z",
+                CreateRecoilCurve(frameRate, zOffsets, baseline.z));
+        }
+
+        private static void SetRecoilEulerCurves(
+            AnimationClip clip,
+            string path,
+            Vector3 baseline,
+            float[] xOffsets,
+            float frameRate)
+        {
+            float[] zeroOffsets = new float[xOffsets.Length];
+            clip.SetCurve(path, typeof(Transform), "localEulerAnglesRaw.x",
+                CreateRecoilCurve(frameRate, xOffsets, baseline.x));
+            clip.SetCurve(path, typeof(Transform), "localEulerAnglesRaw.y",
+                CreateRecoilCurve(frameRate, zeroOffsets, baseline.y));
+            clip.SetCurve(path, typeof(Transform), "localEulerAnglesRaw.z",
+                CreateRecoilCurve(frameRate, zeroOffsets, baseline.z));
+        }
+
+        private static AnimationClip CreateBodyDrivenFireRecoilClip(
+            AnimatorController controller,
+            AnimationClip importedClip,
+            GameObject modelInstance,
+            string unitName)
+        {
+            if (controller == null || importedClip == null || modelInstance == null)
+            {
+                return null;
+            }
+
+            string bodyBone = FindAnimationCurvePath(importedClip, "Bone_Hull", "LocalPosition");
+            string bodyBoneName = "Bone_Hull";
+            if (string.IsNullOrEmpty(bodyBone))
+            {
+                bodyBone = FindAnimationCurvePath(importedClip, "Bone_Pelvis", "LocalPosition");
+                bodyBoneName = "Bone_Pelvis";
+            }
+
+            string barrelPath = FindAnimationCurvePath(importedClip, "Bone_BarrelRecoil", "LocalPosition");
+            string pitchPath = FindAnimationCurvePath(importedClip, "Bone_TurretPitch", "LocalRotation");
+            if (string.IsNullOrEmpty(pitchPath))
+            {
+                pitchPath = FindAnimationCurvePath(importedClip, "Bone_TurretPitch", "Euler");
+            }
+            if (string.IsNullOrEmpty(bodyBone) || (string.IsNullOrEmpty(barrelPath) && string.IsNullOrEmpty(pitchPath)))
+            {
+                Debug.LogWarning("[VehiclePrefabBuilder] Cannot synthesize body-driven FireRecoil for " + unitName +
+                    ": imported clip has no resolvable body and weapon paths.");
+                return null;
+            }
+
+            string controllerPath = AssetDatabase.GetAssetPath(controller);
+            if (string.IsNullOrEmpty(controllerPath)) return null;
+            foreach (UnityEngine.Object asset in AssetDatabase.LoadAllAssetsAtPath(controllerPath))
+            {
+                AnimationClip oldGenerated = asset as AnimationClip;
+                if (oldGenerated != null && oldGenerated.name == importedClip.name && oldGenerated != importedClip)
+                {
+                    UnityEngine.Object.DestroyImmediate(oldGenerated, true);
+                }
+            }
+
+            AnimationClip generatedClip = new AnimationClip();
+            generatedClip.name = importedClip.name;
+            generatedClip.frameRate = importedClip.frameRate > 0f ? importedClip.frameRate : 24f;
+            generatedClip.wrapMode = WrapMode.ClampForever;
+            generatedClip.hideFlags = HideFlags.HideInHierarchy;
+            AssetDatabase.AddObjectToAsset(generatedClip, controller);
+
+            Transform bodyTransform = ResolveAnimationTransform(modelInstance, bodyBone, bodyBoneName);
+            Transform barrelTransform = ResolveAnimationTransform(modelInstance, barrelPath, "Bone_BarrelRecoil");
+            Transform pitchTransform = ResolveAnimationTransform(modelInstance, pitchPath, "Bone_TurretPitch");
+            Vector3 bodyPosition = bodyTransform != null ? bodyTransform.localPosition : Vector3.zero;
+            Vector3 bodyEuler = bodyTransform != null ? bodyTransform.localEulerAngles : Vector3.zero;
+            Vector3 barrelPosition = barrelTransform != null ? barrelTransform.localPosition : Vector3.zero;
+            Vector3 pitchEuler = pitchTransform != null ? pitchTransform.localEulerAngles : Vector3.zero;
+
+            float[] zero = { 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+            float[] bodyY = { 0f, 0.008f, -0.024f, -0.010f, -0.002f, 0f, 0f };
+            float[] bodyPitch = { 0f, 0.25f, -1.4f, 0.45f, 0.12f, 0f, 0f };
+            float[] barrelY = { 0f, 0.035f, -0.22f, -0.080f, -0.018f, 0f, 0f };
+            float[] pitch = { 0f, 0.35f, -0.90f, 0.25f, 0.08f, 0f, 0f };
+
+            SetRecoilVectorCurves(generatedClip, bodyBone, bodyPosition, zero, bodyY, zero, generatedClip.frameRate);
+            SetRecoilEulerCurves(generatedClip, bodyBone, bodyEuler, bodyPitch, generatedClip.frameRate);
+            if (!string.IsNullOrEmpty(barrelPath))
+            {
+                SetRecoilVectorCurves(generatedClip, barrelPath, barrelPosition, zero, barrelY, zero, generatedClip.frameRate);
+            }
+            if (!string.IsNullOrEmpty(pitchPath))
+            {
+                SetRecoilEulerCurves(generatedClip, pitchPath, pitchEuler, pitch, generatedClip.frameRate);
+            }
+
+            EditorUtility.SetDirty(generatedClip);
+            EditorUtility.SetDirty(controller);
+            AssetDatabase.SaveAssets();
+            Debug.Log("[VehiclePrefabBuilder] Synthesized body-driven FireRecoil for " + unitName +
+                " from imported paths (body=" + bodyBone + ", barrel=" + barrelPath + ", pitch=" + pitchPath + ").");
+            return generatedClip;
         }
 
         private static AnimatorState GetOrCreateAnimationState(AnimatorStateMachine stateMachine, AnimationClip clip)
@@ -991,6 +1638,27 @@ namespace RogueCommandExpansion.Authoring
             transition.AddCondition(condition, 0f, parameterName);
         }
 
+        private static void RemoveStateTransitionsWithConditionExcept(
+            AnimatorState source,
+            string parameterName,
+            AnimatorConditionMode condition,
+            AnimatorState destination)
+        {
+            if (source == null) return;
+
+            bool keptExpectedTransition = false;
+            foreach (AnimatorStateTransition existing in source.transitions)
+            {
+                if (!HasTransitionCondition(existing, parameterName, condition)) continue;
+                if (existing.destinationState == destination && !keptExpectedTransition)
+                {
+                    keptExpectedTransition = true;
+                    continue;
+                }
+                source.RemoveTransition(existing);
+            }
+        }
+
         private static void EnsureAnyStateTriggerTransition(
             AnimatorStateMachine stateMachine,
             AnimatorState destination,
@@ -1021,6 +1689,29 @@ namespace RogueCommandExpansion.Authoring
             transition.hasExitTime = true;
             transition.exitTime = 1f;
             transition.duration = 0.05f;
+        }
+
+        private static void EnsureExitTransitionWithCondition(
+            AnimatorState source,
+            AnimatorState destination,
+            string parameterName,
+            AnimatorConditionMode condition)
+        {
+            if (source == null || destination == null) return;
+            foreach (AnimatorStateTransition existing in source.transitions)
+            {
+                if (existing.destinationState == destination && existing.hasExitTime &&
+                    HasTransitionCondition(existing, parameterName, condition))
+                {
+                    return;
+                }
+            }
+
+            AnimatorStateTransition transition = source.AddTransition(destination);
+            transition.hasExitTime = true;
+            transition.exitTime = 1f;
+            transition.duration = 0.05f;
+            transition.AddCondition(condition, 0f, parameterName);
         }
 
         private static bool HasTransitionCondition(
@@ -1132,7 +1823,7 @@ namespace RogueCommandExpansion.Authoring
             return false;
         }
 
-        private static void ConfigureAnimationClipLooping(string modelPath)
+        public static void ConfigureAnimationClipLooping(string modelPath)
         {
             ModelImporter importer = AssetImporter.GetAtPath(modelPath) as ModelImporter;
             if (importer == null) return;
@@ -1149,6 +1840,7 @@ namespace RogueCommandExpansion.Authoring
             {
                 if (clip == null) continue;
                 bool shouldLoop = clip.name.IndexOf("Idle", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    clip.name.IndexOf("Walk", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     clip.name.IndexOf("Drive", StringComparison.OrdinalIgnoreCase) >= 0;
                 if (clip.loopTime != shouldLoop)
                 {
@@ -1301,6 +1993,13 @@ namespace RogueCommandExpansion.Authoring
                 mat.SetTexture("_BumpMap", null);
                 mat.SetFloat("_BumpScale", 1.0f);
             }
+
+            // Shared tileable rolled-steel micro relief (RNM-blended in the shader).
+            Texture2D detailTex = LoadConfiguredAtlasTexture(
+                "Assets/RogueCommandExpansionSample/Textures/Detail/RCL_SteelMicroDetail_Normal.png",
+                TextureImporterType.NormalMap, false, false);
+            mat.SetTexture("_DetailBumpMap", detailTex);
+            mat.SetFloat("_DetailBumpScale", detailTex != null ? 0.5f : 0.0f);
 
             if (emissionTex != null)
             {

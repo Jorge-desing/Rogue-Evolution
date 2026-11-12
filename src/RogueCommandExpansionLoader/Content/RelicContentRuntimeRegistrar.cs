@@ -216,7 +216,36 @@ namespace RogueCommandExpansionLoader.Content
                     SetEnumField(change, "side", source.side);
                     SetField(change, "onlyForTheseEntityIds",
                         new List<string>(source.onlyForTheseEntityIds ?? new string[0]));
-                    SetField(change, "entityIdsNotAllowed", new List<string>());
+                    SetField(change, "entityIdsNotAllowed",
+                        new List<string>(source.entityIdsNotAllowed ?? new string[0]));
+                    SetField(change, "changeableValueHasToBeGreaterZero", source.changeableValueHasToBeGreaterZero);
+
+                    FieldInfo allRolesField = _cardChangeType.GetField("cardMustHaveAllOfTheseRoles", InstanceFields);
+                    if (allRolesField != null && allRolesField.FieldType.IsEnum)
+                    {
+                        allRolesField.SetValue(change, ParseRoleBitmask(allRolesField.FieldType, source.cardMustHaveAllOfTheseRoles, 0));
+                    }
+
+                    FieldInfo oneRolesField = _cardChangeType.GetField("cardMustHaveOneOfTheseRoles", InstanceFields);
+                    if (oneRolesField != null && oneRolesField.FieldType.IsEnum)
+                    {
+                        long allMask = -1;
+                        try { allMask = Convert.ToInt64(Enum.Parse(oneRolesField.FieldType, "All", true)); } catch {}
+                        oneRolesField.SetValue(change, ParseRoleBitmask(oneRolesField.FieldType, source.cardMustHaveOneOfTheseRoles, allMask));
+                    }
+
+                    FieldInfo notRolesField = _cardChangeType.GetField("cardMustNotHaveOneOfTheseRoles", InstanceFields);
+                    if (notRolesField != null && notRolesField.FieldType.IsEnum)
+                    {
+                        notRolesField.SetValue(change, ParseRoleBitmask(notRolesField.FieldType, source.cardMustNotHaveOneOfTheseRoles, 0));
+                    }
+
+                    FieldInfo notTechsField = _cardChangeType.GetField("cardMustNotHaveOneOfTheseTechs", InstanceFields);
+                    if (notTechsField != null && notTechsField.FieldType.IsEnum)
+                    {
+                        notTechsField.SetValue(change, ParseTechBitmask(notTechsField.FieldType, source.cardMustNotHaveOneOfTheseTechs, "Ancient"));
+                    }
+
                     typedChanges.Add(change);
                     changes.Add(change);
                 }
@@ -231,13 +260,13 @@ namespace RogueCommandExpansionLoader.Content
                 // RelicBalancingStore.Image() returns its cached bundle Sprite before consulting
                 // Resources.Load(imageLocation), which cannot resolve assets from mod AssetBundles.
                 SetStructField(balanceParameters, "imageLocation", "RCL/" + definition.id);
-                SetStructField(balanceParameters, "coinsAmount", 0);
+                SetStructField(balanceParameters, "coinsAmount", definition.coinsAmount);
                 SetEnumStructField(balanceParameters, "tech", definition.tech);
                 SetEnumStructField(balanceParameters, "rarity", definition.rarity);
                 SetEnumStructField(balanceParameters, "offeredSystemTags", definition.offeredSystemTags);
                 SetEnumStructField(balanceParameters, "neededSystemTags", definition.neededSystemTags);
                 SetStructField(balanceParameters, "neededExperienceLevel", definition.neededExperienceLevel);
-                SetStructField(balanceParameters, "inactive", false);
+                SetStructField(balanceParameters, "inactive", definition.inactive);
                 SetStructField(balanceParameters, "isAllowedForDemo", definition.isAllowedForDemo);
                 SetStructField(balanceParameters, "isForSpecialists", definition.isForSpecialists);
 
@@ -335,7 +364,82 @@ namespace RogueCommandExpansionLoader.Content
                 nativeValue = "MaxHealth";
             }
 
-            field.SetValue(target, Enum.Parse(field.FieldType, nativeValue, false));
+            // CardChange side is stored in the native Side enum as False/True/Irrelevant.
+            // Content packs use readable Friendly/Enemy/All labels, so translate them.
+            if (String.Equals(name, "side", StringComparison.Ordinal) &&
+                String.Equals(field.FieldType.Name, "Side", StringComparison.Ordinal))
+            {
+                string normalizedSide = string.IsNullOrWhiteSpace(value) ? "Friendly" : value.Trim();
+                if (string.Equals(normalizedSide, "Friendly", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalizedSide, "Player", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(normalizedSide, "Allies", StringComparison.OrdinalIgnoreCase))
+                {
+                    nativeValue = "False";
+                }
+                else if (string.Equals(normalizedSide, "Enemy", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "AI", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "Hostile", StringComparison.OrdinalIgnoreCase))
+                {
+                    nativeValue = "True";
+                }
+                else if (string.Equals(normalizedSide, "All", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "Any", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "Irrelevant", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(normalizedSide, "Neutral", StringComparison.OrdinalIgnoreCase))
+                {
+                    nativeValue = "Irrelevant";
+                }
+                else
+                {
+                    nativeValue = normalizedSide;
+                }
+            }
+
+            field.SetValue(target, Enum.Parse(field.FieldType, nativeValue, true));
+        }
+
+        private static object ParseRoleBitmask(Type roleEnumType, string[] roleNames, long defaultValue)
+        {
+            if (roleNames == null || roleNames.Length == 0)
+            {
+                return Enum.ToObject(roleEnumType, defaultValue);
+            }
+
+            long mask = 0;
+            for (int i = 0; i < roleNames.Length; i++)
+            {
+                string roleName = roleNames[i];
+                if (!String.IsNullOrWhiteSpace(roleName))
+                {
+                    object parsed = Enum.Parse(roleEnumType, roleName.Trim(), true);
+                    mask |= Convert.ToInt64(parsed);
+                }
+            }
+
+            return Enum.ToObject(roleEnumType, mask);
+        }
+
+        private static object ParseTechBitmask(Type techEnumType, string[] techNames, string defaultName)
+        {
+            if (techNames == null || techNames.Length == 0)
+            {
+                return String.IsNullOrEmpty(defaultName)
+                    ? Enum.ToObject(techEnumType, 0)
+                    : Enum.Parse(techEnumType, defaultName, true);
+            }
+
+            long mask = 0;
+            for (int i = 0; i < techNames.Length; i++)
+            {
+                string techName = techNames[i];
+                if (!String.IsNullOrWhiteSpace(techName))
+                {
+                    object parsed = Enum.Parse(techEnumType, techName.Trim(), true);
+                    mask |= Convert.ToInt64(parsed);
+                }
+            }
+
+            return Enum.ToObject(techEnumType, mask);
         }
 
         private void SetStructField(object target, string name, object value)

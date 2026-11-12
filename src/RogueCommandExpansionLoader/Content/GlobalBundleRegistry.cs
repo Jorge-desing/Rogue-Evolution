@@ -21,6 +21,15 @@ namespace RogueCommandExpansionLoader.Content
         /// </summary>
         public async Task<AssetBundle> LoadBundleAsync(string bundleId, string path)
         {
+            if (string.IsNullOrWhiteSpace(bundleId))
+            {
+                throw new ArgumentException("A bundle ID is required.", nameof(bundleId));
+            }
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                throw new ArgumentException("A bundle path is required.", nameof(path));
+            }
+
             lock (_lock)
             {
                 if (_bundles.TryGetValue(bundleId, out var existing))
@@ -46,10 +55,10 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (_bundles.TryGetValue(bundleId, out var existing))
                 {
-                    // Another thread loaded it in the meantime.
-                    // Since LoadFromFileAsync creates a new instance if not cached by Unity, 
-                    // and we want to maintain a single instance, we should be careful.
-                    // However, Unity's internal cache usually handles this.
+                    if (!ReferenceEquals(existing, bundle))
+                    {
+                        bundle.Unload(false);
+                    }
                     return existing;
                 }
 
@@ -99,7 +108,7 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     if (!System.Object.ReferenceEquals(existing, bundle))
                     {
-                        bundle.Unload(true);
+                        bundle.Unload(false);
                     }
                     return existing;
                 }

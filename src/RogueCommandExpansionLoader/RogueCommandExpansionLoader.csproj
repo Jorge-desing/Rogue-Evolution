@@ -5,7 +5,7 @@
     <Nullable>disable</Nullable>
     <AssemblyName>RogueCommandExpansionLoader</AssemblyName>
     <RootNamespace>RogueCommandExpansionLoader</RootNamespace>
-    <Version>1.19.0</Version>
+    <Version>1.20.10</Version>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <GameRoot Condition="'$(GameRoot)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Rogue Command</GameRoot>
     <GameManagedPath>$(GameRoot)\Rogue Command_Data\Managed</GameManagedPath>
@@ -51,6 +51,18 @@
       <HintPath>$(GameManagedPath)\UnityEngine.AssetBundleModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(GameManagedPath)\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(GameManagedPath)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(GameManagedPath)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine.JSONSerializeModule">
       <HintPath>$(GameManagedPath)\UnityEngine.JSONSerializeModule.dll</HintPath>
       <Private>false</Private>
@@ -71,6 +83,10 @@
       <HintPath>$(GameManagedPath)\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="RogueCommandExpansionLoader.ValidationTests" />
   </ItemGroup>
 
   <Target Name="ValidateGameAndLoaderReferences" BeforeTargets="ResolveReferences">

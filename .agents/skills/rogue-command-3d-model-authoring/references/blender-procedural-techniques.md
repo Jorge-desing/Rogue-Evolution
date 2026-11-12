@@ -15,10 +15,16 @@ Run this sequence before treating a generated vehicle as final:
 3. **Review the silhouette**: inspect a black, unlit render from the elevated RTS camera and major orthographic views. At the local 30–120 px review range, correct indistinct role cues and overly thin features before material work. These sizes and the 250 ms glance target are local heuristics.
 4. **Refine visible shells**: reshape long profiles and cross-sections, form compound transitions, and create believable overlaps, shadow gaps, and joints. Preserve flat armor facets where they describe plates. Do not add surface detail to hide unresolved blockout shapes.
 5. **Review geometry and shading independently**: use selective bevels for physical edge radii/chamfers; use angle smoothing and weighted normals for the appearance of curved or broad faces. Weighted normals cannot round the silhouette. Keep normals/tangents authored for the Unity FBX import and inspect the imported result.
-6. **Add baked detail and inspect budgets**: after geometry and UVs stabilize, bake useful fine relief into the existing Normal atlas with padding. Treat the current 7,500-face value as a Rogue Command profiling ceiling for LOD0, not a universal Unity budget or an instruction to use every face. Compare Blender face counts with exported Unity triangle counts and review the LODs.
+6. **Add baked detail and inspect budgets**: after geometry and UVs stabilize, bake useful fine relief into the existing Normal atlas with padding. Treat 10,000 Blender source faces as the strict Level 1 chassis LOD0 maximum and 2,000 faces as the separate maximum for each Level 2 module. Do not combine module faces with the chassis count or with other modules. Neither value is a universal Unity budget or a quota to fill. Compare each asset's Blender faces with its exported Unity triangle count and review the LODs.
 7. **Preserve integration contracts**: before export, verify canonical sockets, hierarchy, pivots, ground contact, UVs, texture channels/import settings, and the mesh `Color` RGBA vertex-wear attribute. See [PBR Texture Authoring](../../rogue-command-pbr-texture-authoring/SKILL.md) and [PBR Texture Validation](../../rogue-command-pbr-texture-validation/SKILL.md).
 
+Vehicle and structure `build_and_export` methods run `RogueModelKit.reduce_subpixel_details_to_budget` after optional detail/refinement and before the Level 1 chassis LOD0 gate. Direct-source builders call it before skinning and vertex-color baking; the common `batch_and_join_by_material` and `merge_meshes_by_material` paths enforce the final asset cap. The canonical Level 2 module builder passes its separate 2,000-face maximum per module through both pre-export and batching checks. Preset bevel refinements use the same authored-data guards. The pass prioritizes tiny fasteners, welds, lugs, shackles, and hinges, then dissolves redundant splits on eligible fittings up to 0.60 m; the bounded fallback reaches 1.20 m and protects armor/shell parts plus turret bases, rings, yaw races, and mantlets. UV discontinuities delimit dissolves. Every proposed change is checked against a 0.02 m accumulated symmetric sampled surface-displacement ceiling. Meshes with authored Color data, weights, custom normals, multiple material assignments, or explicit sharp/seam edges are skipped so their surface data remains exact. If the Level 1 chassis remains above 10,000 faces, or an individual Level 2 module remains above 2,000, redesign that asset; do not decimate primary shells, weapons, sensors, mobility silhouettes, or visible assemblies just to pass. Exporters that bypass the shared builders and batchers must invoke the helper with the correct per-asset limit.
+
+At each procedural assembly, keep circular sections for mechanically explained axes, axles, pistons, bearings, wheels, barrels, tanks, and exhaust paths. Avoid decorative concentric rings or repeated circular primitives on armor and housings. Before UVs, inspect front, side, top, elevated RTS, and representative motion views: exposed surfaces must not penetrate neighboring parts. Permit overlap only inside concealed mounts, sealed joints, or articulated interfaces, and correct other contacts before export.
+
 This project workflow adapts RTS silhouette guidance, Blender's separation of mesh geometry and shading, and Unity's FBX/LOD behavior. The cited sources do not mandate one universal style or polygon count; see [Design Guides Adapted](design-guides-adapted.md).
+
+`RogueModelKit.make_weld_seam_bead` represents a weld seam as one continuous, lightly scalloped 8-sided tube sampled at 0.05 m, rather than a row of capped cones. This removes hidden cap faces and prevents neighboring bead cones from intersecting each other while keeping the raised seam readable. Treat fine weld ripples as sub-pixel surface detail at the RTS camera; preserve plate seams and welded contact points.
 
 ---
 
@@ -91,12 +97,30 @@ These assemblies are repeatable starting forms. A faceted housing or wedge hull 
 
 | Generator Function | Primary Parameters | Geometric Features & Chamfers |
 |---|---|---|
+| `make_lofted_superellipse_shell` | `stations`, `axis`, `segments`, `exponent`, `smooth` | Profiled armor/cabin/body shell with tapered sections; use shape stations to create shoulders, formed covers, or sloped noses instead of visible primitive stacks |
 | `make_sloped_glacis_hull` | `length_front`, `length_rear`, `width_front`, `width_rear`, `height_lower`, `height_upper`, `bevel=0.045` | Armored wedge chassis, sloped frontal glacis, undercut belly clearance, tapered sponson flanks |
 | `make_faceted_turret_housing` | `location`, `size=(x,y,z)`, `armor_mat`, `roof_mat`, `bevel=0.035` | Octagonal faceted turret shell, sloped gun mantlet cradle, rear bustle counterweight |
 | `make_troop_compartment` | `location`, `size`, `armor_mat`, `door_mat`, `detail_mat` | Armored personnel cabin, rear clamshell access doors with grab handles, roof commander cupola |
 | `make_tubular_rollcage_assembly` | `size`, `location`, `bar_radius=0.034`, `tube_mat`, `roof_mat`, `visor_mat` | Welded tubular roll cage, A/B pillars, cross-header bar, diagonal C-stays, armored sun visor plate |
 
 ```python
+# Profile a body from rear to front. Each Y-axis station is
+# (y, center_x, center_z, half_width, half_height).
+hull_shell = rmk.make_lofted_superellipse_shell(
+    name="Vehicle_HullShell",
+    stations=[
+        (-1.35, 0.0, 0.48, 0.48, 0.24),
+        (-1.12, 0.0, 0.50, 0.64, 0.29),
+        (0.70, 0.0, 0.50, 0.62, 0.29),
+        (1.12, 0.0, 0.43, 0.42, 0.20),
+    ],
+    material=armor_primary,
+    axis="Y",
+    segments=24,
+    exponent=0.72,
+    smooth=False,
+)
+
 # Chassis and superstructure construction pattern
 hull = rmk.make_sloped_glacis_hull(
     name="Vehicle_Hull", length_front=1.45, length_rear=1.40,
@@ -249,7 +273,27 @@ optimized_objects = rmk.batch_and_join_by_material(
 ```
 
 - **Smart Angle-Weighted Smoothing**: Uses Blender 4.5's `bpy.ops.object.shade_smooth_by_angle` to smooth round barrels, road wheels, hubs, and exhaust pipes while preserving deliberate hard edges between planar armor faces.
-- **Face-Area Weighted Normals (`apply_weighted_normals`)**: Applies Blender's `WEIGHTED_NORMAL` modifier (`mode="FACE_AREA"`, `weight=50`, `keep_sharp=True`) to reduce shading pinch across broad armor faces and their intentional edge treatments. Use it to improve shading, not to conceal poor topology or an unsuitable cross-section. Exported via `mesh_smooth_type="FACE"`.
+- **The Native Bevel + Face-Area Weighted Normals Pipeline**:
+  - *Mathematical Shading Principle:*
+    A vertex shared between a large plate and a narrow bevel face normally interpolates their normals evenly, creating an artificial bend (shading gradient/pinch) across the flat armor plate. Under face-area weighting:
+    $$\vec{N}_v = \frac{\sum_i A(f_i) \cdot \vec{N}_{f_i}}{\|\sum_i A(f_i) \cdot \vec{N}_{f_i}\|}$$
+    For a hull plate ($3.0\text{m}^2$) adjacent to a $15\text{mm}$ chamfer ($0.03\text{m}^2$), the plate contributes $>99\%$ of the normal vector. The plate remains optically flat without requiring dense SubD support loops.
+  - *Bevel Modifier Parameters:*
+    - `width`: $0.003\text{m} - 0.006\text{m}$ (hardware), $0.010\text{m} - 0.025\text{m}$ (armor plates), $0.030\text{m} - 0.060\text{m}$ (castings/silos).
+    - `segments`: 1 (crisp machined chamfer), 2–3 (rolled edges / castings).
+    - `limit_method`: `'ANGLE'` (`angle_limit = math.radians(35.0)`).
+    - `profile`: `0.50` (planar chamfer / circular fillet).
+    - `clamp_overlap`: `True`.
+  - *Weighted Normal Modifier Parameters (`apply_weighted_normals`):*
+    - `mode`: `'FACE_AREA'`
+    - `weight`: `50` to `60`
+    - `keep_sharp`: `True`
+  - *Export & Unity URP Alignment:*
+    - FBX Export: `mesh_smooth_type="FACE"`, `use_mesh_modifiers=True`, `bake_space_transform=False`.
+    - Unity Import: `Normals = Import`, `Normal Generation = MikkTSpace`, `Tangents = Calculate MikkTSpace`.
+- **Optional Blender Add-ons:**
+  - Third-party UV, procedural-geometry, or hard-surface add-ons are optional. Verify license, Blender 4.5.14 compatibility, install path, and reproducible export before using them in a project workflow.
+  - Prefer the pinned repository helpers and Blender built-ins for the production baseline. Add-ons must not change the authored hierarchy, sockets, UV contract, mesh Color RGBA, or export settings.
 - **Batching Estimate**: The authoring report estimates fewer mesh/material groups after batching; confirm actual draw calls in Unity with the selected prefab source and rendering settings.
 - **Clean Normals**: Re-evaluates outward normals consistently and strips non-manifold seams.
 
@@ -337,13 +381,13 @@ Inspects model boundaries, ground contact, vertex counts, and material coverage 
 diagnostics = rmk.validate_model_mesh_quality(model_objects)
 # Verifies:
 # - Ground contact: -0.02m <= Z_min <= 0.08m
-# - Polycount: typically 1,500 to 5,000 polygons
+# - Face count, export triangle count, bounds, contact, and material assignment
 # - Material slots: zero unassigned faces or missing materials
 
 profile = rmk.profile_model_budget_and_drawcalls(
     model_objects,
     prefix="Colossus",
-    target_budget=4500
+    target_budget=rmk.LEVEL1_CHASSIS_FACE_BUDGET
 )
 # Outputs detailed subsystem triangle distribution & budget health
 ```

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Contracts;
 using UnityEngine;
@@ -8,7 +9,8 @@ namespace RogueCommandExpansionLoader.Modules
 {
     /// <summary>
     /// Dispatches bounded attack-move orders to native AI-building waypoints and intercepts player
-    /// units attacking the configured AI base. Repeated waypoint orders are inferred patrol behavior.
+    /// units attacking the configured AI base. Native patrol routes are opt-in; attack-move remains
+    /// the default waypoint behavior.
     /// </summary>
     public sealed class PatrolAndInterceptAiModule : IRogueCommandAiModule
     {
@@ -36,11 +38,13 @@ namespace RogueCommandExpansionLoader.Modules
         private sealed class RuntimeBehaviour : IRogueCommandAiRuntimeBehaviour
         {
             private const string TagPrefix = "roguecommand.expansionloader.patrol-intercept.";
+            private static readonly FieldInfo NativeCommandChainField = ResolveNativeCommandChainField();
             private readonly DefaultAiBehaviour _owner;
             private readonly PatrolAndInterceptSettings _settings;
             private string _tag;
             private float _nextScanAt;
             private bool _stopped;
+            private bool _commandChainWarningLogged;
 
             public RuntimeBehaviour(DefaultAiBehaviour owner, PatrolAndInterceptSettings settings)
             {
@@ -157,6 +161,18 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
+                    if (_settings.PatrolMode == "Native")
+                    {
+                        if (candidate.CurrentPlayerCommandName != EntityCommand.Command.DoNothing ||
+                            HasQueuedCommandsOrCannotVerify(candidate))
+                        {
+                            continue;
+                        }
+
+                        if (TryDispatchNativePatrol(candidate, baseBuildings, waypointCells)) dispatched++;
+                        continue;
+                    }
+
                     int waypointIndex;
                     if (!PatrolAndInterceptWaypointResolver.TrySelectNearest(candidate.CurrentCell,
                             waypointCells, _settings.PatrolRadiusCells, out waypointIndex))
@@ -179,6 +195,82 @@ namespace RogueCommandExpansionLoader.Modules
                         Debug.LogWarning("[RogueCommandExpansionLoader] Patrol waypoint dispatch failed: " +
                             ex.GetType().Name + ": " + ex.Message);
                     }
+                }
+            }
+
+            private bool HasQueuedCommandsOrCannotVerify(EntityController candidate)
+            {
+                if (NativeCommandChainField == null)
+                {
+                    LogCommandChainWarning("the native field was not found with the expected type");
+                    return true;
+                }
+
+                try
+                {
+                    LinkedList<EntityCommand> commandChain =
+                        NativeCommandChainField.GetValue(candidate) as LinkedList<EntityCommand>;
+                    if (commandChain != null) return commandChain.Count > 0;
+                }
+                catch (Exception ex)
+                {
+                    LogCommandChainWarning("reading the native field failed (" + ex.GetType().Name + ")");
+                    return true;
+                }
+
+                LogCommandChainWarning("the native queue was null or had an unexpected type");
+                return true;
+            }
+
+            private static FieldInfo ResolveNativeCommandChainField()
+            {
+                try
+                {
+                    FieldInfo field = typeof(EntityController).GetField("_commandChain",
+                        BindingFlags.Instance | BindingFlags.NonPublic);
+                    return field != null && field.DeclaringType == typeof(EntityController) && field.IsPrivate &&
+                           !field.IsStatic && field.FieldType == typeof(LinkedList<EntityCommand>) ? field : null;
+                }
+                catch (Exception)
+                {
+                    return null;
+                }
+            }
+
+            private void LogCommandChainWarning(string reason)
+            {
+                if (_commandChainWarningLogged) return;
+                _commandChainWarningLogged = true;
+                Debug.LogWarning("[RogueCommandExpansionLoader] Native patrol skipped because the command queue " +
+                    "could not be verified: " + reason + ".");
+            }
+
+            private bool TryDispatchNativePatrol(EntityController candidate,
+                IList<EntityController> baseBuildings, IList<Vector2Int> waypointCells)
+            {
+                int[] routeIndices = new int[PatrolAndInterceptWaypointResolver.MaximumNativePatrolWaypoints];
+                int routeCount = PatrolAndInterceptWaypointResolver.SelectNearestRoute(candidate.CurrentCell,
+                    waypointCells, _settings.PatrolRadiusCells, routeIndices);
+                if (routeCount == 0) return false;
+
+                try
+                {
+                    candidate.ClearPatrolPositions();
+                    for (int i = 0; i < routeCount; i++)
+                        candidate.AddPatrolPosition(baseBuildings[routeIndices[i]].Position);
+                    if (candidate.ArePatrolPositionsEmpty()) return false;
+
+                    EntityCommand command = EntityCommand.Patrol(0);
+                    command.tag = _tag;
+                    candidate.ExecuteCommand(command,
+                        EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning("[RogueCommandExpansionLoader] Native patrol dispatch failed: " +
+                        ex.GetType().Name + ": " + ex.Message);
+                    return false;
                 }
             }
 

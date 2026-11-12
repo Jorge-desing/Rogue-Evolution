@@ -1,145 +1,75 @@
-# Rogue Command 3D Art Style & Color Palette Guide
+# Rogue Command 3D Art Style & Palette Guide
 
-This guide establishes the visual rules and aesthetic principles for authoring grounded, mechanically plausible 3D vehicles and unit models that remain legible in Rogue Command's stylized sci-fi RTS world.
+## Direction
 
----
+Use grounded, stylized military science-fiction realism. Models should carry believable mass, connected mechanisms, intentional surface transitions, and distinct unit silhouettes while remaining legible from the elevated RTS camera. The goal is a more convincing, original version of Rogue Command's visual language, not photorealism.
 
-## 1. Aesthetic Lineage & Core Philosophy
+The project native units are a gameplay and scale reference, not a shape limit. Preserve the role and recognition cues of a unit while developing its own stance, proportions, outline, and construction details. See [Design Guides Adapted](design-guides-adapted.md) for source findings and the adapted workflow.
 
-Use a grounded, stylized military sci-fi language: readable from the elevated RTS camera, with believable mass, connected machinery, and surfaces that respond like armor, cast housings, rubber, and machined metal. The desired finish is not photorealism; it is a more convincing, less primitive-looking version of the project's clear faction and gameplay language.
-The checks below adapt public RTS art-direction and Blender/Unity modeling guidance to this project; see [Design Guides Adapted](design-guides-adapted.md) for sources and the full workflow.
-1. **Designed Silhouettes**: Distinct proportions and a coherent outer shell replace a stack of uniform boxes. Use faceted planes where they describe armor and controlled curvature where it describes cast or formed parts.
-2. **High-Readability RTS Stance**: Keep the archetype and facing legible from the elevated, angled camera (~45°–60° isometric/orthographic tilt), including when the unit is roughly 30–120 pixels tall.
-3. **Believable Fabrication**: Distinguish welded plates, cast armor, access panels, suspension, and attached equipment through thickness, overlap, recesses, joints, and scale-aware edge radii.
-4. **Functional Color and Material Blocking**: Keep a disciplined 5-to-6-tone faction palette, then use restrained value and roughness variation to distinguish structural roles without adding visual noise.
+Before detailed modeling, compare the draft against the closest native or mod counterpart. Record which body-plan conventions it inherits and which role cues must remain. If the silhouette still follows a generic stock pattern, make two structurally different blockouts based on the unit's mobility and systems, then select the form with the clearest support, clearance, and RTS read. This local divergence pass creates originality through shape and function; surface noise and decorative add-ons do not substitute for it.
 
----
+## Form design
 
-## 2. Silhouette Readability & The 3-Tier Hierarchy
+- Start with tactical role, mobility, primary weapon/system, and two or three silhouette cues.
+- Build the primary body before adding detail. Replace visible primitive stacks with tapered profiles, lofted shells, curved or faceted transitions, and purposeful plate layering.
+- Retain cylinders, circular caps, and rings only when their round section supports a named mechanical function such as an axle, barrel, bearing, wheel, tank, exhaust, or mast. Avoid concentric trim, repeated cylinder stacks, and circular armor details without a mechanical purpose; use shaped, lofted, superellipse, faceted, or chamfered forms for housings and armor.
+- Before UV work, inspect exposed geometry from front, side, top, and RTS views. No visible surface may pass through a neighboring part; allow overlap only inside concealed mounts, sealed joints, and articulated interfaces, and recheck the full motion envelope for moving assemblies.
+- Use faceted planes for fabricated armor, controlled curvature for cast or formed parts, and asymmetric shapes when they support the unit's function or identity.
+- Connect each visible mechanism to a support, load path, energy/fluid path, and required motion clearance where relevant. Do not require tank subsystems on bikes, walkers, aircraft, hover units, or facilities that do not use them.
+- Use large, medium, and small form hierarchy as a composition aid. Fixed 65/25/10, 70/20/10, or 70/30 percentages are optional heuristics, not acceptance rules.
 
-Every unit must pass the **Silhouette Test**: from the elevated gameplay camera and the main orthographic views, the black silhouette should identify its role and forward orientation before color or material is considered. The project's roughly 50-pixel review size and 250ms glance target are internal heuristics, not external standards. The camera-first review is adapted from RTS art direction that prioritizes form and removes noisy micro-detail.
+## RTS readability and originality
 
-- **Tier 1 (Macro Silhouette, 65%)**: Proportion, stance, ground clearance, and largest hull/turret masses. Identifies archetype (Scout vs Siege vs Mech vs Bike).
-- **Tier 2 (Meso Mechanical Construction, 25%)**: Hull transitions, turret seating, track or suspension depth, weapon mounts, engine deck, and access systems. Explains how the unit is built and operated.
-- **Tier 3 (Micro Accents, 10%)**: Optics, fasteners, seams, markings, and localized wear. Directs attention but never carries the silhouette on its own.
+Review a black silhouette and a neutral clay render from the elevated camera and front/side/top views. Compare at actual on-screen sizes; around 50 pixels tall can be a useful internal review size, but it is not an external standard. Enlarge only the features that disappear. Remove micro-detail that merges into noise.
 
-Treat 65/25/10 as relative visual priorities for this project, not measured percentages or an external standard.
+Unit identity should come from outline, stance, proportion, negative space, weapon placement, and material blocks. Color, emissive optics, wear, and surface texture reinforce recognition; they cannot rescue an unclear silhouette.
 
-### Form Construction Checklist
-- Establish the primary hull/cabin/turret as a coherent shell from tapered profiles and intersecting volumes with intentional transitions; do not leave obvious box-to-box joins on the visible silhouette.
-- Vary dimensions and cross-sections according to each component's job. Taper barrels and booms, soften cast shoulders, recess wheel wells and optics, and give panels enough thickness to read at gameplay scale.
-- Make mechanical connections visible where they matter: turret ring under turret, suspension arms into wheel hubs, gun breech into mantlet, hose ends on fittings, and exhausts rooted in the engine deck.
-- Keep intentional asymmetry purposeful. Repeated details should follow a real layout (bolt rows, cooling banks, track shoes) and should not become all-over surface decoration.
-- Compare a neutral clay render under grazing light against the textured model. Geometry must carry the form without relying on camouflage, AO, vertex wear, or emissive accents.
+## Palette and material cues
 
-### Archetype Silhouette Matrix
+Use faction colors and material response to distinguish armor, machinery, rubber, optics, and warning accents. Treat the examples below as starting points; tune color, metallic, roughness/smoothness, and accent coverage for the unit's role, lighting, atlas, and game scale. No fixed palette percentage is required.
 
-| Archetype | Native Template | Silhouette Features | Dimensions (W × L × H) | Mass Distribution |
-|---|---|---|---|---|
-| **Fast Scout** | `PCXBaseTank` | Low profile, sloped glacis, wide stance, elevated sensor mast | ~2.1m × 2.6m × 1.5m | Low and central |
-| **Strike Bike** | `BombBike` | Ultra-narrow 2-wheel footprint, aggressive forward rake, roll cage | ~1.1m × 2.0m × 1.3m | Forward-leaning |
-| **Heavy Artillery** | `ArtilleryTank` | Broad tracked chassis, rear outriggers, massive elongated cannon barrel | ~2.8m × 3.6m × 1.9m | Rear-biased |
-| **Assault Walker** | `GatlingWalker` | Vertical bipedal stance, digitigrade inverted knee, twin rotary guns | ~2.2m × 2.0m × 2.7m | Dynamic vertical |
-| **Surge Arc Tank** | `LightningTank` | Segmented tracked hull, central toroidal reactor coil, emitter prongs | ~2.3m × 2.8m × 1.6m | Central reactor core |
-| **Hover Skimmer** | `PCXBaseTank` | Anti-grav cushion, ventral thruster bells, lateral stabilizer fins | ~2.5m × 2.9m × 1.6m | Floating (Z ~0.24–0.45m) |
-| **Siege Spider** | `GatlingWalker` | 4 wide outrigger crawler legs, central turret, hydraulic knee knuckles | ~4.6m × 4.8m × 1.8m | Low 4-point footprint |
-| **VTOL Gunship** | `PCXBaseTank` | Sleek lifting body, swept wings, dual ducted tilt-rotors, V-tail | ~3.8m × 4.7m × 1.5m | Wing-biased |
-| **Half-Track APC** | `PCXBaseTank` | Front wheels, rear continuous tracks, armored troop cabin | ~2.2m × 3.8m × 2.2m | Mid-chassis |
-| **Super-Heavy** | `ArtilleryTank` | 4 independent track pods, massive superstructure, dual heavy cannons | ~3.3m × 4.6m × 2.4m | Broad 4-pod base |
-| **Recon Buggy** | `BombBike` | Wide stance all-terrain tires, tubular roll cage, exposed rear engine | ~2.3m × 3.2m × 2.2m | Low off-road stance |
-
----
-
-## 3. The 5-Tone Color Palette Rule
-
-Every vehicle follows the disciplined 5-to-6-tone structural PBR material standard:
-
-| Material Role | Proportion | Vanguard (`vanguard`) | Heavy Siege (`siege`) | Syndicate (`syndicate`) | PBR Properties |
-|---|---|---|---|---|---|
-| **Primary Armor** | 40–45% | Slate Teal (`#244552`) | Rust Ochre (`#684126`) | Deep Cobalt (`#14243b`) | Met: $0.35–0.55$, Smooth: $0.50–0.68$ |
-| **Secondary Armor** | 20–25% | Seafoam Slate (`#435f62`) | Desert Sand (`#8c6d48`) | Titanium Grey (`#526070`) | Met: $0.25–0.60$, Smooth: $0.55–0.72$ |
-| **Mechanical Gunmetal** | 15–20% | Charcoal Steel (`#1b262b`)| Cast Iron (`#1e1f22`) | Anodized Black (`#12161c`)| Met: $0.74–0.80$, Smooth: $0.65–0.75$ |
-| **Tread / Rubber** | 10–15% | Carbon Black (`#161b1e`) | Carbon Black (`#161b1e`) | Dark Tungsten (`#12161c`) | Met: $0.08–0.18$, Smooth: $0.28–0.34$ |
-| **Warning Accent** | 3–5% | Signal Amber (`#e86c20`) | Hazard Yellow (`#f2a91d`) | Electric Magenta (`#d41876`)| Met: $0.15–0.20$, Smooth: $0.60–0.70$ |
-| **Emissive Optics** | 1–3% | Arc Cyan (`#1fcdbf`, 1.8×) | Molten Orange (`#ff5511`, 2.2×)| Plasma Cyan (`#00f0ff`, 2.5×) | Met: $0.10–0.20$, Smooth: $0.76–0.88$ |
-
-### Camouflage Presets (`--camo`)
-- **`desert`**: Coyote tan (`#6b522e`), desert khaki secondary (`#8c7042`), matte finish with high-visibility signal markings.
-- **`urban`**: Concrete slate (`#383d42`), asphalt grey secondary (`#5c636b`), dark tungsten mechanics, cool cyan optics.
-- **`arctic`**: Glacial tundra white (`#c2d1e0`), frost grey secondary (`#8494a8`), dark carbon rubber, crimson hazard accents.
-- **`woodland`**: Olive drab (`#2e4024`), forest green secondary (`#475c38`), dark gunmetal, high-visibility yellow bands.
-
----
-
-## 4. Scale-Aware Edge Radii & Surface Shading
-
-Use edge treatment to describe fabrication and catch light, not to make every object look like the same beveled primitive.
-- **Treat edges selectively**: Keep broad armor planes clean. Chamfer an edge when it is a cut plate edge, protective corner, or deliberate facet; use a rounded transition for cast housings, formed covers, wheel shoulders, and other surfaces that should not read as a sharp folded plate.
-- **Scale the treatment to the part**: As a starting guide, use about `0.003m–0.010m` on small machined details, `0.006m–0.025m` on exposed armor plate edges, and `0.02m–0.06m` on large cast or molded housings. Prefer a fraction of local part thickness over a universal bevel width. Reduce these values when they make a panel look inflated.
-- **Choose segments by shape**: A 1-segment bevel is appropriate for a crisp chamfer. Use 2–4 segments for visible rolled edges and rounded transitions; use enough radial sides on wheels, pipes, and barrels that their gameplay-scale silhouette does not look square. Keep hidden geometry economical.
-- **Preserve intentional planes**: Keep true armor facets flat-shaded, but shade curved surfaces smoothly by angle. Inspect normal transitions and highlights in a neutral clay render; do not use weighted normals to disguise a bad cross-section or intersecting shells.
-- **Avoid uniform beveling**: Never apply the same wide bevel to every edge. Large, soft corners on all panels create a toy-like look and erase structural differences.
-
-Keep shape and shading checks separate: bevels change mesh geometry and highlights; smooth shading and weighted normals change how existing faces shade. If a black silhouette still looks boxy, revise the mesh cross-section instead of increasing normal weights.
-
----
-
-## 5. Functional Construction Details
-
-Every added detail should explain protection, access, cooling, sensing, propulsion, ammunition, or field repair. Avoid decorative repetition and scattered “greebles” without a visible attachment point.
-
-1. **Continuous Track Loops**: Sloped front approach angles (~25°–35° climb), rounded return idlers, and individual tread shoes (`0.15m–0.22m` spacing).
-2. **Road Wheel Rims & Hubs**: Stepped cylinders: outer rubber tire (matte), recessed rim, and central 6-bolt planetary axle cap (gunmetal).
-3. **Engine Grilles**: 2–4 angled chamfered cooling louvers on the rear engine deck.
-4. **Sensor Masts**: Armored hood visor with recessed glowing optical lens.
-5. **Weapon Sleeves**: Stepped muzzle brakes or heat-dissipation collars at the barrel tip.
-6. **Conduit Rails**: Insulated charge rails along flanks for energy weapons.
-7. **Applique Armor (ERA)**: Spaced armor tiles on frontal glacis angled at 20°–35°.
-8. **Fasteners & Seams**: Place small fasteners along real plate flanges, access covers, and mounting rails; keep scale and spacing consistent with the panel they secure.
-
----
-
-## 6. Weapon Hardpoints & Kinematics Standards
-
-- **Heavy Ballistic Cannons**: Barrel length $1.4	imes$ to $2.2	imes$ turret length with breech collar, double-baffle muzzle brake, and parallel recoil dampers.
-- **Rotary Gatling Clusters**: 6-barrel bundles with clamp collars at 45% and 95% of length, central drive axle, and offset ammo chute.
-- **Missile Pods**: Multi-cell honeycomb arrays ($2	imes 3$, $2	imes 2$, or $3	imes 3$) recessed inside an armored box tilted $10^\circ–20^\circ$.
-- **Arc Weapons**: Twin/triple toroidal induction coils around a plasma cathode with convergent discharge prongs.
-- **Biped Walkers**: Digitigrade stance (thigh $-15^\circ$ to $-25^\circ$, shin $+20^\circ$ to $+35^\circ$) with hydraulic rams and 3-toed stabilizer foot resting at $Z \ge 0.0\text{m}$.
-
----
-
-## 7. Draw-Call Optimization via Material Batching
-
-- **Blockout and Refinement**: Start with clean primitives and explicit materials, then replace visible silhouette masses with refined shells, transitions, or shaped components before the production export.
-- **Material-Based Unification for Export**: Group and join static submeshes by PBR material via `batch_and_join_by_material`.
-- **Target Output**: 4 to 6 unified mesh objects per vehicle (one per material, plus independent animated pivots like `TurretBase` or `MainBarrel`).
-
----
-
-## 8. Multi-Channel Procedural Vertex Shading (`Mesh.colors32`)
-
-Tactile shading is encoded directly into vertex colors to avoid heavy texture lookups:
-
-| Channel | Shader Role | Technical Mapping & Invariant |
+| Material role | Example treatment | Notes |
 |---|---|---|
-| **R (Red)** | Ambient Occlusion & Cavity Dirt | $0.25–0.40$ on undersides, wheel recesses, and crevices; $1.0$ on zenith faces. |
-| **G (Green)** | Curvature & Edge Wear | $0.70–1.0$ on sharp convex edges (dihedral angle $\ge 35^\circ$); $0.0$ on flat planes. |
-| **B (Blue)** | Thermal Soot & Weathering | $0.0$ default clean base metal; scales to $1.0$ at muzzles and exhaust tips with quadratic dropoff $(1 - d/R)^2$. Never invert. |
-| **A (Alpha)** | Team Tint Mask | $1.0$ on primary and light armor plates for runtime tinting; $0.0$ on gunmetal and rubber treads. |
+| Primary armor | Faction base color, satin or matte response | Main silhouette surfaces and armor shells |
+| Secondary armor | Lighter, darker, or warmer related tone | Selective panels, shields, or high-contrast equipment |
+| Machinery | Dark gunmetal or exposed alloy | Joints, barrels, axles, actuators, and mounting hardware |
+| Rubber and treads | Near-black, low metallic response | Tires, pads, seals, and flexible surfaces |
+| Warning marks | Amber, yellow, red, or faction accent | Localized labels and safety cues |
+| Optics and energy | Restrained cyan, orange, magenta, or faction color | Keep emissives small and role-specific |
 
----
+Use camouflage or panel-value variation to support unit recognition and material separation. Do not add procedural noise that obscures the armor layout.
 
-## 9. Multi-Level LOD Hierarchy & Collision Geometry
+## Edge treatment and finish
 
-- **LOD0 (Combat View, 100%)**: Full fidelity ($1,500$–$5,000$ triangles), complete chamfers, road wheel lugs, and sensor antennas.
-- **LOD1 (Mid-Range View, 50%)**: Preserved planar boundaries, decimated fine bevels ($800$–$2,000$ triangles).
-- **LOD2 (Far Tactical View, 22%)**: Coarse blockout silhouette ($300$–$700$ triangles) for extreme RTS camera zoom.
-- **Collision Hulls**: Flat-shaded `<Prefix>_COLLIDER_Hull` and `<Prefix>_COLLIDER_Turret` matching vehicle bounding boxes (`is_collider = True`).
+- Keep broad armor planes clean. Chamfer a cut or exposed plate edge; use a rounded transition for cast housings, wheel shoulders, and formed covers.
+- Scale edge widths to the part and its visible size. Inspect highlights and silhouette rather than applying a single bevel value everywhere.
+- Flat-shade deliberate facets; smooth curved surfaces by intent. Use weighted normals to stabilize broad faces after the shape is already correct.
+- Review the model in neutral clay under grazing light before relying on material color, vertex wear, or emission.
 
----
+## PBR and vertex-wear contracts
 
-## 10. Standardized Gameplay Sockets
+Keep the project's four texture outputs:
 
-Models emit standardized empty locators in the FBX hierarchy (`Socket_MuzzlePrimary`, `Socket_MuzzleSecondary`, `Socket_TurretPivot`, `Socket_RecoilPrimary`, `Socket_EngineAudio`, `Socket_WeaponAudio`, `Socket_DamageSmoke`, `Socket_DamageFire`, `Socket_GroundContact`). Sockets must never repeat vehicle prefixes.
-*Detailed transform hierarchy and runtime binding: [Native Hierarchy & Pivots](native-hierarchy-and-pivots.md) and [AGENT-HANDOFF.md](../../../../docs/research/AGENT-HANDOFF.md).*
+| Map | Required content |
+|---|---|
+| Albedo | sRGB base color, camouflage, and authored paint |
+| MetallicGloss | Linear; RGB = metallic, A = smoothness (1 - roughness); the shader reads R and A |
+| Normal | Tangent-space normal map |
+| Emission | sRGB emissive regions |
+
+The current Unity import and material wiring remain authoritative. Do not put AO into MetallicGloss; this map does not consume it. Keep vertex wear on the mesh Color RGBA attribute:
+
+| Channel | Meaning |
+|---|---|
+| R | Cavity AO: lower in recesses and undersides, higher on open surfaces |
+| G | Edge wear: on convex exposed edges, zero on broad flat or concave faces |
+| B | Thermal soot: localized at exhausts and muzzles |
+| A | Team mask: armor tinting where supported by the material |
+
+Never replace vertex wear with texture AO or an external painter's vertex-color output. Follow the project PBR authoring and validation skills when maps or imports change.
+
+## LOD and delivery
+
+The current Level 1 primary chassis profile sets a strict maximum of 10,000 Blender source faces for LOD0. Level 2 visual modules use a separate 2,000-face maximum per module asset; never add Level 2 counts to the chassis or to one another for that per-module check. Neither number is a Unity limit or a quota to fill. Record Blender face counts and Unity-exported triangles separately. Preserve the unit's primary silhouette and functional parts through LOD changes; simplify duplicates, hidden internals, redundant bevels, and sub-pixel details first. Vehicle and structure builders plus both shared material-batching paths apply the bounded cleanup from `RogueModelKit` and reject models that remain over the applicable asset cap. Run the chassis pass before skinning or vertex-color baking; meshes with authored Color data, weights, custom normals, material splits, or explicit sharp/seam edges stay untouched, while UV discontinuities delimit dissolves. Each accepted dissolve must remain within 0.02 m accumulated symmetric sampled surface displacement. The fallback reaches fittings up to 1.2 m; if safe changes cannot meet the asset's cap, rework that asset instead of forcing decimation. Exporters that bypass those paths must call the same helper with the correct level-specific maximum before export.
+
+Keep Blender 4.5.14, Unity 2021.3.45f2, canonical unprefixed sockets, UVs, source hierarchy, rig/pivots, mesh Color RGBA, and the existing PBR/import contract intact. Validate the final FBX and bundle locally. A Blender preview or Unity import does not establish live in-game appearance.

@@ -57,6 +57,62 @@ CANONICAL_STATS = [
     "ArmorProtection",
 ]
 
+SIMULATED_CUSTOM_BALANCE_FIELDS: Dict[str, str] = {
+    "Cost": "cost",
+    "ProductionDuration": "production_duration",
+    "MaxCapacity": "max_capacity",
+    "MaxHealth": "max_health",
+    "MaxShield": "max_shield",
+    "MaxMana": "max_mana",
+    "MaxRank": "max_rank",
+    "MoveSpeed": "move_speed",
+    "SightRadius": "sight_radius",
+    "Damage1": "damage1",
+    "Damage2": "damage2",
+    "Attack1Cooldown": "attack_cooldown",
+    "Attack2Cooldown": "attack2_cooldown",
+    "WeaponRange": "weapon_range",
+    "EffectRadius1": "effect_radius1",
+    # Preserved for reporting/parity only; the duel/CEI model below does not
+    # consume these fields (no invented mechanics). MaxArmor in particular is
+    # not EHP: only ArmorProtection and discrete shield charges mitigate damage.
+    "EffectRadius2": "effect_radius2",
+    "SkillRange": "skill_range",
+    "HealAmount1": "heal_amount1",
+    "HealAmount2": "heal_amount2",
+    "GainCreditsAmount": "gain_credits_amount",
+    "SkillManaCost": "skill_mana_cost",
+    "Duration1": "duration1",
+    "SpawnTtl": "spawn_ttl",
+    "MaxArmor": "max_armor",
+    "ArmorProtection": "armor_protection",
+}
+
+# REA-verified combat model constants (mechanics confirmed via decompiled
+# EntityController.TakeDamage / LandsCriticalHit / ChargeShield).
+# Numeric DEFAULTS are MODEL ASSUMPTIONS, NOT values extracted from
+# Assembly-CSharp.dll (protected/non-standard layout prevents clean extraction).
+CRITICAL_HIT_MULTIPLIER_DEFAULT: float = 2.0
+SHIELD_RECHARGE_PER_SECOND_DEFAULT: float = 1.0
+SHIELD_RECHARGE_COOLDOWN_DEFAULT: float = 3.0
+MANA_RECHARGE_PER_SECOND_DEFAULT: float = 1.0
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"Invalid non-finite JSON number: {value}")
+
+
+def _finite_number(value: Any, context: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"Invalid numeric value for {context}: {value!r}")
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"Invalid numeric value for {context}: {value!r}") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"Non-finite numeric value for {context}: {value!r}")
+    return number
+
 # Built-in fallback archetype stats from Rogue Command 1.0.9 verified dataset
 BUILTIN_NATIVE_ARCHETYPES: Dict[str, Dict[str, Any]] = {
     "PCXBaseTank": {
@@ -174,8 +230,11 @@ class UnitProfile:
     template_id: Optional[str] = None
     cost: float = 100.0
     production_duration: float = 30.0
+    max_capacity: float = 0.0
     max_health: float = 100.0
     max_shield: float = 0.0  # Discrete shield charges
+    max_mana: float = 0.0
+    max_rank: float = 0.0
     armor_protection: float = 0.0  # Flat reduction
     move_speed: float = 12.0
     sight_radius: float = 6.0
@@ -186,9 +245,29 @@ class UnitProfile:
     attack2_cooldown: float = 0.0
     weapon_range: float = 5.0
     effect_radius1: float = 0.0
+    # Preserved per-unit balance fields (see SIMULATED_CUSTOM_BALANCE_FIELDS):
+    # carried for parity/reporting, not consumed by the duel/CEI model.
+    effect_radius2: float = 0.0
+    skill_range: float = 0.0
+    heal_amount1: float = 0.0
+    heal_amount2: float = 0.0
+    gain_credits_amount: float = 0.0
+    skill_mana_cost: float = 0.0
+    duration1: float = 0.0
+    spawn_ttl: float = 0.0
+    max_armor: float = 0.0  # Repair pool / visual bar only; never EHP.
     attack_type: str = "Unknown"  # AttackType metadata; not currently used by the damage model.
     is_suicide: bool = False
     tags: List[str] = field(default_factory=list)
+    # REA-verified combat model extensions (mechanics confirmed via decompiled
+    # EntityController; numeric defaults are MODEL ASSUMPTIONS, not verified
+    # game values -- see module-level constants).
+    crit_chance: float = 0.0  # Probability of a critical hit per volley (0.0-1.0)
+    crit_multiplier: float = CRITICAL_HIT_MULTIPLIER_DEFAULT  # Critical damage multiplier
+    shield_recharge_per_second: float = 0.0  # 0 unless the manifest declares shieldRegeneration
+    shield_recharge_cooldown: float = 0.0  # 0 unless the manifest declares shieldRegeneration
+    mana_recharge_per_second: float = MANA_RECHARGE_PER_SECOND_DEFAULT  # Mana regenerated per second (ability DPS)
+    ignore_armor: bool = False  # If True, attacks bypass defender armor (DealDamage.ignoreArmor)
 
     @property
     def is_suicide_unit(self) -> bool:
@@ -221,25 +300,42 @@ class UnitProfile:
         return val
 
     def effective_dps_against(self, defender_armor: float) -> float:
-        """DPS after flat armor subtraction with min 0.1 floor."""
+        """DPS after flat armor subtraction with min 0.1 floor.
+
+        Incorporates REA-verified critical hit expected-value multiplier:
+        E[dmg] = base_dmg * (1 + crit_chance * (crit_multiplier - 1)).
+        If ignore_armor is set, armor subtraction is bypassed (DealDamage.ignoreArmor).
+        """
+        effective_armor = 0.0 if self.ignore_armor else defender_armor
+        crit_factor = 1.0 + self.crit_chance * (self.crit_multiplier - 1.0)
         if self.is_suicide_unit:
-            return max(0.1, self.damage1 - defender_armor)
+            return max(0.1, (self.damage1 - effective_armor)) * crit_factor
         val = 0.0
         if self.attack_cooldown > 0.0:
-            dmg1 = max(0.1, self.damage1 - defender_armor)
+            dmg1 = max(0.1, self.damage1 - effective_armor)
             val += (dmg1 * self.fire_point_count) / self.attack_cooldown
         if self.damage2 > 0.0 and self.attack2_cooldown > 0.0:
-            dmg2 = max(0.1, self.damage2 - defender_armor)
+            dmg2 = max(0.1, self.damage2 - effective_armor)
             val += dmg2 / self.attack2_cooldown
-        return val
+        return val * crit_factor
 
-    def effective_health_against(self, attacker_damage: float) -> float:
-        """Effective Health Pool (EHP) accounting for discrete shield charges and flat armor."""
+    def effective_health_against(self, attacker_damage: float, combat_duration: float = 0.0) -> float:
+        """Effective Health Pool (EHP) accounting for discrete shield charges, flat armor,
+        and REA-verified shield recharge (ShieldRechargePerSecond after ShieldRechargeCooldown).
+
+        If combat_duration > 0, models shield regen over the combat duration:
+        regenerated_shields = shield_recharge_per_second * max(0, combat_duration - shield_recharge_cooldown).
+        """
         shield_absorbed_damage = self.max_shield * attacker_damage
         effective_damage = max(0.1, attacker_damage - self.armor_protection)
         mitigation_ratio = attacker_damage / effective_damage if attacker_damage > 0 else 1.0
         armor_ehp = self.max_health * mitigation_ratio
-        return shield_absorbed_damage + armor_ehp
+        ehp = shield_absorbed_damage + armor_ehp
+        if combat_duration > 0.0 and self.shield_recharge_per_second > 0.0:
+            regen_window = max(0.0, combat_duration - self.shield_recharge_cooldown)
+            regen_shields = self.shield_recharge_per_second * regen_window
+            ehp += regen_shields * attacker_damage
+        return ehp
 
     @property
     def cost_efficiency_index(self) -> float:
@@ -300,15 +396,18 @@ class CombatSimulator:
         self.max_simulation_time = max_simulation_time
 
     @staticmethod
-    def calculate_hit_damage(raw_damage: float, defender_armor: float, defender_shields: float) -> Tuple[float, float, float]:
+    def calculate_hit_damage(raw_damage: float, defender_armor: float, defender_shields: float, ignore_armor: bool = False) -> Tuple[float, float, float]:
         """Calculates exact damage resolution according to REA-verified Rogue Command mechanics.
 
         Returns: (applied_hp_damage, absorbed_by_armor, absorbed_by_shields)
+
+        If ignore_armor is True, armor subtraction is bypassed (DealDamage.ignoreArmor).
         """
         if defender_shields > 0:
             return 0.0, 0.0, raw_damage
 
-        effective_damage = max(0.1, raw_damage - defender_armor)
+        effective_armor = 0.0 if ignore_armor else defender_armor
+        effective_damage = max(0.1, raw_damage - effective_armor)
         absorbed_armor = max(0.0, raw_damage - effective_damage)
         return effective_damage, absorbed_armor, 0.0
 
@@ -319,12 +418,14 @@ class CombatSimulator:
         defender_armor: float,
         defender_shields: float,
         defender_hp: Optional[float] = None,
+        ignore_armor: bool = False,
     ) -> Tuple[float, float, float, float, int]:
         """Applies one discrete projectile hit per firepoint in a primary attack volley.
 
         Each projectile independently consumes one shield charge before later projectiles
         in the same volley can damage HP. If a target HP total is supplied, stop when it
         would be destroyed rather than counting unused projectiles as shots fired.
+        If ignore_armor is True, armor subtraction is bypassed (DealDamage.ignoreArmor).
         """
         hp_damage = 0.0
         armor_absorbed = 0.0
@@ -336,7 +437,7 @@ class CombatSimulator:
             if defender_hp is not None and hp_damage >= defender_hp:
                 break
             hit_damage, armor_hit, shield_hit = self.calculate_hit_damage(
-                raw_damage, defender_armor, remaining_shields
+                raw_damage, defender_armor, remaining_shields, ignore_armor
             )
             shots_fired += 1
             hp_damage += hit_damage
@@ -362,6 +463,10 @@ class CombatSimulator:
         hp_b = unit_b.max_health
         shields_a = unit_a.max_shield
         shields_b = unit_b.max_shield
+
+        # REA-verified shield recharge tracking: seconds since last damage
+        shield_regen_timer_a = unit_a.shield_recharge_cooldown
+        shield_regen_timer_b = unit_b.shield_recharge_cooldown
 
         cd_a = random.uniform(0.0, unit_a.attack_cooldown * 0.2) if (jitter_initiative and unit_a.attack_cooldown > 0) else 0.0
         cd_b = random.uniform(0.0, unit_b.attack_cooldown * 0.2) if (jitter_initiative and unit_b.attack_cooldown > 0) else 0.0
@@ -411,6 +516,14 @@ class CombatSimulator:
             cd_a -= self.time_step
             cd_b -= self.time_step
 
+            # REA-verified shield recharge: regenerate shields after cooldown
+            shield_regen_timer_a = max(0.0, shield_regen_timer_a - self.time_step)
+            shield_regen_timer_b = max(0.0, shield_regen_timer_b - self.time_step)
+            if shield_regen_timer_a <= 0.0 and unit_a.shield_recharge_per_second > 0.0 and shields_a < unit_a.max_shield:
+                shields_a = min(unit_a.max_shield, shields_a + unit_a.shield_recharge_per_second * self.time_step)
+            if shield_regen_timer_b <= 0.0 and unit_b.shield_recharge_per_second > 0.0 and shields_b < unit_b.max_shield:
+                shields_b = min(unit_b.max_shield, shields_b + unit_b.shield_recharge_per_second * self.time_step)
+
             a_in_range = current_distance <= unit_a.effective_range
             b_in_range = current_distance <= unit_b.effective_range
 
@@ -442,12 +555,16 @@ class CombatSimulator:
                     unit_b.armor_protection,
                     shields_b,
                     hp_b,
+                    ignore_armor=unit_a.ignore_armor,
                 )
                 shots_a += fired_projectiles
                 hp_b -= hp_loss
                 dmg_dealt_a += hp_loss
                 armor_absorbed_b += arm_abs
                 shield_absorbed_b += sh_abs
+                # Reset defender's shield recharge timer on any damage
+                if hp_loss > 0.0 or sh_abs > 0.0:
+                    shield_regen_timer_b = unit_b.shield_recharge_cooldown
 
                 if unit_a.is_suicide_unit:
                     hp_a = 0.0
@@ -462,12 +579,16 @@ class CombatSimulator:
                     unit_a.armor_protection,
                     shields_a,
                     hp_a,
+                    ignore_armor=unit_b.ignore_armor,
                 )
                 shots_b += fired_projectiles
                 hp_a -= hp_loss
                 dmg_dealt_b += hp_loss
                 armor_absorbed_a += arm_abs
                 shield_absorbed_a += sh_abs
+                # Reset defender's shield recharge timer on any damage
+                if hp_loss > 0.0 or sh_abs > 0.0:
+                    shield_regen_timer_a = unit_a.shield_recharge_cooldown
 
                 if unit_b.is_suicide_unit:
                     hp_b = 0.0
@@ -761,27 +882,51 @@ class BalanceRepository:
                 sys.stderr.write(f"Warning: Failed to parse TSV at {self.tsv_path}: {e}\n")
 
     def load_content_pack(self, content_json_path: Path) -> List[str]:
-        """Loads a mod content.json pack, cloning native templates and applying balanceOverrides."""
+        """Loads a mod pack and applies raw, custom, and structured movement balance in runtime precedence."""
         loaded_units = []
         if not content_json_path.exists():
             return loaded_units
 
         with open(content_json_path, mode="r", encoding="utf-8") as f:
-            pack_data = json.load(f)
+            pack_data = json.load(f, parse_constant=_reject_json_constant)
+
+        if not isinstance(pack_data, dict):
+            raise ValueError("Invalid manifest: expected a JSON object")
 
         units = pack_data.get("units", [])
+        if not isinstance(units, list):
+            raise ValueError("Invalid manifest units: expected an array")
         for u in units:
+            if not isinstance(u, dict):
+                raise ValueError("Invalid unit entry: expected an object")
             uid = u.get("id")
-            if not uid:
-                continue
+            if not isinstance(uid, str) or not uid.strip():
+                raise ValueError("Invalid unit entry id: expected a non-empty string")
 
             template_id = u.get("nativeTemplateId")
+            if "nativeTemplateId" in u and (
+                not isinstance(template_id, str) or not template_id.strip()
+            ):
+                raise ValueError(f"Invalid nativeTemplateId for unit {uid}: expected a non-empty string")
             base = self.profiles.get(template_id) if template_id else None
 
             display_name = uid
-            for loc in u.get("localizations", []):
-                if loc.get("language") == "en-US":
-                    display_name = loc.get("name", uid)
+            localizations = u.get("localizations", [])
+            if not isinstance(localizations, list):
+                raise ValueError(f"Invalid localizations for {uid}: expected an array")
+            if "localizations" in u and not localizations:
+                raise ValueError(f"Invalid localizations for {uid}: expected at least one entry")
+            for index, loc in enumerate(localizations):
+                if not isinstance(loc, dict):
+                    raise ValueError(f"Invalid localizations[{index}] for {uid}: expected an object")
+                language = loc.get("language")
+                name = loc.get("name")
+                if not isinstance(language, str) or not language.strip():
+                    raise ValueError(f"Invalid localizations[{index}].language for {uid}: expected a non-empty string")
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError(f"Invalid localizations[{index}].name for {uid}: expected a non-empty string")
+                if language == "en-US":
+                    display_name = name
                     break
 
             if base:
@@ -798,15 +943,67 @@ class BalanceRepository:
                     template_id=template_id,
                 )
 
-            for override in u.get("balanceOverrides", []):
-                name = override.get("name", "")
-                raw_val = override.get("value", "")
-                try:
-                    val = float(raw_val)
-                except ValueError:
-                    val = 0.0
+            # Import loader-backed combat mechanics that affect the duel model.
+            # criticalHitChance is applied by EntityController.AddCriticalHitChanceBonus;
+            # shieldRegeneration is opt-in, so units without that declaration must not
+            # regenerate merely because they have a copied native template.
+            if "criticalHitChance" in u:
+                profile.crit_chance = _finite_number(
+                    u["criticalHitChance"], f"criticalHitChance for {uid}"
+                )
+            else:
+                profile.crit_chance = 0.0
 
+            shield_regeneration = u.get("shieldRegeneration")
+            if shield_regeneration is None:
+                profile.shield_recharge_per_second = 0.0
+                profile.shield_recharge_cooldown = 0.0
+            else:
+                if not isinstance(shield_regeneration, dict):
+                    raise ValueError(f"Invalid shieldRegeneration for {uid}: expected an object")
+                profile.shield_recharge_per_second = _finite_number(
+                    shield_regeneration.get(
+                        "rechargeRate", SHIELD_RECHARGE_PER_SECOND_DEFAULT
+                    ),
+                    f"shieldRegeneration.rechargeRate for {uid}",
+                )
+                profile.shield_recharge_cooldown = _finite_number(
+                    shield_regeneration.get(
+                        "rechargeDelay", SHIELD_RECHARGE_COOLDOWN_DEFAULT
+                    ),
+                    f"shieldRegeneration.rechargeDelay for {uid}",
+                )
+
+            raw_overrides = u.get("balanceOverrides", [])
+            if not isinstance(raw_overrides, list):
+                raise ValueError(f"Invalid balanceOverrides for {uid}: expected an array")
+            raw_move_speed_overridden = False
+            for index, override in enumerate(raw_overrides):
+                if not isinstance(override, dict):
+                    raise ValueError(f"Invalid balanceOverrides[{index}] for {uid}: expected an object")
+                name = override.get("name", "")
+                if not isinstance(name, str) or not name:
+                    raise ValueError(f"Invalid balanceOverrides[{index}].name for {uid}: expected a non-empty string")
+                if "value" not in override:
+                    raise ValueError(f"Invalid balanceOverrides[{index}].value for {uid}: missing value")
+                raw_val = override["value"]
                 key = name.lower()
+                if key == "attacktype":
+                    if not isinstance(raw_val, str):
+                        raise ValueError(f"Invalid attackType override for {uid}: expected a string")
+                    profile.attack_type = raw_val
+                    continue
+                if key not in {
+                    "cost", "productionduration", "maxhealth", "health", "maxshield", "shield",
+                    "armorprotection", "armor", "movespeed", "speed", "sightradius", "sight",
+                    "damage1", "damage", "attackcooldown", "cooldown", "damage2", "attack2cooldown",
+                    "firepointcount", "weaponrange", "range", "effectradius1", "effectradius", "aoe",
+                }:
+                    continue
+                val = _finite_number(raw_val, f"balanceOverrides[{index}].value for {uid}.{name}")
+
+                if key in ("movespeed", "speed"):
+                    raw_move_speed_overridden = True
                 if key == "cost":
                     profile.cost = val
                 elif key == "productionduration":
@@ -825,14 +1022,40 @@ class BalanceRepository:
                     profile.damage1 = val
                 elif key in ("attackcooldown", "cooldown"):
                     profile.attack_cooldown = val
+                elif key == "damage2":
+                    profile.damage2 = val
+                elif key == "attack2cooldown":
+                    profile.attack2_cooldown = val
                 elif key == "firepointcount":
                     profile.fire_point_count = max(0, int(val))
                 elif key in ("weaponrange", "range"):
                     profile.weapon_range = val
                 elif key in ("effectradius1", "effectradius", "aoe"):
                     profile.effect_radius1 = val
-                elif key == "attacktype":
-                    profile.attack_type = str(raw_val)
+
+            custom_balance = u.get("customBalance", {})
+            if not isinstance(custom_balance, dict):
+                raise ValueError(f"Invalid customBalance for {uid}: expected an object")
+            for name, raw_val in custom_balance.items():
+                value = _finite_number(raw_val, f"customBalance {uid}.{name}")
+                profile_field = SIMULATED_CUSTOM_BALANCE_FIELDS.get(name)
+                if profile_field is not None:
+                    setattr(profile, profile_field, value)
+
+            movement = u.get("movement", {})
+            if not isinstance(movement, dict):
+                raise ValueError(f"Invalid movement for {uid}: expected an object")
+            movement_speed = (
+                _finite_number(movement["moveSpeed"], f"movement.moveSpeed for {uid}")
+                if "moveSpeed" in movement
+                else None
+            )
+            if (
+                not raw_move_speed_overridden
+                and "MoveSpeed" not in custom_balance
+                and movement_speed is not None
+            ):
+                profile.move_speed = movement_speed
 
             self.profiles[uid] = profile
             loaded_units.append(uid)

@@ -32,6 +32,152 @@ namespace RogueCommandExpansionLoader.Runtime
         private static BlueprintRewardScopeFrame _blueprintRewardScope;
         public static Action<object> OnEntityInstantiated;
 
+        private static int _unitCreationHookCount;
+        private static int _unitReuseHookCount;
+        private static int _placementGhostHookCount;
+        private static int _factoryProduceHookCount;
+        private static int _entityRegistryResetCount;
+        private static int _entityRegisteredCount;
+        private static int _entityUnregisteredCount;
+        private static int _commandExecutedCount;
+        private static int _commandNextStepCount;
+        private static int _commandResetCount;
+        private static int _commandChainDeletedCount;
+        private static int _unitCreationTranspilerCount;
+        private static int _entityRegisteredTranspilerCount;
+        private static int _entityUnregisteredTranspilerCount;
+        private static int _unitReuseTranspilerCount;
+        private static int _initEntityControllerTranspilerCount;
+        private static int _entityOnInstantiatedTranspilerCount;
+        private static int _entityReuseOnInstantiatedTranspilerCount;
+        private static int _factoryProduceTranspilerCount;
+        private static int _entityRegistryResetTranspilerCount;
+        private static int _placementGhostTranspilerCount;
+        private static int _entityInitTranspilerCount;
+        private static int _entityDestroyTranspilerCount;
+        private static int _entityDestroyGameObjectTranspilerCount;
+        private static int _deathVisualRetirementCount;
+        private static int _commandExecutedTranspilerCount;
+        private static int _commandNextStepTranspilerCount;
+        private static int _commandResetTranspilerCount;
+        private static int _commandChainDeletedTranspilerCount;
+        private static string _lastExecutedCommandKind = string.Empty;
+        private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
+        private static FieldInfo _cachedCommandKindField;
+        private static FieldInfo _cachedCommandTagField;
+
+        public static int UnitCreationHookCount => System.Threading.Interlocked.CompareExchange(ref _unitCreationHookCount, 0, 0);
+        public static int UnitReuseHookCount => System.Threading.Interlocked.CompareExchange(ref _unitReuseHookCount, 0, 0);
+        public static int PlacementGhostHookCount => System.Threading.Interlocked.CompareExchange(ref _placementGhostHookCount, 0, 0);
+        public static int FactoryProduceHookCount => System.Threading.Interlocked.CompareExchange(ref _factoryProduceHookCount, 0, 0);
+        public static int EntityRegistryResetCount => System.Threading.Interlocked.CompareExchange(ref _entityRegistryResetCount, 0, 0);
+        public static int EntityRegisteredCount => System.Threading.Interlocked.CompareExchange(ref _entityRegisteredCount, 0, 0);
+        public static int EntityUnregisteredCount => System.Threading.Interlocked.CompareExchange(ref _entityUnregisteredCount, 0, 0);
+        public static int CommandExecutedCount => System.Threading.Interlocked.CompareExchange(ref _commandExecutedCount, 0, 0);
+        public static int CommandNextStepCount => System.Threading.Interlocked.CompareExchange(ref _commandNextStepCount, 0, 0);
+        public static int CommandResetCount => System.Threading.Interlocked.CompareExchange(ref _commandResetCount, 0, 0);
+        public static int CommandChainDeletedCount => System.Threading.Interlocked.CompareExchange(ref _commandChainDeletedCount, 0, 0);
+        public static int UnitCreationTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _unitCreationTranspilerCount, 0, 0);
+        public static int EntityRegisteredTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityRegisteredTranspilerCount, 0, 0);
+        public static int EntityUnregisteredTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityUnregisteredTranspilerCount, 0, 0);
+        public static int UnitReuseTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _unitReuseTranspilerCount, 0, 0);
+        public static int InitEntityControllerTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _initEntityControllerTranspilerCount, 0, 0);
+        public static int EntityOnInstantiatedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityOnInstantiatedTranspilerCount, 0, 0);
+        public static int EntityReuseOnInstantiatedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityReuseOnInstantiatedTranspilerCount, 0, 0);
+        public static int FactoryProduceTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _factoryProduceTranspilerCount, 0, 0);
+        public static int EntityRegistryResetTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityRegistryResetTranspilerCount, 0, 0);
+        public static int PlacementGhostTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _placementGhostTranspilerCount, 0, 0);
+        public static int EntityInitTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityInitTranspilerCount, 0, 0);
+        public static int EntityDestroyTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityDestroyTranspilerCount, 0, 0);
+        public static int EntityDestroyGameObjectTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityDestroyGameObjectTranspilerCount, 0, 0);
+        public static int DeathVisualRetirementCount => System.Threading.Interlocked.CompareExchange(ref _deathVisualRetirementCount, 0, 0);
+        public static int CommandExecutedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandExecutedTranspilerCount, 0, 0);
+        public static int CommandNextStepTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandNextStepTranspilerCount, 0, 0);
+        public static int CommandResetTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandResetTranspilerCount, 0, 0);
+        public static int CommandChainDeletedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandChainDeletedTranspilerCount, 0, 0);
+
+        public static string LastExecutedCommandKind
+        {
+            get
+            {
+                lock (Gate)
+                {
+                    return _lastExecutedCommandKind ?? string.Empty;
+                }
+            }
+        }
+
+        public static int ActiveRegisteredEntityCount
+        {
+            get
+            {
+                lock (_activeRegisteredEntities)
+                {
+                    return _activeRegisteredEntities.Count;
+                }
+            }
+        }
+
+        public static bool IsEntityRegisteredInBattlefield(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return false;
+            }
+
+            int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+            if (key == 0)
+            {
+                return false;
+            }
+
+            lock (_activeRegisteredEntities)
+            {
+                return _activeRegisteredEntities.Contains(key);
+            }
+        }
+
+        public static void ResetCoreHookTelemetry()
+        {
+            System.Threading.Interlocked.Exchange(ref _unitCreationHookCount, 0);
+            System.Threading.Interlocked.Exchange(ref _unitReuseHookCount, 0);
+            System.Threading.Interlocked.Exchange(ref _placementGhostHookCount, 0);
+            System.Threading.Interlocked.Exchange(ref _factoryProduceHookCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityRegistryResetCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityRegisteredCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityUnregisteredCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandExecutedCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandNextStepCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandResetCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandChainDeletedCount, 0);
+            System.Threading.Interlocked.Exchange(ref _unitCreationTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityRegisteredTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityUnregisteredTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _unitReuseTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _initEntityControllerTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityOnInstantiatedTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityReuseOnInstantiatedTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _factoryProduceTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityRegistryResetTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _placementGhostTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityInitTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityDestroyTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityDestroyGameObjectTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _deathVisualRetirementCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandExecutedTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandNextStepTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandResetTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _commandChainDeletedTranspilerCount, 0);
+            lock (Gate)
+            {
+                _lastExecutedCommandKind = string.Empty;
+            }
+            lock (_activeRegisteredEntities)
+            {
+                _activeRegisteredEntities.Clear();
+            }
+        }
+
         public static void Bind(
             RuntimeContentMutator mutator,
             IRuntimeContentProvider provider,
@@ -141,6 +287,174 @@ namespace RogueCommandExpansionLoader.Runtime
                 activeScope.Scope.RemoveFactoriesOutsideStage(candidates);
                 activeScope.Observation.RecordGlobalCandidates(candidates, activeScope.Scope, true);
             }
+        }
+
+        public static void AddGlobalBlueprintRewardCandidates(object[] args, ref List<string> result)
+        {
+            if (result == null || args == null || args.Length < 2)
+            {
+                return;
+            }
+
+            try
+            {
+                int rarity = args[0] != null ? Convert.ToInt32(args[0]) : -1;
+                bool? startingBlueprints = args[1] as bool?;
+                bool demoOnly = args.Length > 2 && args[2] is bool ? (bool)args[2] : false;
+                int? maxExp = args.Length > 4 && args[4] is int ? (int?)args[4] : null;
+
+                IGlobalBlueprintCandidateProvider candidateProvider;
+                lock (Gate)
+                {
+                    candidateProvider = _provider as IGlobalBlueprintCandidateProvider;
+                }
+
+                if (candidateProvider != null)
+                {
+                    IEnumerable<string> modFactories = candidateProvider.GetEligibleBlueprintFactories(
+                        rarity, startingBlueprints, demoOnly, maxExp);
+                    if (modFactories != null)
+                    {
+                        foreach (string factoryId in modFactories)
+                        {
+                            if (!String.IsNullOrEmpty(factoryId) && !result.Contains(factoryId))
+                            {
+                                result.Add(factoryId);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("Error in AddGlobalBlueprintRewardCandidates: " + ex.GetBaseException().Message);
+            }
+        }
+
+        public static bool EnsureGuaranteedModCardOption(List<string> ids, int? forcedSlot = null)
+        {
+            if (ids == null || ids.Count == 0)
+            {
+                return false;
+            }
+
+            RuntimeContentMutator mutator;
+            if (!TryPrepareRuntimeContent(out mutator) || mutator == null || mutator.GameAssembly == null)
+            {
+                return false;
+            }
+
+            // The card coroutine can start before any EntityFactory call. Register packs before
+            // adding a mod ID, otherwise CardNew.Init cannot resolve its balance row.
+            bool rowsRegistered = false;
+            SafeCall(delegate { rowsRegistered = mutator.RegisterEntityRows(); });
+            if (!rowsRegistered)
+            {
+                Log("Mod card reward injection was skipped because entity rows are not registered.");
+                return false;
+            }
+
+            IGuaranteedModCardRewardProvider guaranteedProvider = GetGuaranteedRewardProvider();
+            if (guaranteedProvider == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (guaranteedProvider.IsModUnitProduct(ids[i]))
+                {
+                    return false;
+                }
+            }
+
+            string poolId = null;
+            bool isStartingSelection = false;
+            int currentXpLevel = 0;
+            HashSet<string> excluded = new HashSet<string>(ids, StringComparer.Ordinal);
+
+            try
+            {
+                // The game assembly also defines Shapes2D.Game; resolve only the global Game type.
+                Type gameType = mutator.GameAssembly.GetType("Game", false, false);
+                if (gameType != null)
+                {
+                    FieldInfo startingField = gameType.GetField("AtLeastOneBlueprintHasBeenAddedByPlayer",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (startingField != null)
+                    {
+                        object value = startingField.GetValue(null);
+                        if (value is bool)
+                        {
+                            isStartingSelection = !(bool)value;
+                        }
+                    }
+
+                    PropertyInfo cardsInDeckProperty = gameType.GetProperty("CardsInDeck",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    IEnumerable<string> cardsInDeck = cardsInDeckProperty == null
+                        ? null
+                        : cardsInDeckProperty.GetValue(null, null) as IEnumerable<string>;
+                    if (cardsInDeck != null)
+                    {
+                        foreach (string card in cardsInDeck)
+                        {
+                            if (!String.IsNullOrEmpty(card))
+                            {
+                                excluded.Add(card);
+                            }
+                        }
+                    }
+
+                    FieldInfo openCardRewardsField = gameType.GetField("OpenCardRewards",
+                        BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    System.Collections.IList openRewards = openCardRewardsField == null
+                        ? null
+                        : openCardRewardsField.GetValue(null) as System.Collections.IList;
+                    if (openRewards != null && openRewards.Count > 0 && openRewards[0] != null)
+                    {
+                        FieldInfo poolIdField = openRewards[0].GetType().GetField("blueprintPoolId",
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (poolIdField != null)
+                        {
+                            poolId = poolIdField.GetValue(openRewards[0]) as string;
+                        }
+                    }
+                }
+
+                Type metaGameType = mutator.GameAssembly.GetType("MetaGame", false, false);
+                PropertyInfo instanceProperty = metaGameType == null ? null : metaGameType.GetProperty("Instance",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                object metaGame = instanceProperty == null ? null : instanceProperty.GetValue(null, null);
+                PropertyInfo xpProperty = metaGame == null ? null : metaGameType.GetProperty("CurrentExperienceLevel",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                object xpValue = xpProperty == null ? null : xpProperty.GetValue(metaGame, null);
+                if (xpValue is int)
+                {
+                    currentXpLevel = (int)xpValue;
+                }
+            }
+            catch (Exception exception)
+            {
+                Log("Warning: Could not inspect game state for guaranteed mod card reward: " +
+                    exception.GetBaseException().Message);
+            }
+
+            string modProductId;
+            if (guaranteedProvider.TryGetGuaranteedModRewardProduct(
+                poolId, isStartingSelection, currentXpLevel, excluded, out modProductId))
+            {
+                int slot = forcedSlot.HasValue
+                    ? Math.Abs(forcedSlot.Value) % ids.Count
+                    : _guaranteedRewardRandom.Next(0, ids.Count);
+                string replaced = ids[slot];
+                ids[slot] = modProductId;
+                Log(string.Format("Guaranteed mod unit card injected into slot {0} (replaced '{1}'): '{2}'",
+                    slot, replaced, modProductId));
+                return true;
+            }
+
+            return false;
         }
 
         public static void ObserveBlueprintPoolCandidates(
@@ -336,6 +650,153 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static void OnSetupPrespawning()
+        {
+            SafeCall(delegate { ApplyModPrespawnQuotas(false); });
+        }
+
+        public static void OnSetupAiPrespawning()
+        {
+            SafeCall(delegate { ApplyModPrespawnQuotas(true); });
+        }
+
+        private static void ApplyModPrespawnQuotas(bool isAi)
+        {
+            RuntimeContentMutator mutator;
+            TryPrepareRuntimeContent(out mutator);
+
+            IPrespawnRuntimeProvider prespawnProvider;
+            lock (Gate) { prespawnProvider = _provider as IPrespawnRuntimeProvider; }
+            if (prespawnProvider == null || mutator == null || mutator.GameAssembly == null) return;
+
+            Type entityFactoryType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "EntityFactory");
+            if (entityFactoryType == null) return;
+
+            FieldInfo toPrespawnField = entityFactoryType.GetField("EntitiesToPrespawn",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            FieldInfo prespawnedField = entityFactoryType.GetField("PrespawnedEntities",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+            if (toPrespawnField == null || prespawnedField == null) return;
+
+            System.Collections.IDictionary toPrespawn = toPrespawnField.GetValue(null) as System.Collections.IDictionary;
+            System.Collections.IDictionary prespawned = prespawnedField.GetValue(null) as System.Collections.IDictionary;
+            if (toPrespawn == null || prespawned == null) return;
+
+            IEnumerable<PrespawnQuota> quotas = prespawnProvider.GetPrespawnQuotas();
+            if (quotas == null) return;
+
+            Type entityControllerType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "EntityController");
+            if (entityControllerType == null) return;
+            Type stackType = typeof(Stack<>).MakeGenericType(entityControllerType);
+
+            MethodInfo prespawnEntityMethod = entityFactoryType.GetMethod("PrespawnEntity",
+                BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+
+            HashSet<string> activeEntityIds = null;
+            try
+            {
+                Type gameType = mutator.GameAssembly.GetType("Game", false, false);
+                if (gameType != null)
+                {
+                    activeEntityIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (!isAi)
+                    {
+                        PropertyInfo cardsInDeckProp = gameType.GetProperty("CardsInDeck",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (cardsInDeckProp != null)
+                        {
+                            IEnumerable<string> cards = cardsInDeckProp.GetValue(null) as IEnumerable<string>;
+                            if (cards != null)
+                            {
+                                foreach (string card in cards)
+                                {
+                                    if (!string.IsNullOrEmpty(card))
+                                    {
+                                        activeEntityIds.Add(card);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Type defaultAiType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "DefaultAiBehaviour");
+                        MethodInfo constructablesMethod = defaultAiType?.GetMethod("ConstructableEntities_Static",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (constructablesMethod != null)
+                        {
+                            System.Collections.IEnumerable constructables = constructablesMethod.Invoke(null, null) as System.Collections.IEnumerable;
+                            if (constructables != null)
+                            {
+                                foreach (object item in constructables)
+                                {
+                                    if (item != null)
+                                    {
+                                        FieldInfo idField = item.GetType().GetField("entityId",
+                                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                                        string id = idField?.GetValue(item) as string;
+                                        if (!string.IsNullOrEmpty(id))
+                                        {
+                                            activeEntityIds.Add(id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("Deck / AI constructable inspection failed: " + ex.GetBaseException().Message);
+            }
+
+            foreach (PrespawnQuota quota in quotas)
+            {
+                if (String.IsNullOrEmpty(quota.EntityId) || quota.Quota <= 0) continue;
+
+                if (toPrespawn.Contains(quota.EntityId))
+                {
+                    int current = Convert.ToInt32(toPrespawn[quota.EntityId]);
+                    if (current < quota.Quota)
+                    {
+                        toPrespawn[quota.EntityId] = quota.Quota;
+                    }
+                }
+                else
+                {
+                    toPrespawn[quota.EntityId] = quota.Quota;
+                }
+
+                if (!prespawned.Contains(quota.EntityId))
+                {
+                    object stack = Activator.CreateInstance(stackType);
+                    prespawned[quota.EntityId] = stack;
+                }
+
+                bool isActive = activeEntityIds == null || activeEntityIds.Count == 0 ||
+                    activeEntityIds.Contains(quota.EntityId) ||
+                    (!string.IsNullOrEmpty(quota.FactoryId) && activeEntityIds.Contains(quota.FactoryId));
+
+                if (isActive && prespawnEntityMethod != null)
+                {
+                    try
+                    {
+                        int warmCount = Math.Min(2, quota.Quota);
+                        for (int w = 0; w < warmCount; w++)
+                        {
+                            object result = prespawnEntityMethod.Invoke(null, new object[] { quota.EntityId, warmCount });
+                            if (result is bool spawned && !spawned) break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("Warm pre-spawn omitted for " + quota.EntityId + ": " + ex.GetBaseException().Message);
+                    }
+                }
+            }
+        }
+
         public static bool BlueprintNamePrefix(string __0, ref string __result)
         {
             return TryResolveUnitLocalization(__0, false, ref __result);
@@ -406,6 +867,16 @@ namespace RogueCommandExpansionLoader.Runtime
             return TryResolveRelicLocalization(__0, true, ref __result);
         }
 
+        public static bool UpgradeNamePrefix(string __0, ref string __result)
+        {
+            return TryResolveUpgradeLocalization(__0, false, ref __result);
+        }
+
+        public static bool UpgradeDescriptionPrefix(string __0, ref string __result)
+        {
+            return TryResolveUpgradeLocalization(__0, true, ref __result);
+        }
+
         public static bool SkillDescriptionPrefix(string __0, ref string __result)
         {
             IUnitSkillLocalizationRuntimeProvider provider;
@@ -418,6 +889,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
             if (provider == null)
             {
+                if (__0 != null && __0.Contains(":"))
+                {
+                    __result = String.Empty;
+                    return false;
+                }
                 return true;
             }
 
@@ -426,6 +902,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 string value;
                 if (!provider.TryGetUnitSkillDescription(__0, out value))
                 {
+                    if (__0 != null && __0.Contains(":"))
+                    {
+                        __result = String.Empty;
+                        return false;
+                    }
                     return true;
                 }
 
@@ -440,6 +921,11 @@ namespace RogueCommandExpansionLoader.Runtime
                         exception.GetType().Name + ": " + exception.Message);
                 }
 
+                if (__0 != null && __0.Contains(":"))
+                {
+                    __result = String.Empty;
+                    return false;
+                }
                 return true;
             }
         }
@@ -453,12 +939,44 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             IBlueprintPoolRuntimeProvider poolProvider = provider as IBlueprintPoolRuntimeProvider;
-            string sourcePoolId;
-            if (poolProvider != null && poolProvider.TryGetBlueprintPoolLocalizationId(__0, out sourcePoolId))
+            string sourcePoolId = null;
+            bool isRclPool = !String.IsNullOrEmpty(__0) &&
+                (__0.StartsWith("RCL_POOL_", StringComparison.OrdinalIgnoreCase) ||
+                 __0.StartsWith("rcl_pool_", StringComparison.OrdinalIgnoreCase));
+
+            if (isRclPool || (poolProvider != null && poolProvider.TryGetBlueprintPoolLocalizationId(__0, out sourcePoolId)))
             {
-                // Let the game's localization resolve language, variables, and fallback
-                // using the source pool's authored key instead of the generated registry ID.
-                __0 = sourcePoolId;
+                if (String.IsNullOrEmpty(sourcePoolId) && poolProvider != null)
+                {
+                    poolProvider.TryGetBlueprintPoolLocalizationId(__0, out sourcePoolId);
+                }
+
+                while (!String.IsNullOrEmpty(sourcePoolId) &&
+                       (sourcePoolId.StartsWith("RCL_POOL_", StringComparison.OrdinalIgnoreCase) ||
+                        sourcePoolId.StartsWith("rcl_pool_", StringComparison.OrdinalIgnoreCase)))
+                {
+                    string next;
+                    if (poolProvider != null && poolProvider.TryGetBlueprintPoolLocalizationId(sourcePoolId, out next) && next != sourcePoolId)
+                    {
+                        sourcePoolId = next;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (!String.IsNullOrEmpty(sourcePoolId) &&
+                    !sourcePoolId.StartsWith("RCL_POOL_", StringComparison.OrdinalIgnoreCase) &&
+                    !sourcePoolId.StartsWith("rcl_pool_", StringComparison.OrdinalIgnoreCase))
+                {
+                    __0 = sourcePoolId;
+                    return true;
+                }
+
+                // If sourcePoolId could not be resolved or is still an RCL_POOL_,
+                // rewrite to native blueprint tooltip so native Loca.Global never throws 'No translation found'.
+                __0 = "overworldMapBlueprintTooltip";
                 return true;
             }
 
@@ -485,6 +1003,30 @@ namespace RogueCommandExpansionLoader.Runtime
                 return true;
             }
         }
+
+        public static Exception LandscapeLocalizationFinalizer(Exception __exception, ref string __result)
+
+        {
+
+            if (__exception != null)
+
+            {
+
+                Log("Handled localization exception: " + __exception.Message);
+
+                __result = "Blueprint";
+
+                return null;
+
+            }
+
+
+
+            return null;
+
+        }
+
+
 
         public static bool BlueprintPoolIsInPoolPrefix(object __instance, string __0, ref bool __result)
         {
@@ -628,6 +1170,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
             if (provider == null)
             {
+                if (unitId != null && unitId.Contains(":"))
+                {
+                    result = description ? String.Empty : unitId;
+                    return false;
+                }
                 return true;
             }
 
@@ -636,6 +1183,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 string value;
                 if (!provider.TryGetUnitLocalization(unitId, description, out value))
                 {
+                    if (unitId != null && unitId.Contains(":"))
+                    {
+                        result = description ? String.Empty : unitId;
+                        return false;
+                    }
                     return true;
                 }
 
@@ -650,6 +1202,11 @@ namespace RogueCommandExpansionLoader.Runtime
                         exception.GetType().Name + ": " + exception.Message);
                 }
 
+                if (unitId != null && unitId.Contains(":"))
+                {
+                    result = description ? String.Empty : unitId;
+                    return false;
+                }
                 return true;
             }
         }
@@ -685,6 +1242,44 @@ namespace RogueCommandExpansionLoader.Runtime
                 if (logger != null)
                 {
                     logger("Could not resolve localized text for relic '" + relicId + "': " +
+                        exception.GetType().Name + ": " + exception.Message);
+                }
+
+                return true;
+            }
+        }
+
+        private static bool TryResolveUpgradeLocalization(string upgradeId, bool description, ref string result)
+        {
+            IUpgradeLocalizationRuntimeProvider provider;
+            Action<string> logger;
+            lock (Gate)
+            {
+                provider = _provider as IUpgradeLocalizationRuntimeProvider;
+                logger = _log;
+            }
+
+            if (provider == null)
+            {
+                return true;
+            }
+
+            try
+            {
+                string value;
+                if (!provider.TryGetUpgradeLocalization(upgradeId, description, out value))
+                {
+                    return true;
+                }
+
+                result = value ?? String.Empty;
+                return false;
+            }
+            catch (Exception exception)
+            {
+                if (logger != null)
+                {
+                    logger("Could not resolve localized text for upgrade '" + upgradeId + "': " +
                         exception.GetType().Name + ": " + exception.Message);
                 }
 
@@ -753,6 +1348,247 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static FieldInfo _entityAttackControllerField;
+        private static PropertyInfo _entityControllerIdProperty;
+        private static FieldInfo _entityControllerIdBackingField;
+        private static PropertyInfo _entityControllerPositionProperty;
+        private static MethodInfo _setActiveStatusEffectMethod;
+        private static Type _statusEffectEnumType;
+        private static Type _durationTypeEnumType;
+        [ThreadStatic]
+        private static System.Random _threadRng;
+        private static System.Random Rng => _threadRng ?? (_threadRng = new System.Random());
+
+#pragma warning disable CS0649
+        public static Func<string, float?> MinAttackRangeResolver;
+        public static Func<string, List<RogueCommandExpansionLoader.Content.ContentOnHitStatusEffectDefinition>> OnHitStatusEffectsResolver;
+#pragma warning restore CS0649
+
+        public static void EntityAttackIsTargetInRangePostfix(object __instance, object __0, ref bool __result)
+        {
+            if (!__result || __instance == null || __0 == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_entityAttackControllerField == null)
+                {
+                    _entityAttackControllerField = __instance.GetType().GetField("_entityController",
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                    if (_entityAttackControllerField == null)
+                    {
+                        return;
+                    }
+                }
+
+                object attackerObj = _entityAttackControllerField.GetValue(__instance);
+                if (attackerObj == null)
+                {
+                    return;
+                }
+
+                if (_entityControllerIdProperty == null && _entityControllerIdBackingField == null)
+                {
+                    Type attackerType = attackerObj.GetType();
+                    _entityControllerIdProperty = attackerType.GetProperty("EntityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (_entityControllerIdProperty == null)
+                    {
+                        _entityControllerIdBackingField = attackerType.GetField("entityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    }
+                }
+
+                string entityId = null;
+                if (_entityControllerIdProperty != null)
+                {
+                    entityId = _entityControllerIdProperty.GetValue(attackerObj, null) as string;
+                }
+                else if (_entityControllerIdBackingField != null)
+                {
+                    entityId = _entityControllerIdBackingField.GetValue(attackerObj) as string;
+                }
+
+                if (string.IsNullOrEmpty(entityId))
+                {
+                    return;
+                }
+
+                float? minRange = MinAttackRangeResolver != null ? MinAttackRangeResolver(entityId) : null;
+                if (minRange.HasValue && minRange.Value > 0f)
+                {
+                    if (_entityControllerPositionProperty == null)
+                    {
+                        _entityControllerPositionProperty = attackerObj.GetType().GetProperty("Position",
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    }
+
+                    if (_entityControllerPositionProperty != null)
+                    {
+                        Vector3 p1 = (Vector3)_entityControllerPositionProperty.GetValue(attackerObj, null);
+                        Vector3 p2 = (Vector3)_entityControllerPositionProperty.GetValue(__0, null);
+                        float dx = p1.x - p2.x;
+                        float dz = p1.z - p2.z;
+                        float worldMinRange = minRange.Value <= 25f ? minRange.Value * 10f : minRange.Value;
+                        if ((dx * dx + dz * dz) < (worldMinRange * worldMinRange))
+                        {
+                            __result = false;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log?.Invoke("[RuntimeHooks] EntityAttackIsTargetInRangePostfix error: " + ex.Message);
+            }
+        }
+
+        public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
+        {
+            if (__instance == null || __1 == null || __0 <= 0f)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_entityControllerIdProperty == null && _entityControllerIdBackingField == null)
+                {
+                    Type attackerType = __1.GetType();
+                    _entityControllerIdProperty = attackerType.GetProperty("EntityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (_entityControllerIdProperty == null)
+                    {
+                        _entityControllerIdBackingField = attackerType.GetField("entityId", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    }
+                }
+
+                string originatorId = null;
+                if (_entityControllerIdProperty != null)
+                {
+                    originatorId = _entityControllerIdProperty.GetValue(__1, null) as string;
+                }
+                else if (_entityControllerIdBackingField != null)
+                {
+                    originatorId = _entityControllerIdBackingField.GetValue(__1) as string;
+                }
+
+                if (string.IsNullOrEmpty(originatorId) ||
+                    !RuntimeUnitMechanicsDirector.IsHostileTarget(__1, __instance))
+                {
+                    return;
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDealtDamage(__instance, __0, __1);
+
+                List<RogueCommandExpansionLoader.Content.ContentOnHitStatusEffectDefinition> effects =
+                    OnHitStatusEffectsResolver != null ? OnHitStatusEffectsResolver(originatorId) : null;
+                if (effects == null || effects.Count == 0)
+                {
+                    return;
+                }
+
+                if (_setActiveStatusEffectMethod == null)
+                {
+                    Type ecType = __instance.GetType();
+                    Assembly gameAsm = ecType.Assembly;
+                    _statusEffectEnumType = gameAsm.GetType("StatusEffect");
+                    _durationTypeEnumType = gameAsm.GetType("SetStatusEffect+DurationType") ?? gameAsm.GetType("SetStatusEffect/DurationType");
+                    if (_statusEffectEnumType != null && _durationTypeEnumType != null)
+                    {
+                        _setActiveStatusEffectMethod = ecType.GetMethod("SetActiveStatusEffect",
+                            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                            null,
+                            new Type[] { _statusEffectEnumType, _durationTypeEnumType, typeof(float) },
+                            null);
+                    }
+                }
+
+                if (_setActiveStatusEffectMethod == null || _statusEffectEnumType == null || _durationTypeEnumType == null)
+                {
+                    return;
+                }
+
+                for (int i = 0; i < effects.Count; i++)
+                {
+                    RogueCommandExpansionLoader.Content.ContentOnHitStatusEffectDefinition effect = effects[i];
+                    if (effect == null || string.IsNullOrEmpty(effect.statusEffect) || effect.duration <= 0f)
+                    {
+                        continue;
+                    }
+
+                    if (effect.chance < 1.0f && (float)Rng.NextDouble() > effect.chance)
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        object parsedEffect = Enum.Parse(_statusEffectEnumType, effect.statusEffect, true);
+                        object durationTypeSeconds = Enum.ToObject(_durationTypeEnumType, 1);
+                        _setActiveStatusEffectMethod.Invoke(__instance, new object[] { parsedEffect, durationTypeSeconds, effect.duration });
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _log?.Invoke("[RuntimeHooks] EntityTakeDamagePostfix error: " + ex.Message);
+            }
+        }
+
+        public static void EntityControllerDiePostfix(object __instance)
+        {
+            if (__instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                RuntimeUnitMechanicsDirector.OnEntityKilled(__instance);
+            }
+            catch (Exception exception)
+            {
+                Log("EntityControllerDiePostfix failed safely: " + exception.Message);
+            }
+        }
+
+        public static void EntityControllerHealPostfix(object __instance, float __0)
+        {
+            if (__instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                RuntimeUnitMechanicsDirector.OnEntityHealed(__instance, __0);
+            }
+            catch (Exception exception)
+            {
+                Log("EntityControllerHealPostfix failed safely: " + exception.Message);
+            }
+        }
+
+        public static void EntityControllerRepairArmorPostfix(object __instance, float __0)
+        {
+            if (__instance == null)
+            {
+                return;
+            }
+
+            try
+            {
+                RuntimeUnitMechanicsDirector.OnEntityRepairedArmor(__instance, __0);
+            }
+            catch (Exception exception)
+            {
+                Log("EntityControllerRepairArmorPostfix failed safely: " + exception.Message);
+            }
+        }
+
         public static bool TryLoadResource(string resourcePath, out UnityEngine.Object asset)
         {
             asset = null;
@@ -788,6 +1624,16 @@ namespace RogueCommandExpansionLoader.Runtime
             lock (Gate)
             {
                 return _mutator;
+            }
+        }
+
+        private static readonly System.Random _guaranteedRewardRandom = new System.Random();
+
+        private static IGuaranteedModCardRewardProvider GetGuaranteedRewardProvider()
+        {
+            lock (Gate)
+            {
+                return _provider as IGuaranteedModCardRewardProvider;
             }
         }
 
@@ -840,6 +1686,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 return;
             }
 
+            System.Threading.Interlocked.Increment(ref _unitCreationHookCount);
+
             Action<object> callback;
             lock (Gate)
             {
@@ -850,14 +1698,596 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 SafeCall(delegate { callback(result); });
             }
+            else
+            {
+                SafeCall(delegate
+                {
+                    Visual.RuntimeVisualDirector.AttachIfApplicable(result);
+                    RuntimeUnitMechanicsDirector.AttachIfApplicable(result);
+                    RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(result);
+                });
+            }
+        }
+
+        public static void AfterCreateBuildingPlacementGhost(string entityId, GameObject ghost)
+        {
+            System.Threading.Interlocked.Increment(ref _placementGhostHookCount);
+            if (ghost == null)
+            {
+                return;
+            }
+
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(ghost);
+                RuntimeGameplayCommandDirector.OnPlacementGhostCreated(entityId, ghost);
+            });
+        }
+
+        public static void BeforeEntityResetForReuse(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _unitReuseHookCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDied(entityObj);
+            });
+        }
+        public static void OnInitEntityControllerTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _initEntityControllerTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityHasBeenInstantiatedTranspiler(object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityOnInstantiatedTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityHasBeenInstantiatedForReuseTranspiler(object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityReuseOnInstantiatedTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                Visual.RuntimeVisualDirector.OnEntityReused(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityProduceTranspiler(object factoryObj, bool instantProduction, bool forFree, bool doNotTriggerEvent)
+        {
+            if (factoryObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _factoryProduceTranspilerCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnFactoryProduced(factoryObj, instantProduction, forFree, doNotTriggerEvent);
+            });
+        }
+
+        public static void OnEntityRegistryResetTranspiler(object existingControllersObj)
+        {
+            System.Threading.Interlocked.Increment(ref _entityRegistryResetTranspilerCount);
+            lock (_activeRegisteredEntities)
+            {
+                _activeRegisteredEntities.Clear();
+            }
+
+            SafeCall(delegate
+            {
+                RuntimeUnitMechanicsDirector.OnBattlefieldRegistryReset();
+                RuntimeGameplayCommandDirector.OnBattlefieldRegistryReset();
+            });
+        }
+
+        public static void OnCreateBuildingPlacementGhostTranspiler(object ghostObj, string entityId, bool returnInactive)
+        {
+            System.Threading.Interlocked.Increment(ref _placementGhostTranspilerCount);
+            if (ghostObj == null)
+            {
+                return;
+            }
+
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(ghostObj);
+            });
+        }
+
+        public static void OnEntityInitTranspiler(object entityObj, object originEntityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityInitTranspilerCount);
+            SafeCall(delegate
+            {
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityDestroyTranspiler(object entityObj, bool withoutTriggeringActions, object originatorObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityDestroyTranspilerCount);
+            SafeCall(delegate
+            {
+                try
+                {
+                    Component entityComponent = entityObj as Component;
+                    if (entityComponent != null)
+                    {
+                        if (!withoutTriggeringActions)
+                        {
+                            Visual.RuntimeVisualDirector visualDirector =
+                                entityComponent.GetComponent<Visual.RuntimeVisualDirector>();
+                            if (visualDirector != null)
+                            {
+                                visualDirector.TriggerDeathAnimationForDestruction();
+                            }
+                        }
+
+                        Visual.NativeRigRetargetProfile profile =
+                            entityComponent.GetComponent<Visual.NativeRigRetargetProfile>();
+                        if (profile != null)
+                        {
+                            profile.SuspendForDeath();
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log("OnEntityDestroyTranspiler retarget suspension failed safely: " + exception.Message);
+                }
+
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDestroyed(entityObj);
+            });
+        }
+
+        public static void OnEntityDestroyGameObjectTranspiler(UnityEngine.Object destroyedObject)
+        {
+            if (destroyedObject == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityDestroyGameObjectTranspilerCount);
+            GameObject gameObject = destroyedObject as GameObject;
+            if (gameObject != null)
+            {
+                try
+                {
+                    EntityController entity = gameObject.GetComponent<EntityController>();
+                    Visual.RuntimeVisualDirector visualDirector =
+                        gameObject.GetComponent<Visual.RuntimeVisualDirector>();
+                    if (entity != null && entity.DestroyHasBeenStarted && entity.IsDestroyed &&
+                        visualDirector != null && visualDirector.TryBeginDeathVisualRetirementForDestruction())
+                    {
+                        System.Threading.Interlocked.Increment(ref _deathVisualRetirementCount);
+                        return;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Log("Entity destroy visual hold failed safely: " + exception.Message);
+                }
+            }
+
+            UnityEngine.Object.Destroy(destroyedObject);
+        }
+
+        public static void OnEntityExecuteCommandTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandExecutedTranspilerCount);
+        }
+
+        public static void OnEntityExecuteNextCommandTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandNextStepTranspilerCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandChainStep(entityObj);
+            });
+        }
+
+        public static void OnEntityResetCurrentCommandTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandResetTranspilerCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandReset(entityObj);
+            });
+        }
+
+        public static void OnEntityDeleteCommandChainTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandChainDeletedTranspilerCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandChainDeleted(entityObj);
+            });
+        }
+
+        public static void AfterEntityReused(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            AfterInstantiateEntity(entityObj);
+        }
+
+        public static void AfterEntityProduce(object factoryObj, bool instantProduction, bool forFree, bool doNotTriggerEvent)
+        {
+            if (factoryObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _factoryProduceHookCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnFactoryProduced(factoryObj, instantProduction, forFree, doNotTriggerEvent);
+            });
+        }
+
+        public static void OnEntityRegistryReset(object existingControllersObj)
+        {
+            System.Threading.Interlocked.Increment(ref _entityRegistryResetCount);
+            lock (_activeRegisteredEntities)
+            {
+                _activeRegisteredEntities.Clear();
+            }
+
+            SafeCall(delegate
+            {
+                RuntimeUnitMechanicsDirector.OnBattlefieldRegistryReset();
+                RuntimeGameplayCommandDirector.OnBattlefieldRegistryReset();
+            });
+        }
+
+        public static void OnEntityRegistered(object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityRegisteredCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Add(key);
+                    }
+                }
+
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityUnregistered(object entityObj, object originatorObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityUnregisteredCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDestroyed(entityObj);
+            });
+        }
+
+        public static void OnEntityInstantiatedTranspiler(object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _unitCreationTranspilerCount);
+            SafeCall(delegate
+            {
+                // EntityFactory.InstantiateEntity also returns objects popped from its
+                // native stack pool, where OnHasBeenInstantiatedForReuse is not called.
+                // Reset visuals here after factory initialization for both new and reused units.
+                Visual.RuntimeVisualDirector.OnEntityReused(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityRegisteredTranspiler(object existingControllersObj, object entityObj, bool hasBeenCalledFromAbove)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityRegisteredTranspilerCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Add(key);
+                    }
+                }
+
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnEntityWillBeDestroyedTranspiler(object existingControllersObj, object entityObj, object originatorObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _entityUnregisteredTranspilerCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDestroyed(entityObj);
+            });
+        }
+
+        public static void OnEntityResetForReuseTranspiler(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _unitReuseTranspilerCount);
+            SafeCall(delegate
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key != 0)
+                {
+                    lock (_activeRegisteredEntities)
+                    {
+                        _activeRegisteredEntities.Remove(key);
+                    }
+                }
+
+                RuntimeUnitMechanicsDirector.OnEntityDied(entityObj);
+            });
+        }
+
+        public static void OnEntityExecuteCommand(object entityObj, object[] args)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandExecutedCount);
+            SafeCall(delegate
+            {
+                string commandKind = "Unknown";
+                string processingType = "ExecuteAndCancelCurrentCommand";
+                string commandTag = string.Empty;
+
+                if (args != null && args.Length > 0 && args[0] != null)
+                {
+                    object cmdObj = args[0];
+                    Type cmdType = cmdObj.GetType();
+                    FieldInfo cmdField = _cachedCommandKindField;
+                    if (cmdField == null || cmdField.DeclaringType != cmdType)
+                    {
+                        cmdField = cmdType.GetField("command", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        _cachedCommandKindField = cmdField;
+                    }
+
+                    if (cmdField != null)
+                    {
+                        object val = cmdField.GetValue(cmdObj);
+                        if (val != null)
+                        {
+                            commandKind = val.ToString();
+                        }
+                    }
+                    else
+                    {
+                        commandKind = cmdObj.ToString();
+                    }
+
+                    FieldInfo tagField = _cachedCommandTagField;
+                    if (tagField == null || tagField.DeclaringType != cmdType)
+                    {
+                        tagField = cmdType.GetField("tag", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        _cachedCommandTagField = tagField;
+                    }
+
+                    if (tagField != null)
+                    {
+                        object tagVal = tagField.GetValue(cmdObj);
+                        if (tagVal != null)
+                        {
+                            commandTag = tagVal.ToString();
+                        }
+                    }
+                }
+
+                if (args != null && args.Length > 1 && args[1] != null)
+                {
+                    processingType = args[1].ToString();
+                }
+
+                lock (Gate)
+                {
+                    _lastExecutedCommandKind = commandKind ?? "Unknown";
+                }
+
+                RuntimeGameplayCommandDirector.OnEntityCommandExecuted(entityObj, commandKind, processingType, commandTag);
+            });
+        }
+
+        public static void OnEntityExecuteNextCommand(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandNextStepCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandChainStep(entityObj);
+            });
+        }
+
+        public static void OnEntityResetCurrentCommand(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandResetCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandReset(entityObj);
+            });
+        }
+
+        public static void OnEntityDeleteCommandChain(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            System.Threading.Interlocked.Increment(ref _commandChainDeletedCount);
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.OnEntityCommandChainDeleted(entityObj);
+            });
         }
     }
 
-    internal static class RuntimeHarmonyPatches
+    public static class RuntimeHarmonyPatches
     {
         public static void PresentCardsToChoosePrefix(out object __state)
         {
             __state = RuntimeHooks.BeginBlueprintRewardScope();
+        }
+
+        public static void InstantiateCardsWithDelayPrefix(List<string> __0)
+        {
+            RuntimeHooks.EnsureGuaranteedModCardOption(__0);
         }
 
         public static Exception PresentCardsToChooseFinalizer(Exception __exception, object __state)
@@ -879,14 +2309,25 @@ namespace RogueCommandExpansionLoader.Runtime
             RuntimeHooks.ObserveBlueprintRewardRecord(__3, __4);
         }
 
-        public static void AllEntityIdsAllowedAsBlueprintsPostfix(ref List<string> __result)
+        public static void AllEntityIdsAllowedAsBlueprintsPostfix(object[] __args, ref List<string> __result)
         {
+            RuntimeHooks.AddGlobalBlueprintRewardCandidates(__args, ref __result);
             RuntimeHooks.FilterGlobalBlueprintRewardCandidates(__result);
         }
 
         public static void FallbackLandscapeGeneratorsPostfix(ref List<global::LandscapeGenerator> __result)
         {
             __result = (List<global::LandscapeGenerator>)RuntimeHooks.ResolveFallbackLandscapes(__result);
+        }
+
+        public static void EntityFactorySetupPrespawningPostfix()
+        {
+            RuntimeHooks.OnSetupPrespawning();
+        }
+
+        public static void EntityFactorySetupAiPrespawningPostfix()
+        {
+            RuntimeHooks.OnSetupAiPrespawning();
         }
 
         public static void EntityBalancingStoreInitPostfix()
@@ -944,6 +2385,27 @@ namespace RogueCommandExpansionLoader.Runtime
             RuntimeHooks.AfterInstantiateEntity(__result);
         }
 
+        public static bool EntityControllerIsProductionPossiblePrefix(object __instance, ref bool __result)
+        {
+            if (RuntimeUnitMechanicsDirector.ShouldBlockAiProduction(__instance))
+            {
+                __result = false;
+                return false;
+            }
+
+            return true;
+        }
+
+        public static void EntityControllerFixedUpdatePrefix(object __instance)
+        {
+            RuntimeUnitMechanicsDirector.ApplyNativeAiSkillActivationInterval(__instance, false);
+        }
+
+        public static void EntityControllerFixedUpdatePostfix(object __instance)
+        {
+            RuntimeUnitMechanicsDirector.ApplyNativeAiSkillActivationInterval(__instance, true);
+        }
+
         public static void CreateEntityMeshPrefix()
         {
             RuntimeHooks.BeforeEntityFactory();
@@ -989,9 +2451,24 @@ namespace RogueCommandExpansionLoader.Runtime
             return RuntimeHooks.RelicDescriptionPrefix(__0, ref __result);
         }
 
+        public static bool UpgradeNamePrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.UpgradeNamePrefix(__0, ref __result);
+        }
+
+        public static bool UpgradeDescriptionPrefix(string __0, ref string __result)
+        {
+            return RuntimeHooks.UpgradeDescriptionPrefix(__0, ref __result);
+        }
+
         public static bool LandscapeLocalizationPrefix(ref string __0, ref string __result)
         {
             return RuntimeHooks.LandscapeLocalizationPrefix(ref __0, ref __result);
+        }
+
+        public static Exception LandscapeLocalizationFinalizer(Exception __exception, ref string __result)
+        {
+            return RuntimeHooks.LandscapeLocalizationFinalizer(__exception, ref __result);
         }
 
         public static bool BlueprintPoolIsInPoolPrefix(object __instance, string __0, ref bool __result)
@@ -1007,6 +2484,195 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void BlueprintPoolExclusiveBlueprintsPostfix(string __0, HashSet<string> __result)
         {
             RuntimeHooks.BlueprintPoolExclusiveBlueprintsPostfix(__0, __result);
+        }
+
+        public static void EntityAttackIsTargetInRangePostfix(object __instance, object __0, ref bool __result)
+        {
+            RuntimeHooks.EntityAttackIsTargetInRangePostfix(__instance, __0, ref __result);
+        }
+
+        public static void EntityControllerDiePostfix(object __instance)
+        {
+            RuntimeHooks.EntityControllerDiePostfix(__instance);
+        }
+
+        public static void EntityControllerHealPostfix(object __instance, float __0)
+        {
+            RuntimeHooks.EntityControllerHealPostfix(__instance, __0);
+        }
+
+        public static void EntityControllerDestroyPostfix(object __instance)
+        {
+            RuntimeUnitMechanicsDirector.OnEntityDestroyed(__instance);
+        }
+
+        public static void EntityControllerRepairArmorPostfix(object __instance, float __0)
+        {
+            RuntimeHooks.EntityControllerRepairArmorPostfix(__instance, __0);
+        }
+
+        public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
+        {
+            RuntimeHooks.EntityTakeDamagePostfix(__instance, __0, __1);
+        }
+
+        public static void CreateBuildingPlacementGhostPrefix()
+        {
+            RuntimeHooks.BeforeEntityFactory();
+        }
+
+        public static void CreateBuildingPlacementGhostPostfix(string __0, GameObject __result)
+        {
+            RuntimeHooks.AfterCreateBuildingPlacementGhost(__0, __result);
+        }
+
+        public static void InitEntityControllerPrefix()
+        {
+            RuntimeHooks.BeforeEntityFactory();
+        }
+
+        public static void InitEntityControllerPostfix(object __result)
+        {
+            RuntimeHooks.AfterInstantiateEntity(__result);
+        }
+
+        public static void EntityControllerResetAndInitForReusePrefix(object __instance)
+        {
+            RuntimeHooks.BeforeEntityResetForReuse(__instance);
+        }
+
+        public static void EntityControllerOnHasBeenInstantiatedForReusePostfix(object __instance)
+        {
+            RuntimeHooks.AfterEntityReused(__instance);
+        }
+
+        public static void EntityControllerProducePrefix()
+        {
+            RuntimeHooks.BeforeEntityFactory();
+        }
+
+        public static void EntityControllerProducePostfix(object __instance, bool __0, bool __1, bool __2)
+        {
+            RuntimeHooks.AfterEntityProduce(__instance, __0, __1, __2);
+        }
+
+        public static void ExistingControllersInitPostfix(object __instance)
+        {
+            RuntimeHooks.OnEntityRegistryReset(__instance);
+        }
+
+        public static void ExistingControllersOnEntityCreatedPostfix(object __0, bool __1)
+        {
+            RuntimeHooks.OnEntityRegistered(__0, __1);
+        }
+
+        public static void ExistingControllersOnEntityWillBeDestroyedPostfix(object __0, object __1)
+        {
+            RuntimeHooks.OnEntityUnregistered(__0, __1);
+        }
+
+        public static void EntityControllerExecuteCommandPostfix(object __instance, object[] __args)
+        {
+            RuntimeHooks.OnEntityExecuteCommand(__instance, __args);
+        }
+
+        public static void EntityControllerExecuteNextCommandPostfix(object __instance)
+        {
+            RuntimeHooks.OnEntityExecuteNextCommand(__instance);
+        }
+
+        public static void EntityControllerResetCurrentCommandPostfix(object __instance)
+        {
+            RuntimeHooks.OnEntityResetCurrentCommand(__instance);
+        }
+
+        public static void EntityControllerDeleteCommandChainPostfix(object __instance)
+        {
+            RuntimeHooks.OnEntityDeleteCommandChain(__instance);
+        }
+
+        public static void OnEntityInstantiatedTranspilerHook(object entity, bool hasBeenCalledFromAbove)
+        {
+            RuntimeHooks.OnEntityInstantiatedTranspiler(entity, hasBeenCalledFromAbove);
+        }
+
+        public static void OnEntityRegisteredTranspilerHook(object existingControllers, object entity, bool hasBeenCalledFromAbove)
+        {
+            RuntimeHooks.OnEntityRegisteredTranspiler(existingControllers, entity, hasBeenCalledFromAbove);
+        }
+
+        public static void OnEntityWillBeDestroyedTranspilerHook(object existingControllers, object entity, object originator)
+        {
+            RuntimeHooks.OnEntityWillBeDestroyedTranspiler(existingControllers, entity, originator);
+        }
+
+        public static void OnEntityResetForReuseTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityResetForReuseTranspiler(entity);
+        }
+        public static void OnInitEntityControllerTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnInitEntityControllerTranspiler(entity);
+        }
+
+        public static void OnEntityHasBeenInstantiatedTranspilerHook(object entity, bool hasBeenCalledFromAbove)
+        {
+            RuntimeHooks.OnEntityHasBeenInstantiatedTranspiler(entity, hasBeenCalledFromAbove);
+        }
+
+        public static void OnEntityHasBeenInstantiatedForReuseTranspilerHook(object entity, bool hasBeenCalledFromAbove)
+        {
+            RuntimeHooks.OnEntityHasBeenInstantiatedForReuseTranspiler(entity, hasBeenCalledFromAbove);
+        }
+
+        public static void OnEntityProduceTranspilerHook(object factory, bool instantProduction, bool forFree, bool doNotTriggerEvent)
+        {
+            RuntimeHooks.OnEntityProduceTranspiler(factory, instantProduction, forFree, doNotTriggerEvent);
+        }
+
+        public static void OnEntityRegistryResetTranspilerHook(object existingControllers)
+        {
+            RuntimeHooks.OnEntityRegistryResetTranspiler(existingControllers);
+        }
+
+        public static void OnCreateBuildingPlacementGhostTranspilerHook(object ghost, string entityId, bool returnInactive)
+        {
+            RuntimeHooks.OnCreateBuildingPlacementGhostTranspiler(ghost, entityId, returnInactive);
+        }
+
+        public static void OnEntityInitTranspilerHook(object entity, object originEntity)
+        {
+            RuntimeHooks.OnEntityInitTranspiler(entity, originEntity);
+        }
+
+        public static void OnEntityDestroyTranspilerHook(object entity, bool withoutTriggeringActions, object originator)
+        {
+            RuntimeHooks.OnEntityDestroyTranspiler(entity, withoutTriggeringActions, originator);
+        }
+
+        public static void OnEntityDestroyGameObjectTranspilerHook(UnityEngine.Object destroyedObject)
+        {
+            RuntimeHooks.OnEntityDestroyGameObjectTranspiler(destroyedObject);
+        }
+
+        public static void OnEntityExecuteCommandTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityExecuteCommandTranspiler(entity);
+        }
+
+        public static void OnEntityExecuteNextCommandTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityExecuteNextCommandTranspiler(entity);
+        }
+
+        public static void OnEntityResetCurrentCommandTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityResetCurrentCommandTranspiler(entity);
+        }
+
+        public static void OnEntityDeleteCommandChainTranspilerHook(object entity)
+        {
+            RuntimeHooks.OnEntityDeleteCommandChainTranspiler(entity);
         }
     }
 

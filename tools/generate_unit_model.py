@@ -9,11 +9,12 @@ Archetypes:
     colossus_titan, hover_cruiser, heavy_dropship,
     shield_truck, demolition_breacher, artillery_strider, thermobaric_tank, ew_jammer,
     mobile_sam_launcher, recovery_crawler, mine_layer, sniper_tankette, hexapod_assault, assault_hovercraft,
-    bridge_layer, command_hq_rig, flying_wing_bomber, mortar_carrier, siege_drill_mole, heavy_crane_mech
+    bridge_layer, command_hq_rig, flying_wing_bomber, mortar_carrier, siege_drill_mole, heavy_crane_mech,
+    nanite_support_rover, gravity_siege_breaker, tactical_relay_carrier, amphibious_assault_tank, plasma_mortar_strider, stealth_recon_skimmer
 
 Weapons:
     cannon, gatling, missile, arc, howitzer, dual_cannon, railgun, quad_flak, plasma_mortar,
-    laser_beam, vls_missiles, flamethrower, emp_emitter
+    laser_beam, vls_missiles, flamethrower, emp_emitter, nanite_projector, gravity_cannon
 
 Presets:
     siege_breaker, recon_interceptor, gunship_alpha, apc_enforcer, dune_raider,
@@ -27,7 +28,9 @@ Presets:
     early_warning_array, fusion_silo,
     scissor_bridgelayer, overlord_command_hq, wraith_stealth_wing, thunder_mortar_carrier,
     subterranean_mole, atlas_crane_mech, fortified_pillbox, patriot_sam_battery, deep_space_relay,
-    crimson_praetorian, cobalt_widowmaker, golden_aegis_command
+    crimson_praetorian, cobalt_widowmaker, golden_aegis_command,
+    sentinel_relay, gravitas_breaker, command_relay, coastal_dreadnought, plasma_strider, phantom_skimmer,
+    emerald_warden, solar_colossus, void_spectre
     (presets may also set default camo, wear, attachments, custom hex colors, and VFX; explicit CLI options win)
 
 Options:
@@ -60,6 +63,10 @@ Options:
     --drone-dock               Attach recessed landing cradle with charging rails, LED markers, and parasitic drone
     --recoil-spade             Attach rear-mounted heavy hydraulic recoil spades / earth anchors (Z ≈ 0.02)
     --barrel-shroud            Attach ventilated thermal barrel jacket with BMesh cooling slots and muzzle brake
+    --nanite-dispenser         Attach bilateral armored field nanite repair dispenser pods with inspection sight glasses
+    --grav-dampener            Attach gyroscopic gravitational anchor and inertial dampener hub
+    --comms-mast               Attach telescopic communications & EW jamming mast with planar blade antenna fins
+    --ram-prow                 Attach heavy angled V-shaped kinetic battering ram prow / cowcatcher bumper
     --weighted-normals         Apply weighted normals (default); --no-weighted-normals disables them
     --wreckage-severity <sev>  Damage severity for wreckage: light, medium, catastrophic (default: catastrophic)
     --smoke                    Attach multi-tube smoke discharger banks
@@ -67,7 +74,7 @@ Options:
     --sponsons                 Attach armored external side sponsons
     --dirt                     Bake procedural vertex ambient dirt/cavity shading (default: True)
     --locators                 Generate Unity locator sockets (default: True)
-    --lod                      Print low-poly triangle budget diagnostics and LOD recommendations
+    --lod                      Print the calibrated scene allocation and camera-aware LOD recommendations
     --multiview                Render 4-perspective orthographic sheet (ISO, TOP, FRONT, SIDE)
     --out-dir <path>           Base output directory (default: repo root)
 """
@@ -682,6 +689,104 @@ PRESETS = {
         "era_bricks": True,
         "vfx_thruster": True,
     },
+    # --- Wave 7: 6 tactical archetypes & support hardware ---
+    "sentinel_relay": {
+        "archetype": "nanite_support_rover",
+        "weapon": "nanite_projector",
+        "faction": "vanguard",
+        "wear": "factory_new",
+        "nanite_dispenser": True,
+        "hydraulic_hoses": True,
+    },
+    "gravitas_breaker": {
+        "archetype": "gravity_siege_breaker",
+        "weapon": "gravity_cannon",
+        "faction": "siege",
+        "wear": "battle_hardened",
+        "ram_prow": True,
+        "grav_dampener": True,
+        "era_bricks": True,
+        "recoil_spade": True,
+        "thermal_radiators": True,
+    },
+    "command_relay": {
+        "archetype": "tactical_relay_carrier",
+        "weapon": "missile",
+        "faction": "vanguard",
+        "wear": "factory_new",
+        "comms_mast": True,
+        "drone_dock": True,
+    },
+    "coastal_dreadnought": {
+        "archetype": "amphibious_assault_tank",
+        "weapon": "dual_cannon",
+        "faction": "arctic",
+        "camo": "arctic",
+        "spaced_skirts": True,
+        "thermal_radiators": True,
+        "smoke": True,
+        "tactical_markings": True,
+    },
+    "plasma_strider": {
+        "archetype": "plasma_mortar_strider",
+        "weapon": "plasma_mortar",
+        "faction": "siege",
+        "wear": "battle_hardened",
+        "ik_rig": True,
+        "recoil_spade": True,
+        "hydraulic_hoses": True,
+        "hydraulic_pistons": True,
+    },
+    "phantom_skimmer": {
+        "archetype": "stealth_recon_skimmer",
+        "weapon": "gatling",
+        "faction": "syndicate",
+        "camo": "digital",
+        "aps_suite": True,
+        "camo_netting": True,
+        "thermal_radiators": True,
+        "vfx_thruster": True,
+    },
+    # --- Wave 7: 3 elite custom-palette & VFX remixes ---
+    "emerald_warden": {
+        "archetype": "nanite_support_rover",
+        "weapon": "nanite_projector",
+        "faction": "vanguard",
+        "primary_color": "#163b27",
+        "light_armor_color": "#2a5c40",
+        "emissive_color": "#00ff88",
+        "wear": "factory_new",
+        "nanite_dispenser": True,
+        "aps_suite": True,
+        "vfx_flash": True,
+    },
+    "solar_colossus": {
+        "archetype": "gravity_siege_breaker",
+        "weapon": "gravity_cannon",
+        "faction": "siege",
+        "primary_color": "#4d2800",
+        "light_armor_color": "#784208",
+        "emissive_color": "#ff9900",
+        "wear": "battle_hardened",
+        "ram_prow": True,
+        "grav_dampener": True,
+        "thermal_radiators": True,
+        "era_bricks": True,
+        "vfx_flash": True,
+    },
+    "void_spectre": {
+        "archetype": "stealth_recon_skimmer",
+        "weapon": "laser_beam",
+        "faction": "syndicate",
+        "primary_color": "#151522",
+        "light_armor_color": "#2b2b40",
+        "emissive_color": "#9d00ff",
+        "wear": "pristine",
+        "aps_suite": True,
+        "thermal_radiators": True,
+        "vfx_thruster": True,
+    },
+
 }
 
 WAVE3_PRESETS = (
@@ -697,6 +802,40 @@ WAVE4_PRESETS = (
     "fortified_pillbox", "patriot_sam_battery", "deep_space_relay",
     "crimson_praetorian", "cobalt_widowmaker", "golden_aegis_command",
 )
+
+WAVE7_PRESETS = (
+    "sentinel_relay", "gravitas_breaker", "command_relay",
+    "coastal_dreadnought", "plasma_strider", "phantom_skimmer",
+    "emerald_warden", "solar_colossus", "void_spectre",
+)
+
+
+def _validate_in_range(name: str, value: float, min_val: float, max_val: float) -> None:
+    """Validate that a CLI float argument is finite and falls within [min_val, max_val]."""
+    if not math.isfinite(value) or not (min_val <= value <= max_val):
+        raise SystemExit(f"--{name} must be finite and between {min_val} and {max_val}.")
+
+
+def _calculate_ortho_scale(archetype: str) -> float:
+    """Calculates viewport framing extent based on archetype mass and visual profile."""
+    if archetype in ("colossus_titan", "hover_cruiser", "heavy_dropship", "flying_wing_bomber"):
+        return 8.5
+    if archetype in (
+        "super_heavy", "siege_crawler", "drone_carrier", "artillery_strider",
+        "mobile_sam_launcher", "recovery_crawler", "hexapod_assault",
+        "assault_hovercraft", "bridge_layer", "command_hq_rig", "siege_drill_mole",
+        "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker",
+        "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider",
+        "stealth_recon_skimmer",
+    ):
+        return 7.2
+    if archetype in (
+        "artillery", "spider", "vtol", "flak_anti_air", "quad_mech",
+        "combat_harvester", "shield_truck", "thermobaric_tank", "ew_jammer",
+        "mine_layer", "mortar_carrier",
+    ):
+        return 6.2
+    return 5.6
 
 
 def parse_args():
@@ -719,7 +858,7 @@ def parse_args():
             "colossus_titan", "hover_cruiser", "heavy_dropship",
             "shield_truck", "demolition_breacher", "artillery_strider", "thermobaric_tank", "ew_jammer",
             "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft",
-            "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"
+            "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker", "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider", "stealth_recon_skimmer"
         ],
         help="Vehicle archetype",
     )
@@ -741,7 +880,7 @@ def parse_args():
         choices=[
             "cannon", "gatling", "missile", "arc", "howitzer", "dual_cannon",
             "railgun", "quad_flak", "plasma_mortar", "laser_beam", "vls_missiles",
-            "flamethrower", "emp_emitter"
+            "flamethrower", "emp_emitter", "nanite_projector", "gravity_cannon"
         ],
         help="Primary weapon subsystem",
     )
@@ -777,7 +916,11 @@ def parse_args():
     parser.add_argument("--drone-dock", action="store_true", help="Attach recessed roof/deck landing cradle with magnetic charging guide rails, alignment runway glow LEDs, and docked parasitic reconnaissance drone")
     parser.add_argument("--recoil-spade", action="store_true", help="Attach rear-mounted heavy hydraulic recoil spades / earth anchors that bite into the terrain plane (Z ≈ 0.02)")
     parser.add_argument("--barrel-shroud", action="store_true", help="Attach ventilated thermal barrel jacket with consolidated BMesh cooling perforation slats, reinforced clamping collars, and multi-baffle muzzle brake")
-    parser.add_argument("--weighted-normals", action=argparse.BooleanOptionalAction, default=True, help="Apply face-area weighted custom split normals to eliminate low-poly chamfer shading pinch (default: enabled)")
+    parser.add_argument("--nanite-dispenser", action="store_true", help="Attach bilateral armored field nanite repair dispenser pods with inspection sight glasses and spray heads")
+    parser.add_argument("--grav-dampener", action="store_true", help="Attach gyroscopic gravitational anchor and inertial dampener hub with counter-rotating magnetic rings and singularity core")
+    parser.add_argument("--comms-mast", action="store_true", help="Attach telescopic communications & EW jamming mast with planar blade antenna fins, cross-dipole horns, and satcom dome")
+    parser.add_argument("--ram-prow", action="store_true", help="Attach heavy angled V-shaped kinetic battering ram prow / cowcatcher bumper with towing shackles and hazard chevrons")
+    parser.add_argument("--weighted-normals", action=argparse.BooleanOptionalAction, default=True, help="Apply face-area weighted custom split normals to stabilize authored hard-surface highlights (default: enabled)")
     parser.add_argument("--smoke", action="store_true", help="Include multi-tube smoke discharger banks")
     parser.add_argument("--radar", action="store_true", help="Include command/recon radar dish")
     parser.add_argument("--sponsons", action="store_true", help="Include armored external side sponsons")
@@ -810,7 +953,7 @@ def parse_args():
     parser.add_argument("--wear", default="field_tested", choices=["none", "pristine", "factory_new", "field_tested", "battle_hardened"], help="Procedural surface wear level")
     parser.add_argument("--structural-wear-mask", action="store_true", help="Keep convex-edge wear localized in vertex-color channel G, with flat and concave corners unmarked")
     parser.add_argument("--soot-intensity", type=float, default=1.0, help="Thermal soot intensity around muzzles and exhausts (0.0–2.0; default 1.0)")
-    parser.add_argument("--lods", action="store_true", help="Generate multi-level LOD chain (LOD0, LOD1, LOD2) and export _LODs.fbx")
+    parser.add_argument("--lods", action="store_true", default=True, help="Generate calibrated LOD0/LOD1/LOD2 geometry and export _LODs.fbx (always enabled for exports)")
     parser.add_argument("--colliders", action="store_true", help="Generate low-poly physics collision hulls")
     parser.add_argument("--gameplay-json", action="store_true", help="Export companion .gameplay.json specification")
     parser.add_argument("--wreckage", action="store_true", help="Export burned / dislodged turret wreckage variant")
@@ -823,13 +966,17 @@ def parse_args():
     parser.add_argument("--render-icons", action="store_true", help="Render dual orthographic 2D tactical icons (Top-Down and Isometric) with transparent alpha")
     parser.add_argument("--icon-size", type=int, default=128, choices=[64, 128], help="Resolution for rendered tactical icons")
     parser.add_argument("--icon-elevation", type=float, default=45.0, help="Elevation angle for tactical isometric icon in degrees (default 45.0 for RTS 45-degree angle, or 35.26 for true isometric)")
-    parser.add_argument("--target-budget", type=int, default=rmk.DEFAULT_FACE_BUDGET, help="Target face budget for profiling (default: 7500)")
+    parser.add_argument(
+        "--model-budget-profile",
+        default=str(rmk.MODEL_BUDGET_PROFILE_PATH),
+        help="Calibrated scene and LOD profile; exports fail closed if it is missing or uncalibrated",
+    )
     parser.add_argument("--rts-budget", action="store_true", help="Use lower-detail preset variants for RTS camera polygon budgets")
     parser.add_argument("--model-scale", type=float, default=1.0, help="Uniformly scale authored vehicle geometry and sockets around the ground origin")
-    parser.add_argument("--lod", action="store_true", help="Calculate polygon budget and recommend LOD reductions")
+    parser.add_argument("--lod", action="store_true", help="Report calibrated per-asset triangles and screen-space LOD thresholds")
     parser.add_argument("--smooth-angle", type=float, default=38.0, help="Smart angle-weighted auto-smooth threshold in degrees")
     parser.add_argument("--multiview", action="store_true", help="Render 4 orthographic views")
-    parser.add_argument("--batch-all-archetypes", action="store_true", help="Batch generate all 36 archetypes into the output directory")
+    parser.add_argument("--batch-all-archetypes", action="store_true", help="Batch generate all 42 archetypes into the output directory")
     parser.add_argument("--report-json", default=None, help="Path to write detailed structural and budget JSON report")
     parser.add_argument("--dry-run", action="store_true", help="Validate CLI parameters and print archetype plan without building Blender geometry")
     parser.add_argument("--out-dir", default=None, help="Base root directory for outputs")
@@ -879,6 +1026,7 @@ def parse_args():
             "slat_armor", "era_bricks", "camo_netting", "thermal_radiators",
             "rws_mount", "drone_dock", "recoil_spade", "barrel_shroud",
             "vfx_flash", "vfx_thruster",
+            "nanite_dispenser", "grav_dampener", "comms_mast", "ram_prow",
         ):
             if p.get(flag) and f"--{flag.replace('_', '-')}" not in script_args:
                 setattr(args, flag, True)
@@ -918,7 +1066,7 @@ ALL_ARCHETYPES = [
     "colossus_titan", "hover_cruiser", "heavy_dropship",
     "shield_truck", "demolition_breacher", "artillery_strider", "thermobaric_tank", "ew_jammer",
     "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft",
-    "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"
+    "bridge_layer", "command_hq_rig", "flying_wing_bomber", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker", "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider", "stealth_recon_skimmer"
 ]
 
 ARCHETYPE_DEFAULT_WEAPONS = {
@@ -958,6 +1106,12 @@ ARCHETYPE_DEFAULT_WEAPONS = {
     "mortar_carrier": "plasma_mortar",
     "siege_drill_mole": "flamethrower",
     "heavy_crane_mech": "dual_cannon",
+    "nanite_support_rover": "nanite_projector",
+    "gravity_siege_breaker": "gravity_cannon",
+    "tactical_relay_carrier": "missile",
+    "amphibious_assault_tank": "dual_cannon",
+    "plasma_mortar_strider": "plasma_mortar",
+    "stealth_recon_skimmer": "gatling",
 }
 
 
@@ -998,7 +1152,7 @@ def build_vehicle_model(
     colliders: bool = False,
     gameplay_json: bool = False,
     wreckage: bool = False,
-    target_budget: int = rmk.DEFAULT_FACE_BUDGET,
+    budget_profile_path: Path | None = None,
     lod_diagnostics: bool = False,
     smooth_angle: float = 38.0,
     multiview: bool = False,
@@ -1042,6 +1196,10 @@ def build_vehicle_model(
     drone_dock: bool = False,
     recoil_spade: bool = False,
     barrel_shroud: bool = False,
+    nanite_dispenser: bool = False,
+    grav_dampener: bool = False,
+    comms_mast: bool = False,
+    ram_prow: bool = False,
     weighted_normals: bool = True,
     wreckage_severity: str = "catastrophic",
     model_scale: float = 1.0,
@@ -1117,21 +1275,26 @@ def build_vehicle_model(
     # 1. Mobility and Chassis by Archetype
     if archetype == "walker":
         builder.add_bipedal_legs(hip_height=1.45, hip_spacing_x=0.88)
-        builder.objects.extend([
-            rmk.make_box(f"{name}Armor_Pelvis", (0.92, 0.65, 0.42), (0.0, -0.02, 1.40), builder.palette.gunmetal, 0.08),
-            rmk.make_box(f"{name}Armor_Torso", (1.14, 0.74, 0.78), (0.0, 0.02, 1.96), builder.palette.primary_armor, 0.09),
-            rmk.make_box(f"{name}Armor_ChestPlate", (1.02, 0.22, 0.45), (0.0, 0.42, 2.04), builder.palette.light_armor, 0.065),
-            rmk.make_box(f"{name}Armor_PowerCell", (0.72, 0.40, 0.60), (0.0, -0.52, 2.03), builder.palette.gunmetal, 0.07),
-        ])
+        builder.add_cast_pelvis(location=(0.0, -0.02, 1.40), width=0.92, depth=0.65, height=0.42)
+        builder.add_mech_torso(location=(0.0, 0.02, 1.96), width=1.14, length=0.74, height=0.78)
+        builder.add_lifting_lugs()
+        builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
+        builder.add_weapon_trunnions()
         builder.add_sensor_visor()
 
     elif archetype == "bike":
         builder.add_all_terrain_wheels(wheelbase_y=1.95, track_width_x=0.0, wheel_radius=0.38, wheel_width=0.22)
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_SpineFrame", (0.34, 1.85, 0.38), (0.0, -0.05, 0.72), builder.palette.primary_armor, 0.04),
             rmk.make_box(f"{name}Armor_EngineBlock", (0.46, 0.68, 0.42), (0.0, -0.18, 0.82), builder.palette.gunmetal, 0.035),
             rmk.make_box(f"{name}Armor_CockpitCowl", (0.42, 0.58, 0.32), (0.0, 0.45, 1.05), builder.palette.light_armor, 0.03,
                           (math.radians(-16), 0.0, 0.0)),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CowlCollar", (0.0, 0.45, 0.89), (0.42, 0.58), height=0.035, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_rod(f"{name}Joint_Fork_L", Vector((-0.18, 0.45, 1.05)), Vector((-0.16, 0.98, 0.38)), 0.035, builder.palette.gunmetal),
             rmk.make_rod(f"{name}Joint_Fork_R", Vector((0.18, 0.45, 1.05)), Vector((0.16, 0.98, 0.38)), 0.035, builder.palette.gunmetal),
             rmk.make_box(f"{name}Joint_Handlebars", (0.64, 0.06, 0.05), (0.0, 0.38, 1.18), builder.palette.gunmetal, 0.01),
@@ -1148,9 +1311,32 @@ def build_vehicle_model(
 
     elif archetype == "artillery":
         builder.add_sloped_hull(length=3.4, width=2.6, height=0.96)
+        builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=3.2, height=0.68, belt_width=0.36, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings()
+        builder.add_track_tensioners()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.add_exhaust_heat_shield()
+        builder.add_exhaust_heat_shield()
+        builder.add_pioneer_tool_racks()
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
+        builder.add_weld_seams([
+            ((-1.20, 0.48, 0.72), (-1.05, 1.65, 0.38)),
+            ((1.20, 0.48, 0.72), (1.05, 1.65, 0.38)),
+        ])
+        builder.add_fuel_drums()
         builder.add_turret(size=(1.5, 1.7, 0.48), center_y=0.12)
+        builder.add_turret_ring_guard()
+        builder.add_weapon_trunnions(spacing_x=0.60, bracket_width=0.14)
+        builder.add_coaxial_weapon_ports(offset_x=0.35)
+        builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         for side in (-1, 1):
             side_tag = "L" if side < 0 else "R"
             builder.objects.extend([
@@ -1164,31 +1350,67 @@ def build_vehicle_model(
 
     elif archetype == "arc_tank":
         builder.add_sloped_hull(length=2.8, width=2.3, height=0.86)
+        builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=2.7, height=0.58, belt_width=0.32, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
+        builder.add_track_tensioners()
         builder.add_engine_deck(slat_count=3, with_exhausts=False)
+        builder.add_exhaust_heat_shield()
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_exhaust_heat_shield()
+        builder.add_fuel_drums()
         builder.add_turret(size=(1.3, 1.4, 0.42), center_y=0.0)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.28)
+        builder.add_crew_cupola()
+        builder.add_bustle_basket()
         builder.add_arc_emitter(core_radius=0.22, prongs=3)
         builder.add_sensor_visor()
 
     elif archetype == "hover":
         builder.add_sloped_hull(length=2.9, width=2.5, height=0.78)
+        builder.add_deck_edge_weld_seams()
         builder.add_hover_skimmer(float_height=0.48)
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
         builder.add_turret(size=(1.35, 1.5, 0.42), center_y=0.06)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.28)
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
     elif archetype == "spider":
         builder.add_sloped_hull(length=2.6, width=2.4, height=0.82)
+        builder.add_deck_edge_weld_seams()
+        builder.objects.append(rmk.make_transitional_coaming_collar(
+            f"{name}Armor_WaistCollar", (0.0, 0.0, 0.78), (1.50, 1.60), height=0.045, collar_mat=builder.palette.gunmetal
+        ))
+        builder.add_cast_pelvis(location=(0.0, 0.0, 0.72), width=1.10, depth=1.30, height=0.35)
         builder.add_quad_crawler_legs(knee_height=0.98, reach_x=1.12, reach_y=0.88)
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
         builder.add_turret(size=(1.45, 1.55, 0.44), center_y=0.04)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.28)
+        builder.add_weapon_trunnions()
         builder.add_sensor_visor()
 
     elif archetype == "vtol":
         builder.is_hover = True
+        builder.add_access_hatches()
+        builder.objects.extend(rmk.make_aerodynamic_fuselage_assembly(
+            f"{name}Armor", length=2.60, width=1.35, height=0.58, location=(0.0, 0.10, 0.72),
+            primary_mat=builder.palette.primary_armor, canopy_mat=builder.palette.light_armor,
+            intake_mat=builder.palette.gunmetal, exhaust_mat=builder.palette.warning,
+            with_wing_fairings=True
+        ))
         builder.objects.extend([
-            rmk.make_box(f"{name}Armor_Fuselage", (1.35, 2.60, 0.58), (0.0, 0.10, 0.72), builder.palette.primary_armor, 0.04),
-            rmk.make_box(f"{name}Armor_CockpitNose", (1.05, 0.92, 0.42), (0.0, 1.45, 0.68), builder.palette.light_armor, 0.035,
-                         rotation=(math.radians(-16), 0.0, 0.0)),
             rmk.make_box(f"{name}Armor_TailBoom", (0.34, 1.65, 0.26), (0.0, -1.85, 0.82), builder.palette.primary_armor, 0.03),
             rmk.make_box(f"{name}Armor_HorizStab", (1.15, 0.38, 0.06), (0.0, -2.50, 0.88), builder.palette.light_armor, 0.015),
             rmk.make_box(f"{name}Armor_VertFin_L", (0.05, 0.42, 0.48), (-0.42, -2.55, 1.05), builder.palette.primary_armor, 0.015,
@@ -1210,11 +1432,14 @@ def build_vehicle_model(
 
     elif archetype == "halftrack":
         wheel_z = builder.ground_clearance + 0.38 + 0.035
+        front_wheel_locs = []
         for side in (-1, 1):
             tag = "L" if side < 0 else "R"
+            w_loc = (side * 0.88, 1.25, wheel_z)
+            front_wheel_locs.append(w_loc)
             builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
                 f"{name}Wheel_Front_{tag}",
-                location=(side * 0.88, 1.25, wheel_z),
+                location=w_loc,
                 radius=0.38, width=0.26,
                 tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
                 hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
@@ -1222,6 +1447,7 @@ def build_vehicle_model(
         builder.objects.append(rmk.make_box(
             f"{name}Joint_FrontAxle", (1.65, 0.14, 0.12), (0.0, 1.25, wheel_z), builder.palette.gunmetal, 0.02
         ))
+        builder.add_wheel_fenders(front_wheel_locs, radius=0.38, width=0.26)
         for side in (-1, 1):
             builder.objects.extend(rmk.make_continuous_track_assembly(
                 f"{name}Treads",
@@ -1238,18 +1464,19 @@ def build_vehicle_model(
                 ground_z=builder.ground_clearance,
                 center_y=-0.55
             ))
-        builder.objects.append(
+        builder.objects.extend([
             rmk.make_sloped_glacis_hull(
                 f"{name}Armor_Hood",
                 length_front=0.85, length_rear=0.65,
                 width_front=1.20, width_rear=1.35,
                 height_lower=builder.ground_clearance + 0.35, height_upper=0.92,
                 material=builder.palette.primary_armor, bevel=0.035
-            )
-        )
-        builder.objects.append(
-            rmk.make_box(f"{name}Armor_Cab", (1.38, 0.88, 0.62), (0.0, 0.20, 1.05), builder.palette.primary_armor, 0.035)
-        )
+            ),
+            rmk.make_box(f"{name}Armor_Cab", (1.38, 0.88, 0.62), (0.0, 0.20, 1.05), builder.palette.primary_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 0.20, 0.74), (1.38, 0.88), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
         builder.objects.extend(
             rmk.make_recessed_sensor_visor(
                 f"{name}Sensor_CabVisor",
@@ -1259,44 +1486,111 @@ def build_vehicle_model(
             )
         )
         builder.add_troop_compartment(size=(1.42, 1.65, 0.74), location=(0.0, -0.95, 0.88))
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_recovery_winch()
+        builder.add_final_drive_housings(radius=0.18)
+        builder.add_track_tensioners(radius=0.14)
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.05, 1.15, 0.35), center_y=0.20)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.25)
         builder.add_spring_antenna()
 
     elif archetype == "super_heavy":
         builder.add_sloped_hull(length=3.8, width=2.8, height=1.05, bevel=0.055)
-        builder.objects.append(rmk.make_box(
-            f"{name}Armor_Superstructure",
-            (2.1, 2.7, 0.34), (0.0, -0.10, 1.25), builder.palette.primary_armor, 0.04
-        ))
+        builder.add_deck_edge_weld_seams()
+        builder.objects.extend([
+            rmk.make_box(
+                f"{name}Armor_Superstructure",
+                (2.1, 2.7, 0.34), (0.0, -0.10, 1.25), builder.palette.primary_armor, 0.04
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_SuperstructureCollar", (0.0, -0.10, 1.08), (2.1, 2.7), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
         builder.add_quad_track_pods(pod_length=1.65, pod_height=0.62, track_spacing_x=2.55, pod_spacing_y=2.0)
+        builder.add_final_drive_housings(radius=0.22, depth=0.14)
+        builder.add_track_tensioners(radius=0.18, depth=0.12)
         builder.add_engine_deck(slat_count=5, with_exhausts=True)
+        builder.add_exhaust_heat_shield()
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_weld_seams([
+            ((-1.32, 0.55, 0.78), (-1.15, 1.85, 0.42)),
+            ((1.32, 0.55, 0.78), (1.15, 1.85, 0.42)),
+        ])
+        builder.add_fuel_drums()
+        builder.add_era_bricks()
         builder.add_turret(size=(1.85, 2.1, 0.58), center_y=0.15)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.38, caliber=0.038, barrel_length=0.42)
+        builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_radar_dish()
         builder.add_armor_applique((-0.95, 1.95, 0.95), (0.95, 1.95, 0.95), count=6)
         builder.add_spring_antenna()
 
     elif archetype == "buggy":
-        builder.add_all_terrain_wheels(wheelbase_y=2.2, track_width_x=1.85, wheel_radius=0.42, wheel_width=0.30)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.2, track_width_x=1.85, wheel_radius=0.42, wheel_width=0.30, with_fenders=True
+        )
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_SpineChassis", (0.85, 2.4, 0.28), (0.0, -0.05, 0.58), builder.palette.primary_armor, 0.035),
             rmk.make_box(f"{name}Armor_FrontNose", (0.72, 0.85, 0.26), (0.0, 1.05, 0.65), builder.palette.light_armor, 0.03,
                          rotation=(math.radians(-14), 0.0, 0.0)),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_FrontNoseCollar", (0.0, 1.05, 0.54), (0.72, 0.85), height=0.035, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_EngineBlock", (0.78, 0.88, 0.46), (0.0, -0.88, 0.78), builder.palette.gunmetal, 0.03),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_EngineCollar", (0.0, -0.88, 0.56), (0.78, 0.88), height=0.035, collar_mat=builder.palette.gunmetal
+            ),
+            rmk.make_rod(f"{name}Joint_ShockAbsorber_L", (-0.42, 0.85, 0.58), (-0.85, 1.10, 0.42), 0.035, builder.palette.warning),
+            rmk.make_rod(f"{name}Joint_ShockAbsorber_R", (0.42, 0.85, 0.58), (0.85, 1.10, 0.42), 0.035, builder.palette.warning),
             rmk.make_cylinder(f"{name}Armor_Exhaust_L", 0.055, 0.42, (-0.28, -1.25, 0.95), builder.palette.gunmetal,
                               rotation=(math.radians(-24), 0.0, 0.0), vertices=10, bevel=0.008),
             rmk.make_cylinder(f"{name}Armor_Exhaust_R", 0.055, 0.42, (0.28, -1.25, 0.95), builder.palette.gunmetal,
                               rotation=(math.radians(-24), 0.0, 0.0), vertices=10, bevel=0.008),
         ])
         builder.add_rollcage(size=(1.15, 1.5, 0.82), location=(0.0, 0.02, 1.02))
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_sensor_visor()
         builder.turret_center = Vector((0.0, 0.05, 1.45))
 
     elif archetype == "flak_anti_air":
         builder.add_sloped_hull(length=3.2, width=2.4, height=0.90)
+        builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=3.0, height=0.64, belt_width=0.34, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
+        builder.add_track_tensioners()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.add_exhaust_heat_shield()
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_exhaust_heat_shield()
         builder.add_turret(size=(1.5, 1.65, 0.52), center_y=0.04)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.30)
+        builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_radar_dish(is_rotodome=False)
         builder.add_outriggers(count=2, reach_x=0.55)
@@ -1304,13 +1598,29 @@ def build_vehicle_model(
 
     elif archetype == "siege_crawler":
         builder.add_sloped_hull(length=4.2, width=3.0, height=1.15, bevel=0.055)
-        builder.objects.append(rmk.make_box(
-            f"{name}Armor_Citadel",
-            (2.3, 2.9, 0.42), (0.0, -0.05, 1.35), builder.palette.primary_armor, 0.045
-        ))
+        builder.add_deck_edge_weld_seams()
+        builder.objects.extend([
+            rmk.make_box(
+                f"{name}Armor_Citadel",
+                (2.3, 2.9, 0.42), (0.0, -0.05, 1.35), builder.palette.primary_armor, 0.045
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CitadelCollar", (0.0, -0.05, 1.14), (2.3, 2.9), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
         builder.add_quad_track_pods(pod_length=1.85, pod_height=0.68, track_spacing_x=2.75, pod_spacing_y=2.3)
+        builder.add_final_drive_housings(radius=0.22, depth=0.14)
+        builder.add_track_tensioners(radius=0.18, depth=0.12)
         builder.add_engine_deck(slat_count=6, with_exhausts=True)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(2.0, 2.3, 0.62), center_y=0.18)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.38)
         builder.add_sensor_visor()
         builder.add_outriggers(count=4, reach_x=0.85)
         builder.add_side_sponsons()
@@ -1318,11 +1628,27 @@ def build_vehicle_model(
 
     elif archetype == "drone_carrier":
         builder.add_sloped_hull(length=4.4, width=3.2, height=0.92, bevel=0.045)
+        builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=4.1, height=0.68, belt_width=0.40, roadwheels=7, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.22)
+        builder.add_track_tensioners(radius=0.18)
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_pioneer_tool_racks()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
+        builder.add_commander_sight()
         builder.add_flight_deck(size=(2.10, 3.20, 0.22))
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_BridgeTower", (0.55, 1.25, 0.68), (1.18, -0.15, 1.48), builder.palette.primary_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_TowerCollar", (1.18, -0.15, 1.14), (0.55, 1.25), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_BridgeRoof", (0.62, 1.32, 0.12), (1.18, -0.15, 1.84), builder.palette.light_armor, 0.02),
         ])
         builder.objects.extend(rmk.make_recessed_sensor_visor(
@@ -1336,27 +1662,57 @@ def build_vehicle_model(
 
     elif archetype == "quad_mech":
         builder.add_sloped_hull(length=2.8, width=2.5, height=0.88, bevel=0.05)
-        builder.objects.append(rmk.make_box(
-            f"{name}Armor_MechPelvisCore",
-            (1.4, 1.8, 0.48), (0.0, 0.0, 1.05), builder.palette.primary_armor, 0.04
+        builder.add_deck_edge_weld_seams()
+        builder.add_cast_pelvis(location=(0.0, 0.0, 1.05), width=1.40, depth=1.80, height=0.48)
+        builder.objects.append(rmk.make_transitional_coaming_collar(
+            f"{name}Armor_WaistCollar", (0.0, 0.0, 0.81), (1.40, 1.80), height=0.045, collar_mat=builder.palette.gunmetal
         ))
         builder.add_quad_crawler_legs(knee_height=1.25, reach_x=1.35, reach_y=1.10)
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
+        builder.add_commander_sight()
+        builder.add_era_bricks()
         builder.add_turret(size=(1.55, 1.7, 0.48), center_y=0.10)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.30)
+        builder.add_weapon_trunnions()
+        builder.add_crew_cupola()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
     elif archetype == "combat_harvester":
         builder.add_sloped_hull(length=3.6, width=2.7, height=1.05, bevel=0.045)
+        builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=3.3, height=0.68, belt_width=0.38, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.22)
+        builder.add_track_tensioners(radius=0.18)
         builder.add_engine_deck(slat_count=5, with_exhausts=True)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_recovery_winch()
+        builder.add_commander_sight()
+        builder.add_exhaust_deflector()
+        builder.add_exhaust_heat_shield()
         builder.add_excavator_drum(width=2.5, radius=0.34)
         for side in (-1, 1):
             side_tag = "L" if side < 0 else "R"
-            builder.objects.append(rmk.make_box(
-                f"{name}Armor_OreHopper_{side_tag}",
-                (0.42, 1.65, 0.65), (side * 1.32, -0.42, 1.05), builder.palette.primary_armor, 0.035
-            ))
+            builder.objects.extend([
+                rmk.make_box(
+                    f"{name}Armor_OreHopper_{side_tag}",
+                    (0.42, 1.65, 0.65), (side * 1.32, -0.42, 1.05), builder.palette.primary_armor, 0.035
+                ),
+                rmk.make_transitional_coaming_collar(
+                    f"{name}Armor_HopperCollar_{side_tag}", (side * 1.32, -0.42, 0.72), (0.42, 1.65), height=0.045, collar_mat=builder.palette.gunmetal
+                ),
+            ])
         builder.add_turret(size=(1.15, 1.25, 0.38), center_y=0.25)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.28)
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -1366,16 +1722,14 @@ def build_vehicle_model(
             hip_spacing_x=1.35,
             total_height=2.35,
         )
-        builder.objects.extend([
-            rmk.make_box(f"{name}Armor_PelvisCore", (1.50, 0.95, 0.55), (0.0, -0.05, 2.25), builder.palette.gunmetal, 0.08),
-            rmk.make_box(f"{name}Armor_CitadelTorso", (2.05, 1.35, 1.20), (0.0, 0.02, 3.05), builder.palette.primary_armor, 0.10),
-            rmk.make_box(f"{name}Armor_GlacisChest", (1.75, 0.40, 0.70), (0.0, 0.68, 3.10), builder.palette.light_armor, 0.065, rotation=(math.radians(-18), 0.0, 0.0)),
-            rmk.make_box(f"{name}Armor_ShoulderPauldrons_L", (0.65, 1.15, 0.55), (-1.35, 0.05, 3.35), builder.palette.primary_armor, 0.07),
-            rmk.make_box(f"{name}Armor_ShoulderPauldrons_R", (0.65, 1.15, 0.55), (1.35, 0.05, 3.35), builder.palette.primary_armor, 0.07),
-            rmk.make_box(f"{name}Armor_PowerReactorCore", (1.35, 0.70, 0.90), (0.0, -0.75, 3.15), builder.palette.gunmetal, 0.07),
-            rmk.make_cylinder(f"{name}Armor_CoolingStack_L", 0.12, 0.65, (-0.45, -1.15, 3.45), builder.palette.gunmetal, rotation=(math.radians(22), 0.0, 0.0)),
-            rmk.make_cylinder(f"{name}Armor_CoolingStack_R", 0.12, 0.65, (0.45, -1.15, 3.45), builder.palette.gunmetal, rotation=(math.radians(22), 0.0, 0.0)),
-        ])
+        builder.add_cast_pelvis(location=(0.0, -0.05, 2.25), width=1.50, depth=0.95, height=0.55)
+        builder.add_mech_torso(location=(0.0, 0.02, 3.05), width=2.05, length=1.35, height=1.20)
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
+        builder.add_weapon_trunnions()
+        builder.add_interlocking_gussets(locations=[(-0.85, -0.05, 2.85), (0.85, -0.05, 2.85)])
+        builder.add_commander_sight()
+        builder.add_era_bricks()
         builder.add_turret(size=(1.60, 1.75, 0.55), center_y=0.10)
         builder.turret_center = Vector((0.0, 0.10, 3.75))
         builder.add_sensor_visor()
@@ -1385,6 +1739,7 @@ def build_vehicle_model(
     elif archetype == "hover_cruiser":
         builder.is_hover = True
         builder.add_sloped_hull(length=4.6, width=2.8, height=0.85, bevel=0.06)
+        builder.add_deck_edge_weld_seams()
         builder.add_hover_skimmer(float_height=0.45)
         builder.objects.extend([
             rmk.make_sloped_glacis_hull(
@@ -1399,16 +1754,25 @@ def build_vehicle_model(
             rmk.make_cylinder(f"{name}Engine_JetPod_L", 0.22, 1.15, (-1.15, -2.05, 0.72), builder.palette.gunmetal, rotation=(math.radians(90), 0.0, 0.0)),
             rmk.make_cylinder(f"{name}Engine_JetPod_R", 0.22, 1.15, (1.15, -2.05, 0.72), builder.palette.gunmetal, rotation=(math.radians(90), 0.0, 0.0)),
         ])
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
         builder.add_turret(size=(1.75, 2.05, 0.52), center_y=0.45)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.35)
         builder.add_sensor_visor()
         builder.add_radar_dish(is_rotodome=True, location=(0.0, -0.95, 1.95))
         builder.add_whip_antenna()
 
     elif archetype == "heavy_dropship":
         builder.is_hover = True
+        builder.add_access_hatches()
+        builder.objects.extend(rmk.make_aerodynamic_fuselage_assembly(
+            f"{name}Armor", length=3.80, width=2.10, height=0.95, location=(0.0, 0.15, 1.15),
+            primary_mat=builder.palette.primary_armor, canopy_mat=builder.palette.light_armor,
+            intake_mat=builder.palette.gunmetal, exhaust_mat=builder.palette.warning,
+            with_wing_fairings=True
+        ))
         builder.objects.extend([
-            rmk.make_box(f"{name}Armor_CargoFuselage", (2.10, 3.80, 0.95), (0.0, 0.15, 1.15), builder.palette.primary_armor, 0.05),
-            rmk.make_box(f"{name}Armor_CockpitNose", (1.45, 1.20, 0.62), (0.0, 2.35, 1.05), builder.palette.light_armor, 0.04, rotation=(math.radians(-14), 0.0, 0.0)),
             rmk.make_box(f"{name}Armor_RampDoor", (1.55, 0.12, 0.75), (0.0, -1.78, 1.05), builder.palette.gunmetal, 0.02, rotation=(math.radians(16), 0.0, 0.0)),
             rmk.make_box(f"{name}Armor_HighWing_L", (1.45, 0.85, 0.18), (-1.65, 0.25, 1.55), builder.palette.light_armor, 0.03),
             rmk.make_box(f"{name}Armor_HighWing_R", (1.45, 0.85, 0.18), (1.65, 0.25, 1.55), builder.palette.light_armor, 0.03),
@@ -1427,11 +1791,19 @@ def build_vehicle_model(
         builder.hull_length = 3.5
         builder.hull_width = 2.2
         builder.hull_deck_z = 0.88
-        builder.add_all_terrain_wheels(wheelbase_y=2.45, track_width_x=1.95, wheel_radius=0.40, wheel_width=0.28, middle_axle=True)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.45, track_width_x=1.95, wheel_radius=0.40, wheel_width=0.28, middle_axle=True, with_fenders=True
+        )
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_ChassisFrame", (1.65, 3.45, 0.36), (0.0, 0.0, 0.56), builder.palette.gunmetal, 0.03),
             rmk.make_box(f"{name}Armor_ForwardCab", (1.82, 1.10, 0.78), (0.0, 1.15, 1.05), builder.palette.primary_armor, 0.04),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 1.15, 0.74), (1.82, 1.10), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_GeneratorBed", (1.92, 2.05, 0.56), (0.0, -0.65, 0.95), builder.palette.primary_armor, 0.04),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_BedCollar", (0.0, -0.65, 0.74), (1.92, 2.05), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_cylinder(f"{name}Armor_ProjectorPedestal", 0.68, 0.42, (0.0, -0.65, 1.40), builder.palette.light_armor, vertices=12, bevel=0.03),
             rmk.make_torus(f"{name}Armor_ShieldCoilRing", (0.0, -0.65, 1.65), major_radius=0.72, minor_radius=0.08, material=builder.palette.emissive, major_segments=14, minor_segments=6),
             rmk.make_cylinder(f"{name}Armor_ShieldDomeCore", 0.52, 0.26, (0.0, -0.65, 1.72), builder.palette.emissive, vertices=12, bevel=0.05),
@@ -1448,13 +1820,33 @@ def build_vehicle_model(
             size=(1.15, 0.12, 0.18),
             armor_mat=builder.palette.light_armor, lens_mat=builder.palette.emissive, cavity_mat=builder.palette.gunmetal
         ))
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_recovery_winch()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.15, 1.25, 0.36), center_y=1.10)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.25)
         builder.turret_center = Vector((0.0, 1.10, 1.62))
         builder.add_spring_antenna()
 
     elif archetype == "demolition_breacher":
         builder.add_sloped_hull(length=2.45, width=2.05, height=0.74, bevel=0.04)
+        builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=2.35, height=0.56, belt_width=0.32, roadwheels=4, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.18)
+        builder.add_track_tensioners(radius=0.15)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_recovery_winch()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_era_bricks()
         builder.objects.extend([
             rmk.make_cylinder(
                 f"{name}Armor_VolatileCoreDrum", 0.56, 1.35,
@@ -1467,6 +1859,9 @@ def build_vehicle_model(
                 rotation=(0.0, math.radians(90), 0.0), vertices=14, bevel=0.01
             ),
             rmk.make_box(f"{name}Armor_BreacherProw", (1.85, 0.42, 0.38), (0.0, 1.25, 0.55), builder.palette.primary_armor, 0.03),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_ProwCollar", (0.0, 1.25, 0.36), (1.85, 0.42), height=0.035, collar_mat=builder.palette.gunmetal
+            ),
         ])
         for side in (-1, 0, 1):
             builder.objects.append(rmk.make_rod(
@@ -1474,7 +1869,11 @@ def build_vehicle_model(
                 (side * 0.55, 1.35, 0.55), (side * 0.55, 1.78, 0.55),
                 0.045, builder.palette.gunmetal, vertices=6
             ))
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
         builder.add_turret(size=(0.95, 1.05, 0.32), center_y=0.52)
+        builder.add_crew_cupola()
         builder.add_sensor_visor()
 
     elif archetype == "artillery_strider":
@@ -1482,20 +1881,28 @@ def build_vehicle_model(
         builder.hull_length = 2.2
         builder.hull_width = 1.6
         builder.hull_deck_z = 2.25
+        builder.add_cast_pelvis(location=(0.0, -0.04, 1.72), width=1.05, depth=0.78, height=0.44)
+        builder.add_mech_torso(location=(0.0, -0.05, 2.26), width=1.28, length=1.35, height=0.68)
         builder.objects.extend([
-            rmk.make_box(f"{name}Armor_Pelvis", (1.05, 0.78, 0.44), (0.0, -0.04, 1.72), builder.palette.gunmetal, 0.07),
-            rmk.make_box(f"{name}Armor_Torso", (1.28, 1.35, 0.68), (0.0, -0.05, 2.26), builder.palette.primary_armor, 0.08),
             rmk.make_box(f"{name}Armor_CounterweightBustle", (0.96, 0.68, 0.52), (0.0, -0.92, 2.30), builder.palette.light_armor, 0.05),
             rmk.make_cylinder(f"{name}Sensor_OpticMast", 0.14, 0.55, (-0.48, 0.35, 2.78), builder.palette.gunmetal, vertices=10, bevel=0.015),
         ])
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
         builder.add_turret(size=(1.25, 1.55, 0.44), center_y=0.05)
+        builder.add_weapon_trunnions()
         builder.turret_center = Vector((0.0, 0.05, 2.75))
         builder.add_sensor_visor()
         builder.add_whip_antenna()
 
     elif archetype == "thermobaric_tank":
         builder.add_sloped_hull(length=3.25, width=2.55, height=0.92, bevel=0.045)
+        builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=3.05, height=0.64, belt_width=0.36, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings()
+        builder.add_track_tensioners()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         for side in (-1, 1):
             stag = "L" if side < 0 else "R"
@@ -1516,7 +1923,22 @@ def build_vehicle_model(
                     0.045, builder.palette.gunmetal, vertices=8
                 ),
             ])
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_exhaust_heat_shield()
+        builder.add_weapon_trunnions()
+        builder.add_turret_ring_guard()
+        builder.add_exhaust_heat_shield()
+        builder.add_weapon_trunnions()
         builder.add_turret(size=(1.50, 1.65, 0.46), center_y=0.22)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.34)
+        builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -1524,7 +1946,9 @@ def build_vehicle_model(
         builder.hull_length = 3.35
         builder.hull_width = 2.25
         builder.hull_deck_z = 0.90
-        builder.add_all_terrain_wheels(wheelbase_y=2.35, track_width_x=1.95, wheel_radius=0.39, wheel_width=0.28, middle_axle=True)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.35, track_width_x=1.95, wheel_radius=0.39, wheel_width=0.28, middle_axle=True, with_fenders=True
+        )
         builder.objects.extend([
             rmk.make_sloped_glacis_hull(
                 f"{name}Armor_Hull",
@@ -1534,6 +1958,9 @@ def build_vehicle_model(
                 material=builder.palette.primary_armor, bevel=0.04
             ),
             rmk.make_box(f"{name}Armor_EWShelter", (1.76, 1.95, 0.62), (0.0, -0.35, 1.16), builder.palette.light_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_ShelterCollar", (0.0, -0.35, 0.85), (1.76, 1.95), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_cylinder(f"{name}Sensor_InterferenceMast", 0.16, 0.78, (0.0, -0.78, 1.75), builder.palette.gunmetal, vertices=10, bevel=0.015),
         ])
         for side in (-1, 1):
@@ -1550,7 +1977,13 @@ def build_vehicle_model(
                     builder.palette.gunmetal, 0.015
                 ),
             ])
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.22, 1.35, 0.38), center_y=0.42)
+        builder.add_turret_ring_guard()
         builder.turret_center = Vector((0.0, 0.42, 1.58))
         builder.add_sensor_visor()
         builder.add_whip_antenna()
@@ -1562,12 +1995,18 @@ def build_vehicle_model(
         builder.hull_deck_z = 0.90
         builder.add_all_terrain_wheels(
             wheelbase_y=2.55, track_width_x=1.95, wheel_radius=0.40, wheel_width=0.28,
-            middle_axle=True, lug_count=6 if rts_budget else 10, bolt_count=0 if rts_budget else 6
+            middle_axle=True, lug_count=6 if rts_budget else 10, bolt_count=0 if rts_budget else 6, with_fenders=True
         )
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_ChassisFrame", (1.62, 3.55, 0.34), (0.0, 0.0, 0.56), builder.palette.gunmetal, 0.03),
             rmk.make_box(f"{name}Armor_ForwardCab", (1.80, 1.05, 0.74), (0.0, 1.28, 1.02), builder.palette.primary_armor, 0.04),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 1.28, 0.65), (1.80, 1.05), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_LauncherBed", (1.72, 1.95, 0.22), (0.0, -0.62, 0.86), builder.palette.light_armor, 0.025),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_BedCollar", (0.0, -0.62, 0.75), (1.72, 1.95), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_ErectorCradle", (1.30, 0.32, 0.30), (0.0, -1.42, 1.08), builder.palette.gunmetal, 0.02),
         ])
         erector_rot = (math.radians(-52), 0.0, 0.0)
@@ -1590,7 +2029,13 @@ def build_vehicle_model(
             f"{name}Sensor_CabVisor", location=(0.0, 1.82, 1.16), size=(1.10, 0.12, 0.17),
             armor_mat=builder.palette.light_armor, lens_mat=builder.palette.emissive, cavity_mat=builder.palette.gunmetal
         ))
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(0.95, 1.00, 0.30), center_y=1.20)
+        builder.add_turret_ring_guard()
         builder.turret_center = Vector((0.0, 1.20, 1.55))
         builder.add_radar_dish(is_rotodome=False)
         builder.add_spring_antenna()
@@ -1598,10 +2043,18 @@ def build_vehicle_model(
     elif archetype == "recovery_crawler":
         # Armored recovery vehicle: tracked hull, slewing crane boom, winch drum and earth spade.
         builder.add_sloped_hull(length=3.4, width=2.6, height=0.96, bevel=0.045)
+        builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=3.2, height=0.66, belt_width=0.36, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.21)
+        builder.add_track_tensioners(radius=0.17)
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CraneSlewBase", (0.85, 0.85, 0.28), (0.62, 0.55, 1.18), builder.palette.light_armor, 0.03),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CraneCollar", (0.62, 0.55, 1.04), (0.85, 0.85), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_rod(f"{name}Joint_CraneBoom", (0.62, 0.55, 1.32), (0.62, -1.15, 2.55), 0.11, builder.palette.warning, vertices=8),
             rmk.make_rod(f"{name}Joint_CraneJib", (0.62, -1.15, 2.55), (0.62, -1.75, 2.20), 0.07, builder.palette.warning, vertices=8),
             rmk.make_rod(f"{name}Joint_CraneHoistCable", (0.62, -1.75, 2.20), (0.62, -1.75, 1.35), 0.015, builder.palette.gunmetal, vertices=6),
@@ -1611,8 +2064,17 @@ def build_vehicle_model(
             rmk.make_box(f"{name}Armor_EarthSpade", (2.30, 0.16, 0.52), (0.0, 1.82, 0.30), builder.palette.primary_armor, 0.025,
                          rotation=(math.radians(-18), 0.0, 0.0)),
             rmk.make_box(f"{name}Armor_ToolLocker", (0.75, 1.30, 0.38), (-0.70, -0.45, 1.14), builder.palette.light_armor, 0.025),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_LockerCollar", (-0.70, -0.45, 0.95), (0.75, 1.30), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
         ])
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_driver_periscope_hood()
+        builder.add_recovery_winch()
         builder.add_turret(size=(0.95, 1.00, 0.32), center_y=0.40)
+        builder.add_turret_ring_guard()
+        builder.add_crew_cupola()
         builder.turret_center = Vector((-0.55, 0.40, 1.30))
         builder.add_sensor_visor()
         builder.add_spring_antenna()
@@ -1620,9 +2082,24 @@ def build_vehicle_model(
     elif archetype == "mine_layer":
         # Tracked mine layer: rear hopper, angled dispensing chute and racked AT mine discs.
         builder.add_sloped_hull(length=3.2, width=2.5, height=0.92, bevel=0.045)
+        builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=3.05, height=0.64, belt_width=0.34, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
+        builder.add_track_tensioners()
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_exhaust_deflector()
+        builder.add_exhaust_heat_shield()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_MineHopper", (1.70, 1.30, 0.62), (0.0, -0.80, 1.22), builder.palette.primary_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_HopperCollar", (0.0, -0.80, 0.91), (1.70, 1.30), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_HopperLid", (1.76, 1.36, 0.08), (0.0, -0.80, 1.57), builder.palette.light_armor, 0.015),
             rmk.make_box(f"{name}Joint_DispenserChute", (0.62, 1.05, 0.10), (0.0, -1.95, 0.62), builder.palette.gunmetal, 0.015,
                          rotation=(math.radians(-32), 0.0, 0.0)),
@@ -1638,7 +2115,11 @@ def build_vehicle_model(
                     f"{name}Armor_ATMine_{stag}{idx}", 0.16, 0.08, (side * 1.02, -0.30 - idx * 0.38, 1.02),
                     builder.palette.warning, rotation=(0.0, math.radians(90), 0.0), vertices=12, bevel=0.01
                 ))
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
         builder.add_turret(size=(1.05, 1.15, 0.34), center_y=0.62)
+        builder.add_turret_ring_guard()
+        builder.add_crew_cupola()
         builder.turret_center = Vector((0.0, 0.62, 1.30))
         builder.add_sensor_visor()
         builder.add_spring_antenna()
@@ -1646,7 +2127,10 @@ def build_vehicle_model(
     elif archetype == "sniper_tankette":
         # Low-silhouette two-crew tankette with a long-barrel precision gun.
         builder.add_sloped_hull(length=2.35, width=1.95, height=0.62, bevel=0.035)
+        builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=2.25, height=0.50, belt_width=0.28, roadwheels=4, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.16, depth=0.10)
+        builder.add_track_tensioners(radius=0.13, depth=0.08)
         builder.add_engine_deck(slat_count=3, with_exhausts=True)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CasemateShield", (1.10, 0.18, 0.30), (0.0, 0.62, 0.88), builder.palette.light_armor, 0.02,
@@ -1654,15 +2138,32 @@ def build_vehicle_model(
             rmk.make_cylinder(f"{name}Sensor_ThermalSight", 0.08, 0.26, (-0.38, 0.30, 1.12), builder.palette.gunmetal,
                               rotation=(math.radians(90), 0.0, 0.0), vertices=10, bevel=0.008),
         ])
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
         builder.add_turret(size=(1.05, 1.15, 0.28), center_y=0.05)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.24, caliber=0.024, barrel_length=0.28)
+        builder.add_crew_cupola()
         builder.add_sensor_visor()
 
     elif archetype == "hexapod_assault":
         # Six-legged assault crawler: four rigged crawler legs plus a static middle leg pair bound to the body.
         builder.add_sloped_hull(length=3.0, width=2.4, height=0.84, bevel=0.05)
-        builder.objects.append(rmk.make_box(
-            f"{name}Armor_ThoraxCore", (1.45, 1.95, 0.42), (0.0, 0.0, 1.02), builder.palette.primary_armor, 0.04
-        ))
+        builder.add_deck_edge_weld_seams()
+        builder.add_cast_pelvis(location=(0.0, 0.0, 0.78), width=1.25, depth=1.65, height=0.38)
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
+        builder.objects.extend([
+            rmk.make_box(
+                f"{name}Armor_ThoraxCore", (1.45, 1.95, 0.42), (0.0, 0.0, 1.02), builder.palette.primary_armor, 0.04
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_ThoraxCollar", (0.0, 0.0, 0.81), (1.45, 1.95), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
         builder.add_quad_crawler_legs(knee_height=1.05, reach_x=1.25, reach_y=1.05)
         for side in (-1, 1):
             stag = "ML" if side < 0 else "MR"
@@ -1678,6 +2179,9 @@ def build_vehicle_model(
                                   builder.palette.tread, vertices=10, bevel=0.01),
             ])
         builder.add_turret(size=(1.45, 1.55, 0.44), center_y=0.08)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.30)
+        builder.add_weapon_trunnions()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -1685,6 +2189,7 @@ def build_vehicle_model(
         # Amphibious assault hovercraft: inflated skirt, bow ramp and twin ducted rear propellers.
         builder.is_hover = True
         builder.add_sloped_hull(length=3.9, width=2.7, height=0.80, bevel=0.05)
+        builder.add_deck_edge_weld_seams()
         builder.add_hover_skimmer(float_height=0.42)
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_BowRamp", (1.55, 0.12, 0.62), (0.0, 2.02, 0.82), builder.palette.light_armor, 0.02,
@@ -1705,17 +2210,37 @@ def build_vehicle_model(
                 rmk.make_box(f"{name}Armor_Rudder_{stag}", (0.05, 0.28, 0.70), (side * 0.78, -2.25, 1.55),
                              builder.palette.warning, 0.01),
             ])
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
         builder.add_turret(size=(1.15, 1.25, 0.36), center_y=0.85)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.28)
         builder.add_sensor_visor()
         builder.add_whip_antenna()
 
     elif archetype == "bridge_layer":
         # Tracked scissor-bridge layer (AVLB) with hydraulic launch boom and twin folded treadway spans.
         builder.add_sloped_hull(length=3.6, width=2.65, height=0.92, bevel=0.045)
+        builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=3.4, height=0.66, belt_width=0.38, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.22)
+        builder.add_track_tensioners(radius=0.18)
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_recovery_winch()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_exhaust_deflector()
+        builder.add_exhaust_heat_shield()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_LaunchCradle", (1.85, 0.55, 0.36), (0.0, 1.48, 1.05), builder.palette.gunmetal, 0.025),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CradleCollar", (0.0, 1.48, 0.87), (1.85, 0.55), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_rod(f"{name}Joint_LaunchBoom_L", (-0.65, 0.85, 1.05), (-0.65, 1.75, 1.68), 0.065, builder.palette.warning, vertices=8),
             rmk.make_rod(f"{name}Joint_LaunchBoom_R", (0.65, 0.85, 1.05), (0.65, 1.75, 1.68), 0.065, builder.palette.warning, vertices=8),
             rmk.make_cylinder(f"{name}Joint_ScissorHingePin", 0.14, 2.35, (0.0, 1.78, 1.62), builder.palette.gunmetal,
@@ -1730,7 +2255,10 @@ def build_vehicle_model(
                 rmk.make_box(f"{name}Armor_ApproachRamp_{stag}", (0.74, 0.65, 0.10), (tx, -1.85, 1.52), builder.palette.warning, 0.015,
                              rotation=(math.radians(18.0), 0.0, 0.0)),
             ])
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
         builder.add_turret(size=(0.88, 0.96, 0.28), center_y=0.95)
+        builder.add_crew_cupola()
         builder.turret_center = Vector((0.0, 0.95, 1.92))
         builder.add_sensor_visor()
         builder.add_spring_antenna()
@@ -1740,7 +2268,9 @@ def build_vehicle_model(
         builder.hull_length = 4.1
         builder.hull_width = 2.35
         builder.hull_deck_z = 0.94
-        builder.add_all_terrain_wheels(wheelbase_y=2.85, track_width_x=2.05, wheel_radius=0.41, wheel_width=0.30, middle_axle=True)
+        builder.add_all_terrain_wheels(
+            wheelbase_y=2.85, track_width_x=2.05, wheel_radius=0.41, wheel_width=0.30, middle_axle=True, with_fenders=True
+        )
         for side in (-1, 1):
             stag = "L" if side < 0 else "R"
             builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
@@ -1753,6 +2283,9 @@ def build_vehicle_model(
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_ChassisSpine", (1.75, 4.05, 0.36), (0.0, 0.0, 0.58), builder.palette.gunmetal, 0.03),
             rmk.make_box(f"{name}Armor_ArmoredCab", (2.05, 1.22, 0.84), (0.0, 1.38, 1.08), builder.palette.primary_armor, 0.04),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 1.38, 0.66), (2.05, 1.22), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_box(f"{name}Armor_CommandShelter", (2.18, 2.45, 0.96), (0.0, -0.62, 1.24), builder.palette.primary_armor, 0.045),
             rmk.make_box(f"{name}Armor_SlideOutBay_L", (0.24, 1.65, 0.68), (-1.18, -0.62, 1.24), builder.palette.light_armor, 0.025),
             rmk.make_box(f"{name}Armor_SlideOutBay_R", (0.24, 1.65, 0.68), (1.18, -0.62, 1.24), builder.palette.light_armor, 0.025),
@@ -1764,7 +2297,15 @@ def build_vehicle_model(
             f"{name}Sensor_CabVisor", location=(0.0, 2.00, 1.22), size=(1.28, 0.12, 0.18),
             armor_mat=builder.palette.light_armor, lens_mat=builder.palette.emissive, cavity_mat=builder.palette.gunmetal
         ))
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
+        builder.add_recovery_winch()
         builder.add_turret(size=(1.05, 1.12, 0.32), center_y=1.32)
+        builder.add_turret_ring_guard()
         builder.turret_center = Vector((0.0, 1.32, 1.66))
         builder.add_radar_dish(is_rotodome=True, location=(0.45, -1.25, 2.05))
         builder.add_whip_antenna()
@@ -1772,6 +2313,7 @@ def build_vehicle_model(
     elif archetype == "flying_wing_bomber":
         # Low-observable delta flying-wing strike craft with swept wings, dorsal intakes, and landing skids.
         builder.is_hover = True
+        builder.add_access_hatches()
         builder.hull_length = 3.2
         builder.hull_width = 4.2
         builder.hull_deck_z = 1.05
@@ -1819,9 +2361,25 @@ def build_vehicle_model(
     elif archetype == "mortar_carrier":
         # Open-hatch tracked heavy siege mortar carrier with split roof doors, baseplate, and ammo racks.
         builder.add_sloped_hull(length=3.15, width=2.48, height=0.96, bevel=0.045)
+        builder.add_deck_edge_weld_seams()
+        builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=2.98, height=0.64, belt_width=0.35, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
+        builder.add_track_tensioners()
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_exhaust_deflector()
+        builder.add_exhaust_heat_shield()
         builder.objects.extend([
             rmk.make_box(f"{name}Armor_CasemateSuperstructure", (1.92, 2.05, 0.48), (0.0, -0.22, 1.16), builder.palette.primary_armor, 0.035),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CasemateCollar", (0.0, -0.22, 0.92), (1.92, 2.05), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
             rmk.make_cylinder(f"{name}Joint_MortarTurntable", 0.68, 0.16, (0.0, -0.25, 1.18), builder.palette.gunmetal, vertices=12, bevel=0.015),
         ])
         for side in (-1, 1):
@@ -1844,7 +2402,11 @@ def build_vehicle_model(
                     (side * 0.72, -0.68 + idx * 0.32, 1.32), builder.palette.warning,
                     vertices=10, bevel=0.01
                 ))
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
         builder.add_turret(size=(1.12, 1.18, 0.26), center_y=-0.20)
+        builder.add_turret_ring_guard()
+        builder.add_crew_cupola()
         builder.turret_center = Vector((0.0, -0.20, 1.38))
         builder.add_sensor_visor()
         builder.add_spring_antenna()
@@ -1852,7 +2414,12 @@ def build_vehicle_model(
     elif archetype == "siege_drill_mole":
         # Subterranean assault bore vehicle with stepped conical front auger drill, side vents, and heavy tracks.
         builder.add_sloped_hull(length=3.35, width=2.62, height=0.98, bevel=0.045)
+        builder.add_deck_edge_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
         builder.add_continuous_tracks(length=3.15, height=0.68, belt_width=0.38, roadwheels=6, with_skirts=skirts)
+        builder.add_final_drive_housings(radius=0.22)
+        builder.add_track_tensioners(radius=0.18)
         builder.add_engine_deck(slat_count=5, with_exhausts=True)
         # Multi-stage stepped conical borer head + helical cutter rings along +Y prow
         builder.objects.append(rmk.make_cylinder(
@@ -1882,7 +2449,11 @@ def build_vehicle_model(
                     major_segments=12, minor_segments=6
                 ),
             ])
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_driver_periscope_hood()
         builder.add_turret(size=(1.22, 1.32, 0.36), center_y=0.05)
+        builder.add_turret_ring_guard()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -1892,9 +2463,9 @@ def build_vehicle_model(
         builder.hull_length = 2.4
         builder.hull_width = 1.9
         builder.hull_deck_z = 2.65
+        builder.add_cast_pelvis(location=(0.0, -0.04, 1.90), width=1.28, depth=0.86, height=0.48)
+        builder.add_mech_torso(location=(0.0, 0.04, 2.55), width=1.68, length=1.22, height=0.96)
         builder.objects.extend([
-            rmk.make_box(f"{name}Armor_PelvisBlock", (1.28, 0.86, 0.48), (0.0, -0.04, 1.90), builder.palette.gunmetal, 0.07),
-            rmk.make_box(f"{name}Armor_IndustrialTorso", (1.68, 1.22, 0.96), (0.0, 0.04, 2.55), builder.palette.primary_armor, 0.085),
             rmk.make_box(f"{name}Armor_RollCageCanopy", (1.12, 0.55, 0.58), (0.0, 0.62, 2.58), builder.palette.warning, 0.045),
             rmk.make_cylinder(f"{name}Armor_DorsalReactorDrum", 0.46, 1.25, (0.0, -0.72, 2.62), builder.palette.gunmetal,
                               rotation=(0.0, math.radians(90.0), 0.0), vertices=12, bevel=0.03),
@@ -1913,16 +2484,330 @@ def build_vehicle_model(
             ])
         # The compact rear-set turret places both cannon firepoints at the native
         # GatlingWalker muzzle envelope after the preset's 0.75 model scale.
+        builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_interlocking_gussets(locations=[(-0.75, -0.05, 2.35), (0.75, -0.05, 2.35)])
         builder.add_turret(size=(1.28, 1.42, 0.42), center_y=-0.40)
+        builder.add_turret_ring_guard()
         builder.turret_center = Vector((0.0, -0.40, 2.145))
         builder.add_sensor_visor()
         builder.add_whip_antenna()
 
+    elif archetype == "nanite_support_rover":
+        # The Wave 7 tread-lug profile extends below the tire carcass; leave
+        # an explicit margin so every exported lug remains above Z=0.
+        wheel_z = builder.ground_clearance + 0.43 + 0.035
+        rover_wheel_locs = []
+        for side in (-1, 1):
+            tag = "L" if side < 0 else "R"
+            for y_off, ytag in ((1.05, "F"), (-1.05, "R")):
+                w_loc = (side * 0.95, y_off, wheel_z)
+                rover_wheel_locs.append(w_loc)
+                builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
+                    f"{name}Wheel_{ytag}_{tag}",
+                    location=w_loc,
+                    radius=0.42, width=0.28,
+                    tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
+                    hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
+                ))
+        builder.objects.append(rmk.make_box(
+            f"{name}Joint_FrontAxle", (1.75, 0.16, 0.14), (0.0, 1.05, wheel_z), builder.palette.gunmetal, 0.02
+        ))
+        builder.objects.append(rmk.make_box(
+            f"{name}Joint_RearAxle", (1.75, 0.16, 0.14), (0.0, -1.05, wheel_z), builder.palette.gunmetal, 0.02
+        ))
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_Chassis",
+                length_front=1.20, length_rear=1.35,
+                width_front=1.35, width_rear=1.45,
+                height_lower=builder.ground_clearance + 0.28, height_upper=0.76,
+                material=builder.palette.primary_armor, bevel=0.035
+            ),
+            rmk.make_box(
+                f"{name}Armor_CabCowl",
+                (1.18, 0.95, 0.42), (0.0, 0.35, 1.02),
+                builder.palette.light_armor, bevel=0.03,
+                rotation=(math.radians(-14), 0.0, 0.0)
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_Cab", (0.0, 0.35, 0.81), (1.18, 0.95), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+            rmk.make_box(
+                f"{name}Armor_EquipmentBay",
+                (1.24, 1.15, 0.48), (0.0, -0.65, 0.98),
+                builder.palette.primary_armor, bevel=0.03
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_Bay", (0.0, -0.65, 0.74), (1.24, 1.15), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
+        builder.add_wheel_fenders(rover_wheel_locs, radius=0.42, width=0.28)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
+        builder.add_turret(size=(1.10, 1.25, 0.36), center_y=0.10)
+        builder.add_turret_ring_guard()
+        builder.add_sensor_visor()
+        builder.add_nanite_dispenser(scale=0.92, spacing_x=1.75)
+
+    elif archetype == "gravity_siege_breaker":
+        builder.add_continuous_tracks(
+            length=3.8, height=0.74, belt_width=0.42, roadwheels=6, with_skirts=skirts
+        )
+        builder.add_final_drive_housings(radius=0.24, depth=0.15)
+        builder.add_track_tensioners(radius=0.20, depth=0.12)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_commander_sight()
+        builder.add_era_bricks()
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_CitadelLower",
+                length_front=1.75, length_rear=1.65,
+                width_front=2.10, width_rear=2.15,
+                height_lower=builder.ground_clearance + 0.38, height_upper=0.95,
+                material=builder.palette.primary_armor, bevel=0.045
+            ),
+            rmk.make_box(
+                f"{name}Armor_UpperCasemate",
+                (1.95, 2.40, 0.55), (0.0, -0.15, 1.25),
+                builder.palette.light_armor, bevel=0.04
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CasemateCollar", (0.0, -0.15, 0.97), (1.95, 2.40), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+            rmk.make_box(
+                f"{name}Armor_RearPowerCore",
+                (1.45, 0.85, 0.65), (0.0, -1.35, 1.28),
+                builder.palette.gunmetal, bevel=0.035
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_PowerCoreCollar", (0.0, -1.35, 0.95), (1.45, 0.85), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_turret(size=(1.65, 1.95, 0.48), center_y=0.15)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.36)
+        builder.add_ram_prow(width=2.5, height=0.60, forward_reach=0.48)
+        builder.add_grav_dampener(radius=0.38, height=0.25, location=(0.0, -0.85, 1.55))
+        builder.add_engine_deck(slat_count=4, with_exhausts=True)
+
+    elif archetype == "tactical_relay_carrier":
+        wheel_z = builder.ground_clearance + 0.40 + 0.035
+        wheel_y_positions = [(1.45, "F"), (-0.15, "M"), (-1.55, "R")]
+        relay_wheel_locs = []
+        for side in (-1, 1):
+            tag = "L" if side < 0 else "R"
+            for y_off, ytag in wheel_y_positions:
+                w_loc = (side * 0.96, y_off, wheel_z)
+                relay_wheel_locs.append(w_loc)
+                builder.objects.extend(rmk.make_all_terrain_wheel_assembly(
+                    f"{name}Wheel_{ytag}_{tag}",
+                    location=w_loc,
+                    radius=0.40, width=0.26,
+                    tire_mat=builder.palette.tread, rim_mat=builder.palette.wheel_rim,
+                    hub_mat=builder.palette.gunmetal, accent_mat=builder.palette.warning
+                ))
+        for y_off, ytag in wheel_y_positions:
+            builder.objects.append(rmk.make_box(
+                f"{name}Joint_Axle_{ytag}", (1.75, 0.14, 0.12), (0.0, y_off, wheel_z), builder.palette.gunmetal, 0.02
+            ))
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_Chassis",
+                length_front=1.75, length_rear=2.05,
+                width_front=1.45, width_rear=1.55,
+                height_lower=builder.ground_clearance + 0.35, height_upper=0.82,
+                material=builder.palette.primary_armor, bevel=0.038
+            ),
+            rmk.make_box(
+                f"{name}Armor_ForwardCab",
+                (1.35, 1.15, 0.58), (0.0, 1.05, 1.12),
+                builder.palette.light_armor, bevel=0.03,
+                rotation=(math.radians(-12), 0.0, 0.0)
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CabCollar", (0.0, 1.05, 0.83), (1.35, 1.15), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+            rmk.make_box(
+                f"{name}Armor_ElectronicsShelter",
+                (1.48, 2.15, 0.72), (0.0, -0.65, 1.22),
+                builder.palette.primary_armor, bevel=0.035
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_ShelterCollar", (0.0, -0.65, 0.86), (1.48, 2.15), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
+        builder.add_wheel_fenders(relay_wheel_locs, radius=0.40, width=0.26)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_access_hatches()
+        builder.add_driver_periscope_hood()
+        builder.add_pioneer_tool_racks()
+        builder.add_turret(size=(1.25, 1.35, 0.40), center_y=0.15)
+        builder.add_turret_ring_guard()
+        builder.add_comms_mast(height=1.65, location=(-0.35, -1.25, 1.58))
+        builder.add_sensor_visor()
+
+    elif archetype == "amphibious_assault_tank":
+        builder.add_continuous_tracks(
+            length=3.6, height=0.66, belt_width=0.36, roadwheels=5, with_skirts=skirts
+        )
+        builder.add_final_drive_housings(radius=0.20)
+        builder.add_track_tensioners(radius=0.16)
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_AmphibHull",
+                length_front=1.65, length_rear=1.55,
+                width_front=1.75, width_rear=1.85,
+                height_lower=builder.ground_clearance + 0.32, height_upper=0.88,
+                material=builder.palette.primary_armor, bevel=0.04
+            ),
+            rmk.make_box(
+                f"{name}Armor_BowProw",
+                (1.65, 0.75, 0.45), (0.0, 1.75, builder.ground_clearance + 0.48),
+                builder.palette.light_armor, bevel=0.035,
+                rotation=(math.radians(-18), 0.0, 0.0)
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_BowCollar", (0.0, 1.75, builder.ground_clearance + 0.25), (1.65, 0.75), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+        ])
+        for side in (-1, 1):
+            stag = "L" if side < 0 else "R"
+            jet_x = side * 0.72
+            builder.objects.extend([
+                rmk.make_cylinder(
+                    f"{name}Waterjet_Tunnel_{stag}",
+                    radius=0.18, depth=0.45,
+                    location=(jet_x, -1.85, builder.ground_clearance + 0.28),
+                    material=builder.palette.gunmetal,
+                    vertices=12, bevel=0.015,
+                    rotation=(math.radians(90), 0.0, 0.0)
+                ),
+                rmk.make_cylinder(
+                    f"{name}Waterjet_Nozzle_{stag}",
+                    radius=0.14, depth=0.12,
+                    location=(jet_x, -2.10, builder.ground_clearance + 0.28),
+                    material=builder.palette.wheel_rim,
+                    vertices=10, bevel=0.008,
+                    rotation=(math.radians(90), 0.0, 0.0)
+                ),
+            ])
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_glacis_weld_seams()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_turret(size=(1.55, 1.75, 0.46), center_y=0.08)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.32)
+        builder.add_crew_cupola()
+        builder.add_bustle_basket()
+        builder.add_sensor_visor()
+        builder.add_engine_deck(slat_count=3, with_exhausts=False)
+
+    elif archetype == "plasma_mortar_strider":
+        builder.add_sloped_hull(length=2.8, width=2.6, height=0.92)
+        builder.add_deck_edge_weld_seams()
+        builder.add_cast_pelvis(location=(0.0, 0.0, 0.95), width=1.30, depth=1.50, height=0.42)
+        builder.add_quad_crawler_legs(knee_height=1.20, reach_x=1.35, reach_y=1.15)
+        builder.add_access_hatches()
+        builder.add_lifting_lugs()
+        builder.objects.extend([
+            rmk.make_box(
+                f"{name}Armor_CruciformCenter",
+                (1.85, 1.85, 0.52), (0.0, 0.0, 1.25),
+                builder.palette.primary_armor, bevel=0.04
+            ),
+            rmk.make_transitional_coaming_collar(
+                f"{name}Armor_CenterCollar", (0.0, 0.0, 0.99), (1.85, 1.85), height=0.045, collar_mat=builder.palette.gunmetal
+            ),
+            rmk.make_box(
+                f"{name}Armor_TurntablePedestal",
+                (1.45, 1.45, 0.24), (0.0, 0.0, 1.55),
+                builder.palette.gunmetal, bevel=0.025
+            ),
+        ])
+        builder.add_turret(size=(1.60, 1.75, 0.52), center_y=0.0)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.32)
+        builder.add_weapon_trunnions()
+        builder.add_recoil_spade(width=2.1, depth=0.85, deployed=True, location=(0.0, -1.65, 0.45))
+
+    elif archetype == "stealth_recon_skimmer":
+        builder.add_hover_skimmer(float_height=0.35)
+        builder.objects.extend([
+            rmk.make_sloped_glacis_hull(
+                f"{name}Armor_StealthGlacis",
+                length_front=1.45, length_rear=1.35,
+                width_front=1.55, width_rear=1.65,
+                height_lower=builder.ground_clearance + 0.22, height_upper=0.55,
+                material=builder.palette.primary_armor, bevel=0.035
+            ),
+            rmk.make_box(
+                f"{name}Armor_StealthChine_L",
+                (0.45, 2.20, 0.12), (-0.95, 0.0, 0.48),
+                builder.palette.light_armor, bevel=0.02,
+                rotation=(0.0, math.radians(-16), 0.0)
+            ),
+            rmk.make_box(
+                f"{name}Armor_StealthChine_R",
+                (0.45, 2.20, 0.12), (0.95, 0.0, 0.48),
+                builder.palette.light_armor, bevel=0.02,
+                rotation=(0.0, math.radians(16), 0.0)
+            ),
+            rmk.make_box(
+                f"{name}Armor_StealthCanopy",
+                (0.85, 1.15, 0.28), (0.0, 0.35, 0.68),
+                builder.palette.gunmetal, bevel=0.025,
+                rotation=(math.radians(-18), 0.0, 0.0)
+            ),
+        ])
+        builder.add_access_hatches()
+        builder.add_turret(size=(1.10, 1.25, 0.32), center_y=0.0)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports(offset_x=0.25)
+        builder.add_sensor_visor()
+
     else:  # standard tank
         builder.add_sloped_hull(length=3.0, width=2.4, height=0.88)
+        builder.add_deck_edge_weld_seams()
         builder.add_continuous_tracks(length=2.85, height=0.62, belt_width=0.34, roadwheels=5, with_skirts=skirts)
+        builder.add_final_drive_housings()
+        builder.add_track_tensioners()
         builder.add_engine_deck(slat_count=4, with_exhausts=True)
+        builder.add_towing_shackles()
+        builder.add_lifting_lugs()
+        builder.add_interlocking_gussets()
+        builder.add_splash_rib()
+        builder.add_driver_periscope_hood()
+        builder.add_access_hatches()
+        builder.add_pioneer_tool_racks()
+        builder.add_weld_seams([
+            ((-1.10, 0.45, 0.65), (-0.95, 1.45, 0.35)),
+            ((1.10, 0.45, 0.65), (0.95, 1.45, 0.35)),
+        ])
         builder.add_turret(size=(1.4, 1.6, 0.45), center_y=0.08)
+        builder.add_turret_ring_guard()
+        builder.add_coaxial_weapon_ports()
+        builder.add_crew_cupola()
+        builder.add_commander_sight()
+        builder.add_bustle_basket()
         builder.add_sensor_visor()
         builder.add_spring_antenna()
 
@@ -1930,8 +2815,15 @@ def build_vehicle_model(
     if archetype not in ("arc_tank",):
         if weapon == "railgun":
             builder.add_railgun(rail_length=2.40, rail_height=0.28, rail_width=0.40, elevation_deg=8.0)
+            builder.add_weapon_trunnions(spacing_x=0.56, bracket_width=0.14)
+        elif weapon == "nanite_projector":
+            builder.add_nanite_projector(head_radius=0.16, length=1.25, elevation_deg=6.0)
+        elif weapon == "gravity_cannon":
+            builder.add_gravity_cannon(barrel_length=2.25, bore_radius=0.14, ring_count=4, elevation_deg=5.0)
+            builder.add_weapon_trunnions(spacing_x=0.58, bracket_width=0.14)
         elif weapon == "laser_beam":
             builder.add_beam_laser(barrel_length=2.10, caliber=0.08, elevation_deg=6.0)
+            builder.add_weapon_trunnions(spacing_x=0.50, bracket_width=0.12)
         elif weapon == "vls_missiles":
             builder.add_vls_missile_array(rows=2, cols=4)
         elif weapon == "flamethrower":
@@ -1940,19 +2832,28 @@ def build_vehicle_model(
             builder.add_emp_emitter(core_radius=0.14, length=1.55, elevation_deg=5.0)
         elif weapon == "quad_flak":
             builder.add_quad_flak(barrel_length=1.65, caliber_radius=0.038, elevation_deg=34.0)
+            builder.add_weapon_trunnions(spacing_x=0.54, bracket_width=0.12)
         elif weapon == "plasma_mortar":
             builder.add_plasma_mortar(caliber=0.175, length=0.95, elevation_deg=42.0)
+            builder.add_weapon_trunnions(spacing_x=0.60, bracket_width=0.15)
         elif weapon == "howitzer":
             builder.add_howitzer(caliber=0.135, length=1.15, elevation_deg=26.0)
+            builder.add_weapon_trunnions(spacing_x=0.58, bracket_width=0.14)
         elif weapon == "dual_cannon":
             if archetype == "heavy_crane_mech":
                 builder.add_dual_cannon(caliber=0.082, length=0.60, spacing=0.38, elevation_deg=11.0)
+                builder.add_weapon_trunnions(spacing_x=0.48, bracket_width=0.10)
             else:
                 builder.add_dual_cannon(caliber=0.082, length=1.65, spacing=0.38, elevation_deg=11.0)
+                builder.add_weapon_trunnions(spacing_x=0.62, bracket_width=0.14)
         elif weapon == "gatling":
             if archetype in ("walker", "bike", "colossus_titan", "artillery_strider", "heavy_crane_mech"):
-                p_z = 3.25 if archetype == "colossus_titan" else (2.85 if archetype == "heavy_crane_mech" else (2.45 if archetype == "artillery_strider" else 1.25))
-                p_x = 1.35 if archetype == "colossus_titan" else (1.15 if archetype == "heavy_crane_mech" else (0.95 if archetype == "artillery_strider" else 0.75))
+                gatling_offsets = {
+                    "colossus_titan": (1.35, 3.25),
+                    "heavy_crane_mech": (1.15, 2.85),
+                    "artillery_strider": (0.95, 2.45),
+                }
+                p_x, p_z = gatling_offsets.get(archetype, (0.75, 1.25))
                 builder.add_rotary_gatling(side=-1, pivot_offset=(p_x, 0.35, p_z))
                 builder.add_rotary_gatling(side=1, pivot_offset=(p_x, 0.35, p_z))
             elif archetype in ("vtol", "heavy_dropship", "flying_wing_bomber"):
@@ -1983,8 +2884,10 @@ def build_vehicle_model(
         elif archetype == "sniper_tankette":
             # Long-barrel precision gun: thinner caliber, ~40% longer tube, flatter elevation.
             builder.add_cannon(caliber=0.072, length=2.45, elevation_deg=4.0)
+            builder.add_weapon_trunnions(spacing_x=0.46, bracket_width=0.10)
         else:  # cannon
             builder.add_cannon(caliber=0.095, length=1.70, elevation_deg=11.0)
+            builder.add_weapon_trunnions(spacing_x=0.52, bracket_width=0.12)
 
     # 3. Optional Subsystems & Greebles
     if rollcage and archetype not in ("buggy",):
@@ -1999,7 +2902,7 @@ def build_vehicle_model(
     if dozer and archetype in ("tank", "artillery", "halftrack", "super_heavy", "combat_harvester", "demolition_breacher", "thermobaric_tank", "recovery_crawler", "mine_layer", "bridge_layer", "mortar_carrier"):
         builder.add_dozer_blade(width=builder.hull_width * 1.05, height=0.44)
 
-    if smoke and archetype in ("tank", "artillery", "hover", "spider", "halftrack", "super_heavy", "quad_mech", "flak_anti_air", "colossus_titan", "hover_cruiser", "shield_truck", "thermobaric_tank", "ew_jammer", "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech"):
+    if smoke and archetype in ("tank", "artillery", "hover", "spider", "halftrack", "super_heavy", "quad_mech", "flak_anti_air", "colossus_titan", "hover_cruiser", "shield_truck", "thermobaric_tank", "ew_jammer", "mobile_sam_launcher", "recovery_crawler", "mine_layer", "sniper_tankette", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "mortar_carrier", "siege_drill_mole", "heavy_crane_mech", "nanite_support_rover", "gravity_siege_breaker", "tactical_relay_carrier", "amphibious_assault_tank", "plasma_mortar_strider", "stealth_recon_skimmer"):
         builder.add_smoke_launchers(tube_count=3)
 
     if radar:
@@ -2056,7 +2959,7 @@ def build_vehicle_model(
     if slat_armor:
         builder.add_slat_armor()
 
-    if era_bricks:
+    if era_bricks and archetype != "gravity_siege_breaker":
         builder.add_era_bricks()
 
     if camo_netting:
@@ -2076,6 +2979,15 @@ def build_vehicle_model(
 
     if barrel_shroud:
         builder.add_barrel_shroud()
+    if nanite_dispenser and archetype != "nanite_support_rover":
+        builder.add_nanite_dispenser()
+    if grav_dampener and archetype != "gravity_siege_breaker":
+        builder.add_grav_dampener()
+    if comms_mast and archetype != "tactical_relay_carrier":
+        builder.add_comms_mast()
+    if ram_prow and archetype != "gravity_siege_breaker":
+        builder.add_ram_prow()
+
 
     # 3. Modular Attachments
     if attachments:
@@ -2099,24 +3011,19 @@ def build_vehicle_model(
         preview_path=preview_file,
         card_path=card_path,
         render_multiview=multiview,
-        ortho_scale=(
-            8.5 if archetype in ("colossus_titan", "hover_cruiser", "heavy_dropship", "flying_wing_bomber")
-            else (7.2 if archetype in ("super_heavy", "siege_crawler", "drone_carrier", "artillery_strider", "mobile_sam_launcher", "recovery_crawler", "hexapod_assault", "assault_hovercraft", "bridge_layer", "command_hq_rig", "siege_drill_mole", "heavy_crane_mech")
-            else (6.2 if archetype in ("artillery", "spider", "vtol", "flak_anti_air", "quad_mech", "combat_harvester", "shield_truck", "thermobaric_tank", "ew_jammer", "mine_layer", "mortar_carrier") else 5.6))
-        ),
+        ortho_scale=_calculate_ortho_scale(archetype),
         smooth_by_angle=True,
         smooth_angle_deg=smooth_angle,
         weighted_normals=weighted_normals,
         bake_vertex_dirt=dirt,
         include_locators=locators,
-        generate_lods=lods,
+        generate_lods=True,
         generate_colliders=colliders,
         wear_level=wear,
         soot_intensity=soot_intensity,
         gameplay_meta_path=gameplay_meta_path,
         wreckage_fbx_path=wreckage_fbx_path,
         damaged_fbx_path=damaged_fbx_path,
-        target_budget=target_budget,
         include_vfx_flash=vfx_flash,
         include_vfx_thruster=vfx_thruster,
         include_shield_bubble=shield_bubble,
@@ -2133,16 +3040,18 @@ def build_vehicle_model(
         wreckage_severity=wreckage_severity,
         structural_wear_mask=structural_wear_mask,
         unity_batch_names=(archetype == "heavy_crane_mech"),
+        budget_profile_path=budget_profile_path,
     )
 
     if lod_diagnostics:
-        print("\n--- Low-Poly Geometry Budget & LOD Diagnostics ---")
+        print("\n--- Calibrated Geometry & Camera-Aware LOD Diagnostics ---")
         true_triangles = res.get("profile_report", {}).get("total_triangles", res["total_polygons"])
         print(f"LOD0 (Current): {res['total_polygons']} faces / {true_triangles} triangles | {res['total_vertices']} verts (RTS Combat Camera)")
-        print(f"  Target Face Budget: 1,500 - 7,500 faces (Current: {round(res['total_polygons'] / max(1, target_budget) * 100, 1)}% of budget)")
+        print(f"  Profile verdict: {res.get('profile_report', {}).get('budget_verdict', 'unavailable')}")
+        print(f"  LOD transitions: {res.get('lod_screen_thresholds', {})}")
         print("LOD Recommendations:")
-        print(f"  LOD1 (~1,200 tris): Merge track cleats & road wheel rims into single cylinder silhouettes.")
-        print(f"  LOD2 (~500 tris): Collapse greebles, antennas, and multi-barrel clusters into convex hulls.")
+        print("  LOD1: Preserve the main silhouette and functional assemblies; simplify only details that disappear at its screen size.")
+        print("  LOD2: Reduce sub-pixel greebles and repeated hardware while keeping role-defining weapon and mobility shapes readable.")
         print("---------------------------------------------------\n")
 
     print("\n========================================================")
@@ -2203,7 +3112,13 @@ def build_structure_model(
     drone_dock: bool = False,
     recoil_spade: bool = False,
     barrel_shroud: bool = False,
+    nanite_dispenser: bool = False,
+    grav_dampener: bool = False,
+    comms_mast: bool = False,
+    ram_prow: bool = False,
     weighted_normals: bool = True,
+    structural_wear_mask: bool = False,
+    budget_profile_path: Path | None = None,
 ) -> dict:
     rmk.clear_scene()
 
@@ -2305,6 +3220,15 @@ def build_structure_model(
 
     if barrel_shroud:
         builder.add_barrel_shroud()
+    if nanite_dispenser and archetype != "nanite_support_rover":
+        builder.add_nanite_dispenser()
+    if grav_dampener and archetype != "gravity_siege_breaker":
+        builder.add_grav_dampener()
+    if comms_mast and archetype != "tactical_relay_carrier":
+        builder.add_comms_mast()
+    if ram_prow and archetype != "gravity_siege_breaker":
+        builder.add_ram_prow()
+
 
     gameplay_meta_path = (fbx_file.parent / f"{name}.gameplay.json") if gameplay_json else None
 
@@ -2312,7 +3236,7 @@ def build_structure_model(
         fbx_path=fbx_file,
         blend_path=blend_file,
         preview_path=preview_file,
-        generate_lods=lods,
+        generate_lods=True,
         generate_colliders=colliders,
         gameplay_meta_path=gameplay_meta_path,
         render_icons=render_icons,
@@ -2324,6 +3248,8 @@ def build_structure_model(
         weighted_normals=weighted_normals,
         wear_level=wear,
         soot_intensity=soot_intensity,
+        structural_wear_mask=structural_wear_mask,
+        budget_profile_path=budget_profile_path,
     )
 
     print("\n========================================================")
@@ -2342,16 +3268,11 @@ def build_structure_model(
 
 def main():
     args = parse_args()
-    if not math.isfinite(args.camo_scale) or not 0.1 <= args.camo_scale <= 10.0:
-        raise SystemExit("--camo-scale must be finite and between 0.1 and 10.0.")
-    if not math.isfinite(args.camo_contrast) or not 0.0 <= args.camo_contrast <= 4.0:
-        raise SystemExit("--camo-contrast must be finite and between 0.0 and 4.0.")
-    if not math.isfinite(args.normal_intensity) or not 0.0 <= args.normal_intensity <= 4.0:
-        raise SystemExit("--normal-intensity must be finite and between 0.0 and 4.0.")
-    if not math.isfinite(args.soot_intensity) or not 0.0 <= args.soot_intensity <= 2.0:
-        raise SystemExit("--soot-intensity must be finite and between 0.0 and 2.0.")
-    if not math.isfinite(args.model_scale) or not 0.1 <= args.model_scale <= 10.0:
-        raise SystemExit("--model-scale must be finite and between 0.1 and 10.0.")
+    _validate_in_range("camo-scale", args.camo_scale, 0.1, 10.0)
+    _validate_in_range("camo-contrast", args.camo_contrast, 0.0, 4.0)
+    _validate_in_range("normal-intensity", args.normal_intensity, 0.0, 4.0)
+    _validate_in_range("soot-intensity", args.soot_intensity, 0.0, 2.0)
+    _validate_in_range("model-scale", args.model_scale, 0.1, 10.0)
     out_root = resolve_path(args.out_dir, REPO_ROOT) or REPO_ROOT
 
     if args.dry_run:
@@ -2374,7 +3295,7 @@ def main():
                 print(f"  Colliders: {args.name}_COLLIDER_Base, {args.name}_COLLIDER_Roof")
             if args.render_icons:
                 print(f"  Tactical Icons: {args.icon_size}x{args.icon_size} Top-Down and Isometric")
-            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, RWSMount={args.rws_mount}, DroneDock={args.drone_dock}, RecoilSpade={args.recoil_spade}, BarrelShroud={args.barrel_shroud}, WeightedNormals={args.weighted_normals}")
+            print(f"  Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, RWSMount={args.rws_mount}, DroneDock={args.drone_dock}, RecoilSpade={args.recoil_spade}, BarrelShroud={args.barrel_shroud}, NaniteDispenser={args.nanite_dispenser}, GravDampener={args.grav_dampener}, CommsMast={args.comms_mast}, RamProw={args.ram_prow}, WeightedNormals={args.weighted_normals}")
             if args.bake_atlas or args.bake_normals or args.single_material or structure_camo != "none":
                 print(f"  Texture Atlas: {args.atlas_resolution}x{args.atlas_resolution} PBR (Albedo, MetallicGloss, Normal, Emission)")
             if args.single_material:
@@ -2391,7 +3312,7 @@ def main():
                 unit_name = f"{args.name}_{arch_title}"
                 def_weapon = ARCHETYPE_DEFAULT_WEAPONS.get(arch, "cannon") if args.weapon == "cannon" else args.weapon
                 is_walker = arch in ("walker", "colossus_titan", "artillery_strider", "heavy_crane_mech")
-                is_quad = arch in ("spider", "quad_mech", "siege_crawler", "hexapod_assault")
+                is_quad = arch in ("spider", "quad_mech", "siege_crawler", "hexapod_assault", "plasma_mortar_strider")
                 rig_desc = "Biped Armature (8 bones)" if is_walker else ("Quad Armature (10 bones)" if is_quad else "Standard Rig (6 bones)")
                 print(f"- {arch:<20} -> {unit_name:<30} | Weapon: {def_weapon:<14} | Rig: {rig_desc}")
             print("\n=== Dry run complete. No meshes created. ===\n")
@@ -2408,7 +3329,7 @@ def main():
         print(f"Primary Weapon: {args.weapon}")
         print(f"Subsystems: Skirts={args.skirts}, Rollcage={args.rollcage}, QuadTracks={args.quad_tracks}, TiltRotors={args.tilt_rotors}, Dozer={args.dozer}, Smoke={args.smoke}, Radar={args.radar}, Sponsons={args.sponsons}, Outriggers={args.outriggers}, FlightDeck={args.flight_deck}, ExcavatorDrum={args.excavator_drum}")
         print(f"Micro-Details: Antenna={args.antenna}, Cupola={args.cupola}, Rivets={args.rivets}, TrackShoes={args.track_shoes}, SuspensionArms={args.suspension_arms}, MantletBoot={args.mantlet_boot}, SpacedSkirts={args.spaced_skirts}")
-        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, RWSMount={args.rws_mount}, DroneDock={args.drone_dock}, RecoilSpade={args.recoil_spade}, BarrelShroud={args.barrel_shroud}, WeightedNormals={args.weighted_normals}")
+        print(f"Authoring Details: HydraulicHoses={args.hydraulic_hoses}, HullGreebles={args.hull_greebles}, TacticalMarkings={args.tactical_markings}, HydraulicPistons={args.hydraulic_pistons}, AmmoChutes={args.ammo_chutes}, APSSuite={args.aps_suite}, StowageKit={args.stowage_kit}, SlatArmor={args.slat_armor}, ERABricks={args.era_bricks}, CamoNetting={args.camo_netting}, ThermalRadiators={args.thermal_radiators}, RWSMount={args.rws_mount}, DroneDock={args.drone_dock}, RecoilSpade={args.recoil_spade}, BarrelShroud={args.barrel_shroud}, NaniteDispenser={args.nanite_dispenser}, GravDampener={args.grav_dampener}, CommsMast={args.comms_mast}, RamProw={args.ram_prow}, WeightedNormals={args.weighted_normals}")
         if args.attachments:
             print(f"Modular Attachments: {args.attachments} (Detached FBX: {args.export_detached_attachments})")
         if args.primary_color:
@@ -2508,7 +3429,7 @@ def main():
                 colliders=args.colliders,
                 gameplay_json=args.gameplay_json,
                 wreckage=args.wreckage,
-                target_budget=args.target_budget,
+                budget_profile_path=Path(args.model_budget_profile),
                 lod_diagnostics=args.lod,
                 smooth_angle=args.smooth_angle,
                 multiview=args.multiview,
@@ -2615,6 +3536,8 @@ def main():
             recoil_spade=args.recoil_spade,
             barrel_shroud=args.barrel_shroud,
             weighted_normals=args.weighted_normals,
+            structural_wear_mask=args.structural_wear_mask,
+            budget_profile_path=Path(args.model_budget_profile),
         )
     else:
         res = build_vehicle_model(
@@ -2650,11 +3573,10 @@ def main():
             emissive_color=args.emissive_color,
             locators=args.locators,
             dirt=args.dirt,
-            lods=args.lods,
+            lods=True,
             colliders=args.colliders,
             gameplay_json=args.gameplay_json,
             wreckage=args.wreckage,
-            target_budget=args.target_budget,
             lod_diagnostics=args.lod,
             smooth_angle=args.smooth_angle,
             multiview=args.multiview,
@@ -2704,6 +3626,7 @@ def main():
             card_path=card_path,
             structural_wear_mask=args.structural_wear_mask or args.archetype == "heavy_crane_mech",
             rts_budget=args.rts_budget,
+            budget_profile_path=Path(args.model_budget_profile),
         )
 
     if args.report_json:
@@ -2727,6 +3650,11 @@ def main():
             "lod_levels": res.get("lod_levels", {}),
             "colliders": res.get("colliders", []),
             "budget_diagnostics": res.get("budget_diagnostics", {}),
+            "face_budget_reduction": res.get("face_budget_reduction", {}),
+            "target_lod0_faces": res.get("target_lod0_faces"),
+            "target_lod0_triangles": res.get("target_lod0_triangles"),
+            "geometry_budget": res.get("geometry_budget", {}),
+            "face_budget_passed": res.get("face_budget_passed", False),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report_data, indent=2), encoding="utf-8")

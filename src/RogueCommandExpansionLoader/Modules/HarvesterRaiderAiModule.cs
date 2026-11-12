@@ -103,7 +103,7 @@ namespace RogueCommandExpansionLoader.Modules
                     EntityController raider = raiders[i];
                     EntityCommand raidCommand = EntityCommand.AttackMoveOnPosition(
                         targetPos,
-                        EntityCommand.Role.None,
+                        EntityCommand.Role.ThisCommandWantsPathToBeCleared,
                         "Harvester raid strike");
                     raidCommand.tag = _commandTag;
 
@@ -125,7 +125,7 @@ namespace RogueCommandExpansionLoader.Modules
                     _nextScanAt = now + _settings.CooldownSeconds;
                     Debug.Log("[RogueCommandExpansionLoader] AI base " + _settings.BaseIndex +
                         " launched harvester raid squad (" + dispatched + " units) toward player harvester at " +
-                        targetPos + ".");
+                        targetHarvester.Position + ".");
                 }
             }
 
@@ -181,7 +181,7 @@ namespace RogueCommandExpansionLoader.Modules
                 foreach (EntityController unit in aiUnits)
                 {
                     if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted ||
-                        !unit.IsControlledByAi || !unit.IsUnit ||
+                        !unit.IsControlledByAi || !unit.IsUnit || !unit.IsCombatUnit ||
                         unit.aiBaseIndex != _settings.BaseIndex ||
                         !unit.CanAttackAndIsAttackEnabled ||
                         !unit.CanMoveAndMovementIsEnabled ||
@@ -194,6 +194,11 @@ namespace RogueCommandExpansionLoader.Modules
                     }
 
                     if (unit.CurrentCommandIsTaggedWith(_commandTag))
+                    {
+                        continue;
+                    }
+
+                    if (unit.CurrentAttackTarget != null && unit.CurrentAttackTarget.HasRole(UnitRole.Harvester))
                     {
                         continue;
                     }

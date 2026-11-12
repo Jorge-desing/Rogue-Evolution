@@ -162,7 +162,7 @@ namespace RogueCommandExpansionLoader.Modules
                 foreach (EntityController playerUnit in playerUnits)
                 {
                     if (playerUnit == null || playerUnit.IsDestroyed || playerUnit.DestroyHasBeenStarted ||
-                        !playerUnit.IsControlledByPlayer || !playerUnit.IsUnit ||
+                        !playerUnit.IsControlledByPlayer || !playerUnit.IsUnit || !playerUnit.IsCombatUnit ||
                         !playerUnit.CanAttackAndIsAttackEnabled ||
                         playerUnit.canNotBeAttacked || playerUnit.canNotBeTargetedByAi ||
                         playerUnit.doNotRegisterGlobally)
@@ -172,7 +172,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                     EntityController target = playerUnit.CurrentAttackTarget;
                     if (target == null || target.IsDestroyed || target.DestroyHasBeenStarted ||
-                        !target.IsControlledByAi || !target.IsBuilding || target.aiBaseIndex != _settings.BaseIndex)
+                        !IsProtectedTarget(target))
                     {
                         continue;
                     }
@@ -189,6 +189,22 @@ namespace RogueCommandExpansionLoader.Modules
                 return attackers.Count > 0;
             }
 
+            private bool IsProtectedTarget(EntityController target)
+            {
+                bool protectsBuildings = _settings.ProtectedTargetType == "Buildings" ||
+                    _settings.ProtectedTargetType == "BuildingsAndHarvesters";
+                bool protectsHarvesters = _settings.ProtectedTargetType == "Harvesters" ||
+                    _settings.ProtectedTargetType == "BuildingsAndHarvesters";
+                if (protectsBuildings && target.IsControlledByAi && target.IsBuilding &&
+                    target.aiBaseIndex == _settings.BaseIndex)
+                {
+                    return true;
+                }
+
+                return protectsHarvesters && target.IsControlledByAi && target.IsUnit &&
+                    target.HasRole(UnitRole.Harvester) && target.aiBaseIndex == _settings.BaseIndex;
+            }
+
             private HashSet<EntityController> FindCommittedResponders(List<EntityController> attackers)
             {
                 var committed = new HashSet<EntityController>();
@@ -200,7 +216,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                 foreach (EntityController unit in aiUnits)
                 {
-                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted || !unit.IsUnit ||
+                    if (unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted || !unit.IsUnit || !unit.IsCombatUnit ||
                         !unit.IsControlledByAi || unit.aiBaseIndex != _settings.BaseIndex)
                     {
                         continue;
@@ -262,20 +278,21 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    float distanceToBase;
+                    float distanceToProtectedTarget;
                     EntityController nearestAttacker;
-                    if (!TryFindNearestThreat(candidate, attackers, out nearestAttacker, out distanceToBase))
+                    if (!TryFindNearestThreat(candidate, attackers, out nearestAttacker, out distanceToProtectedTarget))
                     {
                         continue;
                     }
 
                     float maximumDistanceSquared = _settings.DefenseRadiusCells * _settings.DefenseRadiusCells;
-                    if (distanceToBase > maximumDistanceSquared || distanceToBase >= nearestDefenderDistance)
+                    if (distanceToProtectedTarget > maximumDistanceSquared ||
+                        distanceToProtectedTarget >= nearestDefenderDistance)
                     {
                         continue;
                     }
 
-                    nearestDefenderDistance = distanceToBase;
+                    nearestDefenderDistance = distanceToProtectedTarget;
                     defender = candidate;
                     attacker = nearestAttacker;
                 }
@@ -287,36 +304,36 @@ namespace RogueCommandExpansionLoader.Modules
                 EntityController defender,
                 List<EntityController> attackers,
                 out EntityController nearestAttacker,
-                out float nearestBuildingDistanceSquared)
+                out float nearestTargetDistanceSquared)
             {
                 nearestAttacker = null;
-                nearestBuildingDistanceSquared = Single.MaxValue;
+                nearestTargetDistanceSquared = Single.MaxValue;
                 float nearestAttackerDistanceSquared = Single.MaxValue;
                 for (int i = 0; i < attackers.Count; i++)
                 {
                     EntityController attacker = attackers[i];
-                    EntityController building = attackers[i].CurrentAttackTarget;
-                    if (attacker == null || building == null)
+                    EntityController protectedTarget = attackers[i].CurrentAttackTarget;
+                    if (attacker == null || protectedTarget == null)
                     {
                         continue;
                     }
 
-                    float buildingDistance = ReactiveBaseDefenseThreatRange.DistanceSquared(
-                        defender.CurrentCell, building.CurrentCell);
+                    float targetDistance = ReactiveBaseDefenseThreatRange.DistanceSquared(
+                        defender.CurrentCell, protectedTarget.CurrentCell);
                     float attackerDistance = ReactiveBaseDefenseThreatRange.DistanceSquared(
                         defender.CurrentCell, attacker.CurrentCell);
                     if (!ReactiveBaseDefenseThreatRange.IsWithinRadius(
-                        defender.CurrentCell, building.CurrentCell, _settings.DefenseRadiusCells))
+                        defender.CurrentCell, protectedTarget.CurrentCell, _settings.DefenseRadiusCells))
                     {
                         continue;
                     }
 
-                    if (nearestAttacker == null || buildingDistance < nearestBuildingDistanceSquared ||
-                        (buildingDistance == nearestBuildingDistanceSquared &&
+                    if (nearestAttacker == null || targetDistance < nearestTargetDistanceSquared ||
+                        (targetDistance == nearestTargetDistanceSquared &&
                             attackerDistance < nearestAttackerDistanceSquared))
                     {
                         nearestAttacker = attacker;
-                        nearestBuildingDistanceSquared = buildingDistance;
+                        nearestTargetDistanceSquared = targetDistance;
                         nearestAttackerDistanceSquared = attackerDistance;
                     }
                 }

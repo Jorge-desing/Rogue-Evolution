@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RogueCommandExpansionLoader.Runtime;
 
 namespace RogueCommandExpansionLoader.Content
 {
@@ -15,9 +16,13 @@ namespace RogueCommandExpansionLoader.Content
         public string assetBundleManifestPath;
         public ContentAssetBundleDefinition[] assetBundles;
         public ContentUnitDefinition[] units;
+        public ContentBuildingDefinition[] buildings;
         public ContentStageDefinition[] stages;
         public ContentAiProfileDefinition[] aiProfiles;
         public ContentRelicDefinition[] relics;
+        public ContentUpgradeDefinition[] upgrades;
+
+        public ContentPackDefinition Clone() => ContentPackCopy.DeepClone(this);
     }
 
     [Serializable]
@@ -49,6 +54,12 @@ namespace RogueCommandExpansionLoader.Content
         public float cooldown;
         public float manaCost;
         public float effectValue;
+        public string targetOrigin;
+        public float? range;
+        public float? radius;
+        public bool? helpAiToActivate;
+        public string aiActivationTrigger;
+        public float? aiSkillCooldown;
     }
 
     [Serializable]
@@ -58,6 +69,14 @@ namespace RogueCommandExpansionLoader.Content
         public string statName;
         public float multiplier;
         public float duration;
+    }
+
+    [Serializable]
+    public sealed class ContentOnHitStatusEffectDefinition
+    {
+        public string statusEffect;
+        public float duration;
+        public float chance = 1.0f;
     }
 
     [Serializable]
@@ -89,6 +108,13 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitVisualModuleDefinition
+    {
+        public string slotId;
+        public string assetName;
+    }
+
+    [Serializable]
     public sealed class ContentUnitVisualVariantDefinition
     {
         public string id;
@@ -96,6 +122,15 @@ namespace RogueCommandExpansionLoader.Content
         public string visualRootPath;
         public string colorTint;
         public float scale;
+        public ContentUnitVisualModuleDefinition[] modules;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitVariantDefinition
+    {
+        public string id;
+        public string loadout;
+        public ContentBalanceOverride[] balanceOverrides;
     }
 
     [Serializable]
@@ -228,17 +263,82 @@ namespace RogueCommandExpansionLoader.Content
     }
 
     [Serializable]
+    public sealed class ContentUnitShieldRegenDefinition
+    {
+        public float rechargeDelay;
+        public float rechargeRate;
+        public float burstAmount;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitVampiricLeechDefinition
+    {
+        public float siphonRatio;
+        public bool siphonToShield;
+        public float maxSiphonPerHit;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitTauntDefinition
+    {
+        public float pulseInterval;
+        public float tauntRadius;
+        public float duration;
+        public int maxTargets;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitShieldOverloadNovaDefinition
+    {
+        public float novaRadius;
+        public float damage;
+        public float stunDuration;
+        public float cooldown;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitDamageReflectDefinition
+    {
+        public float reflectRatio;
+        public float maxReflectPerHit;
+    }
+
+    [Serializable]
+    public sealed class ContentUnitDeathNovaDefinition
+    {
+        public float novaRadius;
+        public float damage;
+        public float stunDuration;
+        public float slowDuration;
+        public int maxTargets;
+    }
+
+    [Serializable]
+    public sealed class ContentNativeRigRetargetDefinition
+    {
+        public ContentNativeRigRetargetMappingDefinition[] mappings;
+    }
+
+    [Serializable]
+    public sealed class ContentNativeRigRetargetMappingDefinition
+    {
+        public string sourcePath;
+        public string targetPath;
+    }
+
+    [Serializable]
     public sealed class ContentUnitDefinition
     {
         public string id;
         public string unitType;
-        public Dictionary<string, float> customBalance;
+        public Dictionary<string, double> customBalance;
         public string assetBundleId;
         public string balanceAssetName;
         public string prefabAssetName;
         public string cardImageAssetName;
         public string visualAssetName;
         public string visualRootPath;
+        public ContentNativeRigRetargetDefinition nativeRigRetarget;
         public string nativeTemplateId;
         public bool isAllowedAsStartingBlueprint;
         public bool isAllowedForAi;
@@ -252,6 +352,7 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitExperienceDefinition experience;
         public ContentUnitSynergyDefinition[] synergies;
         public ContentUnitVisualVariantDefinition[] visualVariants;
+        public ContentUnitVariantDefinition[] variants;
         public ContentUnitSpawnDefinition spawn;
         public ContentUnitStatusEffectDefinition[] statusEffects;
         public ContentUnitProductionQueueDefinition productionQueue;
@@ -267,16 +368,280 @@ namespace RogueCommandExpansionLoader.Content
         public ContentUnitAuraDefinition aura;
         public ContentUnitResourceGatheringDefinition resourceGathering;
         public ContentUnitAiBehaviorDefinition aiBehavior;
+        public ContentUnitShieldRegenDefinition shieldRegeneration;
+        public ContentUnitVampiricLeechDefinition vampiricLeech;
+        public ContentUnitTauntDefinition tauntPulse;
+        public ContentUnitShieldOverloadNovaDefinition shieldOverloadNova;
+        public ContentUnitDamageReflectDefinition damageReflect;
+        public ContentUnitDeathNovaDefinition deathNova;
+        public int? combatValue;
+        public int? gridSize;
+        public int? maxCapacity;
+        public float? cardModelScalingFactor;
+        public int? coinsAmount;
+        public int? firePointCount;
+        public string copyUpgradesToEntityId;
+        public string[] roles;
+        public string attackType;
+        public string skillType;
+        public string rarity;
+        public string tech;
+        public int? neededExperienceLevel;
+        public string[] systemTags;
+        public string[] baselineStatusEffects;
+        public float? rotationDegreesPerSecond;
+        public float? collisionRadius;
+        public float? attackWarmUpTime;
+        public bool? canAttackWhileMoving;
+        public bool? shootAutomaticallyOnEnemiesWithinRange;
+        public bool? defendPositionAggressivelyWhenIdle;
+        public int? rangeToChooseNewTargetAutomatically;
+        public float? minAttackRange;
+        public ContentOnHitStatusEffectDefinition[] onHitStatusEffects;
+        public float? criticalHitChance;
+        public int? prespawnCount;
+        public string defaultTacticalStance;
+        public string[] startingAffixes;
+        public string defaultLoadout;
+        public int? startingVeterancyRank;
+        public string selectionSoundAssetName;
+        public string engineSoundAssetName;
+        public string weaponSoundAssetName;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
         public ContentProductionBuildingDefinition productionBuilding;
     }
 
+    internal enum BalanceParameterType
+    {
+        Int,
+        Float
+    }
+
+    internal readonly struct BalanceParameterDefinition
+    {
+        public BalanceParameterDefinition(
+            string changeableValueName,
+            int changeableValueOrdinal,
+            string rowFieldName,
+            BalanceParameterType storageType,
+            string mappingNote = null)
+        {
+            ChangeableValueName = changeableValueName;
+            ChangeableValueOrdinal = changeableValueOrdinal;
+            RowFieldName = rowFieldName;
+            StorageType = storageType;
+            MappingNote = mappingNote;
+        }
+
+        /// <summary>Canonical <c>EntityBalancingStore.ChangeableValue</c> member name.</summary>
+        public string ChangeableValueName { get; }
+
+        /// <summary>Ordinal of the member in the pinned 1.0.9 enum declaration order.</summary>
+        public int ChangeableValueOrdinal { get; }
+
+        /// <summary>Exact <c>EntityBalancingParameters</c> field read by the native getter.</summary>
+        public string RowFieldName { get; }
+
+        public BalanceParameterType StorageType { get; }
+
+        /// <summary>
+        /// Native reader for this member in the pinned assembly: int-backed members are
+        /// read by <c>GetOriginalIntValue</c> and float-backed members by
+        /// <c>GetOriginalFloatValue</c> (the latter also serves the global
+        /// <c>ManaRechargePerSecond</c>, which has no per-unit row field).
+        /// </summary>
+        public string NativeGetter =>
+            StorageType == BalanceParameterType.Int ? "GetOriginalIntValue" : "GetOriginalFloatValue";
+
+        /// <summary>Non-obvious field-name note, when the row field cannot be derived from the enum name.</summary>
+        public string MappingNote { get; }
+    }
+
     internal static class UnitBalanceOverrideMapper
     {
-        public static Dictionary<string, float> CreateCustomBalance(ContentUnitDefinition unit)
+        public const int MaximumContiguousSingleExactInteger = 1 << 24;
+
+        // Single source of truth for the 25 per-unit ChangeableValue members, in pinned
+        // enum declaration order (ManaRechargePerSecond, ordinal 23, is global-only and
+        // intentionally absent). Ordinals, row fields, and storage types were verified
+        // against the pinned Assembly-CSharp.dll (1.0.9, SHA-256
+        // d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b, MVID
+        // db0e9462-128d-4296-9900-de18b4bd0c00): GetOriginalIntValue reads Cost,
+        // MaxCapacity, MaxHealth, MaxShield, MaxMana, MaxRank, SightRadius and
+        // SkillRange from their Int32 row fields; GetOriginalFloatValue reads the
+        // remaining 17 from Single row fields. Attack1Cooldown and SpawnTtl are the
+        // two names that must not be derived by casing rules.
+        private static readonly BalanceParameterDefinition[] OrderedParameters =
         {
-            var parameters = new Dictionary<string, float>(StringComparer.Ordinal);
+            new BalanceParameterDefinition("Cost", 0, "cost", BalanceParameterType.Int),
+            new BalanceParameterDefinition("ProductionDuration", 1, "productionDuration", BalanceParameterType.Float),
+            new BalanceParameterDefinition("MaxCapacity", 2, "maxCapacity", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MaxHealth", 3, "maxHealth", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MaxShield", 4, "maxShield", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MaxMana", 5, "maxMana", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MaxRank", 6, "maxRank", BalanceParameterType.Int),
+            new BalanceParameterDefinition("MoveSpeed", 7, "moveSpeed", BalanceParameterType.Float),
+            new BalanceParameterDefinition("SightRadius", 8, "sightRadius", BalanceParameterType.Int),
+            new BalanceParameterDefinition("Damage1", 9, "damage1", BalanceParameterType.Float),
+            new BalanceParameterDefinition("Damage2", 10, "damage2", BalanceParameterType.Float),
+            new BalanceParameterDefinition("WeaponRange", 11, "weaponRange", BalanceParameterType.Float),
+            new BalanceParameterDefinition("Attack1Cooldown", 12, "attackCooldown", BalanceParameterType.Float,
+                "Row field is attackCooldown (no '1'); the primary cooldown. Do not derive by casing."),
+            new BalanceParameterDefinition("Attack2Cooldown", 13, "attack2Cooldown", BalanceParameterType.Float),
+            new BalanceParameterDefinition("EffectRadius1", 14, "effectRadius1", BalanceParameterType.Float),
+            new BalanceParameterDefinition("EffectRadius2", 15, "effectRadius2", BalanceParameterType.Float),
+            new BalanceParameterDefinition("SkillRange", 16, "skillRange", BalanceParameterType.Int),
+            new BalanceParameterDefinition("HealAmount1", 17, "healAmount1", BalanceParameterType.Float),
+            new BalanceParameterDefinition("HealAmount2", 18, "healAmount2", BalanceParameterType.Float),
+            new BalanceParameterDefinition("GainCreditsAmount", 19, "gainCreditsAmount", BalanceParameterType.Float),
+            new BalanceParameterDefinition("SkillManaCost", 20, "skillManaCost", BalanceParameterType.Float),
+            new BalanceParameterDefinition("Duration1", 21, "duration1", BalanceParameterType.Float),
+            new BalanceParameterDefinition("SpawnTtl", 22, "duration2", BalanceParameterType.Float,
+                "Row field is duration2 (no spawnTtl field). Do not derive by casing."),
+            new BalanceParameterDefinition("MaxArmor", 24, "maxArmor", BalanceParameterType.Float),
+            new BalanceParameterDefinition("ArmorProtection", 25, "armorProtection", BalanceParameterType.Float)
+        };
+
+        private static readonly Dictionary<string, BalanceParameterDefinition> BalanceParameters;
+        private static readonly Dictionary<string, BalanceParameterDefinition> RowFieldParameters;
+
+        static UnitBalanceOverrideMapper()
+        {
+            BalanceParameters = new Dictionary<string, BalanceParameterDefinition>(
+                OrderedParameters.Length, StringComparer.Ordinal);
+            RowFieldParameters = new Dictionary<string, BalanceParameterDefinition>(
+                OrderedParameters.Length, StringComparer.Ordinal);
+            for (int i = 0; i < OrderedParameters.Length; i++)
+            {
+                BalanceParameterDefinition definition = OrderedParameters[i];
+                BalanceParameters.Add(definition.ChangeableValueName, definition);
+                RowFieldParameters.Add(definition.RowFieldName, definition);
+            }
+        }
+
+        /// <summary>All 25 per-unit parameters in pinned enum declaration order.</summary>
+        public static IReadOnlyList<BalanceParameterDefinition> AllParameters =>
+            Array.AsReadOnly(OrderedParameters);
+
+        public static Dictionary<string, BalanceParameterDefinition> CreateBalanceParameterMap()
+        {
+            return new Dictionary<string, BalanceParameterDefinition>(BalanceParameters, StringComparer.Ordinal);
+        }
+
+        public static bool TryGetBalanceParameterDefinition(
+            string name,
+            out BalanceParameterDefinition parameterDefinition)
+        {
+            if (name == null)
+            {
+                parameterDefinition = default(BalanceParameterDefinition);
+                return false;
+            }
+
+            return BalanceParameters.TryGetValue(name, out parameterDefinition);
+        }
+
+        /// <summary>
+        /// Reverse lookup from an exact native row field name (for example
+        /// <c>attackCooldown</c> or <c>duration2</c>) to its canonical
+        /// <c>ChangeableValue</c> member. Matching is ordinal and exact: aliases
+        /// such as <c>duration</c>, <c>spawnTtl</c>, or <c>MoveSpeed</c> do not resolve.
+        /// </summary>
+        public static bool TryGetByRowFieldName(
+            string rowFieldName,
+            out BalanceParameterDefinition parameterDefinition)
+        {
+            if (rowFieldName == null)
+            {
+                parameterDefinition = default(BalanceParameterDefinition);
+                return false;
+            }
+
+            return RowFieldParameters.TryGetValue(rowFieldName, out parameterDefinition);
+        }
+
+        public static bool IsNativeIntegerBalanceRowField(string rowFieldName)
+        {
+            return TryGetByRowFieldName(rowFieldName, out BalanceParameterDefinition definition) &&
+                definition.StorageType == BalanceParameterType.Int;
+        }
+
+        /// <summary>
+        /// Shared validation + conversion for a single canonical parameter. This is
+        /// the only place that turns a <c>double</c> manifest value into the boxed
+        /// native <c>int</c>/<c>float</c> row value, so package validation and the
+        /// runtime mutator cannot drift apart.
+        /// </summary>
+        public static bool TryConvertBalanceValue(
+            string name,
+            double value,
+            out object convertedValue,
+            out string diagnostic)
+        {
+            convertedValue = null;
+            if (!TryGetBalanceParameterDefinition(name, out BalanceParameterDefinition definition))
+            {
+                diagnostic = "Custom balance keys must target per-unit ChangeableValue members with a native row field.";
+                return false;
+            }
+
+            return TryConvertBalanceValue(definition, value, out convertedValue, out diagnostic);
+        }
+
+        public static bool TryConvertBalanceValue(
+            BalanceParameterDefinition definition,
+            double value,
+            out object convertedValue,
+            out string diagnostic)
+        {
+            convertedValue = null;
+            if (!TryValidateCustomBalanceValue(definition.ChangeableValueName, value, out diagnostic))
+            {
+                return false;
+            }
+
+            convertedValue = definition.StorageType == BalanceParameterType.Int
+                ? (object)(int)value
+                : (object)(float)value;
+            diagnostic = null;
+            return true;
+        }
+
+        public static bool TryValidateCustomBalanceValue(string name, double value, out string diagnostic)
+        {
+            if (!TryGetBalanceParameterDefinition(name, out BalanceParameterDefinition parameterDefinition))
+            {
+                diagnostic = "Custom balance keys must target per-unit ChangeableValue members with a native row field.";
+                return false;
+            }
+
+            if (Double.IsNaN(value) || Double.IsInfinity(value) || value < 0d)
+            {
+                diagnostic = "Custom balance values must be finite and non-negative.";
+                return false;
+            }
+
+            if (parameterDefinition.StorageType == BalanceParameterType.Int &&
+                (Math.Truncate(value) != value || value > MaximumContiguousSingleExactInteger))
+            {
+                diagnostic = "Integer-backed balance fields require whole-number values within the exact native Single integer range.";
+                return false;
+            }
+
+            if (parameterDefinition.StorageType == BalanceParameterType.Float && value > Single.MaxValue)
+            {
+                diagnostic = "Float-backed balance values must fit the native Single range.";
+                return false;
+            }
+
+            diagnostic = null;
+            return true;
+        }
+
+        public static Dictionary<string, double> CreateCustomBalance(ContentUnitDefinition unit)
+        {
+            var parameters = new Dictionary<string, double>(StringComparer.Ordinal);
             if (unit == null)
             {
                 return parameters;
@@ -284,13 +649,39 @@ namespace RogueCommandExpansionLoader.Content
 
             if (unit.customBalance != null)
             {
-                foreach (KeyValuePair<string, float> parameter in unit.customBalance)
+                foreach (KeyValuePair<string, double> parameter in unit.customBalance)
                 {
-                    parameters[parameter.Key] = parameter.Value;
+                    if (!TryGetBalanceParameterDefinition(parameter.Key, out _))
+                    {
+                        throw new InvalidOperationException("Unsupported per-unit balance parameter '" +
+                            parameter.Key + "'.");
+                    }
+                }
+
+                // Emit in pinned enum order so diagnostics, overrides, and provider
+                // rows are deterministic regardless of manifest key order. Values
+                // are re-validated here so this mapper never forwards a value that
+                // package validation would have rejected.
+                for (int i = 0; i < OrderedParameters.Length; i++)
+                {
+                    BalanceParameterDefinition definition = OrderedParameters[i];
+                    double value;
+                    if (!unit.customBalance.TryGetValue(definition.ChangeableValueName, out value))
+                    {
+                        continue;
+                    }
+
+                    if (!TryValidateCustomBalanceValue(definition.ChangeableValueName, value, out string diagnostic))
+                    {
+                        throw new InvalidOperationException("Invalid value for per-unit balance parameter '" +
+                            definition.ChangeableValueName + "': " + diagnostic);
+                    }
+
+                    parameters.Add(definition.ChangeableValueName, value);
                 }
             }
 
-            // Apply only a positive structured speed. A zero in a JsonUtility DTO is
+            // Apply only a positive structured speed. A zero in this DTO is
             // indistinguishable from an omitted value; explicit zero belongs in the
             // native balanceOverrides list. Explicit raw row overrides take priority.
             if (unit.movement != null && unit.movement.moveSpeed > 0f &&
@@ -301,6 +692,39 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             return parameters;
+        }
+
+        public static List<BalanceOverride> CreateBalanceOverridesForLoadedUnits(
+            IEnumerable<ContentUnitDefinition> candidateUnits,
+            ISet<string> registeredUnitIds)
+        {
+            var overrides = new List<BalanceOverride>();
+            if (candidateUnits == null || registeredUnitIds == null)
+            {
+                return overrides;
+            }
+
+            foreach (ContentUnitDefinition unit in candidateUnits)
+            {
+                if (unit == null || String.IsNullOrWhiteSpace(unit.id) || !registeredUnitIds.Contains(unit.id))
+                {
+                    continue;
+                }
+
+                Dictionary<string, double> parameters = CreateCustomBalance(unit);
+                if (parameters.Count == 0)
+                {
+                    continue;
+                }
+
+                overrides.Add(new BalanceOverride
+                {
+                    EntityId = unit.id,
+                    Parameters = parameters
+                });
+            }
+
+            return overrides;
         }
 
         private static bool HasExplicitRowOverride(ContentUnitDefinition unit, string fieldName)
@@ -326,7 +750,6 @@ namespace RogueCommandExpansionLoader.Content
 
     [Serializable]
     public sealed class ContentProductionBuildingDefinition
-
     {
         public string id;
         public string nativeTemplateId;
@@ -334,6 +757,76 @@ namespace RogueCommandExpansionLoader.Content
         public string cardImageAssetName;
         public string visualAssetName;
         public string visualRootPath;
+        public int? gridSize;
+        public int? maxCapacity;
+        public int? cost;
+        public float? buildTime;
+        public int? combatValue;
+        public string rarity;
+        public string tech;
+        public int? neededExperienceLevel;
+        public string[] roles;
+        public string[] systemTags;
+        public float? cardModelScalingFactor;
+        public ContentBalanceOverride[] balanceOverrides;
+        public ContentUnitLocalizationDefinition[] localizations;
+    }
+
+    [Serializable]
+    public sealed class ContentBuildingDefinition
+    {
+        public string id;
+        public string nativeTemplateId;
+        public string assetBundleId;
+        public string cardImageAssetName;
+        public string visualAssetName;
+        public string visualRootPath;
+        public int? gridSize;
+        public int? maxCapacity;
+        public int? cost;
+        public float? buildTime;
+        public int? combatValue;
+        public string rarity;
+        public string tech;
+        public int? neededExperienceLevel;
+        public string[] roles;
+        public string[] systemTags;
+        public float? cardModelScalingFactor;
+        public int? firePointCount;
+        public float? damage1;
+        public float? attackCooldown;
+        public float? weaponRange;
+        public float? damage2;
+        public float? attack2Cooldown;
+        public string attackType;
+        public string skillType;
+        public int? skillRange;
+        public float? skillManaCost;
+        public float? healAmount1;
+        public float? healAmount2;
+        public float? effectRadius1;
+        public float? effectRadius2;
+        public float? duration1;
+        public float? duration2;
+        public bool? isAllowedAsBlueprint;
+        public bool? isAllowedAsStartingBlueprint;
+        public bool? isAllowedForAi;
+        public bool? isAllowedForDemo;
+        public bool? isForSpecialists;
+        public float? rotationDegreesPerSecond;
+        public float? collisionRadius;
+        public float? attackWarmUpTime;
+        public bool? canAttackWhileMoving;
+        public bool? shootAutomaticallyOnEnemiesWithinRange;
+        public bool? defendPositionAggressivelyWhenIdle;
+        public int? rangeToChooseNewTargetAutomatically;
+        public float? minAttackRange;
+        public ContentOnHitStatusEffectDefinition[] onHitStatusEffects;
+        public float? criticalHitChance;
+        public int? prespawnCount;
+        public string selectionSoundAssetName;
+        public string engineSoundAssetName;
+        public string weaponSoundAssetName;
         public ContentBalanceOverride[] balanceOverrides;
         public ContentUnitLocalizationDefinition[] localizations;
     }
@@ -357,15 +850,52 @@ namespace RogueCommandExpansionLoader.Content
         public string tech;
         public string offeredSystemTags;
         public string neededSystemTags;
+        public int coinsAmount;
         public int neededExperienceLevel;
         public bool isAllowedForDemo;
         public bool isForSpecialists;
+        public bool inactive;
         public ContentRelicLocalizationDefinition[] localizations;
         public ContentCardChangeDefinition[] cardChanges;
     }
 
     [Serializable]
     public sealed class ContentRelicLocalizationDefinition
+    {
+        public string language;
+        public string name;
+        public string description;
+    }
+
+    [Serializable]
+    public sealed class ContentUpgradeDefinition
+    {
+        public string id;
+        public string assetBundleId;
+        public string imageAssetName;
+        public string rarity;
+        public string tech;
+        public string offeredSystemTags;
+        public string neededSystemTags;
+        public int coinsAmount;
+        public int neededExperienceLevel;
+        public bool isAllowedForDemo;
+        public bool isForSpecialists;
+        public bool inactive;
+        public bool applyToFactoryWhereApplicable;
+        public string[] entityMustHaveOneOfTheseRoles;
+        public string[] entityMustNotHaveOneOfTheseRoles;
+        public string attackTypeFilterHandling;
+        public string attackTypeFilter;
+        public string skillTypeFilterHandling;
+        public string skillTypeFilter;
+        public string[] mustNotHaveOneOfTheseEntityIds;
+        public ContentUpgradeLocalizationDefinition[] localizations;
+        public ContentCardChangeDefinition[] cardChanges;
+    }
+
+    [Serializable]
+    public sealed class ContentUpgradeLocalizationDefinition
     {
         public string language;
         public string name;
@@ -382,6 +912,12 @@ namespace RogueCommandExpansionLoader.Content
         public bool multiplyValueWithCurrentHeatLevel;
         public string multiplyValueWithMetaProgressionMultiplier;
         public string[] onlyForTheseEntityIds;
+        public string[] cardMustHaveAllOfTheseRoles;
+        public string[] cardMustHaveOneOfTheseRoles;
+        public string[] cardMustNotHaveOneOfTheseRoles;
+        public string[] cardMustNotHaveOneOfTheseTechs;
+        public string[] entityIdsNotAllowed;
+        public bool changeableValueHasToBeGreaterZero;
     }
 
     [Serializable]
@@ -439,6 +975,154 @@ namespace RogueCommandExpansionLoader.Content
         public string[] unitIds;
     }
 
+#nullable enable
+    internal static class StageBlueprintFactoryIds
+    {
+        public static HashSet<string> CollectLoaderFactoryIds(
+            ContentStageDefinition stage,
+            Func<string, string?> resolveFactoryId)
+        {
+            if (stage == null)
+            {
+                throw new ArgumentNullException(nameof(stage));
+            }
+
+            if (resolveFactoryId == null)
+            {
+                throw new ArgumentNullException(nameof(resolveFactoryId));
+            }
+
+            var factoryIds = new HashSet<string>(StringComparer.Ordinal);
+            AddLoaderFactoryIds(stage.unitIds, resolveFactoryId, factoryIds);
+
+            ContentStagePoolEntryDefinition[] poolEntries = stage.blueprintPoolEntries;
+            for (int i = 0; poolEntries != null && i < poolEntries.Length; i++)
+            {
+                if (poolEntries[i] != null)
+                {
+                    AddLoaderFactoryIds(poolEntries[i].unitIds, resolveFactoryId, factoryIds);
+                }
+            }
+
+            return factoryIds;
+        }
+
+        private static void AddLoaderFactoryIds(
+            string[] productIds,
+            Func<string, string?> resolveFactoryId,
+            HashSet<string> factoryIds)
+        {
+            for (int i = 0; productIds != null && i < productIds.Length; i++)
+            {
+                if (String.IsNullOrWhiteSpace(productIds[i]))
+                {
+                    continue;
+                }
+
+                string? factoryId = resolveFactoryId(productIds[i]);
+                if (!String.IsNullOrWhiteSpace(factoryId))
+                {
+                    factoryIds.Add(factoryId);
+                }
+            }
+        }
+    }
+
+    internal static class StageBlueprintPoolFactoryIds
+    {
+        public static Dictionary<string, HashSet<string>> CollectByPool(
+            IEnumerable<string> stageFactoryIds,
+            IEnumerable<string> availablePoolIds,
+            ContentStagePoolEntryDefinition[] poolEntries,
+            Func<string, string?> resolveFactoryId)
+        {
+            if (stageFactoryIds == null)
+            {
+                throw new ArgumentNullException(nameof(stageFactoryIds));
+            }
+
+            if (availablePoolIds == null)
+            {
+                throw new ArgumentNullException(nameof(availablePoolIds));
+            }
+
+            if (resolveFactoryId == null)
+            {
+                throw new ArgumentNullException(nameof(resolveFactoryId));
+            }
+
+            var stageIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string stageFactoryId in stageFactoryIds)
+            {
+                if (!String.IsNullOrWhiteSpace(stageFactoryId))
+                {
+                    stageIds.Add(stageFactoryId);
+                }
+            }
+
+            var explicitPoolIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; poolEntries != null && i < poolEntries.Length; i++)
+            {
+                ContentStagePoolEntryDefinition entry = poolEntries[i];
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(entry.poolId))
+                {
+                    throw new ArgumentException("A stage pool entry must name a pool.", nameof(poolEntries));
+                }
+
+                explicitPoolIds.Add(entry.poolId);
+            }
+
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            foreach (string poolId in availablePoolIds)
+            {
+                if (!String.IsNullOrWhiteSpace(poolId) && !result.ContainsKey(poolId))
+                {
+                    HashSet<string> initialUnitIds = explicitPoolIds.Contains(poolId)
+                        ? new HashSet<string>(StringComparer.Ordinal)
+                        : new HashSet<string>(stageIds, StringComparer.Ordinal);
+                    result.Add(poolId, initialUnitIds);
+                }
+            }
+
+            for (int i = 0; poolEntries != null && i < poolEntries.Length; i++)
+            {
+                ContentStagePoolEntryDefinition entry = poolEntries[i];
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                HashSet<string>? poolUnitIds;
+                if (!result.TryGetValue(entry.poolId, out poolUnitIds) || poolUnitIds == null)
+                {
+                    poolUnitIds = new HashSet<string>(StringComparer.Ordinal);
+                    result[entry.poolId] = poolUnitIds;
+                }
+
+                for (int j = 0; entry.unitIds != null && j < entry.unitIds.Length; j++)
+                {
+                    string productId = entry.unitIds[j];
+                    if (String.IsNullOrWhiteSpace(productId))
+                    {
+                        continue;
+                    }
+
+                    string? factoryId = resolveFactoryId(productId);
+                    string poolUnitId = String.IsNullOrWhiteSpace(factoryId) ? productId : factoryId;
+                    poolUnitIds.Add(poolUnitId);
+                }
+            }
+
+            return result;
+        }
+    }
+#nullable restore
+
     [Serializable]
     public sealed class ContentAiProfileDefinition
     {
@@ -451,6 +1135,12 @@ namespace RogueCommandExpansionLoader.Content
         public ContentAiUnitEntryDefinition[] unitEntries;
         public ContentAiProductionBuildingEntryDefinition[] productionBuildingEntries;
         public ContentAiModuleDefinition[] modules;
+        public string doctrine;
+        public float? aggressionMultiplier;
+        public string defaultUnitStance;
+        public string defaultUnitLoadout;
+        public string[] startingUnitAffixes;
+        public int? startingUnitVeterancyRank;
     }
 
     [Serializable]
@@ -507,9 +1197,11 @@ namespace RogueCommandExpansionLoader.Content
                 assetBundleManifestPath = source.assetBundleManifestPath,
                 assetBundles = CloneArray(source.assetBundles, CloneBundle),
                 units = CloneArray(source.units, CloneUnit),
+                buildings = CloneArray(source.buildings, CloneBuilding),
                 stages = CloneArray(source.stages, CloneStage),
                 aiProfiles = CloneArray(source.aiProfiles, CloneAiProfile),
-                relics = CloneArray(source.relics, CloneRelic)
+                relics = CloneArray(source.relics, CloneRelic),
+                upgrades = CloneArray(source.upgrades, CloneUpgrade)
             };
         }
 
@@ -540,18 +1232,37 @@ namespace RogueCommandExpansionLoader.Content
             {
                 id = source.id,
                 unitType = source.unitType,
-                customBalance = source.customBalance == null ? null : new Dictionary<string, float>(source.customBalance),
+                customBalance = source.customBalance == null ? null : new Dictionary<string, double>(source.customBalance),
                 assetBundleId = source.assetBundleId,
                 balanceAssetName = source.balanceAssetName,
                 prefabAssetName = source.prefabAssetName,
                 cardImageAssetName = source.cardImageAssetName,
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
+                nativeRigRetarget = CloneNativeRigRetarget(source.nativeRigRetarget),
                 nativeTemplateId = source.nativeTemplateId,
                 isAllowedAsStartingBlueprint = source.isAllowedAsStartingBlueprint,
                 isAllowedForAi = source.isAllowedForAi,
                 isAllowedForDemo = source.isAllowedForDemo,
                 isForSpecialists = source.isForSpecialists,
+                rotationDegreesPerSecond = source.rotationDegreesPerSecond,
+                collisionRadius = source.collisionRadius,
+                attackWarmUpTime = source.attackWarmUpTime,
+                canAttackWhileMoving = source.canAttackWhileMoving,
+                shootAutomaticallyOnEnemiesWithinRange = source.shootAutomaticallyOnEnemiesWithinRange,
+                defendPositionAggressivelyWhenIdle = source.defendPositionAggressivelyWhenIdle,
+                rangeToChooseNewTargetAutomatically = source.rangeToChooseNewTargetAutomatically,
+                minAttackRange = source.minAttackRange,
+                onHitStatusEffects = CloneArray(source.onHitStatusEffects, CloneOnHitStatusEffect),
+                criticalHitChance = source.criticalHitChance,
+                prespawnCount = source.prespawnCount,
+                defaultTacticalStance = source.defaultTacticalStance,
+                startingAffixes = source.startingAffixes != null ? (string[])source.startingAffixes.Clone() : null,
+                defaultLoadout = source.defaultLoadout,
+                startingVeterancyRank = source.startingVeterancyRank,
+                selectionSoundAssetName = source.selectionSoundAssetName,
+                engineSoundAssetName = source.engineSoundAssetName,
+                weaponSoundAssetName = source.weaponSoundAssetName,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization),
                 abilities = CloneArray(source.abilities, CloneAbility),
@@ -562,6 +1273,7 @@ namespace RogueCommandExpansionLoader.Content
                 experience = CloneUnitExperience(source.experience),
                 synergies = CloneArray(source.synergies, CloneUnitSynergy),
                 visualVariants = CloneArray(source.visualVariants, CloneUnitVisualVariant),
+                variants = CloneArray(source.variants, CloneUnitVariant),
                 spawn = CloneUnitSpawn(source.spawn),
                 statusEffects = CloneArray(source.statusEffects, CloneUnitStatusEffect),
                 productionQueue = CloneUnitProductionQueue(source.productionQueue),
@@ -577,6 +1289,27 @@ namespace RogueCommandExpansionLoader.Content
                 aura = CloneUnitAura(source.aura),
                 resourceGathering = CloneUnitResourceGathering(source.resourceGathering),
                 aiBehavior = CloneUnitAiBehavior(source.aiBehavior),
+                shieldRegeneration = CloneShieldRegen(source.shieldRegeneration),
+                vampiricLeech = CloneVampiricLeech(source.vampiricLeech),
+                tauntPulse = CloneTaunt(source.tauntPulse),
+                shieldOverloadNova = CloneShieldOverloadNova(source.shieldOverloadNova),
+                damageReflect = CloneDamageReflect(source.damageReflect),
+                deathNova = CloneDeathNova(source.deathNova),
+                combatValue = source.combatValue,
+                gridSize = source.gridSize,
+                maxCapacity = source.maxCapacity,
+                cardModelScalingFactor = source.cardModelScalingFactor,
+                coinsAmount = source.coinsAmount,
+                firePointCount = source.firePointCount,
+                copyUpgradesToEntityId = source.copyUpgradesToEntityId,
+                roles = source.roles != null ? (string[])source.roles.Clone() : null,
+                attackType = source.attackType,
+                skillType = source.skillType,
+                rarity = source.rarity,
+                tech = source.tech,
+                neededExperienceLevel = source.neededExperienceLevel,
+                systemTags = source.systemTags != null ? (string[])source.systemTags.Clone() : null,
+                baselineStatusEffects = source.baselineStatusEffects != null ? (string[])source.baselineStatusEffects.Clone() : null,
                 productionBuilding = CloneProductionBuilding(source.productionBuilding)
             };
         }
@@ -593,12 +1326,35 @@ namespace RogueCommandExpansionLoader.Content
 
         private static ContentActiveSkillDefinition CloneActiveSkill(ContentActiveSkillDefinition source)
         {
-            return source == null ? null : new ContentActiveSkillDefinition { id = source.id, skillType = source.skillType, cooldown = source.cooldown, manaCost = source.manaCost, effectValue = source.effectValue };
+            return source == null ? null : new ContentActiveSkillDefinition
+            {
+                id = source.id,
+                skillType = source.skillType,
+                cooldown = source.cooldown,
+                manaCost = source.manaCost,
+                effectValue = source.effectValue,
+                targetOrigin = source.targetOrigin,
+                range = source.range,
+                radius = source.radius,
+                helpAiToActivate = source.helpAiToActivate,
+                aiActivationTrigger = source.aiActivationTrigger,
+                aiSkillCooldown = source.aiSkillCooldown
+            };
         }
 
         private static ContentCombatBoostDefinition CloneCombatBoost(ContentCombatBoostDefinition source)
         {
             return source == null ? null : new ContentCombatBoostDefinition { id = source.id, statName = source.statName, multiplier = source.multiplier, duration = source.duration };
+        }
+
+        private static ContentOnHitStatusEffectDefinition CloneOnHitStatusEffect(ContentOnHitStatusEffectDefinition source)
+        {
+            return source == null ? null : new ContentOnHitStatusEffectDefinition
+            {
+                statusEffect = source.statusEffect,
+                duration = source.duration,
+                chance = source.chance
+            };
         }
 
         private static ContentUnitUpgradeDefinition CloneUnitUpgrade(ContentUnitUpgradeDefinition source)
@@ -643,7 +1399,46 @@ namespace RogueCommandExpansionLoader.Content
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
                 colorTint = source.colorTint,
-                scale = source.scale
+                scale = source.scale,
+                modules = CloneArray(source.modules, CloneUnitVisualModule)
+            };
+        }
+
+        private static ContentNativeRigRetargetDefinition CloneNativeRigRetarget(
+            ContentNativeRigRetargetDefinition source)
+        {
+            return source == null ? null : new ContentNativeRigRetargetDefinition
+            {
+                mappings = CloneArray(source.mappings, CloneNativeRigRetargetMapping)
+            };
+        }
+
+        private static ContentNativeRigRetargetMappingDefinition CloneNativeRigRetargetMapping(
+            ContentNativeRigRetargetMappingDefinition source)
+        {
+            return source == null ? null : new ContentNativeRigRetargetMappingDefinition
+            {
+                sourcePath = source.sourcePath,
+                targetPath = source.targetPath
+            };
+        }
+
+        private static ContentUnitVisualModuleDefinition CloneUnitVisualModule(ContentUnitVisualModuleDefinition source)
+        {
+            return source == null ? null : new ContentUnitVisualModuleDefinition
+            {
+                slotId = source.slotId,
+                assetName = source.assetName
+            };
+        }
+
+        private static ContentUnitVariantDefinition CloneUnitVariant(ContentUnitVariantDefinition source)
+        {
+            return source == null ? null : new ContentUnitVariantDefinition
+            {
+                id = source.id,
+                loadout = source.loadout,
+                balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride)
             };
         }
 
@@ -806,6 +1601,69 @@ namespace RogueCommandExpansionLoader.Content
             };
         }
 
+        private static ContentUnitShieldRegenDefinition CloneShieldRegen(ContentUnitShieldRegenDefinition source)
+        {
+            return source == null ? null : new ContentUnitShieldRegenDefinition
+            {
+                rechargeDelay = source.rechargeDelay,
+                rechargeRate = source.rechargeRate,
+                burstAmount = source.burstAmount
+            };
+        }
+
+        private static ContentUnitVampiricLeechDefinition CloneVampiricLeech(ContentUnitVampiricLeechDefinition source)
+        {
+            return source == null ? null : new ContentUnitVampiricLeechDefinition
+            {
+                siphonRatio = source.siphonRatio,
+                siphonToShield = source.siphonToShield,
+                maxSiphonPerHit = source.maxSiphonPerHit
+            };
+        }
+
+        private static ContentUnitTauntDefinition CloneTaunt(ContentUnitTauntDefinition source)
+        {
+            return source == null ? null : new ContentUnitTauntDefinition
+            {
+                pulseInterval = source.pulseInterval,
+                tauntRadius = source.tauntRadius,
+                duration = source.duration,
+                maxTargets = source.maxTargets
+            };
+        }
+
+        private static ContentUnitShieldOverloadNovaDefinition CloneShieldOverloadNova(ContentUnitShieldOverloadNovaDefinition source)
+        {
+            return source == null ? null : new ContentUnitShieldOverloadNovaDefinition
+            {
+                novaRadius = source.novaRadius,
+                damage = source.damage,
+                stunDuration = source.stunDuration,
+                cooldown = source.cooldown
+            };
+        }
+
+        private static ContentUnitDamageReflectDefinition CloneDamageReflect(ContentUnitDamageReflectDefinition source)
+        {
+            return source == null ? null : new ContentUnitDamageReflectDefinition
+            {
+                reflectRatio = source.reflectRatio,
+                maxReflectPerHit = source.maxReflectPerHit
+            };
+        }
+
+        private static ContentUnitDeathNovaDefinition CloneDeathNova(ContentUnitDeathNovaDefinition source)
+        {
+            return source == null ? null : new ContentUnitDeathNovaDefinition
+            {
+                novaRadius = source.novaRadius,
+                damage = source.damage,
+                stunDuration = source.stunDuration,
+                slowDuration = source.slowDuration,
+                maxTargets = source.maxTargets
+            };
+        }
+
         private static ContentProductionBuildingDefinition CloneProductionBuilding(
             ContentProductionBuildingDefinition source)
         {
@@ -817,6 +1675,78 @@ namespace RogueCommandExpansionLoader.Content
                 cardImageAssetName = source.cardImageAssetName,
                 visualAssetName = source.visualAssetName,
                 visualRootPath = source.visualRootPath,
+                gridSize = source.gridSize,
+                maxCapacity = source.maxCapacity,
+                cost = source.cost,
+                buildTime = source.buildTime,
+                combatValue = source.combatValue,
+                rarity = source.rarity,
+                tech = source.tech,
+                neededExperienceLevel = source.neededExperienceLevel,
+                roles = source.roles != null ? (string[])source.roles.Clone() : null,
+                systemTags = source.systemTags != null ? (string[])source.systemTags.Clone() : null,
+                cardModelScalingFactor = source.cardModelScalingFactor,
+                balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
+                localizations = CloneArray(source.localizations, CloneUnitLocalization)
+            };
+        }
+
+        private static ContentBuildingDefinition CloneBuilding(ContentBuildingDefinition source)
+        {
+            return source == null ? null : new ContentBuildingDefinition
+            {
+                id = source.id,
+                nativeTemplateId = source.nativeTemplateId,
+                assetBundleId = source.assetBundleId,
+                cardImageAssetName = source.cardImageAssetName,
+                visualAssetName = source.visualAssetName,
+                visualRootPath = source.visualRootPath,
+                gridSize = source.gridSize,
+                maxCapacity = source.maxCapacity,
+                cost = source.cost,
+                buildTime = source.buildTime,
+                combatValue = source.combatValue,
+                rarity = source.rarity,
+                tech = source.tech,
+                neededExperienceLevel = source.neededExperienceLevel,
+                roles = source.roles != null ? (string[])source.roles.Clone() : null,
+                systemTags = source.systemTags != null ? (string[])source.systemTags.Clone() : null,
+                cardModelScalingFactor = source.cardModelScalingFactor,
+                firePointCount = source.firePointCount,
+                damage1 = source.damage1,
+                attackCooldown = source.attackCooldown,
+                weaponRange = source.weaponRange,
+                damage2 = source.damage2,
+                attack2Cooldown = source.attack2Cooldown,
+                attackType = source.attackType,
+                skillType = source.skillType,
+                skillRange = source.skillRange,
+                skillManaCost = source.skillManaCost,
+                healAmount1 = source.healAmount1,
+                healAmount2 = source.healAmount2,
+                effectRadius1 = source.effectRadius1,
+                effectRadius2 = source.effectRadius2,
+                duration1 = source.duration1,
+                duration2 = source.duration2,
+                isAllowedAsBlueprint = source.isAllowedAsBlueprint,
+                isAllowedAsStartingBlueprint = source.isAllowedAsStartingBlueprint,
+                isAllowedForAi = source.isAllowedForAi,
+                isAllowedForDemo = source.isAllowedForDemo,
+                isForSpecialists = source.isForSpecialists,
+                rotationDegreesPerSecond = source.rotationDegreesPerSecond,
+                collisionRadius = source.collisionRadius,
+                attackWarmUpTime = source.attackWarmUpTime,
+                canAttackWhileMoving = source.canAttackWhileMoving,
+                shootAutomaticallyOnEnemiesWithinRange = source.shootAutomaticallyOnEnemiesWithinRange,
+                defendPositionAggressivelyWhenIdle = source.defendPositionAggressivelyWhenIdle,
+                rangeToChooseNewTargetAutomatically = source.rangeToChooseNewTargetAutomatically,
+                minAttackRange = source.minAttackRange,
+                onHitStatusEffects = CloneArray(source.onHitStatusEffects, CloneOnHitStatusEffect),
+                criticalHitChance = source.criticalHitChance,
+                prespawnCount = source.prespawnCount,
+                selectionSoundAssetName = source.selectionSoundAssetName,
+                engineSoundAssetName = source.engineSoundAssetName,
+                weaponSoundAssetName = source.weaponSoundAssetName,
                 balanceOverrides = CloneArray(source.balanceOverrides, CloneBalanceOverride),
                 localizations = CloneArray(source.localizations, CloneUnitLocalization)
             };
@@ -909,7 +1839,13 @@ namespace RogueCommandExpansionLoader.Content
                 unitEntries = CloneArray(source.unitEntries, CloneAiUnitEntry),
                 productionBuildingEntries = CloneArray(source.productionBuildingEntries,
                     CloneAiProductionBuildingEntry),
-                modules = CloneArray(source.modules, CloneAiModule)
+                modules = CloneArray(source.modules, CloneAiModule),
+                doctrine = source.doctrine,
+                aggressionMultiplier = source.aggressionMultiplier,
+                defaultUnitStance = source.defaultUnitStance,
+                defaultUnitLoadout = source.defaultUnitLoadout,
+                startingUnitAffixes = source.startingUnitAffixes != null ? (string[])source.startingUnitAffixes.Clone() : null,
+                startingUnitVeterancyRank = source.startingUnitVeterancyRank
             };
         }
 
@@ -924,9 +1860,11 @@ namespace RogueCommandExpansionLoader.Content
                 tech = source.tech,
                 offeredSystemTags = source.offeredSystemTags,
                 neededSystemTags = source.neededSystemTags,
+                coinsAmount = source.coinsAmount,
                 neededExperienceLevel = source.neededExperienceLevel,
                 isAllowedForDemo = source.isAllowedForDemo,
                 isForSpecialists = source.isForSpecialists,
+                inactive = source.inactive,
                 localizations = CloneArray(source.localizations, CloneRelicLocalization),
                 cardChanges = CloneArray(source.cardChanges, CloneCardChange)
             };
@@ -936,6 +1874,52 @@ namespace RogueCommandExpansionLoader.Content
             ContentRelicLocalizationDefinition source)
         {
             return source == null ? null : new ContentRelicLocalizationDefinition
+            {
+                language = source.language,
+                name = source.name,
+                description = source.description
+            };
+        }
+
+        private static ContentUpgradeDefinition CloneUpgrade(ContentUpgradeDefinition source)
+        {
+            return source == null ? null : new ContentUpgradeDefinition
+            {
+                id = source.id,
+                assetBundleId = source.assetBundleId,
+                imageAssetName = source.imageAssetName,
+                rarity = source.rarity,
+                tech = source.tech,
+                offeredSystemTags = source.offeredSystemTags,
+                neededSystemTags = source.neededSystemTags,
+                coinsAmount = source.coinsAmount,
+                neededExperienceLevel = source.neededExperienceLevel,
+                isAllowedForDemo = source.isAllowedForDemo,
+                isForSpecialists = source.isForSpecialists,
+                inactive = source.inactive,
+                applyToFactoryWhereApplicable = source.applyToFactoryWhereApplicable,
+                entityMustHaveOneOfTheseRoles = source.entityMustHaveOneOfTheseRoles == null
+                    ? null
+                    : (string[])source.entityMustHaveOneOfTheseRoles.Clone(),
+                entityMustNotHaveOneOfTheseRoles = source.entityMustNotHaveOneOfTheseRoles == null
+                    ? null
+                    : (string[])source.entityMustNotHaveOneOfTheseRoles.Clone(),
+                attackTypeFilterHandling = source.attackTypeFilterHandling,
+                attackTypeFilter = source.attackTypeFilter,
+                skillTypeFilterHandling = source.skillTypeFilterHandling,
+                skillTypeFilter = source.skillTypeFilter,
+                mustNotHaveOneOfTheseEntityIds = source.mustNotHaveOneOfTheseEntityIds == null
+                    ? null
+                    : (string[])source.mustNotHaveOneOfTheseEntityIds.Clone(),
+                localizations = CloneArray(source.localizations, CloneUpgradeLocalization),
+                cardChanges = CloneArray(source.cardChanges, CloneCardChange)
+            };
+        }
+
+        private static ContentUpgradeLocalizationDefinition CloneUpgradeLocalization(
+            ContentUpgradeLocalizationDefinition source)
+        {
+            return source == null ? null : new ContentUpgradeLocalizationDefinition
             {
                 language = source.language,
                 name = source.name,
@@ -955,7 +1939,23 @@ namespace RogueCommandExpansionLoader.Content
                 multiplyValueWithMetaProgressionMultiplier = source.multiplyValueWithMetaProgressionMultiplier,
                 onlyForTheseEntityIds = source.onlyForTheseEntityIds == null
                     ? null
-                    : (string[])source.onlyForTheseEntityIds.Clone()
+                    : (string[])source.onlyForTheseEntityIds.Clone(),
+                cardMustHaveAllOfTheseRoles = source.cardMustHaveAllOfTheseRoles == null
+                    ? null
+                    : (string[])source.cardMustHaveAllOfTheseRoles.Clone(),
+                cardMustHaveOneOfTheseRoles = source.cardMustHaveOneOfTheseRoles == null
+                    ? null
+                    : (string[])source.cardMustHaveOneOfTheseRoles.Clone(),
+                cardMustNotHaveOneOfTheseRoles = source.cardMustNotHaveOneOfTheseRoles == null
+                    ? null
+                    : (string[])source.cardMustNotHaveOneOfTheseRoles.Clone(),
+                cardMustNotHaveOneOfTheseTechs = source.cardMustNotHaveOneOfTheseTechs == null
+                    ? null
+                    : (string[])source.cardMustNotHaveOneOfTheseTechs.Clone(),
+                entityIdsNotAllowed = source.entityIdsNotAllowed == null
+                    ? null
+                    : (string[])source.entityIdsNotAllowed.Clone(),
+                changeableValueHasToBeGreaterZero = source.changeableValueHasToBeGreaterZero
             };
         }
 

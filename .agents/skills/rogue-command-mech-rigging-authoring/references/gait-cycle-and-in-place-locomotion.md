@@ -97,13 +97,12 @@ In Blender:
 Every modded walker model should export an FBX containing these four NLA Actions:
 
 1. **`Action_Idle` (30 frames, Looping):**
-   - Subtle chassis breathing, hydraulic pressure micro-adjustments, radiator flutter.
+   - Shallow chassis breathing with slow-in/out shoulders at f8/f22 and a peak at f15.
    - Legs remain firmly planted with zero foot movement.
 2. **`Action_Walk` (or `Action_Drive`, 40 frames, Looping):**
    - In-place gait cycle with pelvis counter-sway and foot lift arcs.
-3. **`Action_FireRecoil` (15 frames, Non-Looping):**
-   - Sharp backward impulse on `Bone_BarrelRecoil` (Frames 1-3).
-   - Torso pitch back $2^\circ - 4^\circ$, rear legs brace.
-   - Smooth damped recovery (Frames 4-15).
-4. **`Action_Death` (45 frames, Non-Looping / Clamp):**
-   - Hydraulic failure: chassis drops, knees buckle outward, unit collapses onto ground armor.
+3. **`Action_FireRecoil` (role-specific end frame: light/medium 15, sam/walker 18, heavy 21, Non-Looping):**
+   - Monotone phases at f1 neutral, f3 anticipation, f5 impact, f7 follow-through, f11 recovery, and f15 neutral/hold.
+   - Body pitch and recoil travel key together; a barrel-only impulse is insufficient.
+4. **`Action_Death` (default 35 frames, verified Bastion override 45 frames, Non-Looping / Clamp):**
+   - Slow collapse starting with a `12%` settle at f8, half collapse at f16, and full collapse by f28 with hold to the end.

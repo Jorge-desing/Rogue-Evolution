@@ -75,6 +75,30 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             return TryMatchCanonicalName(legacySocketName, out canonicalName);
         }
 
+        public static bool TryResolveHardpointType(string slotId, out string hardpointType)
+        {
+            hardpointType = null;
+            if (String.IsNullOrWhiteSpace(slotId)) return false;
+
+            string candidate = slotId.Trim();
+            for (int i = 0; i < CanonicalSocketNames.Length; i++)
+            {
+                const string prefix = "Socket_Hardpoint_";
+                string socketName = CanonicalSocketNames[i];
+                if (!socketName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) continue;
+
+                string type = socketName.Substring(prefix.Length);
+                if (String.Equals(candidate, type, StringComparison.OrdinalIgnoreCase) ||
+                    String.Equals(candidate, socketName, StringComparison.OrdinalIgnoreCase))
+                {
+                    hardpointType = type;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static bool TryMatchCanonicalName(string candidate, out string canonicalName)
         {
             for (int i = 0; i < CanonicalSocketNames.Length; i++)

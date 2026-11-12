@@ -44,7 +44,13 @@ Then confirm the prefab material references the expected maps and the self-conta
 
 The builder may correct stale `.meta` settings during a rebuild. Report the post-reimport importer state, not only the serialized metadata file. Check the imported/compressed result and alpha preservation after the builder has run.
 
-### 4. Visual evidence and handoff
+### 4. Shader compile and normal-map sanity
+
+- Treat shader source inspection as static evidence only. During the pinned Unity Editor build, check the final shader-compiler/import output and the reopened AssetBundle's shader/material dependencies. A transient `Shader Unsupported ... All subshaders removed` message during initial asset import is not by itself proof that the final bundle shader failed; require successful target-variant compilation and a bundle reopen check, and report any remaining compiler warnings.
+- Check normal-map channel statistics and view the map as data, but do not reject a near-neutral tangent-space normal solely because it has little pixel variation: simple faceted geometry may carry its shape in mesh normals. If a map is unexpectedly flat, compare it to the Blender bake input and atlas UVs, confirm `_NORMALMAP` and `_BumpMap` are actually bound, and inspect the imported model/material in Unity before changing or rebaking production maps.
+- If a material must be rebound from an unsupported shader, verify every available map is copied to the replacement shader's matching property and its matching keyword is enabled. Confirm property compatibility from the destination shader; texture presence or keyword flags alone do not prove correct rendering.
+
+### 5. Visual evidence and handoff
 
 - Record whether each check is static source/map inspection or local Unity editor/import validation. A local build or bundle inspection is not in-game evidence.
 - A claim about appearance in a live match requires a supervised, Steam-launched runtime review. Do not start or alter the live game as a side effect of a texture audit.
@@ -53,3 +59,11 @@ The builder may correct stale `.meta` settings during a rebuild. Report the post
 ## Acceptance Criteria
 
 A texture set passes the local authoring contract when all four files have expected names and compatible dimensions, metallic and smoothness occupy the expected channels, the Unity importer preserves linear data and alpha, the prefab material binds the maps to the intended shader, and the imported mesh retains RGBA vertex colors. Mark UV seam quality and final color appearance as visually reviewed only when inspected in Unity; mark in-game appearance only after an actual runtime check.
+
+## Canonical Module Import Checks
+
+- `CanonicalVisualModuleBuilder` checks all four maps are 2048x2048, verifies effective importer color-space/alpha/normal settings after reimport, builds the `RogueCommand/VehiclePBR_VertexWear` material variant, and confirms imported module meshes retain one RGBA vertex color per vertex.
+- It also rejects scripts/gameplay components in module prefabs and reopens the AssetBundles to verify their serialized `assetName` keys. Run `tools/validate_content_bundle_references.py` on each built pack so every `visualVariants[].modules[].assetName` resolves in the unit's declared bundle.
+- Before bundle build, it matches each declared Level 2 module to its generated role/manifest row and requires the owning Level 1 primary prefab to contain exactly one matching canonical `Socket_Hardpoint_<Slot>`; duplicate or noncanonical hardpoints fail the build.
+- Rebuild through `tools/Build-CanonicalVisualModules.ps1` before import/reference acceptance. Run the reference validator against `artifacts/canonical-two-level/validation-packs/`; versioned bundles under `content/packs/*/bundles/` may be earlier snapshots.
+- These are local Unity/import and serialized-bundle checks. A contact sheet or passing bundle audit does not establish that a live unit selected the expected variant or rendered it in a Steam match.

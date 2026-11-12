@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using RogueCommandExpansionLoader.Contracts;
 using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
+using RogueCommandExpansionLoader.Runtime.Visual;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Content
@@ -23,9 +24,10 @@ namespace RogueCommandExpansionLoader.Content
     /// keeps their AssetBundles and Unity objects alive for the whole game session.
     /// </summary>
     public sealed class ContentPackRuntimeLoader : IRuntimeContentProvider, IUnitSkillLocalizationRuntimeProvider,
-        IRelicLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
+        IRelicLocalizationRuntimeProvider, IUpgradeLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
-        IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider
+        IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider,
+        IPrespawnRuntimeProvider, IGuaranteedModCardRewardProvider, IGlobalBlueprintCandidateProvider
     {
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
@@ -42,10 +44,86 @@ namespace RogueCommandExpansionLoader.Content
         private const BindingFlags InstanceFields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private const BindingFlags StaticFields = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static;
 
+        private static readonly Dictionary<string, float> _minAttackRanges =
+            new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+
+        public static bool TryGetMinAttackRange(string entityId, out float minRange)
+        {
+            if (string.IsNullOrEmpty(entityId))
+            {
+                minRange = 0f;
+                return false;
+            }
+            lock (_minAttackRanges)
+            {
+                return _minAttackRanges.TryGetValue(entityId, out minRange);
+            }
+        }
+
+        public static void RegisterMinAttackRange(string entityId, float minRange)
+        {
+            if (!string.IsNullOrEmpty(entityId) && minRange > 0f)
+            {
+                lock (_minAttackRanges)
+                {
+                    _minAttackRanges[entityId] = minRange;
+                }
+            }
+        }
+
+        public static void ClearMinAttackRanges()
+        {
+            lock (_minAttackRanges)
+            {
+                _minAttackRanges.Clear();
+            }
+        }
+
+        private static readonly Dictionary<string, List<ContentOnHitStatusEffectDefinition>> _onHitStatusEffects =
+            new Dictionary<string, List<ContentOnHitStatusEffectDefinition>>(StringComparer.Ordinal);
+
+        public static bool TryGetOnHitStatusEffects(string entityId, out List<ContentOnHitStatusEffectDefinition> effects)
+        {
+            if (string.IsNullOrEmpty(entityId))
+            {
+                effects = null;
+                return false;
+            }
+            lock (_onHitStatusEffects)
+            {
+                return _onHitStatusEffects.TryGetValue(entityId, out effects);
+            }
+        }
+
+        public static void RegisterOnHitStatusEffects(string entityId, ContentOnHitStatusEffectDefinition[] effects)
+        {
+            if (!string.IsNullOrEmpty(entityId) && effects != null && effects.Length > 0)
+            {
+                var list = new List<ContentOnHitStatusEffectDefinition>(effects.Length);
+                for (int i = 0; i < effects.Length; i++)
+                {
+                    if (effects[i] != null) list.Add(effects[i]);
+                }
+                lock (_onHitStatusEffects)
+                {
+                    _onHitStatusEffects[entityId] = list;
+                }
+            }
+        }
+
+        public static void ClearOnHitStatusEffects()
+        {
+            lock (_onHitStatusEffects)
+            {
+                _onHitStatusEffects.Clear();
+            }
+        }
+
         private readonly object _gate = new object();
         private readonly string _packsRoot;
         private readonly Assembly _gameAssembly;
         private readonly RelicContentRuntimeRegistrar _relicRegistrar;
+        private readonly UpgradeContentRuntimeRegistrar _upgradeRegistrar;
         private readonly AiModuleRegistry _moduleRegistry;
         private readonly Action<string> _log;
         private readonly RuntimeMutationManager _mutationManager;
@@ -74,6 +152,29 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _nullableStringHasValueField;
         private readonly FieldInfo _entityRolesField;
         private readonly FieldInfo _entityControllerIdField;
+        private readonly FieldInfo _rotationDegreesPerSecondField;
+        private readonly FieldInfo _collisionRadiusField;
+        private readonly FieldInfo _attackWarmUpTimeField;
+        private readonly FieldInfo _canAttackWhileMovingField;
+        private readonly FieldInfo _shootAutomaticallyField;
+        private readonly FieldInfo _defendPositionAggressivelyField;
+        private readonly FieldInfo _rangeToChooseNewTargetField;
+        private readonly FieldInfo _selectionSoundField;
+        private readonly FieldInfo _movementSoundAudioSourceField;
+        private readonly FieldInfo _hasActiveSkillField;
+        private readonly FieldInfo _activeSkillOrProductionField;
+        private readonly FieldInfo _activeSkillTypeField;
+        private readonly FieldInfo _helpAiToActivateSkillField;
+        private readonly FieldInfo _aiSkillCooldownField;
+        private readonly FieldInfo _skillInfoField;
+        private readonly FieldInfo _conditionToActivateSkillField;
+        private readonly FieldInfo _entityIdentifiersField;
+        private readonly Type _critModType;
+        private readonly MethodInfo _addCriticalHitChanceBonusMethod;
+        private readonly Type _skillInfoType;
+        private readonly Type _targetOriginType;
+        private readonly Type _skillActivationConditionType;
+        private readonly Type _entityIdentifierType;
         private readonly FieldInfo _prefabLocationField;
         private readonly FieldInfo _imageLocationField;
         private readonly FieldInfo _inactiveField;
@@ -82,6 +183,35 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _allowedForAiField;
         private readonly FieldInfo _allowedForDemoField;
         private readonly FieldInfo _isForSpecialistsField;
+        private readonly FieldInfo _combatValueField;
+        private readonly FieldInfo _gridSizeField;
+        private readonly FieldInfo _cardModelScalingFactorField;
+        private readonly FieldInfo _coinsAmountField;
+        private readonly FieldInfo _firePointCountField;
+        private readonly FieldInfo _copyUpgradesToEntityIdField;
+        private readonly FieldInfo _attackTypeField;
+        private readonly FieldInfo _skillTypeField;
+        private readonly FieldInfo _rarityField;
+        private readonly FieldInfo _techField;
+        private readonly FieldInfo _neededExperienceLevelField;
+        private readonly FieldInfo _offeredSystemTagsField;
+        private readonly FieldInfo _costField;
+        private readonly FieldInfo _productionDurationField;
+        private readonly FieldInfo _maxCapacityField;
+        private readonly FieldInfo _damage1Field;
+        private readonly FieldInfo _damage2Field;
+        private readonly FieldInfo _weaponRangeField;
+        private readonly FieldInfo _attackCooldownField;
+        private readonly FieldInfo _attack2CooldownField;
+        private readonly FieldInfo _effectRadius1Field;
+        private readonly FieldInfo _effectRadius2Field;
+        private readonly FieldInfo _skillRangeField;
+        private readonly FieldInfo _healAmount1Field;
+        private readonly FieldInfo _healAmount2Field;
+        private readonly FieldInfo _gainCreditsAmountField;
+        private readonly FieldInfo _skillManaCostField;
+        private readonly FieldInfo _duration1Field;
+        private readonly FieldInfo _duration2Field;
         private readonly FieldInfo _stageParametersField;
         private readonly FieldInfo _stageMapSizeField;
         private readonly FieldInfo _stageDemoField;
@@ -107,11 +237,6 @@ namespace RogueCommandExpansionLoader.Content
         private readonly FieldInfo _stageParametersBlueprintPoolListField;
         private readonly FieldInfo _stageParametersFirstLevelCardsField;
         private readonly FieldInfo _stageParametersDefaultCenterField;
-        private readonly FieldInfo _stageParametersPoolRewardField;
-        private readonly FieldInfo _stagePoolRewardIdField;
-        private readonly FieldInfo _stagePoolRewardCountField;
-        private readonly FieldInfo _stagePoolRewardWeightField;
-        private readonly Type _stageRewardType;
         private readonly FieldInfo _aiAllowedForDemoField;
         private readonly FieldInfo _aiStageRangeField;
         private readonly FieldInfo _aiAscensionRangeField;
@@ -154,6 +279,7 @@ namespace RogueCommandExpansionLoader.Content
         private readonly List<ScriptableObject> _landscapeClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _blueprintPoolClones = new List<ScriptableObject>();
         private readonly List<ScriptableObject> _retainedRelicObjects = new List<ScriptableObject>();
+        private readonly List<ScriptableObject> _retainedUpgradeObjects = new List<ScriptableObject>();
         private readonly List<object> _blueprintPools = new List<object>();
         private readonly BlueprintPoolScopeRegistry _blueprintPoolScopeRegistry =
             new BlueprintPoolScopeRegistry();
@@ -172,6 +298,8 @@ namespace RogueCommandExpansionLoader.Content
             new Dictionary<string, LoadedUnit>(StringComparer.Ordinal);
         private readonly Dictionary<string, ContentRelicDefinition> _relicDefinitions =
             new Dictionary<string, ContentRelicDefinition>(StringComparer.Ordinal);
+        private readonly Dictionary<string, ContentUpgradeDefinition> _upgradeDefinitions =
+            new Dictionary<string, ContentUpgradeDefinition>(StringComparer.Ordinal);
         private readonly HashSet<string> _knownIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeUnitIds = new HashSet<string>(StringComparer.Ordinal);
         private readonly HashSet<string> _nativeFactoryIds = new HashSet<string>(StringComparer.Ordinal);
@@ -197,6 +325,7 @@ namespace RogueCommandExpansionLoader.Content
         private bool _stageMapOrderFailureLogged;
         private object _stageMapSnapshotOwner;
         private List<object> _stageMapVisibleStages;
+        private string _stageMapIdentitySource = "unknown";
         private object _pendingStageMapSnapshotOwner;
         private string _pendingStageMapJson;
 
@@ -214,6 +343,7 @@ namespace RogueCommandExpansionLoader.Content
             _packsRoot = Path.GetFullPath(packsRoot);
             _gameAssembly = gameAssembly ?? throw new ArgumentNullException("gameAssembly");
             _relicRegistrar = new RelicContentRuntimeRegistrar(_gameAssembly);
+            _upgradeRegistrar = new UpgradeContentRuntimeRegistrar(_gameAssembly);
             _moduleRegistry = moduleRegistry ?? throw new ArgumentNullException("moduleRegistry");
             _log = logger;
             _mutationManager = new RuntimeMutationManager(_log ?? (msg => { }));
@@ -261,7 +391,6 @@ namespace RogueCommandExpansionLoader.Content
             _stageParametersType = FindUniqueType("StageParametersScriptableObject");
             Type gameBalancingType = FindUniqueType("GameBalancingScriptableObject");
             Type progressionType = FindUniqueType("LevelProgressionParametersScriptableObject");
-            _stageRewardType = FindUniqueType("OpenReward");
             Type landscapeGeneratorType = FindUniqueType("LandscapeGenerator");
             _landscapeGeneratorType = landscapeGeneratorType;
             _aiBehaviourType = FindUniqueType("AiBehaviour");
@@ -300,6 +429,40 @@ namespace RogueCommandExpansionLoader.Content
                     "EntityBalancingParameters.roles must remain an enum containing Building and Factory.");
             }
             _entityControllerIdField = RequireField(_entityControllerType, "entityId", typeof(string));
+            _rotationDegreesPerSecondField = _entityControllerType.GetField("rotationDegreesPerSecond", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _collisionRadiusField = _entityControllerType.GetField("collisionRadius", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _attackWarmUpTimeField = _entityControllerType.GetField("attackWarmUpTime", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _canAttackWhileMovingField = _entityControllerType.GetField("canAttackWhileMoving", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _shootAutomaticallyField = _entityControllerType.GetField("shootAutomaticallyOnEnemiesWithinRange", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _defendPositionAggressivelyField = _entityControllerType.GetField("defendPositionAggressivelyWhenIdle", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _rangeToChooseNewTargetField = _entityControllerType.GetField("rangeToChooseNewTargetAutomatically", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _selectionSoundField = _entityControllerType.GetField("selectionSound", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _movementSoundAudioSourceField = _entityControllerType.GetField("movementSoundAudioSource", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _hasActiveSkillField = _entityControllerType.GetField("hasActiveSkill", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _activeSkillOrProductionField = _entityControllerType.GetField("activeSkillOrProduction", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _activeSkillTypeField = _entityControllerType.GetField("activeSkillType", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _helpAiToActivateSkillField = _entityControllerType.GetField("helpAiToActivateSkill", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            _aiSkillCooldownField = _entityControllerType.GetField("aiSkillCooldown", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _skillInfoField = _entityControllerType.GetField("_skillInfo", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _conditionToActivateSkillField = _entityControllerType.GetField("conditionToActivateSkill", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _entityIdentifiersField = _entityControllerType.GetField("entityIdentifiers", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            _skillInfoType = _gameAssembly.GetType("SkillInfo", false);
+            _targetOriginType = _gameAssembly.GetType("TargetOrigin", false);
+            _skillActivationConditionType = _gameAssembly.GetType("SkillActivationCondition", false);
+            _entityIdentifierType = _gameAssembly.GetType("EntityIdentifier", false);
+            CounterBatteryAiModule.MinAttackRangeResolver = id => TryGetMinAttackRange(id, out float r) ? (float?)r : null;
+            Runtime.RuntimeHooks.MinAttackRangeResolver = id => TryGetMinAttackRange(id, out float r) ? (float?)r : null;
+            Runtime.RuntimeHooks.OnHitStatusEffectsResolver = id => TryGetOnHitStatusEffects(id, out List<ContentOnHitStatusEffectDefinition> fx) ? fx : null;
+            _critModType = _gameAssembly.GetType("CriticalHitChanceModifier", false);
+            if (_critModType != null && _entityControllerType != null)
+            {
+                _addCriticalHitChanceBonusMethod = _entityControllerType.GetMethod(
+                    "AddCriticalHitChanceBonus",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    new Type[] { _critModType },
+                    null);
+            }
             _prefabLocationField = RequireField(_entityRowType, "prefabLocation", typeof(string));
             _imageLocationField = RequireField(_entityRowType, "imageLocation", typeof(string));
             _inactiveField = RequireField(_entityRowType, "inactive", typeof(bool));
@@ -308,6 +471,35 @@ namespace RogueCommandExpansionLoader.Content
             _allowedForAiField = RequireField(_entityRowType, "isAllowedForAi", typeof(bool));
             _allowedForDemoField = RequireField(_entityRowType, "isAllowedForDemo", typeof(bool));
             _isForSpecialistsField = RequireField(_entityRowType, "isForSpecialists", typeof(bool));
+            _combatValueField = RequireField(_entityRowType, "combatValue", typeof(int));
+            _gridSizeField = RequireField(_entityRowType, "gridSize", typeof(int));
+            _cardModelScalingFactorField = RequireField(_entityRowType, "cardModelScalingFactor", typeof(float));
+            _coinsAmountField = RequireField(_entityRowType, "coinsAmount", typeof(int));
+            _firePointCountField = RequireField(_entityRowType, "firePointCount", typeof(int));
+            _copyUpgradesToEntityIdField = RequireField(_entityRowType, "copyUpgradesToEntityId", nullableStringType);
+            _attackTypeField = FindField(_entityRowType, "attackType", InstanceFields);
+            _skillTypeField = FindField(_entityRowType, "skillType", InstanceFields);
+            _rarityField = FindField(_entityRowType, "rarity", InstanceFields);
+            _techField = FindField(_entityRowType, "tech", InstanceFields);
+            _neededExperienceLevelField = RequireField(_entityRowType, "neededExperienceLevel", typeof(int));
+            _offeredSystemTagsField = FindField(_entityRowType, "offeredSystemTags", InstanceFields);
+            _costField = RequireField(_entityRowType, "cost", typeof(int));
+            _productionDurationField = RequireField(_entityRowType, "productionDuration", typeof(float));
+            _maxCapacityField = RequireField(_entityRowType, "maxCapacity", typeof(int));
+            _damage1Field = FindField(_entityRowType, "damage1", InstanceFields);
+            _damage2Field = FindField(_entityRowType, "damage2", InstanceFields);
+            _weaponRangeField = FindField(_entityRowType, "weaponRange", InstanceFields);
+            _attackCooldownField = FindField(_entityRowType, "attackCooldown", InstanceFields);
+            _attack2CooldownField = FindField(_entityRowType, "attack2Cooldown", InstanceFields);
+            _effectRadius1Field = FindField(_entityRowType, "effectRadius1", InstanceFields);
+            _effectRadius2Field = FindField(_entityRowType, "effectRadius2", InstanceFields);
+            _skillRangeField = FindField(_entityRowType, "skillRange", InstanceFields);
+            _healAmount1Field = FindField(_entityRowType, "healAmount1", InstanceFields);
+            _healAmount2Field = FindField(_entityRowType, "healAmount2", InstanceFields);
+            _gainCreditsAmountField = FindField(_entityRowType, "gainCreditsAmount", InstanceFields);
+            _skillManaCostField = FindField(_entityRowType, "skillManaCost", InstanceFields);
+            _duration1Field = FindField(_entityRowType, "duration1", InstanceFields);
+            _duration2Field = FindField(_entityRowType, "duration2", InstanceFields);
             _stageParametersField = RequireField(_stageType, "stageParameters", _stageParametersType);
             _stageMapSizeField = RequireField(_stageType, "mapSizeRange", typeof(Vector2Int));
             _stageDemoField = RequireField(_stageType, "isPartOfDemo", typeof(bool));
@@ -415,16 +607,11 @@ namespace RogueCommandExpansionLoader.Content
                 throw new InvalidOperationException(
                     "StageParametersScriptableObject.worldList is not WorldList.");
             }
-            _stageParametersBlueprintPoolListField = RequireField(
-                _stageParametersType, "blueprintPoolList", _blueprintPoolListType);
-            _stageParametersFirstLevelCardsField = RequireField(
-                _stageParametersType, "fillFirstLevelWithCardRewards", typeof(bool));
-            _stageParametersDefaultCenterField = RequireField(
-                _stageParametersType, "putDefaultCardRewardInCenter", typeof(bool));
-            _stageParametersPoolRewardField = RequireField(_stageParametersType, "cardReward", _stageRewardType);
-            _stagePoolRewardIdField = RequireField(_stageRewardType, "poolId", typeof(string));
-            _stagePoolRewardCountField = RequireField(_stageRewardType, "count", typeof(int));
-            _stagePoolRewardWeightField = RequireField(_stageRewardType, "weight", typeof(float));
+            StageParameterBindingContract stageParameterBindings = StageParameterBindingContract.Resolve(
+                _stageParametersType, _blueprintPoolListType, InstanceFields);
+            _stageParametersBlueprintPoolListField = stageParameterBindings.BlueprintPoolListField;
+            _stageParametersFirstLevelCardsField = stageParameterBindings.FirstLevelCardsField;
+            _stageParametersDefaultCenterField = stageParameterBindings.DefaultCenterField;
 
             _aiDeactivatedField = RequireField(_aiBehaviourType, "isDeactivated", typeof(bool));
             _aiAllowedForDemoField = RequireField(_aiBehaviourType, "isAllowedForDemo", typeof(bool));
@@ -540,6 +727,10 @@ namespace RogueCommandExpansionLoader.Content
 
                 _nativeRegistryReady = true;
                 RefreshNativeUnitIds();
+                if (_loadingTask == null)
+                {
+                    _loadingTask = LoadAllPacksAsync();
+                }
             }
         }
 
@@ -552,7 +743,12 @@ namespace RogueCommandExpansionLoader.Content
                     return true;
                 }
 
-                RefreshNativeUnitIds();
+                if (RuntimeContentPreparationPolicy.ShouldRefreshNativeUnitIds(
+                    _runtimeContentReady,
+                    _loadingTask != null))
+                {
+                    RefreshNativeUnitIds();
+                }
                 if (!_nativeRegistryReady)
                 {
                     return false;
@@ -601,21 +797,10 @@ namespace RogueCommandExpansionLoader.Content
                     return false;
                 }
 
-                string language = null;
-                try
-                {
-                    language = _localizationLanguageProperty.GetValue(null, null) as string;
-                }
-                catch (Exception exception)
-                {
-                    Log("No se pudo leer Loca.Language para la unidad " + unitId + ": " +
-                        exception.GetBaseException().Message);
-                }
-
-                if (String.IsNullOrWhiteSpace(language))
-                {
-                    language = "en-US";
-                }
+                string language = RuntimeLocalizationLanguage.GetOrDefault(
+                    () => _localizationLanguageProperty.GetValue(null, null) as string,
+                    Log,
+                    "la unidad " + unitId);
 
                 return UnitLocalizationResolver.TryResolve(unit.Definition, language, description,
                     delegate(string templateId, bool lookupDescription)
@@ -648,21 +833,10 @@ namespace RogueCommandExpansionLoader.Content
                     return false;
                 }
 
-                string language = null;
-                try
-                {
-                    language = _localizationLanguageProperty.GetValue(null, null) as string;
-                }
-                catch (Exception exception)
-                {
-                    Log("No se pudo leer Loca.Language para la habilidad de la unidad " + unitId + ": " +
-                        exception.GetBaseException().Message);
-                }
-
-                if (String.IsNullOrWhiteSpace(language))
-                {
-                    language = "en-US";
-                }
+                string language = RuntimeLocalizationLanguage.GetOrDefault(
+                    () => _localizationLanguageProperty.GetValue(null, null) as string,
+                    Log,
+                    "la habilidad de la unidad " + unitId);
 
                 return UnitLocalizationResolver.TryResolveSkillDescription(unit.Definition, language,
                     delegate(string templateId)
@@ -673,8 +847,13 @@ namespace RogueCommandExpansionLoader.Content
                         }
                         catch (Exception exception)
                         {
-                            Log("No se pudo heredar la descripción de habilidad de " + templateId + " para " +
-                                unitId + ": " + exception.GetBaseException().Message);
+                            string baseMessage = exception.GetBaseException().Message ?? String.Empty;
+                            if (baseMessage.IndexOf("No translation found", StringComparison.OrdinalIgnoreCase) < 0)
+                            {
+                                Log("No se pudo heredar la descripción de habilidad de " + templateId + " para " +
+                                    unitId + ": " + baseMessage);
+                            }
+
                             return null;
                         }
                     }, out value);
@@ -692,13 +871,32 @@ namespace RogueCommandExpansionLoader.Content
                     return false;
                 }
 
-                string language = _localizationLanguageProperty.GetValue(null, null) as string;
-                if (String.IsNullOrWhiteSpace(language))
-                {
-                    language = "en-US";
-                }
+                string language = RuntimeLocalizationLanguage.GetOrDefault(
+                    () => _localizationLanguageProperty.GetValue(null, null) as string,
+                    Log,
+                    "el relic " + relicId);
 
                 return RelicLocalizationResolver.TryResolve(relic, language, description, out value);
+            }
+        }
+
+        public bool TryGetUpgradeLocalization(string upgradeId, bool description, out string value)
+        {
+            value = null;
+            lock (_gate)
+            {
+                ContentUpgradeDefinition upgrade;
+                if (String.IsNullOrWhiteSpace(upgradeId) || !_upgradeDefinitions.TryGetValue(upgradeId, out upgrade))
+                {
+                    return false;
+                }
+
+                string language = RuntimeLocalizationLanguage.GetOrDefault(
+                    () => _localizationLanguageProperty.GetValue(null, null) as string,
+                    Log,
+                    "el upgrade " + upgradeId);
+
+                return UpgradeLocalizationResolver.TryResolve(upgrade, language, description, out value);
             }
         }
 
@@ -864,6 +1062,24 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private string GetProductIdForFactory(string factoryId)
+        {
+            if (String.IsNullOrWhiteSpace(factoryId))
+            {
+                return null;
+            }
+
+            foreach (LoadedUnit u in _units.Values)
+            {
+                if (!u.IsProductionBuilding && String.Equals(u.ProductionFactoryId, factoryId, StringComparison.Ordinal))
+                {
+                    return u.Id;
+                }
+            }
+
+            return null;
+        }
+
         public bool TryGetBlueprintPoolDecision(object pool, string unitId, out bool runOriginal)
         {
             lock (_gate)
@@ -881,22 +1097,43 @@ namespace RogueCommandExpansionLoader.Content
                 bool isStartingBlueprintSelection =
                     !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
                 bool isAllowedAsStartingBlueprint =
-                    (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow);
-                if (unit.IsProductionBuilding && _blueprintUnitIds.Contains(unitId) &&
-                    isStartingBlueprintSelection &&
-                    isAllowedAsStartingBlueprint && isAllowedForDemo &&
-                    IsNativeInitialStagePool(pool))
+                    (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow) ||
+                    (unit.Definition != null && (unit.Definition.neededExperienceLevel ?? 0) <= 0);
+                if (isStartingBlueprintSelection && !isAllowedAsStartingBlueprint)
                 {
-                    // Keep the native pool's own BlueprintFilter.IsBlueprintValid check. This
-                    // only lets an explicitly starting-eligible factory reach that filter for
-                    // the first offer in the first native stage.
+                    runOriginal = false;
+                    return true;
+                }
+
+                if (isDemo && !isAllowedForDemo)
+                {
+                    runOriginal = false;
+                    return true;
+                }
+
+                if (_blueprintPoolScopeRegistry.ContainsPool(pool))
+                {
+                    string productId = !unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                        ? unit.Id
+                        : (unit.IsProductionBuilding ? GetProductIdForFactory(unit.Id) : unit.Id);
+
+                    runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(
+                        pool, unitId, isDemo, isAllowedForDemo,
+                        isStartingBlueprintSelection, isAllowedAsStartingBlueprint) ||
+                        (!String.IsNullOrEmpty(productId) && _blueprintPoolScopeRegistry.AllowsModUnitInPool(
+                        pool, productId, isDemo, isAllowedForDemo,
+                        isStartingBlueprintSelection, isAllowedAsStartingBlueprint));
+                    return true;
+                }
+
+                if (_blueprintUnitIds.Contains(unitId) ||
+                    (!String.IsNullOrWhiteSpace(unit.ProductionFactoryId) && _blueprintUnitIds.Contains(unit.ProductionFactoryId)))
+                {
                     runOriginal = true;
                     return true;
                 }
 
-                runOriginal = _blueprintPoolScopeRegistry.AllowsModUnitInPool(
-                    pool, unitId, isDemo, isAllowedForDemo,
-                    isStartingBlueprintSelection, isAllowedAsStartingBlueprint);
+                runOriginal = false;
                 return true;
             }
         }
@@ -910,78 +1147,204 @@ namespace RogueCommandExpansionLoader.Content
 
             object balancing = _gameBalancingAssetField.GetValue(null);
             bool isDemo = balancing != null && (bool)_gameIsDemoField.GetValue(balancing);
-            foreach (LoadedUnit product in _units.Values)
+            foreach (LoadedUnit unit in _units.Values)
             {
-                if (product.IsProductionBuilding || product.Definition == null ||
-                    !product.Definition.isAllowedAsStartingBlueprint ||
-                    String.IsNullOrWhiteSpace(product.ProductionFactoryId) ||
-                    !_blueprintUnitIds.Contains(product.ProductionFactoryId))
+                if (!unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
                 {
-                    continue;
+                    if (unit.Definition != null &&
+                        (unit.Definition.isAllowedAsStartingBlueprint || (unit.Definition.neededExperienceLevel ?? 0) <= 0) &&
+                        _blueprintUnitIds.Contains(unit.ProductionFactoryId))
+                    {
+                        LoadedUnit factory;
+                        if (_units.TryGetValue(unit.ProductionFactoryId, out factory) &&
+                            factory.IsProductionBuilding &&
+                            (!isDemo || (bool)_allowedForDemoField.GetValue(factory.BalanceRow)))
+                        {
+                            destination.Add(factory.Id);
+                        }
+                    }
                 }
-
-                LoadedUnit factory;
-                if (!_units.TryGetValue(product.ProductionFactoryId, out factory) ||
-                    !factory.IsProductionBuilding ||
-                    (isDemo && !(bool)_allowedForDemoField.GetValue(factory.BalanceRow)))
+                else if (unit.IsStandaloneBuilding)
                 {
-                    continue;
+                    object startingVal = _allowedStartingBlueprintField.GetValue(unit.BalanceRow);
+                    bool isStarting = (startingVal is bool && (bool)startingVal) ||
+                                      (unit.Definition != null && (unit.Definition.neededExperienceLevel ?? 0) <= 0);
+                    if (isStarting)
+                    {
+                        if (_blueprintUnitIds.Contains(unit.Id) &&
+                            (!isDemo || (bool)_allowedForDemoField.GetValue(unit.BalanceRow)))
+                        {
+                            destination.Add(unit.Id);
+                        }
+                    }
                 }
-
-                destination.Add(factory.Id);
             }
         }
 
-        private bool IsNativeInitialStagePool(object pool)
+        public bool IsModUnitProduct(string productId)
         {
-            object stageMap = _gameStageMapField.GetValue(null);
-            if (pool == null || stageMap == null ||
-                !System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner) ||
-                _stageMapVisibleStages == null ||
-                (int)_stageMapCurrentStageProperty.GetValue(stageMap, null) != 0)
+            if (String.IsNullOrEmpty(productId))
             {
                 return false;
             }
 
-            object activeStage = BlueprintRewardStageResolver.ResolveVisibleStage(
-                _stageMapVisibleStages, 0);
-            if (activeStage == null)
+            lock (_gate)
             {
-                return false;
-            }
-
-            for (int i = 0; i < _stages.Count; i++)
-            {
-                if (System.Object.ReferenceEquals(_stages[i].RuntimeStage, activeStage))
+                LoadedUnit unit;
+                if (_units.TryGetValue(productId, out unit))
                 {
-                    return false;
+                    return !unit.IsProductionBuilding || unit.IsStandaloneBuilding;
                 }
-            }
 
-            UnityEngine.Object stageParameters =
-                _stageParametersField.GetValue(activeStage) as UnityEngine.Object;
-            if (stageParameters == null)
-            {
-                return false;
-            }
-
-            UnityEngine.Object poolList =
-                _stageParametersBlueprintPoolListField.GetValue(stageParameters) as UnityEngine.Object;
-            IList pools = poolList == null ? null : _blueprintPoolsField.GetValue(poolList) as IList;
-            if (pools == null)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < pools.Count; i++)
-            {
-                if (System.Object.ReferenceEquals(pools[i], pool))
+                if (_blueprintUnitIds.Contains(productId))
                 {
                     return true;
                 }
-            }
 
-            return false;
+                return false;
+            }
+        }
+
+        public bool TryGetGuaranteedModRewardProduct(
+            string poolId,
+            bool isStartingSelection,
+            int currentXpLevel,
+            ICollection<string> excludedProductIds,
+            out string modProductId)
+        {
+            lock (_gate)
+            {
+                modProductId = null;
+                if (_units.Count == 0)
+                {
+                    return false;
+                }
+
+                object balancing = _gameBalancingAssetField != null ? _gameBalancingAssetField.GetValue(null) : null;
+                bool isDemo = balancing != null && _gameIsDemoField != null && (bool)_gameIsDemoField.GetValue(balancing);
+
+                var rewardCandidates = new List<GuaranteedModRewardSelectionCandidate>();
+
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    int neededXp = 0;
+                    if (unit.Definition != null && unit.Definition.neededExperienceLevel.HasValue)
+                    {
+                        neededXp = unit.Definition.neededExperienceLevel.Value;
+                    }
+
+                    bool isAllowedForDemo = !isDemo || _allowedForDemoField == null ||
+                        (bool)_allowedForDemoField.GetValue(unit.BalanceRow);
+                    bool isAllowedAsStartingBlueprint = unit.Definition != null &&
+                        unit.Definition.isAllowedAsStartingBlueprint;
+                    string[] roles = unit.Definition == null ? null : unit.Definition.roles;
+                    rewardCandidates.Add(new GuaranteedModRewardSelectionCandidate(
+                        unit.Id, unit.ProductionFactoryId, neededXp, isAllowedAsStartingBlueprint,
+                        isAllowedForDemo, unit.IsProductionBuilding, unit.IsStandaloneBuilding, roles));
+                }
+
+                List<GuaranteedModRewardSelectionCandidate> selectedList =
+                    GuaranteedModRewardSelectionPolicy.GetEligibleCandidates(
+                        rewardCandidates, poolId, isStartingSelection, currentXpLevel, isDemo, excludedProductIds);
+
+                if (selectedList.Count == 0)
+                {
+                    return false;
+                }
+
+                int index = new System.Random().Next(0, selectedList.Count);
+                modProductId = selectedList[index].ProductId;
+                return true;
+            }
+        }
+
+        public IEnumerable<string> GetEligibleBlueprintFactories(
+            int rarity,
+            bool? startingBlueprints,
+            bool demoBlueprintsOnly,
+            int? maxNeededExperienceLevel)
+        {
+            lock (_gate)
+            {
+                var result = new List<string>();
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (!unit.IsProductionBuilding && !unit.IsStandaloneBuilding)
+                    {
+                        continue;
+                    }
+
+                    if (!_blueprintUnitIds.Contains(unit.Id))
+                    {
+                        continue;
+                    }
+
+                    if (_inactiveField != null && (bool)_inactiveField.GetValue(unit.BalanceRow))
+                    {
+                        continue;
+                    }
+
+                    if (demoBlueprintsOnly && _allowedForDemoField != null && !(bool)_allowedForDemoField.GetValue(unit.BalanceRow))
+                    {
+                        continue;
+                    }
+
+                    if (_rarityField != null && rarity >= 0)
+                    {
+                        object rowRarity = _rarityField.GetValue(unit.BalanceRow);
+                        if (rowRarity != null && Convert.ToInt32(rowRarity) != rarity)
+                        {
+                            continue;
+                        }
+                    }
+
+                    int neededXp = 0;
+                    if (unit.Definition != null && unit.Definition.neededExperienceLevel.HasValue)
+                    {
+                        neededXp = unit.Definition.neededExperienceLevel.Value;
+                    }
+                    else if (_neededExperienceLevelField != null)
+                    {
+                        object xpVal = _neededExperienceLevelField.GetValue(unit.BalanceRow);
+                        if (xpVal is int)
+                        {
+                            neededXp = (int)xpVal;
+                        }
+                    }
+
+                    if (maxNeededExperienceLevel.HasValue && neededXp > maxNeededExperienceLevel.Value)
+                    {
+                        continue;
+                    }
+
+                    if (startingBlueprints.HasValue)
+                    {
+                        bool isStartingEligible = false;
+                        if (_allowedStartingBlueprintField != null)
+                        {
+                            object val = _allowedStartingBlueprintField.GetValue(unit.BalanceRow);
+                            if (val is bool && (bool)val)
+                            {
+                                isStartingEligible = true;
+                            }
+                        }
+
+                        if (!isStartingEligible && unit.Definition != null)
+                        {
+                            isStartingEligible = unit.Definition.isAllowedAsStartingBlueprint || neededXp <= 0;
+                        }
+
+                        if (startingBlueprints.Value && !isStartingEligible)
+                        {
+                            continue;
+                        }
+                    }
+
+                    result.Add(unit.Id);
+                }
+
+                return result;
+            }
         }
 
         public void AddExclusiveBlueprints(string otherThanPoolId, HashSet<string> result)
@@ -1067,10 +1430,13 @@ namespace RogueCommandExpansionLoader.Content
 
                         bool isStartingBlueprintSelection =
                             !(bool)_gameAtLeastOneBlueprintAddedByPlayerField.GetValue(null);
-                        if (activeStageIndex == 0 && !activeStageIsPackOwned &&
-                            isStartingBlueprintSelection)
+                        if (isStartingBlueprintSelection)
                         {
                             AddInitialStageStartingFactories(stageFactoryIds);
+                        }
+                        else if (!activeStageIsPackOwned)
+                        {
+                            stageFactoryIds.UnionWith(_blueprintUnitIds);
                         }
                     }
                 }
@@ -1101,6 +1467,7 @@ namespace RogueCommandExpansionLoader.Content
                 _pendingStageMapJson = null;
                 _stageMapSnapshotOwner = stageMap;
                 _stageMapVisibleStages = null;
+                _stageMapIdentitySource = "unknown";
                 List<object> visibleStages;
                 if (stageMap == null || !TryBuildVisibleStageSequence(out visibleStages))
                 {
@@ -1116,6 +1483,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 _stageMapVisibleStages = visibleStages;
+                _stageMapIdentitySource = "live_progression_sequence";
             }
         }
 
@@ -1125,6 +1493,9 @@ namespace RogueCommandExpansionLoader.Content
             {
                 _stageMapSnapshotOwner = stageMap;
                 _stageMapVisibleStages = null;
+                _stageMapIdentitySource = stageMap != null
+                    ? "persisted_stage_order_marker_pending"
+                    : "unknown";
                 if (stageMap == null)
                 {
                     _pendingStageMapSnapshotOwner = null;
@@ -1316,6 +1687,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 LogStageMapOrderFailure("A saved stage map has no valid loader stage-order marker; " +
                     "custom factories will be omitted from generic rewards for this map.");
+                _stageMapIdentitySource = "unknown";
                 ClearPendingStageMapOrder();
                 return false;
             }
@@ -1350,6 +1722,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 _stageMapSnapshotOwner = _pendingStageMapSnapshotOwner;
                 _stageMapVisibleStages = resolvedStages;
+                _stageMapIdentitySource = "persisted_rclStageOrderV1";
                 ClearPendingStageMapOrder();
                 return true;
             }
@@ -1358,6 +1731,7 @@ namespace RogueCommandExpansionLoader.Content
             {
                 LogStageMapOrderFailure("The saved stage-order marker did not resolve against the loaded content; " +
                     "custom factories will be omitted from generic rewards for this map.");
+                _stageMapIdentitySource = "unknown";
                 ClearPendingStageMapOrder();
             }
 
@@ -1411,7 +1785,10 @@ namespace RogueCommandExpansionLoader.Content
                 if (!String.IsNullOrWhiteSpace(localizationId) &&
                     _landscapesByLocalizationId.TryGetValue(localizationId, out landscape))
                 {
-                    string language = _localizationLanguageProperty.GetValue(null, null) as string;
+                    string language = RuntimeLocalizationLanguage.GetOrDefault(
+                        () => _localizationLanguageProperty.GetValue(null, null) as string,
+                        Log,
+                        "el paisaje " + localizationId);
                     value = FindLandscapeLocalization(landscape.Definition.localizations, language);
                     if (String.IsNullOrWhiteSpace(value))
                     {
@@ -1592,6 +1969,328 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        /// <summary>
+        /// Resolves the active StageMap index through the same runtime stage sequence used by
+        /// reward scoping. The sequence comes from the live progression or a successfully
+        /// resolved rclStageOrderV1 save marker; localized UI text is never consulted.
+        /// </summary>
+        public ActiveStageAiAssociationDiagnostic GetActiveStageAiAssociationDiagnostic()
+        {
+            lock (_gate)
+            {
+                if (!_runtimeContentReady)
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable("runtime_content_not_ready");
+                }
+
+                object stageMap;
+                IList levelMaps;
+                int stageMapIndex;
+                try
+                {
+                    stageMap = _gameStageMapField.GetValue(null);
+                    if (stageMap == null)
+                    {
+                        return ActiveStageAiAssociationDiagnostic.Unavailable("stage_map_unavailable");
+                    }
+
+                    stageMapIndex = (int)_stageMapCurrentStageProperty.GetValue(stageMap, null);
+                    levelMaps = _stageMapLevelMapsField.GetValue(stageMap) as IList;
+                }
+                catch
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable("stage_map_read_failed");
+                }
+
+                if (!System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner))
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        "stage_map_identity_sequence_not_captured",
+                        stageMapIndex,
+                        "unknown");
+                }
+
+                if (levelMaps == null || _stageMapVisibleStages == null ||
+                    levelMaps.Count != _stageMapVisibleStages.Count)
+                {
+                    string reason = System.Object.ReferenceEquals(stageMap, _pendingStageMapSnapshotOwner)
+                        ? "persisted_stage_order_marker_unresolved"
+                        : "stage_identity_sequence_unavailable";
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        reason,
+                        stageMapIndex,
+                        _stageMapIdentitySource);
+                }
+
+                if (stageMapIndex < 0 || stageMapIndex >= levelMaps.Count)
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        "stage_map_index_out_of_range",
+                        stageMapIndex,
+                        _stageMapIdentitySource);
+                }
+
+                object activeStage = BlueprintRewardStageResolver.ResolveVisibleStage(
+                    _stageMapVisibleStages,
+                    stageMapIndex);
+                if (activeStage == null)
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        "stage_identity_not_resolved",
+                        stageMapIndex,
+                        _stageMapIdentitySource);
+                }
+
+                for (int i = 0; i < _stages.Count; i++)
+                {
+                    LoadedStage loadedStage = _stages[i];
+                    if (loadedStage != null && loadedStage.Definition != null &&
+                        System.Object.ReferenceEquals(loadedStage.RuntimeStage, activeStage))
+                    {
+                        return new ActiveStageAiAssociationDiagnostic(
+                            true,
+                            stageMapIndex,
+                            loadedStage.Definition.id,
+                            loadedStage.PackId,
+                            "custom",
+                            _stageMapIdentitySource,
+                            string.Empty,
+                            loadedStage.Definition.aiProfileIds);
+                    }
+                }
+
+                try
+                {
+                    UnityEngine.Object stageParameters = _stageParametersField.GetValue(activeStage) as UnityEngine.Object;
+                    if (stageParameters == null || String.IsNullOrWhiteSpace(stageParameters.name))
+                    {
+                        return ActiveStageAiAssociationDiagnostic.Unavailable(
+                            "native_stage_asset_identity_unavailable",
+                            stageMapIndex,
+                            _stageMapIdentitySource);
+                    }
+
+                    return new ActiveStageAiAssociationDiagnostic(
+                        true,
+                        stageMapIndex,
+                        stageParameters.name,
+                        string.Empty,
+                        "native",
+                        _stageMapIdentitySource,
+                        string.Empty,
+                        null);
+                }
+                catch
+                {
+                    return ActiveStageAiAssociationDiagnostic.Unavailable(
+                        "stage_asset_identity_read_failed",
+                        stageMapIndex,
+                        _stageMapIdentitySource);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Captures the bounded StageMap identity sequence used by active-stage resolution.
+        /// The returned rows describe configured stage identity and stage-declared AI profile
+        /// IDs only; they are not evidence of live AI behaviour.
+        /// </summary>
+        public StageAiAssociationSequenceDiagnostic GetStageAiAssociationSequenceDiagnostic(int maxEntries = 64)
+        {
+            int limit = Math.Max(1, Math.Min(128, maxEntries));
+            lock (_gate)
+            {
+                if (!_runtimeContentReady)
+                {
+                    return StageAiAssociationSequenceDiagnostic.Unavailable("runtime_content_not_ready");
+                }
+
+                object stageMap;
+                IList levelMaps;
+                int activeStageMapIndex;
+                try
+                {
+                    stageMap = _gameStageMapField.GetValue(null);
+                    if (stageMap == null)
+                    {
+                        return StageAiAssociationSequenceDiagnostic.Unavailable("stage_map_unavailable");
+                    }
+
+                    activeStageMapIndex = (int)_stageMapCurrentStageProperty.GetValue(stageMap, null);
+                    levelMaps = _stageMapLevelMapsField.GetValue(stageMap) as IList;
+                }
+                catch
+                {
+                    return StageAiAssociationSequenceDiagnostic.Unavailable("stage_map_read_failed");
+                }
+
+                int totalStageCount = levelMaps != null ? levelMaps.Count : 0;
+                if (!System.Object.ReferenceEquals(stageMap, _stageMapSnapshotOwner))
+                {
+                    return StageAiAssociationSequenceDiagnostic.Unavailable(
+                        "stage_map_identity_sequence_not_captured",
+                        activeStageMapIndex,
+                        "unknown",
+                        totalStageCount);
+                }
+
+                if (levelMaps == null || _stageMapVisibleStages == null ||
+                    levelMaps.Count != _stageMapVisibleStages.Count)
+                {
+                    string reason = System.Object.ReferenceEquals(stageMap, _pendingStageMapSnapshotOwner)
+                        ? "persisted_stage_order_marker_unresolved"
+                        : "stage_identity_sequence_unavailable";
+                    return StageAiAssociationSequenceDiagnostic.Unavailable(
+                        reason,
+                        activeStageMapIndex,
+                        _stageMapIdentitySource,
+                        totalStageCount);
+                }
+
+                int rowLimit = totalStageCount > limit && activeStageMapIndex >= limit &&
+                    activeStageMapIndex < totalStageCount
+                    ? limit - 1
+                    : limit;
+                var entries = new List<StageAiAssociationSequenceEntry>(Math.Min(totalStageCount, limit));
+                bool hasUnresolvedIdentity = false;
+                for (int stageIndex = 0; stageIndex < rowLimit; stageIndex++)
+                {
+                    StageAiAssociationSequenceEntry entry = ResolveStageAiAssociationSequenceEntry(
+                        stageIndex,
+                        BlueprintRewardStageResolver.ResolveVisibleStage(_stageMapVisibleStages, stageIndex));
+                    entries.Add(entry);
+                    hasUnresolvedIdentity |= !entry.StageIdentityResolved;
+                }
+
+                if (rowLimit < limit && rowLimit < totalStageCount && activeStageMapIndex >= limit &&
+                    activeStageMapIndex < totalStageCount)
+                {
+                    StageAiAssociationSequenceEntry activeEntry = ResolveStageAiAssociationSequenceEntry(
+                        activeStageMapIndex,
+                        BlueprintRewardStageResolver.ResolveVisibleStage(_stageMapVisibleStages, activeStageMapIndex));
+                    entries.Add(activeEntry);
+                    hasUnresolvedIdentity |= !activeEntry.StageIdentityResolved;
+                }
+
+                int omittedStageCount = Math.Max(0, totalStageCount - entries.Count);
+                string failureReason = omittedStageCount > 0
+                    ? "stage_sequence_truncated"
+                    : (hasUnresolvedIdentity ? "stage_identity_unresolved" : string.Empty);
+                string status = omittedStageCount == 0 && !hasUnresolvedIdentity
+                    ? "resolved"
+                    : "partial";
+                return new StageAiAssociationSequenceDiagnostic(
+                    status,
+                    activeStageMapIndex,
+                    totalStageCount,
+                    omittedStageCount,
+                    _stageMapIdentitySource,
+                    failureReason,
+                    entries);
+            }
+        }
+
+        private StageAiAssociationSequenceEntry ResolveStageAiAssociationSequenceEntry(
+            int stageMapIndex,
+            object stage)
+        {
+            if (stage == null)
+            {
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    string.Empty,
+                    "stage_identity_not_resolved",
+                    null);
+            }
+
+            LoadedStage loadedStage = null;
+            int loadedStageMatchCount = 0;
+            for (int i = 0; i < _stages.Count; i++)
+            {
+                LoadedStage candidate = _stages[i];
+                if (candidate != null && System.Object.ReferenceEquals(candidate.RuntimeStage, stage))
+                {
+                    loadedStage = candidate;
+                    loadedStageMatchCount++;
+                }
+            }
+
+            if (loadedStageMatchCount > 1)
+            {
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    "custom",
+                    "custom_stage_runtime_identity_ambiguous",
+                    null);
+            }
+
+            if (loadedStage != null && loadedStage.Definition != null)
+            {
+                if (String.IsNullOrWhiteSpace(loadedStage.Definition.id) || String.IsNullOrWhiteSpace(loadedStage.PackId))
+                {
+                    return new StageAiAssociationSequenceEntry(
+                        stageMapIndex,
+                        false,
+                        loadedStage.Definition.id,
+                        loadedStage.PackId,
+                        "custom",
+                        "custom_stage_qualified_identity_unavailable",
+                        loadedStage.Definition.aiProfileIds);
+                }
+
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    true,
+                    loadedStage.Definition.id,
+                    loadedStage.PackId,
+                    "custom",
+                    string.Empty,
+                    loadedStage.Definition.aiProfileIds);
+            }
+
+            try
+            {
+                UnityEngine.Object stageParameters = _stageParametersField.GetValue(stage) as UnityEngine.Object;
+                if (stageParameters == null || String.IsNullOrWhiteSpace(stageParameters.name))
+                {
+                    return new StageAiAssociationSequenceEntry(
+                        stageMapIndex,
+                        false,
+                        string.Empty,
+                        string.Empty,
+                        "native",
+                        "native_stage_asset_identity_unavailable",
+                        null);
+                }
+
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    true,
+                    stageParameters.name,
+                    string.Empty,
+                    "native",
+                    string.Empty,
+                    null);
+            }
+            catch
+            {
+                return new StageAiAssociationSequenceEntry(
+                    stageMapIndex,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    "unknown",
+                    "stage_asset_identity_read_failed",
+                    null);
+            }
+        }
+
         public LoaderDiagnosticsSnapshot GetDiagnosticsSnapshot()
         {
             lock (_gate)
@@ -1644,20 +2343,89 @@ namespace RogueCommandExpansionLoader.Content
                     bool allowedForAi = false;
                     bool allowedForDemo = false;
                     bool isForSpecialists = false;
+                    var eligibilityReadErrors = new List<string>();
                     try { allowedAsBlueprint = (bool)_allowedBlueprintField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("AllowedAsBlueprint"); }
                     try { allowedAsStartingBlueprint = (bool)_allowedStartingBlueprintField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("AllowedAsStartingBlueprint"); }
                     try { allowedForAi = (bool)_allowedForAiField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("AllowedForAi"); }
                     try { allowedForDemo = (bool)_allowedForDemoField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("AllowedForDemo"); }
                     try { isForSpecialists = (bool)_isForSpecialistsField.GetValue(unit.BalanceRow); }
-                    catch { }
+                    catch { eligibilityReadErrors.Add("IsForSpecialists"); }
+                    // Count declarations on the loaded product only; no loadout is selected or applied here.
+                    int variantCount = !unit.IsProductionBuilding && unit.Definition != null &&
+                        unit.Definition.variants != null ? unit.Definition.variants.Length : 0;
                     units.Add(new UnitDiagnosticReport(
-                        unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint, allowedAsStartingBlueprint, allowedForAi, allowedForDemo, isForSpecialists));
+                        unit.Id, unit.PackId, unit.PrefabKey, unit.ImageKey, allowedAsBlueprint,
+                        allowedAsStartingBlueprint, allowedForAi, allowedForDemo, isForSpecialists,
+                        String.Join(", ", eligibilityReadErrors), variantCount));
                 }
                 units.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
+
+                var resolvedResourceKeys = new HashSet<string>(StringComparer.Ordinal);
+                foreach (KeyValuePair<string, UnityEngine.Object> resource in _resourceAssets)
+                {
+                    if (!String.IsNullOrWhiteSpace(resource.Key) && resource.Value != null)
+                    {
+                        resolvedResourceKeys.Add(resource.Key);
+                    }
+                }
+
+                var visualRequests = new HashSet<string>(StringComparer.Ordinal);
+                var resolvedVisuals = new HashSet<string>(StringComparer.Ordinal);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit.Definition != null &&
+                        !String.IsNullOrWhiteSpace(unit.Definition.nativeTemplateId) &&
+                        !String.IsNullOrWhiteSpace(unit.Definition.visualAssetName))
+                    {
+                        visualRequests.Add(unit.Id);
+                        // A unit is committed only after its requested native-template visual has loaded and validated.
+                        resolvedVisuals.Add(unit.Id);
+                    }
+                }
+
+                IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities =
+                    LoaderUnitDiagnosticsBuilder.CreateEligibilityReports(units);
+                var unitDefinitionsById = new Dictionary<string, ContentUnitDefinition>(StringComparer.Ordinal);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit != null && !String.IsNullOrWhiteSpace(unit.Id))
+                    {
+                        unitDefinitionsById[unit.Id] = unit.Definition;
+                    }
+                }
+                IReadOnlyList<UnitLocalizationCoverageDiagnosticReport> unitLocalizationCoverage =
+                    LoaderUnitDiagnosticsBuilder.CreateLocalizationCoverageReports(
+                        units,
+                        id =>
+                        {
+                            ContentUnitDefinition definition;
+                            if (!unitDefinitionsById.TryGetValue(id, out definition) ||
+                                definition == null || definition.localizations == null)
+                            {
+                                return Array.Empty<string>();
+                            }
+
+                            var languages = new SortedSet<string>(StringComparer.Ordinal);
+                            foreach (ContentUnitLocalizationDefinition localization in definition.localizations)
+                            {
+                                if (localization != null && !String.IsNullOrWhiteSpace(localization.language))
+                                {
+                                    languages.Add(localization.language);
+                                }
+                            }
+                            return languages.ToArray();
+                        },
+                        id =>
+                        {
+                            ContentUnitDefinition definition;
+                            return unitDefinitionsById.TryGetValue(id, out definition) &&
+                                definition != null && !String.IsNullOrWhiteSpace(definition.nativeTemplateId);
+                        });
+                IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions = null;
 
                 var stages = new List<StageDiagnosticReport>(_stages.Count);
                 for (int i = 0; i < _stages.Count; i++)
@@ -1701,6 +2469,54 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 profiles.Sort((left, right) => StringComparer.Ordinal.Compare(left.ProfileId, right.ProfileId));
 
+                var unitFactories = new List<UnitFactoryDiagnosticReport>(_units.Count);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    string factoryId = unit.ProductionFactoryId ?? string.Empty;
+                    bool isLoaded = !string.IsNullOrEmpty(factoryId) &&
+                        (_units.ContainsKey(factoryId) || _nativeUnitIds.Contains(factoryId));
+                    string status = unit.IsProductionBuilding
+                        ? "Production building."
+                        : (isLoaded ? "Factory loaded." : "Factory missing.");
+                    unitFactories.Add(new UnitFactoryDiagnosticReport(unit.Id, factoryId, isLoaded, status));
+                }
+                unitFactories.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
+
+                unitAssetResolutions = LoaderUnitDiagnosticsBuilder.CreateAssetResolutionReports(
+                    units, resolvedResourceKeys, visualRequests, resolvedVisuals);
+
+                var stagePoolScopes = new List<StagePoolScopeDiagnosticReport>();
+                foreach (LoadedStage stage in _stages)
+                {
+                    foreach (BlueprintPoolScopeRegistration scope in stage.BlueprintPoolScopes)
+                    {
+                        stagePoolScopes.Add(new StagePoolScopeDiagnosticReport(
+                            stage.Definition.id,
+                            scope.PoolId,
+                            scope.UnitIds));
+                    }
+                }
+                stagePoolScopes.Sort((left, right) =>
+                {
+                    int cmp = StringComparer.Ordinal.Compare(left.StageId, right.StageId);
+                    if (cmp != 0) return cmp;
+                    return StringComparer.Ordinal.Compare(left.PoolId, right.PoolId);
+                });
+
+                var aiProfileStageRanges = new List<AiProfileStageRangeDiagnosticReport>();
+                foreach (LoadedAiProfile profile in _aiProfiles.Values)
+                {
+                    if (profile.ScopeToReferencedStages)
+                    {
+                        aiProfileStageRanges.Add(new AiProfileStageRangeDiagnosticReport(
+                            profile.Id,
+                            profile.StageMin,
+                            profile.StageMax,
+                            true));
+                    }
+                }
+                aiProfileStageRanges.Sort((left, right) => StringComparer.Ordinal.Compare(left.ProfileId, right.ProfileId));
+
                 string[] recentLogs;
                 lock (_logGate)
                 {
@@ -1718,6 +2534,12 @@ namespace RogueCommandExpansionLoader.Content
                     units,
                     stages,
                     profiles,
+                    unitFactories,
+                    stagePoolScopes,
+                    aiProfileStageRanges,
+                    unitEligibilities,
+                    unitAssetResolutions,
+                    unitLocalizationCoverage,
                     recentLogs);
             }
         }
@@ -1731,41 +2553,71 @@ namespace RogueCommandExpansionLoader.Content
                     return new List<BalanceOverride>();
                 }
 
-                var overrides = new List<BalanceOverride>();
+                var candidateUnits = new List<ContentUnitDefinition>();
                 foreach (var candidate in _packCandidates)
                 {
-                    if (candidate == null || candidate.Definition == null)
+                    if (candidate == null || candidate.Disabled || !candidate.LoadSucceeded ||
+                        candidate.ValidatedDefinition == null)
                     {
                         continue;
                     }
 
-                    if (candidate.Definition.units == null)
+                    if (candidate.ValidatedDefinition.units == null)
                     {
                         continue;
                     }
 
-                    foreach (var unit in candidate.Definition.units)
+                    candidateUnits.AddRange(candidate.ValidatedDefinition.units);
+                }
+
+                var registeredUnitIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit != null && !unit.IsProductionBuilding && !String.IsNullOrWhiteSpace(unit.Id))
                     {
-                        if (unit == null)
-                        {
-                            continue;
-                        }
-
-                        Dictionary<string, float> parameters = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
-                        if (parameters.Count == 0)
-                        {
-                            continue;
-                        }
-
-                        overrides.Add(new BalanceOverride
-                        {
-                            EntityId = unit.id,
-                            Parameters = parameters
-                        });
+                        registeredUnitIds.Add(unit.Id);
                     }
                 }
-                return overrides;
+
+                return UnitBalanceOverrideMapper.CreateBalanceOverridesForLoadedUnits(
+                    candidateUnits, registeredUnitIds);
             }
+        }
+
+        private static IReadOnlyList<string> GetAiProfileTargetUnitIds(ContentAiProfileDefinition definition)
+        {
+            var ids = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (definition != null)
+            {
+                if (definition.unitEntries != null)
+                {
+                    for (int i = 0; i < definition.unitEntries.Length; i++)
+                    {
+                        string unitId = definition.unitEntries[i] == null ? null : definition.unitEntries[i].unitId;
+                        if (!String.IsNullOrWhiteSpace(unitId) && seen.Add(unitId.Trim()))
+                        {
+                            ids.Add(unitId.Trim());
+                        }
+                    }
+                }
+
+                if (definition.productionBuildingEntries != null)
+                {
+                    for (int i = 0; i < definition.productionBuildingEntries.Length; i++)
+                    {
+                        string unitId = definition.productionBuildingEntries[i] == null
+                            ? null
+                            : definition.productionBuildingEntries[i].unitId;
+                        if (!String.IsNullOrWhiteSpace(unitId) && seen.Add(unitId.Trim()))
+                        {
+                            ids.Add(unitId.Trim());
+                        }
+                    }
+                }
+            }
+
+            return ids.AsReadOnly();
         }
 
         public void OnAiBehaviourInitialized(object gameBehaviour)
@@ -1852,7 +2704,23 @@ namespace RogueCommandExpansionLoader.Content
             try
             {
                 bound.RuntimeBehaviour.OnInitialized();
-                // Apply AI overrides from units referenced in this profile
+                RuntimeGameplayCommandDirector.RegisterAiProfileUnitDefaults(
+                    profile.Definition.id,
+                    profile.Definition.doctrine,
+                    profile.Definition.aggressionMultiplier,
+                    profile.Definition.defaultUnitStance,
+                    profile.Definition.defaultUnitLoadout,
+                    profile.Definition.startingUnitAffixes,
+                    profile.Definition.startingUnitVeterancyRank,
+                    true,
+                    GetAiProfileTargetUnitIds(profile.Definition));
+                if (!String.IsNullOrWhiteSpace(profile.Definition.doctrine))
+                {
+                    float mult = profile.Definition.aggressionMultiplier ?? 1.0f;
+                    RuntimeGameplayCommandDirector.TrySetAiDoctrine(profile.Definition.doctrine, mult);
+                }
+                RuntimeGameplayCommandDirector.ApplyActiveAiUnitDefaultsToAiUnits();
+                // Apply AI overrides from units referenced in this profile and warm their pre-spawn pools
                 if (profile.Definition.unitEntries != null)
                 {
                     foreach (var entry in profile.Definition.unitEntries)
@@ -1862,8 +2730,17 @@ namespace RogueCommandExpansionLoader.Content
                             continue;
                         }
                         LoadedUnit unit;
-                        if (_units.TryGetValue(entry.unitId, out unit) && unit != null &&
-                            unit.Definition != null && unit.Definition.aiOverrides != null)
+                        _units.TryGetValue(entry.unitId, out unit);
+                        int warmQuota = Math.Min(50, Math.Max(
+                            entry.countAtStart,
+                            (unit != null && unit.Definition != null && unit.Definition.prespawnCount.HasValue)
+                                ? unit.Definition.prespawnCount.Value
+                                : 0));
+                        if (warmQuota > 0)
+                        {
+                            RuntimeGameplayCommandDirector.TryWarmPrespawnPool(entry.unitId, warmQuota);
+                        }
+                        if (unit != null && unit.Definition != null && unit.Definition.aiOverrides != null)
                         {
                             foreach (var ovr in unit.Definition.aiOverrides)
                             {
@@ -2081,6 +2958,16 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        public void ShutdownBundles()
+        {
+            _bundleRegistry.UnloadAll(true);
+        }
+
+        public bool TryGetBundle(string bundleId, out AssetBundle bundle)
+        {
+            return _bundleRegistry.TryGetBundle(bundleId, out bundle);
+        }
+
         private void RemoveAiBehaviourBindingIfCurrentLocked(
             DefaultAiBehaviour behaviour,
             BoundAiRuntimeBehaviour expected)
@@ -2153,6 +3040,15 @@ namespace RogueCommandExpansionLoader.Content
         {
             _nativeUnitIds.Clear();
             _nativeFactoryIds.Clear();
+            ClearMinAttackRanges();
+            ClearOnHitStatusEffects();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            if (!_loaded)
+            {
+                RuntimeUnitVariantRegistry.Clear();
+                RuntimeUnitVisualVariantRegistry.Clear();
+                RuntimeVisualCensus.ClearLoadedPrefabAudits();
+            }
             IDictionary index = _entityIndexField.GetValue(null) as IDictionary;
             if (index == null)
             {
@@ -2301,7 +3197,16 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     candidate.ValidatedDefinition = validation.Pack;
-                    ResolvePackDependencies(candidate, unitOwners, profileOwners);
+                }
+
+                DisableCrossPackUnitGraphViolations(candidates);
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    PackCandidate candidate = candidates[i];
+                    if (!candidate.Disabled && candidate.ValidatedDefinition != null)
+                    {
+                        ResolvePackDependencies(candidate, unitOwners, profileOwners);
+                    }
                 }
 
                 await LoadPacksInDependencyOrderAsync(candidates);
@@ -2441,6 +3346,69 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private void DisableCrossPackUnitGraphViolations(List<PackCandidate> candidates)
+        {
+            var validatedCandidates = new List<PackCandidate>();
+            var validatedPacks = new List<ContentPackDefinition>();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                PackCandidate candidate = candidates[i];
+                if (candidate == null || candidate.Disabled || candidate.ValidatedDefinition == null)
+                {
+                    continue;
+                }
+
+                validatedCandidates.Add(candidate);
+                validatedPacks.Add(candidate.ValidatedDefinition);
+            }
+
+            IReadOnlyList<CrossPackUnitGraphIssue> issues =
+                ContentPackValidator.ValidateCrossPackUnitReferenceGraphs(validatedPacks);
+            for (int issueIndex = 0; issueIndex < issues.Count; issueIndex++)
+            {
+                CrossPackUnitGraphIssue issue = issues[issueIndex];
+                PackCandidate owner = null;
+                int ownerCount = 0;
+                for (int candidateIndex = 0; candidateIndex < validatedCandidates.Count; candidateIndex++)
+                {
+                    PackCandidate candidate = validatedCandidates[candidateIndex];
+                    if (String.Equals(candidate.ValidatedDefinition.packId, issue.PackId, StringComparison.Ordinal))
+                    {
+                        owner = candidate;
+                        ownerCount++;
+                    }
+                }
+
+                if (ownerCount != 1 || owner == null)
+                {
+                    string failure = "No se pudo resolver de forma única el paquete propietario del diagnóstico " +
+                        issue.PackId + "; se desactivan todos los paquetes validados por seguridad.";
+                    for (int candidateIndex = 0; candidateIndex < validatedCandidates.Count; candidateIndex++)
+                    {
+                        PackCandidate candidate = validatedCandidates[candidateIndex];
+                        candidate.Disabled = true;
+                        candidate.StatusReason = AppendStatusReason(candidate.StatusReason, failure);
+                        Log("Paquete '" + candidate.Name + "' desactivado: " + failure);
+                    }
+                    return;
+                }
+
+                owner.Disabled = true;
+                owner.StatusReason = AppendStatusReason(owner.StatusReason, issue.Diagnostic.ToString());
+                Log("Paquete '" + owner.Name + "' desactivado: " + issue.Diagnostic);
+            }
+        }
+
+        private static string AppendStatusReason(string currentReason, string additionalReason)
+        {
+            if (String.IsNullOrWhiteSpace(currentReason))
+            {
+                return additionalReason;
+            }
+
+            return currentReason + " | " + additionalReason;
+        }
+
         private static IEnumerable<string> EnumerateDefinitionIds(ContentPackDefinition definition)
         {
             if (definition == null)
@@ -2459,7 +3427,8 @@ namespace RogueCommandExpansionLoader.Content
 
             if (definition.units != null)
             {
-                for (int i = 0; i < definition.units.Length; i++)
+                int unitCount = definition.units == null ? 0 : definition.units.Length;
+                for (int i = 0; i < unitCount; i++)
                 {
                     ContentUnitDefinition unit = definition.units[i];
                     if (unit == null)
@@ -2471,6 +3440,18 @@ namespace RogueCommandExpansionLoader.Content
                     if (unit.productionBuilding != null)
                     {
                         yield return unit.productionBuilding.id;
+                    }
+                }
+            }
+
+            if (definition.buildings != null)
+            {
+                for (int i = 0; i < definition.buildings.Length; i++)
+                {
+                    ContentBuildingDefinition building = definition.buildings[i];
+                    if (building != null && !String.IsNullOrWhiteSpace(building.id))
+                    {
+                        yield return building.id;
                     }
                 }
             }
@@ -2847,13 +3828,17 @@ namespace RogueCommandExpansionLoader.Content
                     FileStream stream;
                     if (!TryOpenContainedFile(packageRoot, fullPath, out stream, out pathFailure))
                     {
-                        _log?.Invoke("Warning: Bundle file missing at '" + fullPath + "'; attempting global fallback if configured.");
-
-                        // Implement global-fallback mechanism
-                        string fallbackPath = GetGlobalFallbackBundlePath();
-                        if (!String.IsNullOrWhiteSpace(fallbackPath) && TryOpenContainedFile(packageRoot, fallbackPath, out stream, out pathFailure))
+                        if (BundleFallbackPolicy.ShouldAttemptFallback(true, GetGlobalFallbackBundlePath()))
                         {
-                            _log?.Invoke("Successfully loaded fallback bundle: " + fallbackPath);
+                            string fallbackPath = GetGlobalFallbackBundlePath();
+                            if (TryOpenContainedFile(packageRoot, fallbackPath, out stream, out pathFailure))
+                            {
+                                _log?.Invoke("Successfully loaded fallback bundle: " + fallbackPath);
+                            }
+                            else
+                            {
+                                throw new InvalidDataException(pathFailure);
+                            }
                         }
                         else
                         {
@@ -2950,6 +3935,20 @@ namespace RogueCommandExpansionLoader.Content
 
                         EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, unit.id,
                             "Unidad " + unit.id + " en '" + packageName + "'");
+                        ApplyEntityBehavioralParameters(nativePrefabClone, unit.rotationDegreesPerSecond, unit.collisionRadius,
+                            unit.attackWarmUpTime, unit.canAttackWhileMoving, unit.shootAutomaticallyOnEnemiesWithinRange,
+                            unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
+                        ApplyEntityActiveSkills(nativePrefabClone, unit.activeSkills, unit.id);
+                        ApplyEntityCombatEnhancements(nativePrefabClone, unit.onHitStatusEffects, unit.criticalHitChance, unit.id);
+                        RegisterEntityMechanicsProfile(unit, temporaryBundles, packageName);
+                        AssetBundle audioBundle = !String.IsNullOrWhiteSpace(unit.assetBundleId)
+                            ? GetBundle(temporaryBundles, unit.assetBundleId, packageName)
+                            : null;
+                        ApplyEntityAudioBindings(nativePrefabClone, audioBundle, unit.selectionSoundAssetName,
+                            unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
+                        EnsureMuzzleFlashHierarchy(nativePrefabClone);
+                        RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit(unit.id, nativePrefabClone);
+
                         nativePrefabClone.name = "RCL_Native_" + unit.id.Replace(':', '_');
                         nativePrefabClone.SetActive(false);
                         nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
@@ -2974,6 +3973,7 @@ namespace RogueCommandExpansionLoader.Content
                         _allowedForAiField.SetValue(row, unit.isAllowedForAi);
                         _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
                         _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
+                        ApplyStructuredUnitParameters(row, unit);
                     }
                     else
                     {
@@ -2996,6 +3996,17 @@ namespace RogueCommandExpansionLoader.Content
                         EntityController customController = customPrefabClone.GetComponent<EntityController>();
                         EntityControllerIdentity.Assign(_entityControllerIdField, customController, unit.id,
                             "Unidad " + unit.id + " en '" + packageName + "'");
+                        ApplyEntityBehavioralParameters(customPrefabClone, unit.rotationDegreesPerSecond, unit.collisionRadius,
+                            unit.attackWarmUpTime, unit.canAttackWhileMoving, unit.shootAutomaticallyOnEnemiesWithinRange,
+                            unit.defendPositionAggressivelyWhenIdle, unit.rangeToChooseNewTargetAutomatically, unit.minAttackRange, unit.id);
+                        ApplyEntityActiveSkills(customPrefabClone, unit.activeSkills, unit.id);
+                        ApplyEntityCombatEnhancements(customPrefabClone, unit.onHitStatusEffects, unit.criticalHitChance, unit.id);
+                        RegisterEntityMechanicsProfile(unit, temporaryBundles, packageName);
+                        ApplyEntityAudioBindings(customPrefabClone, bundle, unit.selectionSoundAssetName,
+                            unit.engineSoundAssetName, unit.weaponSoundAssetName, unit.id, packageName);
+                        EnsureMuzzleFlashHierarchy(customPrefabClone);
+                        RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit(unit.id, customPrefabClone);
+
                         customPrefabClone.name = "RCL_Custom_" + unit.id.Replace(':', '_');
                         customPrefabClone.SetActive(false);
                         customPrefabClone.hideFlags = HideFlags.HideAndDontSave;
@@ -3011,6 +4022,7 @@ namespace RogueCommandExpansionLoader.Content
                         _allowedForAiField.SetValue(row, unit.isAllowedForAi);
                         _allowedForDemoField.SetValue(row, unit.isAllowedForDemo);
                         _isForSpecialistsField.SetValue(row, unit.isForSpecialists);
+                        ApplyStructuredUnitParameters(row, unit);
 
                         temporaryResources.Add(prefabKey, customPrefabClone);
                         temporaryResources.Add(imageKey, cardImage);
@@ -3025,10 +4037,39 @@ namespace RogueCommandExpansionLoader.Content
                     _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
                     _allowedBlueprintField.SetValue(row, false);
                     _allowedStartingBlueprintField.SetValue(row, false);
-                    temporaryUnits.Add(new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
-                        row, unit, false, unit.productionBuilding.id));
-                    temporaryUnits.Add(CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
-                        packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
+                    int unitPrespawn = unit.prespawnCount ?? ((unit.systemTags != null && Array.Exists(unit.systemTags, t => String.Equals(t, "Spawn", StringComparison.OrdinalIgnoreCase))) || HasRoleFlag(row, "Spawn") ? 50 : 20);
+                    LoadedUnit productUnit = new LoadedUnit(unit.id, definition.packId, prefabKey, imageKey,
+                        row, unit, false, unit.productionBuilding.id, unitPrespawn, false);
+                    temporaryUnits.Add(productUnit);
+                    try
+                    {
+                        LoadedUnit factoryUnit = CreateProductionBuilding(unit, unit.productionBuilding, definition.packId,
+                            packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources);
+                        if (factoryUnit == null)
+                        {
+                            temporaryUnits.Remove(productUnit);
+                            throw new InvalidDataException("CreateProductionBuilding returned null for " + unit.id);
+                        }
+                        temporaryUnits.Add(factoryUnit);
+                    }
+                    catch
+                    {
+                        temporaryUnits.Remove(productUnit);
+                        throw;
+                    }
+                }
+
+                if (definition.buildings != null)
+                {
+                    for (int i = 0; i < definition.buildings.Length; i++)
+                    {
+                        ContentBuildingDefinition building = definition.buildings[i];
+                        if (building != null)
+                        {
+                            temporaryUnits.Add(CreateStandaloneBuilding(building, definition.packId,
+                                packageName, temporaryBundles, temporaryNativePrefabs, temporaryResources));
+                        }
+                    }
                 }
 
                 for (int i = 0; i < definition.stages.Length; i++)
@@ -3085,11 +4126,10 @@ namespace RogueCommandExpansionLoader.Content
                     {
                         availablePoolIds.Add(_blueprintPoolIdField.GetValue(pools[poolIndex]) as string);
                     }
-                    var nativePoolUnits = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
                     HashSet<string> scopedUnitIds = GetStageModUnitIds(
-                        stage, temporaryUnits, availablePoolIds, nativePoolUnits);
+                        stage, temporaryUnits, availablePoolIds);
                     Dictionary<string, HashSet<string>> unitsByPool = GetStagePoolUnitIds(
-                        stage, scopedUnitIds, nativePoolUnits, temporaryUnits, availablePoolIds);
+                        stage, scopedUnitIds, temporaryUnits, availablePoolIds);
                     var stagePoolScopes = new List<BlueprintPoolScopeRegistration>();
                     if (scopedUnitIds.Count > 0 ||
                         (stage.blueprintPoolEntries != null && stage.blueprintPoolEntries.Length > 0))
@@ -3099,11 +4139,33 @@ namespace RogueCommandExpansionLoader.Content
                             reservedBlueprintPoolIds = LoadNativeBlueprintPoolIds();
                         }
 
+                        ScriptableObject clonedPoolList = UnityEngine.Object.Instantiate(stagePoolList);
+                        if (clonedPoolList == null)
+                        {
+                            throw new InvalidDataException("No se pudo clonar la lista de BlueprintPool de " + stage.id + ".");
+                        }
+
+                        clonedPoolList.name = "RCL_BlueprintPoolList_" + stage.id.Replace(':', '_');
+                        clonedPoolList.hideFlags = HideFlags.HideAndDontSave;
+                        temporaryBlueprintPoolClones.Add(clonedPoolList);
+                        _stageParametersBlueprintPoolListField.SetValue(parameters, clonedPoolList);
+                        poolList = _blueprintPoolsField.GetValue(clonedPoolList) as IList;
+                        if (poolList == null)
+                        {
+                            throw new InvalidDataException("La lista de BlueprintPool clonada para " + stage.id + " es inválida.");
+                        }
+
                         var clonedPools = new List<object>(poolList.Count);
                         for (int poolIndex = 0; poolIndex < pools.Count; poolIndex++)
                         {
                             object pool = pools[poolIndex];
                             string sourcePoolId = _blueprintPoolIdField.GetValue(pool) as string;
+                            string rootSourcePoolId;
+                            if (_blueprintPoolScopeRegistry.TryGetSourcePoolLocalizationId(sourcePoolId, out rootSourcePoolId) &&
+                                !String.IsNullOrWhiteSpace(rootSourcePoolId))
+                            {
+                                sourcePoolId = rootSourcePoolId;
+                            }
                             HashSet<string> additions;
                             if (!unitsByPool.TryGetValue(sourcePoolId, out additions) || additions.Count == 0)
                             {
@@ -3158,6 +4220,34 @@ namespace RogueCommandExpansionLoader.Content
                     UnityEngine.Object fallback = ResolveStageFallback(stage, nativeSourceParameters, stageWorlds, packageName);
                     temporaryStages.Add(new LoadedStage(stage, definition.packId, runtimeStage,
                         pools, stageWorlds, landscape, stagePoolScopes, scopedUnitIds, fallback));
+                }
+
+                // Register stage-scoped blueprint factory eligibility early so AI profile deck validation
+                // can verify that referenced mod units have their production factories enabled in this pack.
+                var packBlueprintFactoryIds = new HashSet<string>(StringComparer.Ordinal);
+                for (int stageIdx = 0; stageIdx < temporaryStages.Count; stageIdx++)
+                {
+                    packBlueprintFactoryIds.UnionWith(StageBlueprintFactoryIds.CollectLoaderFactoryIds(
+                        temporaryStages[stageIdx].Definition,
+                        delegate(string productId)
+                        {
+                            LoadedUnit unit;
+                            if (!TryGetLoadedUnit(productId, temporaryUnits, out unit) || unit.IsProductionBuilding)
+                            {
+                                return null;
+                            }
+                            return String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                                ? unit.Id
+                                : unit.ProductionFactoryId;
+                        }));
+                }
+                for (int unitIdx = 0; unitIdx < temporaryUnits.Count; unitIdx++)
+                {
+                    if (temporaryUnits[unitIdx].IsProductionBuilding &&
+                        packBlueprintFactoryIds.Contains(temporaryUnits[unitIdx].Id))
+                    {
+                        _allowedBlueprintField.SetValue(temporaryUnits[unitIdx].BalanceRow, true);
+                    }
                 }
 
                 Dictionary<string, Vector2Int> scopedAiStageRanges = BuildScopedAiStageRanges(
@@ -3350,8 +4440,17 @@ namespace RogueCommandExpansionLoader.Content
                     }
 
                     var behaviours = new List<object> { nativeBehaviours[0] };
-                    temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, resourceName,
-                        behaviours, prefab));
+                    Vector2Int profileStageRange;
+                    if (scopedAiStageRanges.TryGetValue(profile.id, out profileStageRange))
+                    {
+                        temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, resourceName,
+                            behaviours, prefab, profileStageRange.x, profileStageRange.y));
+                    }
+                    else
+                    {
+                        temporaryProfiles.Add(new LoadedAiProfile(profile, definition.packId, resourceName,
+                            behaviours, prefab));
+                    }
                 }
 
                 ValidateStageGenerationCompatibility(temporaryStages, temporaryProfiles, packageName);
@@ -3439,7 +4538,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 Log("Paquete '" + (String.IsNullOrWhiteSpace(definition.packId) ? packageName : definition.packId) +
-                    "' desactivado sin registrar contenido: " + exception.GetType().Name + ": " + exception.Message);
+                    "' desactivado sin registrar contenido: " + exception.GetType().Name + ": " + exception.Message + "\n" + exception.StackTrace);
                 return false;
             }
         }
@@ -3613,11 +4712,43 @@ namespace RogueCommandExpansionLoader.Content
             var startingBlueprintUnitIds = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < units.Count; i++)
             {
-                if (units[i].Definition.isAllowedAsStartingBlueprint)
+                bool isEligibleForStarting = units[i].Definition != null &&
+                    (units[i].Definition.isAllowedAsStartingBlueprint ||
+                     !units[i].Definition.neededExperienceLevel.HasValue ||
+                     units[i].Definition.neededExperienceLevel.Value <= 0);
+
+                if (isEligibleForStarting)
                 {
                     startingBlueprintUnitIds.Add(units[i].Id);
-                    // Starting-deck eligibility is separate from normal blueprint eligibility.
-                    // Stage unit IDs add their dedicated production factories below.
+                    if (!String.IsNullOrWhiteSpace(units[i].ProductionFactoryId))
+                    {
+                        startingBlueprintUnitIds.Add(units[i].ProductionFactoryId);
+                    }
+                }
+                else if (units[i].IsStandaloneBuilding)
+                {
+                    object startingVal = _allowedStartingBlueprintField.GetValue(units[i].BalanceRow);
+                    if (startingVal is bool && (bool)startingVal)
+                    {
+                        startingBlueprintUnitIds.Add(units[i].Id);
+                    }
+                }
+
+                if (units[i].IsProductionBuilding)
+                {
+                    object allowedVal = _allowedBlueprintField.GetValue(units[i].BalanceRow);
+                    if (allowedVal is bool && (bool)allowedVal)
+                    {
+                        blueprintUnitIds.Add(units[i].Id);
+                    }
+                }
+                else if (String.IsNullOrWhiteSpace(units[i].ProductionFactoryId) && HasRoleFlag(units[i].BalanceRow, "Building"))
+                {
+                    object allowedVal = _allowedBlueprintField.GetValue(units[i].BalanceRow);
+                    if (allowedVal is bool && (bool)allowedVal)
+                    {
+                        blueprintUnitIds.Add(units[i].Id);
+                    }
                 }
             }
 
@@ -3673,9 +4804,6 @@ namespace RogueCommandExpansionLoader.Content
                                 unit.Id + ".");
                         }
 
-                        blueprintUnitIds.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
-                            ? unit.Id
-                            : unit.ProductionFactoryId);
                     }
                     else if (_nativeUnitIds.Contains(unitIds[unitIndex]))
                     {
@@ -3694,6 +4822,28 @@ namespace RogueCommandExpansionLoader.Content
                             " de la etapa " + stage.Definition.id + " no está disponible.");
                     }
                 }
+
+                blueprintUnitIds.UnionWith(StageBlueprintFactoryIds.CollectLoaderFactoryIds(
+                    stage.Definition,
+                    delegate(string productId)
+                    {
+                        LoadedUnit unit;
+                        if (!TryGetLoadedUnit(productId, units, out unit))
+                        {
+                            return null;
+                        }
+
+                        if (unit.IsProductionBuilding)
+                        {
+                            throw new InvalidDataException("La etapa " + stage.Definition.id +
+                                " debe declarar IDs de producto; no puede declarar directamente el edificio " +
+                                unit.Id + ".");
+                        }
+
+                        return String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                            ? unit.Id
+                            : unit.ProductionFactoryId;
+                    }));
             }
 
             for (int i = 0; i < units.Count; i++)
@@ -3727,6 +4877,12 @@ namespace RogueCommandExpansionLoader.Content
                 return bundle.LoadAsset<Sprite>(relic.imageAssetName);
             }, _retainedRelicObjects);
 
+            _upgradeRegistrar.Register(definition.upgrades, delegate(ContentUpgradeDefinition upgrade)
+            {
+                AssetBundle bundle = GetBundle(bundles, upgrade.assetBundleId, definition.packId);
+                return bundle.LoadAsset<Sprite>(upgrade.imageAssetName);
+            }, _retainedUpgradeObjects);
+
             for (int i = 0; i < units.Count; i++)
             {
                 _units.Add(units[i].Id, units[i]);
@@ -3738,12 +4894,32 @@ namespace RogueCommandExpansionLoader.Content
                 _relicDefinitions.Add(definition.relics[i].id, definition.relics[i]);
             }
 
+            for (int i = 0; i < (definition.upgrades ?? new ContentUpgradeDefinition[0]).Length; i++)
+            {
+                _upgradeDefinitions.Add(definition.upgrades[i].id, definition.upgrades[i]);
+            }
+
             _blueprintPoolScopeRegistry.Register(poolScopeRegistrations);
 
             for (int i = 0; i < profiles.Count; i++)
             {
                 _aiProfiles.Add(profiles[i].Id, profiles[i]);
                 _aiProfilesByResourceName.Add(profiles[i].ResourceName, profiles[i]);
+                RuntimeGameplayCommandDirector.RegisterAiProfileUnitDefaults(
+                    profiles[i].Id,
+                    profiles[i].Definition.doctrine,
+                    profiles[i].Definition.aggressionMultiplier,
+                    profiles[i].Definition.defaultUnitStance,
+                    profiles[i].Definition.defaultUnitLoadout,
+                    profiles[i].Definition.startingUnitAffixes,
+                    profiles[i].Definition.startingUnitVeterancyRank,
+                    false,
+                    GetAiProfileTargetUnitIds(profiles[i].Definition));
+                if (!String.IsNullOrWhiteSpace(profiles[i].Definition.doctrine))
+                {
+                    float mult = profiles[i].Definition.aggressionMultiplier ?? 1.0f;
+                    RuntimeGameplayCommandDirector.TrySetAiDoctrine(profiles[i].Definition.doctrine, mult);
+                }
             }
 
             for (int i = 0; i < stages.Count; i++)
@@ -3845,8 +5021,7 @@ namespace RogueCommandExpansionLoader.Content
         private HashSet<string> GetStageModUnitIds(
             ContentStageDefinition stage,
             List<LoadedUnit> currentPackUnits,
-            HashSet<string> allowedPoolIds,
-            Dictionary<string, HashSet<string>> nativePoolUnits)
+            HashSet<string> allowedPoolIds)
         {
             var scopedUnitIds = new HashSet<string>(StringComparer.Ordinal);
             var unitIds = stage.unitIds ?? new string[0];
@@ -3873,7 +5048,6 @@ namespace RogueCommandExpansionLoader.Content
                             (entry == null ? "<nulo>" : entry.poolId));
                     }
 
-                    var nativeUnitIds = new HashSet<string>(StringComparer.Ordinal);
                     for (int j = 0; entry.unitIds != null && j < entry.unitIds.Length; j++)
                     {
                         LoadedUnit unit;
@@ -3884,13 +5058,8 @@ namespace RogueCommandExpansionLoader.Content
                                 throw new InvalidDataException("La etapa " + stage.id +
                                     " declara un edificio de producción como producto de pool: " + entry.unitIds[j]);
                             }
-                            scopedUnitIds.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
-                                ? unit.Id
-                                : unit.ProductionFactoryId);
                         }
-                        else nativeUnitIds.Add(entry.unitIds[j]);
                     }
-                    nativePoolUnits[entry.poolId] = nativeUnitIds;
                 }
             }
 
@@ -3900,76 +5069,33 @@ namespace RogueCommandExpansionLoader.Content
         private Dictionary<string, HashSet<string>> GetStagePoolUnitIds(
             ContentStageDefinition stage,
             HashSet<string> scopedUnitIds,
-            Dictionary<string, HashSet<string>> nativePoolUnits,
             List<LoadedUnit> currentPackUnits,
             IEnumerable<string> availablePoolIds)
         {
-            var result = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-            var explicitPoolIds = new HashSet<string>(StringComparer.Ordinal);
-            for (int i = 0; stage.blueprintPoolEntries != null && i < stage.blueprintPoolEntries.Length; i++)
-            {
-                if (stage.blueprintPoolEntries[i] != null)
-                {
-                    explicitPoolIds.Add(stage.blueprintPoolEntries[i].poolId);
-                }
-            }
-            foreach (string poolId in availablePoolIds)
-            {
-                if (!explicitPoolIds.Contains(poolId))
-                {
-                    result[poolId] = new HashSet<string>(scopedUnitIds, StringComparer.Ordinal);
-                }
-            }
-            if (stage.blueprintPoolEntries == null)
-            {
-                return result;
-            }
-
-            for (int i = 0; i < stage.blueprintPoolEntries.Length; i++)
-            {
-                ContentStagePoolEntryDefinition entry = stage.blueprintPoolEntries[i];
-                HashSet<string> poolUnitIds;
-                if (!result.TryGetValue(entry.poolId, out poolUnitIds))
-                {
-                    poolUnitIds = new HashSet<string>(StringComparer.Ordinal);
-                    result.Add(entry.poolId, poolUnitIds);
-                }
-                for (int j = 0; entry.unitIds != null && j < entry.unitIds.Length; j++)
+            return StageBlueprintPoolFactoryIds.CollectByPool(
+                scopedUnitIds,
+                availablePoolIds,
+                stage.blueprintPoolEntries,
+                delegate(string productId)
                 {
                     LoadedUnit unit;
-                    if (TryGetLoadedUnit(entry.unitIds[j], currentPackUnits, out unit))
+                    if (!TryGetLoadedUnit(productId, currentPackUnits, out unit))
                     {
-                        string id = String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
-                            ? unit.Id : unit.ProductionFactoryId;
-                        poolUnitIds.Add(id);
+                        return null;
                     }
-                    else
+
+                    if (unit.IsProductionBuilding)
                     {
-                        poolUnitIds.Add(entry.unitIds[j]);
+                        throw new InvalidDataException("La etapa " + stage.id +
+                            " declara un edificio de producción como producto de pool: " + productId);
                     }
-                }
-                result[entry.poolId] = poolUnitIds;
-            }
-            return result;
+
+                    return String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                        ? unit.Id
+                        : unit.ProductionFactoryId;
+                });
         }
 
-        private void AddLoadedFactoryId(
-            string unitId,
-            List<LoadedUnit> currentPackUnits,
-            HashSet<string> result,
-            string stageId)
-        {
-            LoadedUnit unit;
-            if (!TryGetLoadedUnit(unitId, currentPackUnits, out unit) || unit.IsProductionBuilding)
-            {
-                throw new InvalidDataException("La etapa " + stageId +
-                    " referencia una unidad no cargada para su pool de blueprints: " + unitId);
-            }
-
-            result.Add(String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
-                ? unit.Id
-                : unit.ProductionFactoryId);
-        }
 
         private bool TryGetLoadedUnit(string unitId, List<LoadedUnit> temporaryUnits, out LoadedUnit unit)
         {
@@ -4010,92 +5136,6 @@ namespace RogueCommandExpansionLoader.Content
             return result;
         }
 
-        private List<object> CloneStageBlueprintPools(
-            UnityEngine.Object stageParameters,
-            string packId,
-            ContentStageDefinition stage,
-            string packageName,
-            List<object> validatedPools,
-            HashSet<string> scopedUnitIds,
-            Dictionary<string, HashSet<string>> nativePoolUnits,
-            List<LoadedUnit> currentPackUnits,
-            HashSet<string> reservedPoolIds,
-            List<ScriptableObject> temporaryClones,
-            List<BlueprintPoolScopeRegistration> registrations)
-        {
-            ScriptableObject sourceList = _stageParametersBlueprintPoolListField.GetValue(stageParameters)
-                as ScriptableObject;
-            if (sourceList == null || sourceList.GetType() != _blueprintPoolListType)
-            {
-                throw new InvalidDataException("Etapa " + stage.id + " en '" + packageName +
-                    "' no tiene una BlueprintPoolList clonable.");
-            }
-
-            ScriptableObject clonedList = UnityEngine.Object.Instantiate(sourceList);
-            if (clonedList == null || clonedList.GetType() != _blueprintPoolListType)
-            {
-                throw new InvalidDataException("No se pudo clonar la lista de BlueprintPool de " + stage.id + ".");
-            }
-
-            temporaryClones.Add(clonedList);
-            clonedList.name = "RCL_BlueprintPoolList_" + stage.id.Replace(':', '_');
-            clonedList.hideFlags = HideFlags.HideAndDontSave;
-            IList clonedPools = _blueprintPoolsField.GetValue(clonedList) as IList;
-            if (clonedPools == null || clonedPools.Count != validatedPools.Count)
-            {
-                throw new InvalidDataException("La lista de BlueprintPool clonada para " + stage.id +
-                    " cambió de forma inesperada.");
-            }
-
-            var sourcePoolIds = new HashSet<string>(StringComparer.Ordinal);
-            for (int poolIndex = 0; poolIndex < validatedPools.Count; poolIndex++)
-            {
-                sourcePoolIds.Add(_blueprintPoolIdField.GetValue(validatedPools[poolIndex]) as string);
-            }
-            Dictionary<string, HashSet<string>> unitsByPool = GetStagePoolUnitIds(
-                stage, scopedUnitIds, nativePoolUnits, currentPackUnits, sourcePoolIds);
-            var result = new List<object>(clonedPools.Count);
-            for (int i = 0; i < clonedPools.Count; i++)
-            {
-                UnityEngine.Object sourcePool = clonedPools[i] as UnityEngine.Object;
-                if (sourcePool == null || sourcePool.GetType() != _blueprintPoolType)
-                {
-                    throw new InvalidDataException("La lista clonada de la etapa " + stage.id +
-                        " contiene un BlueprintPool inválido.");
-                }
-
-                UnityEngine.Object clonedPool = UnityEngine.Object.Instantiate(sourcePool);
-                if (clonedPool == null || clonedPool.GetType() != _blueprintPoolType)
-                {
-                    throw new InvalidDataException("No se pudo clonar un BlueprintPool de la etapa " + stage.id + ".");
-                }
-
-                var poolClone = (ScriptableObject)clonedPool;
-                temporaryClones.Add(poolClone);
-                string originalPoolId = _blueprintPoolIdField.GetValue(sourcePool) as string;
-                HashSet<string> poolUnitIds;
-                if (!unitsByPool.TryGetValue(originalPoolId, out poolUnitIds))
-                {
-                    poolUnitIds = new HashSet<string>(StringComparer.Ordinal);
-                }
-                string scopedPoolId = CreateScopedBlueprintPoolId(
-                    packId, stage.id, originalPoolId, reservedPoolIds);
-                poolClone.name = "RCL_BlueprintPool_" + scopedPoolId.Substring("RCL_POOL_".Length, 16);
-                poolClone.hideFlags = HideFlags.HideAndDontSave;
-                _blueprintPoolIdField.SetValue(poolClone, scopedPoolId);
-                clonedPools[i] = poolClone;
-
-                bool exclusive = (bool)_blueprintPoolExclusiveField.GetValue(poolClone);
-                var registration = new BlueprintPoolScopeRegistration(
-                    scopedPoolId, stage.id, poolClone, poolUnitIds, exclusive, originalPoolId);
-                if (exclusive) registration.SetEligibleExclusiveUnitIds(poolUnitIds);
-                registrations.Add(registration);
-                result.Add(poolClone);
-            }
-
-            _stageParametersBlueprintPoolListField.SetValue(stageParameters, clonedList);
-            return result;
-        }
 
         private string CreateScopedBlueprintPoolId(
             string packId,
@@ -4293,7 +5333,7 @@ namespace RogueCommandExpansionLoader.Content
             if (visualTemplate != null)
             {
                 ApplyVisualOverlay(nativePrefabClone, visualTemplate, localizationDefinition, packageName,
-                    "Edificio de producción", true);
+                    "Edificio de producción", true, true);
             }
 
             EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
@@ -4305,25 +5345,53 @@ namespace RogueCommandExpansionLoader.Content
 
             EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, building.id,
                 "Edificio de producción " + building.id + " en '" + packageName + "'");
+            ApplyEntityBehavioralParameters(nativePrefabClone, null, building.gridSize.HasValue ? (float?)(building.gridSize.Value * 10f) : null,
+                null, false, false, false, -1);
+            EnsureMuzzleFlashHierarchy(nativePrefabClone);
+            RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit(building.id, nativePrefabClone);
+
             nativePrefabClone.name = "RCL_NativeFactory_" + building.id.Replace(':', '_');
             nativePrefabClone.SetActive(false);
             nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
             UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
 
             string prefabKey = ResourceKey(building.id, "prefab");
+            _allowedBlueprintField.SetValue(row, true);
             ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id, false, true);
+            ApplyStructuredProductionBuildingParameters(row, building, product);
             _entityIdField.SetValue(row, building.id);
             _prefabLocationField.SetValue(row, prefabKey);
             _imageLocationField.SetValue(row, imagePath);
             _inactiveField.SetValue(row, false);
-            _allowedBlueprintField.SetValue(row, false);
             ProductionBuildingEligibility.ApplyToFactoryRow(product, row,
                 _allowedStartingBlueprintField, _allowedForAiField, _allowedForDemoField);
             _factoryForEntityIdField.SetValue(row, CreateNullableString(product.id));
+            _copyUpgradesToEntityIdField.SetValue(row, CreateNullableString(product.id));
+            string[] tagsToOffer = (building.systemTags != null && building.systemTags.Length > 0)
+                ? building.systemTags
+                : product.systemTags;
+            if (tagsToOffer != null && tagsToOffer.Length > 0 && _offeredSystemTagsField != null)
+            {
+                int combinedTags = 0;
+                foreach (string tagName in tagsToOffer)
+                {
+                    if (!String.IsNullOrWhiteSpace(tagName))
+                    {
+                        try
+                        {
+                            combinedTags |= Convert.ToInt32(Enum.Parse(_offeredSystemTagsField.FieldType, tagName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                object tagsEnum = Enum.ToObject(_offeredSystemTagsField.FieldType, combinedTags);
+                _offeredSystemTagsField.SetValue(row, tagsEnum);
+            }
             temporaryResources.Add(prefabKey, nativePrefabClone);
 
+            int factoryPrespawn = 2;
             return new LoadedUnit(building.id, packId, prefabKey, imagePath,
-                row, localizationDefinition, true, null);
+                row, localizationDefinition, true, null, factoryPrespawn, false);
         }
 
         private object CreateNullableString(string value)
@@ -4349,6 +5417,586 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             return _nullableStringValueField.GetValue(nullableString) as string;
+        }
+
+        private void ApplyStructuredUnitParameters(object row, ContentUnitDefinition unit)
+        {
+            if (row == null || unit == null)
+            {
+                return;
+            }
+
+            if (unit.combatValue.HasValue)
+            {
+                _combatValueField.SetValue(row, unit.combatValue.Value);
+            }
+            if (unit.gridSize.HasValue)
+            {
+                _gridSizeField.SetValue(row, unit.gridSize.Value);
+            }
+            if (unit.maxCapacity.HasValue && _maxCapacityField != null)
+            {
+                _maxCapacityField.SetValue(row, unit.maxCapacity.Value);
+            }
+            if (unit.cardModelScalingFactor.HasValue)
+            {
+                _cardModelScalingFactorField.SetValue(row, unit.cardModelScalingFactor.Value);
+            }
+            if (unit.coinsAmount.HasValue)
+            {
+                _coinsAmountField.SetValue(row, unit.coinsAmount.Value);
+            }
+            if (unit.firePointCount.HasValue)
+            {
+                _firePointCountField.SetValue(row, unit.firePointCount.Value);
+            }
+            if (!String.IsNullOrEmpty(unit.copyUpgradesToEntityId))
+            {
+                _copyUpgradesToEntityIdField.SetValue(row, CreateNullableString(unit.copyUpgradesToEntityId));
+            }
+            if (unit.roles != null && unit.roles.Length > 0 && _entityRolesField != null)
+            {
+                int combinedRoles = 0;
+                foreach (string roleName in unit.roles)
+                {
+                    if (!String.IsNullOrWhiteSpace(roleName))
+                    {
+                        try
+                        {
+                            combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, roleName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                object rolesEnum = Enum.ToObject(_entityRolesField.FieldType, combinedRoles);
+                _entityRolesField.SetValue(row, rolesEnum);
+            }
+            if (!String.IsNullOrEmpty(unit.attackType) && _attackTypeField != null)
+            {
+                try
+                {
+                    object attackTypeEnum = Enum.Parse(_attackTypeField.FieldType, unit.attackType, true);
+                    _attackTypeField.SetValue(row, attackTypeEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(unit.skillType) && _skillTypeField != null)
+            {
+                try
+                {
+                    object skillTypeEnum = Enum.Parse(_skillTypeField.FieldType, unit.skillType, true);
+                    _skillTypeField.SetValue(row, skillTypeEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(unit.rarity) && _rarityField != null)
+            {
+                try
+                {
+                    object rarityEnum = Enum.Parse(_rarityField.FieldType, unit.rarity, true);
+                    _rarityField.SetValue(row, rarityEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(unit.tech) && _techField != null)
+            {
+                try
+                {
+                    object techEnum = Enum.Parse(_techField.FieldType, unit.tech, true);
+                    _techField.SetValue(row, techEnum);
+                }
+                catch (Exception) { }
+            }
+            if (unit.neededExperienceLevel.HasValue && _neededExperienceLevelField != null)
+            {
+                _neededExperienceLevelField.SetValue(row, unit.neededExperienceLevel.Value);
+            }
+            if (unit.systemTags != null && unit.systemTags.Length > 0 && _offeredSystemTagsField != null)
+            {
+                int combinedTags = 0;
+                foreach (string tagName in unit.systemTags)
+                {
+                    if (!String.IsNullOrWhiteSpace(tagName))
+                    {
+                        try
+                        {
+                            combinedTags |= Convert.ToInt32(Enum.Parse(_offeredSystemTagsField.FieldType, tagName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                object tagsEnum = Enum.ToObject(_offeredSystemTagsField.FieldType, combinedTags);
+                _offeredSystemTagsField.SetValue(row, tagsEnum);
+            }
+            if (unit.activeSkills != null && unit.activeSkills.Length > 0 && unit.activeSkills[0] != null)
+            {
+                ContentActiveSkillDefinition primarySkill = unit.activeSkills[0];
+                if (primarySkill.range.HasValue && _skillRangeField != null)
+                {
+                    if (_skillRangeField.FieldType == typeof(int))
+                    {
+                        _skillRangeField.SetValue(row, (int)Math.Round(primarySkill.range.Value));
+                    }
+                    else
+                    {
+                        _skillRangeField.SetValue(row, primarySkill.range.Value);
+                    }
+                }
+                if (_skillManaCostField != null)
+                {
+                    if (_skillManaCostField.FieldType == typeof(int))
+                    {
+                        _skillManaCostField.SetValue(row, (int)Math.Round(primarySkill.manaCost));
+                    }
+                    else
+                    {
+                        _skillManaCostField.SetValue(row, primarySkill.manaCost);
+                    }
+                }
+            }
+        }
+
+        private void ApplyStructuredProductionBuildingParameters(
+            object row,
+            ContentProductionBuildingDefinition building,
+            ContentUnitDefinition product = null)
+        {
+            if (row == null || building == null)
+            {
+                return;
+            }
+
+            if (building.gridSize.HasValue && _gridSizeField != null)
+            {
+                _gridSizeField.SetValue(row, building.gridSize.Value);
+            }
+            if (building.maxCapacity.HasValue && _maxCapacityField != null)
+            {
+                _maxCapacityField.SetValue(row, building.maxCapacity.Value);
+            }
+            if (building.cost.HasValue && _costField != null)
+            {
+                _costField.SetValue(row, building.cost.Value);
+            }
+            if (building.buildTime.HasValue && _productionDurationField != null)
+            {
+                _productionDurationField.SetValue(row, building.buildTime.Value);
+            }
+            if (building.combatValue.HasValue && _combatValueField != null)
+            {
+                _combatValueField.SetValue(row, building.combatValue.Value);
+            }
+            if (building.cardModelScalingFactor.HasValue && _cardModelScalingFactorField != null)
+            {
+                _cardModelScalingFactorField.SetValue(row, building.cardModelScalingFactor.Value);
+            }
+
+            int? effectiveExp = building.neededExperienceLevel ?? (product != null ? product.neededExperienceLevel : null);
+            if (!effectiveExp.HasValue && product != null && product.balanceOverrides != null)
+            {
+                for (int i = 0; i < product.balanceOverrides.Length; i++)
+                {
+                    if (product.balanceOverrides[i] != null &&
+                        String.Equals(product.balanceOverrides[i].name, "neededExperienceLevel", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int exp;
+                        if (Int32.TryParse(product.balanceOverrides[i].value, out exp))
+                        {
+                            effectiveExp = exp;
+                        }
+                        break;
+                    }
+                }
+            }
+            if (effectiveExp.HasValue && _neededExperienceLevelField != null)
+            {
+                _neededExperienceLevelField.SetValue(row, effectiveExp.Value);
+            }
+
+            string effectiveRarity = !String.IsNullOrEmpty(building.rarity) ? building.rarity : (product != null ? product.rarity : null);
+            if (String.IsNullOrEmpty(effectiveRarity) && product != null && product.balanceOverrides != null)
+            {
+                for (int i = 0; i < product.balanceOverrides.Length; i++)
+                {
+                    if (product.balanceOverrides[i] != null &&
+                        String.Equals(product.balanceOverrides[i].name, "rarity", StringComparison.OrdinalIgnoreCase))
+                    {
+                        effectiveRarity = product.balanceOverrides[i].value;
+                        break;
+                    }
+                }
+            }
+            if (!String.IsNullOrEmpty(effectiveRarity) && _rarityField != null)
+            {
+                try
+                {
+                    object rarityEnum = Enum.Parse(_rarityField.FieldType, effectiveRarity, true);
+                    _rarityField.SetValue(row, rarityEnum);
+                }
+                catch (Exception) { }
+            }
+
+            string effectiveTech = !String.IsNullOrEmpty(building.tech) ? building.tech : (product != null ? product.tech : null);
+            if (String.IsNullOrEmpty(effectiveTech) && product != null && product.balanceOverrides != null)
+            {
+                for (int i = 0; i < product.balanceOverrides.Length; i++)
+                {
+                    if (product.balanceOverrides[i] != null &&
+                        String.Equals(product.balanceOverrides[i].name, "tech", StringComparison.OrdinalIgnoreCase))
+                    {
+                        effectiveTech = product.balanceOverrides[i].value;
+                        break;
+                    }
+                }
+            }
+            if (!String.IsNullOrEmpty(effectiveTech) && _techField != null)
+            {
+                try
+                {
+                    object techEnum = Enum.Parse(_techField.FieldType, effectiveTech, true);
+                    _techField.SetValue(row, techEnum);
+                }
+                catch (Exception) { }
+            }
+            if (building.roles != null && building.roles.Length > 0 && _entityRolesField != null)
+            {
+                int combinedRoles = 0;
+                foreach (string roleName in building.roles)
+                {
+                    if (!String.IsNullOrWhiteSpace(roleName))
+                    {
+                        try
+                        {
+                            combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, roleName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                try
+                {
+                    combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, "Building", true));
+                    combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, "Factory", true));
+                }
+                catch (Exception) { }
+                object rolesEnum = Enum.ToObject(_entityRolesField.FieldType, combinedRoles);
+                _entityRolesField.SetValue(row, rolesEnum);
+            }
+        }
+
+        private void ApplyStructuredBuildingParameters(
+            object row,
+            ContentBuildingDefinition building)
+        {
+            if (row == null || building == null)
+            {
+                return;
+            }
+
+            if (building.gridSize.HasValue && _gridSizeField != null)
+            {
+                _gridSizeField.SetValue(row, building.gridSize.Value);
+            }
+            if (building.maxCapacity.HasValue && _maxCapacityField != null)
+            {
+                _maxCapacityField.SetValue(row, building.maxCapacity.Value);
+            }
+            if (building.cost.HasValue && _costField != null)
+            {
+                _costField.SetValue(row, building.cost.Value);
+            }
+            if (building.buildTime.HasValue && _productionDurationField != null)
+            {
+                _productionDurationField.SetValue(row, building.buildTime.Value);
+            }
+            if (building.combatValue.HasValue && _combatValueField != null)
+            {
+                _combatValueField.SetValue(row, building.combatValue.Value);
+            }
+            if (building.cardModelScalingFactor.HasValue && _cardModelScalingFactorField != null)
+            {
+                _cardModelScalingFactorField.SetValue(row, building.cardModelScalingFactor.Value);
+            }
+            if (building.firePointCount.HasValue && _firePointCountField != null)
+            {
+                _firePointCountField.SetValue(row, building.firePointCount.Value);
+            }
+            if (building.neededExperienceLevel.HasValue && _neededExperienceLevelField != null)
+            {
+                _neededExperienceLevelField.SetValue(row, building.neededExperienceLevel.Value);
+            }
+            if (building.damage1.HasValue && _damage1Field != null)
+            {
+                _damage1Field.SetValue(row, building.damage1.Value);
+            }
+            if (building.attackCooldown.HasValue && _attackCooldownField != null)
+            {
+                _attackCooldownField.SetValue(row, building.attackCooldown.Value);
+            }
+            if (building.weaponRange.HasValue && _weaponRangeField != null)
+            {
+                _weaponRangeField.SetValue(row, building.weaponRange.Value);
+            }
+            if (building.damage2.HasValue && _damage2Field != null)
+            {
+                _damage2Field.SetValue(row, building.damage2.Value);
+            }
+            if (building.attack2Cooldown.HasValue && _attack2CooldownField != null)
+            {
+                _attack2CooldownField.SetValue(row, building.attack2Cooldown.Value);
+            }
+            if (building.effectRadius1.HasValue && _effectRadius1Field != null)
+            {
+                _effectRadius1Field.SetValue(row, building.effectRadius1.Value);
+            }
+            if (building.effectRadius2.HasValue && _effectRadius2Field != null)
+            {
+                _effectRadius2Field.SetValue(row, building.effectRadius2.Value);
+            }
+            if (building.skillRange.HasValue && _skillRangeField != null)
+            {
+                _skillRangeField.SetValue(row, building.skillRange.Value);
+            }
+            if (building.skillManaCost.HasValue && _skillManaCostField != null)
+            {
+                _skillManaCostField.SetValue(row, building.skillManaCost.Value);
+            }
+            if (building.healAmount1.HasValue && _healAmount1Field != null)
+            {
+                _healAmount1Field.SetValue(row, building.healAmount1.Value);
+            }
+            if (building.healAmount2.HasValue && _healAmount2Field != null)
+            {
+                _healAmount2Field.SetValue(row, building.healAmount2.Value);
+            }
+            if (building.duration1.HasValue && _duration1Field != null)
+            {
+                _duration1Field.SetValue(row, building.duration1.Value);
+            }
+            if (building.duration2.HasValue && _duration2Field != null)
+            {
+                _duration2Field.SetValue(row, building.duration2.Value);
+            }
+            if (!String.IsNullOrEmpty(building.attackType) && _attackTypeField != null)
+            {
+                try
+                {
+                    object attackTypeEnum = Enum.Parse(_attackTypeField.FieldType, building.attackType, true);
+                    _attackTypeField.SetValue(row, attackTypeEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(building.skillType) && _skillTypeField != null)
+            {
+                try
+                {
+                    object skillTypeEnum = Enum.Parse(_skillTypeField.FieldType, building.skillType, true);
+                    _skillTypeField.SetValue(row, skillTypeEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(building.rarity) && _rarityField != null)
+            {
+                try
+                {
+                    object rarityEnum = Enum.Parse(_rarityField.FieldType, building.rarity, true);
+                    _rarityField.SetValue(row, rarityEnum);
+                }
+                catch (Exception) { }
+            }
+            if (!String.IsNullOrEmpty(building.tech) && _techField != null)
+            {
+                try
+                {
+                    object techEnum = Enum.Parse(_techField.FieldType, building.tech, true);
+                    _techField.SetValue(row, techEnum);
+                }
+                catch (Exception) { }
+            }
+            if (building.roles != null && building.roles.Length > 0 && _entityRolesField != null)
+            {
+                int combinedRoles = 0;
+                foreach (string roleName in building.roles)
+                {
+                    if (!String.IsNullOrWhiteSpace(roleName))
+                    {
+                        try
+                        {
+                            combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, roleName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                try
+                {
+                    combinedRoles |= Convert.ToInt32(Enum.Parse(_entityRolesField.FieldType, "Building", true));
+                }
+                catch (Exception) { }
+                object rolesEnum = Enum.ToObject(_entityRolesField.FieldType, combinedRoles);
+                _entityRolesField.SetValue(row, rolesEnum);
+            }
+            if (building.systemTags != null && building.systemTags.Length > 0 && _offeredSystemTagsField != null)
+            {
+                int combinedTags = 0;
+                foreach (string tagName in building.systemTags)
+                {
+                    if (!String.IsNullOrWhiteSpace(tagName))
+                    {
+                        try
+                        {
+                            combinedTags |= Convert.ToInt32(Enum.Parse(_offeredSystemTagsField.FieldType, tagName, true));
+                        }
+                        catch (Exception) { }
+                    }
+                }
+                object tagsEnum = Enum.ToObject(_offeredSystemTagsField.FieldType, combinedTags);
+                _offeredSystemTagsField.SetValue(row, tagsEnum);
+            }
+        }
+
+        private LoadedUnit CreateStandaloneBuilding(
+            ContentBuildingDefinition building,
+            string packId,
+            string packageName,
+            Dictionary<string, AssetBundle> temporaryBundles,
+            List<GameObject> temporaryNativePrefabs,
+            Dictionary<string, UnityEngine.Object> temporaryResources)
+        {
+            if (building == null || String.IsNullOrWhiteSpace(building.id) ||
+                String.IsNullOrWhiteSpace(building.nativeTemplateId))
+            {
+                throw new InvalidDataException("El edificio contiene una referencia vacía en '" + packageName + "'.");
+            }
+
+            object row = CopyNativeBalanceRow(building.nativeTemplateId, packageName, building.id);
+            if (!HasRoleFlag(row, "Building"))
+            {
+                throw new InvalidDataException("El nativeTemplateId '" + building.nativeTemplateId + "' de " +
+                    building.id + " en '" + packageName + "' no tiene el rol Building.");
+            }
+
+            string nativePrefabPath = _prefabLocationField.GetValue(row) as string;
+            string nativeImagePath = _imageLocationField.GetValue(row) as string;
+            if (String.IsNullOrWhiteSpace(nativePrefabPath) || String.IsNullOrWhiteSpace(nativeImagePath))
+            {
+                throw new InvalidDataException("El edificio plantilla '" + building.nativeTemplateId +
+                    "' no contiene rutas nativas de prefab e imagen válidas.");
+            }
+
+            GameObject nativeTemplate = Resources.Load<GameObject>(nativePrefabPath);
+            if (nativeTemplate == null)
+            {
+                nativeTemplate = Resources.Load<GameObject>(nativePrefabPath.ToLowerInvariant());
+            }
+
+            if (nativeTemplate == null)
+            {
+                throw new InvalidDataException("El edificio " + building.id + " no pudo cargar el prefab nativo '" +
+                    nativePrefabPath + "' de la plantilla " + building.nativeTemplateId + ".");
+            }
+
+            var localizationDefinition = new ContentUnitDefinition
+            {
+                id = building.id,
+                nativeTemplateId = building.nativeTemplateId,
+                assetBundleId = building.assetBundleId,
+                cardImageAssetName = building.cardImageAssetName,
+                visualAssetName = building.visualAssetName,
+                visualRootPath = building.visualRootPath,
+                localizations = building.localizations,
+                isAllowedAsStartingBlueprint = building.isAllowedAsStartingBlueprint ?? false,
+                isAllowedForAi = building.isAllowedForAi ?? true,
+                isAllowedForDemo = building.isAllowedForDemo ?? true,
+                isForSpecialists = building.isForSpecialists ?? false
+            };
+            ValidateUnitPrefab(nativeTemplate, localizationDefinition, packageName, false);
+
+            GameObject visualTemplate = null;
+            AssetBundle buildingAssetBundle = null;
+            string imagePath = nativeImagePath;
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName) ||
+                !String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                buildingAssetBundle = GetBundle(temporaryBundles, building.assetBundleId, packageName);
+            }
+            if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
+            {
+                AssetBundle cardBundle = buildingAssetBundle ??
+                    GetBundle(temporaryBundles, building.assetBundleId, packageName);
+                Sprite cardImage = LoadRequiredAsset(cardBundle, building.cardImageAssetName,
+                    typeof(Sprite), "building Sprite card image", packageName) as Sprite;
+                imagePath = ResourceKey(building.id, "image");
+                temporaryResources.Add(imagePath, cardImage);
+            }
+
+            if (!String.IsNullOrWhiteSpace(building.visualAssetName))
+            {
+                visualTemplate = LoadRequiredAsset(buildingAssetBundle, building.visualAssetName,
+                    typeof(GameObject), "visual-only building GameObject prefab", packageName) as GameObject;
+                ValidateVisualPrefab(visualTemplate, localizationDefinition, packageName, "Edificio");
+            }
+
+            GameObject nativePrefabClone = InstantiateDormantPrefab(nativeTemplate);
+            if (nativePrefabClone == null)
+            {
+                throw new InvalidDataException("No se pudo clonar el prefab del edificio " + building.id + ".");
+            }
+
+            temporaryNativePrefabs.Add(nativePrefabClone);
+            if (visualTemplate != null)
+            {
+                ApplyVisualOverlay(nativePrefabClone, visualTemplate, localizationDefinition, packageName,
+                    "Edificio", true, true);
+            }
+
+            EntityController clonedController = nativePrefabClone.GetComponent<EntityController>();
+            if (clonedController == null)
+            {
+                throw new InvalidDataException("El clon nativo del edificio " + building.id +
+                    " perdió su EntityController raíz.");
+            }
+
+            EntityControllerIdentity.Assign(_entityControllerIdField, clonedController, building.id,
+                "Edificio " + building.id + " en '" + packageName + "'");
+            ApplyEntityBehavioralParameters(nativePrefabClone, building.rotationDegreesPerSecond, building.collisionRadius,
+                building.attackWarmUpTime, building.canAttackWhileMoving ?? false, building.shootAutomaticallyOnEnemiesWithinRange,
+                building.defendPositionAggressivelyWhenIdle, building.rangeToChooseNewTargetAutomatically, building.minAttackRange, building.id);
+            ApplyEntityAudioBindings(nativePrefabClone, buildingAssetBundle, building.selectionSoundAssetName,
+                building.engineSoundAssetName, building.weaponSoundAssetName, building.id, packageName);
+            ApplyEntityCombatEnhancements(nativePrefabClone, building.onHitStatusEffects, building.criticalHitChance, building.id);
+            RegisterBuildingMechanicsProfile(building);
+            EnsureMuzzleFlashHierarchy(nativePrefabClone);
+            RuntimeVisualCensus.RegisterLoadedPrefabVisualAudit(building.id, nativePrefabClone);
+
+            nativePrefabClone.name = "RCL_NativeBuilding_" + building.id.Replace(':', '_');
+            nativePrefabClone.SetActive(false);
+            nativePrefabClone.hideFlags = HideFlags.HideAndDontSave;
+            UnityEngine.Object.DontDestroyOnLoad(nativePrefabClone);
+
+            string prefabKey = ResourceKey(building.id, "prefab");
+            ApplyBalanceOverrides(row, building.balanceOverrides, packageName, building.id, false, false);
+            ApplyStructuredBuildingParameters(row, building);
+            _entityIdField.SetValue(row, building.id);
+            _prefabLocationField.SetValue(row, prefabKey);
+            _imageLocationField.SetValue(row, imagePath);
+            _inactiveField.SetValue(row, false);
+            _factoryForEntityIdField.SetValue(row, CreateEmptyNullableString());
+            _copyUpgradesToEntityIdField.SetValue(row, CreateEmptyNullableString());
+
+            bool isAllowedAsBlueprint = building.isAllowedAsBlueprint ?? true;
+            _allowedBlueprintField.SetValue(row, isAllowedAsBlueprint);
+            _allowedStartingBlueprintField.SetValue(row, building.isAllowedAsStartingBlueprint ?? false);
+            _allowedForAiField.SetValue(row, building.isAllowedForAi ?? true);
+            _allowedForDemoField.SetValue(row, building.isAllowedForDemo ?? true);
+            if (_isForSpecialistsField != null)
+            {
+                _isForSpecialistsField.SetValue(row, building.isForSpecialists ?? false);
+            }
+
+            temporaryResources.Add(prefabKey, nativePrefabClone);
+
+            int buildingPrespawn = building.prespawnCount ?? 2;
+            return new LoadedUnit(building.id, packId, prefabKey, imagePath,
+                row, localizationDefinition, false, null, buildingPrespawn, true);
         }
 
         private bool HasProductionBuildingRoles(object row)
@@ -4423,7 +6071,9 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     int parsed;
                     if (!Int32.TryParse(balanceOverride.value, NumberStyles.Integer,
-                        CultureInfo.InvariantCulture, out parsed) || parsed < 0)
+                        CultureInfo.InvariantCulture, out parsed) || parsed < 0 ||
+                        (UnitBalanceOverrideMapper.IsNativeIntegerBalanceRowField(balanceOverride.name) &&
+                            parsed > UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger))
                     {
                         throw new InvalidDataException("Unidad " + unitId + " en '" + packageName +
                             "': valor entero inválido para " + balanceOverride.name + ".");
@@ -4580,13 +6230,60 @@ namespace RogueCommandExpansionLoader.Content
             return current != null;
         }
 
+        private static float CalculateVisualYawCorrection(Transform visualRoot)
+        {
+            if (visualRoot == null)
+            {
+                return 0f;
+            }
+
+            Transform muzzle = FindUniqueVisualSocket(visualRoot, "Socket_MuzzlePrimary");
+            Transform rearAnchor = FindUniqueVisualSocket(visualRoot, "Socket_EngineAudio");
+            if (rearAnchor == null)
+            {
+                rearAnchor = FindUniqueVisualSocket(visualRoot, "Socket_DamageSmoke");
+            }
+
+            if (muzzle == null || rearAnchor == null)
+            {
+                return 0f;
+            }
+
+            Vector3 muzzleLocal = visualRoot.InverseTransformPoint(muzzle.position);
+            Vector3 rearLocal = visualRoot.InverseTransformPoint(rearAnchor.position);
+            // Yaw correction must only consider the horizontal forward axis (Z in
+            // Unity space). Y is vertical height; comparing it caused false 180
+            // degree flips on units whose muzzle/rear height difference dominated
+            // their horizontal separation (e.g. walkers with a high turret).
+            float muzzleForward = muzzleLocal.z;
+            float rearForward = rearLocal.z;
+            return VisualOverlayOrientation.CalculateYawCorrectionDegrees(muzzleForward, rearForward);
+        }
+
+        private static Transform FindUniqueVisualSocket(Transform visualRoot, string socketName)
+        {
+            List<Transform> matches = FindTransformsRecursively(visualRoot, transform =>
+            {
+                if (transform == null ||
+                    !Runtime.Visual.RogueCommandSocketCatalog.TryResolveCanonicalSocketName(transform.name, out string canonicalName))
+                {
+                    return false;
+                }
+
+                return String.Equals(canonicalName, socketName, StringComparison.OrdinalIgnoreCase);
+            });
+
+            return matches.Count == 1 ? matches[0] : null;
+        }
+
         private static void ApplyVisualOverlay(
             GameObject nativePrefab,
             GameObject visualTemplate,
             ContentUnitDefinition unit,
             string packageName,
             string ownerLabel = "Unidad",
-            bool meshRenderersOnly = false)
+            bool meshRenderersOnly = false,
+            bool isBuilding = false)
         {
             Transform target = FindUniqueTransformPath(nativePrefab.transform, unit.visualRootPath);
             if (target == null)
@@ -4614,7 +6311,11 @@ namespace RogueCommandExpansionLoader.Content
                     "': visualRootPath '" + unit.visualRootPath + "' no contiene Renderer nativos que reemplazar.");
             }
 
+            ValidateNativeRigRetargetPaths(nativePrefab, visualTemplate, unit, packageName, ownerLabel);
+
             Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
+            float nativeHalfExtent = CalculateRendererHalfExtent(originalRenderers.ToArray());
+            float targetHalfExtent = VisualOverlayScaleCalibration.CalculateTargetHalfExtent(nativeHalfExtent, isBuilding);
 
             for (int i = 0; i < originalRenderers.Count; i++)
             {
@@ -4632,8 +6333,130 @@ namespace RogueCommandExpansionLoader.Content
             visualClone.transform.localPosition = Vector3.zero;
             visualClone.transform.localRotation = Quaternion.identity;
             visualClone.transform.localScale = Vector3.one;
+            float yawCorrection = CalculateVisualYawCorrection(visualClone.transform);
+            visualClone.transform.localRotation = Quaternion.Euler(0f, yawCorrection, 0f);
+
+            float visualExtent = CalculateRendererHalfExtent(
+                visualClone.GetComponentsInChildren<Renderer>(true));
+            if (!VisualOverlayScaleCalibration.IsUsableRendererExtent(visualExtent))
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': el overlay visual '" + unit.visualAssetName + "' no contiene bounds de renderers utilizables.");
+            }
+
+            float scaleFactor = VisualOverlayScaleCalibration.CalculateUniformScale(visualExtent, targetHalfExtent);
+            visualClone.transform.localScale = Vector3.one * scaleFactor;
+
+            if (unit.nativeRigRetarget != null)
+            {
+                ContentNativeRigRetargetMappingDefinition[] mappings = unit.nativeRigRetarget.mappings;
+                var sourcePaths = new string[mappings.Length];
+                var targetPaths = new string[mappings.Length];
+                for (int mappingIndex = 0; mappingIndex < mappings.Length; mappingIndex++)
+                {
+                    sourcePaths[mappingIndex] = mappings[mappingIndex].sourcePath;
+                    targetPaths[mappingIndex] = mappings[mappingIndex].targetPath;
+                }
+
+                NativeRigRetargetProfile retargetProfile = nativePrefab.GetComponent<NativeRigRetargetProfile>();
+                if (retargetProfile == null)
+                {
+                    retargetProfile = nativePrefab.AddComponent<NativeRigRetargetProfile>();
+                }
+
+                retargetProfile.Configure(
+                    sourcePaths,
+                    targetPaths,
+                    unit.visualRootPath + "/" + visualClone.name,
+                    scaleFactor > 0.0001f ? 1f / scaleFactor : 1f);
+            }
+
             ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
             visualClone.SetActive(true);
+        }
+
+        private static void ValidateNativeRigRetargetPaths(
+            GameObject nativePrefab,
+            GameObject visualTemplate,
+            ContentUnitDefinition unit,
+            string packageName,
+            string ownerLabel)
+        {
+            if (unit == null || unit.nativeRigRetarget == null)
+            {
+                return;
+            }
+
+            ContentNativeRigRetargetMappingDefinition[] mappings = unit.nativeRigRetarget.mappings;
+            if (mappings == null || mappings.Length == 0 ||
+                mappings.Length > ContentPackValidator.MaxNativeRigRetargetMappings)
+            {
+                throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                    "': nativeRigRetarget debe incluir entre 1 y " +
+                    ContentPackValidator.MaxNativeRigRetargetMappings + " mappings.");
+            }
+
+            for (int i = 0; i < mappings.Length; i++)
+            {
+                ContentNativeRigRetargetMappingDefinition mapping = mappings[i];
+                if (mapping == null)
+                {
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                        "': nativeRigRetarget.mappings[" + i + "] es nulo.");
+                }
+
+                if (FindUniqueTransformPath(nativePrefab.transform, mapping.sourcePath) == null)
+                {
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                        "': sourcePath '" + mapping.sourcePath +
+                        "' no identifica una única transformación en la plantilla nativa.");
+                }
+
+                if (FindUniqueTransformPath(visualTemplate.transform, mapping.targetPath) == null)
+                {
+                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                        "': targetPath '" + mapping.targetPath +
+                        "' no identifica una única transformación en el prefab visual.");
+                }
+            }
+        }
+
+        private static float CalculateRendererHalfExtent(Renderer[] renderers)
+        {
+            if (renderers == null || renderers.Length == 0)
+            {
+                return 0f;
+            }
+
+            var rendererBounds = new List<VisualRendererBounds>();
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null || (!(renderer is MeshRenderer) && !(renderer is SkinnedMeshRenderer)))
+                {
+                    continue;
+                }
+
+                var hierarchyNames = new List<string>();
+                Transform hierarchyTransform = renderer.transform;
+                while (hierarchyTransform != null)
+                {
+                    hierarchyNames.Add(hierarchyTransform.name);
+                    hierarchyTransform = hierarchyTransform.parent;
+                }
+
+                if (VisualOverlayScaleCalibration.IsExcludedRendererHierarchy(hierarchyNames))
+                {
+                    continue;
+                }
+
+                Bounds bounds = renderer.bounds;
+                rendererBounds.Add(new VisualRendererBounds(
+                    bounds.center.x, bounds.center.y, bounds.center.z,
+                    bounds.size.x, bounds.size.y, bounds.size.z));
+            }
+
+            return VisualOverlayScaleCalibration.CalculateCombinedHalfExtent(rendererBounds);
         }
 
         private static Transform FindUniqueTransformPath(Transform root, string path)
@@ -4708,29 +6531,324 @@ namespace RogueCommandExpansionLoader.Content
             for (int i = 0; i < renderers.Length; i++)
             {
                 Material[] materials = renderers[i].sharedMaterials;
-                bool hasMaterial = false;
-                for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
+                bool hasAnyMaterial = false;
+                bool changed = false;
+                if (materials != null && materials.Length > 0)
                 {
-                    if (materials[materialIndex] != null)
+                    for (int materialIndex = 0; materialIndex < materials.Length; materialIndex++)
                     {
-                        hasMaterial = true;
-                        break;
+                        Material mat = materials[materialIndex];
+                        if (mat != null)
+                        {
+                            hasAnyMaterial = true;
+                            Material rebound = EnsureMaterialSupported(mat, fallbackMaterial);
+                            if (rebound != null && !ReferenceEquals(rebound, mat))
+                            {
+                                materials[materialIndex] = rebound;
+                                changed = true;
+                            }
+                        }
                     }
                 }
 
-                if (hasMaterial)
+                if (changed)
                 {
-                    continue;
+                    renderers[i].sharedMaterials = materials;
                 }
 
-                if (fallbackMaterial == null)
+                if (!hasAnyMaterial)
                 {
-                    throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
-                        "': el modelo visual no tiene materiales y la plantilla nativa no ofrece un material MeshRenderer.");
-                }
+                    if (fallbackMaterial == null)
+                    {
+                        throw new InvalidDataException(ownerLabel + " " + unit.id + " en '" + packageName +
+                            "': el modelo visual no tiene materiales y la plantilla nativa no ofrece un material MeshRenderer.");
+                    }
 
-                renderers[i].sharedMaterial = fallbackMaterial;
+                    renderers[i].sharedMaterial = fallbackMaterial;
+                }
             }
+        }
+
+        private static readonly Dictionary<Material, Material> _reboundMaterials = new Dictionary<Material, Material>();
+        private static readonly Dictionary<string, Shader> _nativeShaderCache = new Dictionary<string, Shader>(StringComparer.Ordinal);
+
+        private static bool IsShaderSupportedAndValid(Shader shader)
+        {
+            if (shader == null || !shader.isSupported)
+            {
+                return false;
+            }
+
+            string name = shader.name ?? String.Empty;
+            if (name.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                name.IndexOf("Hidden", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static Shader FindNativeShader(string shaderName)
+        {
+            if (String.IsNullOrEmpty(shaderName))
+            {
+                return null;
+            }
+
+            Shader cached;
+            if (_nativeShaderCache.TryGetValue(shaderName, out cached) && cached != null && IsShaderSupportedAndValid(cached))
+            {
+                return cached;
+            }
+
+            Shader direct = Shader.Find(shaderName);
+            if (direct != null && IsShaderSupportedAndValid(direct))
+            {
+                _nativeShaderCache[shaderName] = direct;
+                return direct;
+            }
+
+            Shader[] shaders = Resources.FindObjectsOfTypeAll<Shader>();
+            for (int i = 0; i < shaders.Length; i++)
+            {
+                Shader s = shaders[i];
+                if (s == null) continue;
+                if (String.Equals(s.name, shaderName, StringComparison.Ordinal) && IsShaderSupportedAndValid(s))
+                {
+                    _nativeShaderCache[shaderName] = s;
+                    return s;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool HasVehiclePbrContract(Material source)
+        {
+            if (source == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                string shaderName = source.shader != null ? source.shader.name : String.Empty;
+                if (String.Equals(shaderName, "RogueCommand/VehiclePBR_VertexWear", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                // A missing/unsupported shader can still leave the authored map on the
+                // material. Treat that map as the durable signal for this PBR contract.
+                return GetTextureIfAny(source, "_MetallicGlossMap") != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static Material EnsureMaterialSupported(Material source, Material fallbackMaterial)
+        {
+            if (source == null)
+            {
+                return fallbackMaterial;
+            }
+
+            Material existing;
+            if (_reboundMaterials.TryGetValue(source, out existing) && existing != null)
+            {
+                return existing;
+            }
+
+            // If source material already has a valid, supported shader, keep it!
+            if (IsShaderSupportedAndValid(source.shader))
+            {
+                EnsureMaterialKeywords(source);
+                _reboundMaterials[source] = source;
+                return source;
+            }
+
+            // Material shader is missing, broken, or unsupported (e.g. URP/Lit).
+            // Rebind to a supported shader while preserving all textures, colors, and properties!
+            Material result = source;
+            try
+            {
+                string shaderName = source.shader != null ? source.shader.name : String.Empty;
+                Shader targetShader = null;
+
+                if (!String.IsNullOrEmpty(shaderName) &&
+                    shaderName.StartsWith("Universal Render Pipeline/Particles", StringComparison.Ordinal))
+                {
+                    targetShader = FindNativeShader(shaderName) ??
+                                   Shader.Find("Universal Render Pipeline/Particles/Unlit") ??
+                                   Shader.Find("Universal Render Pipeline/Particles/Simple Lit");
+                }
+                else
+                {
+                    bool preferVehiclePbr = HasVehiclePbrContract(source);
+                    if (preferVehiclePbr)
+                    {
+                        // Keep the authored PBR contract ahead of generic native shaders.
+                        // Otherwise an unsupported source shader is rebound to URP/Lit and
+                        // the bundle's metallic/normal maps are lost on the live instance.
+                        targetShader = FindNativeShader("RogueCommand/VehiclePBR_VertexWear");
+                    }
+
+                    // Generic native fallbacks remain unchanged for untextured overlays.
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = FindNativeShader("Universal Render Pipeline/Lit");
+                    }
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = Shader.Find("Universal Render Pipeline/Simple Lit");
+                    }
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = FindNativeShader("Universal Render Pipeline/Simple Lit");
+                    }
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = Shader.Find("Universal Render Pipeline/Unlit");
+                    }
+                    if (targetShader == null || !IsShaderSupportedAndValid(targetShader))
+                    {
+                        targetShader = FindNativeShader("Universal Render Pipeline/Unlit");
+                    }
+                    if (targetShader == null && fallbackMaterial != null && IsShaderSupportedAndValid(fallbackMaterial.shader))
+                    {
+                        targetShader = fallbackMaterial.shader;
+                    }
+                }
+
+                if (targetShader != null)
+                {
+                    result = new Material(targetShader) { name = source.name + " (RCL rebound)" };
+                    CopyLitProperties(source, result);
+                }
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogWarning("[ExpansionLoader] No se pudo reasignar shader para el material '" + source.name + "': " +
+                    exception.GetBaseException().Message);
+                result = source;
+            }
+
+            _reboundMaterials[source] = result;
+            return result;
+        }
+
+        private static void EnsureMaterialKeywords(Material mat)
+        {
+            if (mat == null) return;
+
+            Texture albedo = GetTextureIfAny(mat, "_BaseMap", "_MainTex");
+            if (albedo != null)
+            {
+                if (mat.HasProperty("_BaseMap") && mat.GetTexture("_BaseMap") == null) mat.SetTexture("_BaseMap", albedo);
+                if (mat.HasProperty("_MainTex") && mat.GetTexture("_MainTex") == null) mat.SetTexture("_MainTex", albedo);
+            }
+
+            if (mat.HasProperty("_BumpMap") && mat.GetTexture("_BumpMap") != null)
+            {
+                mat.EnableKeyword("_NORMALMAP");
+            }
+
+            if (mat.HasProperty("_MetallicGlossMap") && mat.GetTexture("_MetallicGlossMap") != null)
+            {
+                mat.EnableKeyword("_METALLICSPECGLOSSMAP");
+            }
+
+            if (mat.HasProperty("_EmissionMap") && mat.GetTexture("_EmissionMap") != null)
+            {
+                mat.EnableKeyword("_EMISSION");
+                mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
+            else if (mat.HasProperty("_EmissionColor"))
+            {
+                Color ec = mat.GetColor("_EmissionColor");
+                if (ec.maxColorComponent > 0.001f)
+                {
+                    mat.EnableKeyword("_EMISSION");
+                    mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                }
+            }
+
+            mat.enableInstancing = true;
+        }
+
+        private static Texture GetTextureIfAny(Material m, string a, string b = null)
+        {
+            Texture t = null;
+            if (m.HasProperty(a)) t = m.GetTexture(a);
+            if (t == null && b != null && m.HasProperty(b)) t = m.GetTexture(b);
+            return t;
+        }
+
+        private static void CopyLitProperties(Material src, Material dst)
+        {
+            Color baseColor = Color.white;
+            if (src.HasProperty("_BaseColor")) baseColor = src.GetColor("_BaseColor");
+            else if (src.HasProperty("_Color")) baseColor = src.GetColor("_Color");
+
+            Texture albedo = GetTextureIfAny(src, "_BaseMap", "_MainTex");
+            if (albedo != null)
+            {
+                if (dst.HasProperty("_BaseMap")) dst.SetTexture("_BaseMap", albedo);
+                if (dst.HasProperty("_MainTex")) dst.SetTexture("_MainTex", albedo);
+            }
+            if (dst.HasProperty("_BaseColor")) dst.SetColor("_BaseColor", baseColor);
+            if (dst.HasProperty("_Color")) dst.SetColor("_Color", baseColor);
+
+            Texture normal = GetTextureIfAny(src, "_BumpMap");
+            if (normal != null && dst.HasProperty("_BumpMap"))
+            {
+                dst.SetTexture("_BumpMap", normal);
+                dst.EnableKeyword("_NORMALMAP");
+                if (dst.HasProperty("_BumpScale") && src.HasProperty("_BumpScale"))
+                {
+                    dst.SetFloat("_BumpScale", src.GetFloat("_BumpScale"));
+                }
+            }
+
+            Texture metallicGloss = GetTextureIfAny(src, "_MetallicGlossMap");
+            if (metallicGloss != null)
+            {
+                if (dst.HasProperty("_MetallicGlossMap"))
+                {
+                    dst.SetTexture("_MetallicGlossMap", metallicGloss);
+                    dst.EnableKeyword("_METALLICSPECGLOSSMAP");
+                }
+                if (dst.HasProperty("_SpecGlossMap"))
+                {
+                    dst.SetTexture("_SpecGlossMap", metallicGloss);
+                }
+                if (dst.HasProperty("_Smoothness")) dst.SetFloat("_Smoothness", 1f);
+                if (dst.HasProperty("_Metallic")) dst.SetFloat("_Metallic", 1f);
+            }
+            else
+            {
+                if (src.HasProperty("_Metallic") && dst.HasProperty("_Metallic")) dst.SetFloat("_Metallic", src.GetFloat("_Metallic"));
+                if (src.HasProperty("_Smoothness") && dst.HasProperty("_Smoothness")) dst.SetFloat("_Smoothness", src.GetFloat("_Smoothness"));
+                if (src.HasProperty("_Glossiness") && dst.HasProperty("_Smoothness")) dst.SetFloat("_Smoothness", src.GetFloat("_Glossiness"));
+            }
+
+            Texture emission = GetTextureIfAny(src, "_EmissionMap");
+            Color emissionColor = src.HasProperty("_EmissionColor") ? src.GetColor("_EmissionColor") : Color.black;
+            if (emission != null || emissionColor.maxColorComponent > 0.001f)
+            {
+                if (emission != null && dst.HasProperty("_EmissionMap")) dst.SetTexture("_EmissionMap", emission);
+                if (dst.HasProperty("_EmissionColor"))
+                {
+                    dst.SetColor("_EmissionColor", emission != null && emissionColor.maxColorComponent <= 0.001f ? Color.white : emissionColor);
+                }
+                dst.EnableKeyword("_EMISSION");
+                dst.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            }
+
+            dst.enableInstancing = true;
         }
 
         private static GameObject InstantiateResourceTemplate(GameObject template, out GameObject holder)
@@ -5315,23 +7433,6 @@ namespace RogueCommandExpansionLoader.Content
             return false;
         }
 
-        private static bool ContainsString(string[] values, string expected)
-        {
-            if (values == null)
-            {
-                return false;
-            }
-
-            for (int i = 0; i < values.Length; i++)
-            {
-                if (String.Equals(values[i], expected, StringComparison.Ordinal))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         private List<object> ValidateStageParameters(
             UnityEngine.Object asset,
@@ -6791,6 +8892,714 @@ namespace RogueCommandExpansionLoader.Content
             public long LoadedBytes { get; set; }
         }
 
+        public IEnumerable<PrespawnQuota> GetPrespawnQuotas()
+        {
+            lock (_gate)
+            {
+                var quotas = new List<PrespawnQuota>(_units.Count);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    quotas.Add(new PrespawnQuota(unit.Id, unit.PrespawnCount, unit.IsProductionBuilding || unit.IsStandaloneBuilding, unit.ProductionFactoryId));
+                }
+                return quotas;
+            }
+        }
+
+        private void ApplyEntityBehavioralParameters(
+            GameObject prefabClone,
+            float? rotationDegreesPerSecond,
+            float? collisionRadius,
+            float? attackWarmUpTime,
+            bool? canAttackWhileMoving,
+            bool? shootAutomaticallyOnEnemiesWithinRange,
+            bool? defendPositionAggressivelyWhenIdle,
+            int? rangeToChooseNewTargetAutomatically,
+            float? minAttackRange = null,
+            string entityId = null)
+        {
+            if (prefabClone == null) return;
+            Component controller = prefabClone.GetComponent(_entityControllerType);
+            if (controller == null) return;
+
+            if (minAttackRange.HasValue && minAttackRange.Value > 0f)
+            {
+                string id = entityId;
+                if (string.IsNullOrEmpty(id) && _entityControllerIdField != null)
+                {
+                    id = _entityControllerIdField.GetValue(controller) as string;
+                }
+                if (!string.IsNullOrEmpty(id))
+                {
+                    RegisterMinAttackRange(id, minAttackRange.Value);
+                }
+            }
+
+            if (rotationDegreesPerSecond.HasValue && _rotationDegreesPerSecondField != null)
+            {
+                _rotationDegreesPerSecondField.SetValue(controller, rotationDegreesPerSecond.Value);
+            }
+            if (collisionRadius.HasValue && _collisionRadiusField != null)
+            {
+                _collisionRadiusField.SetValue(controller, collisionRadius.Value);
+            }
+            if (attackWarmUpTime.HasValue && _attackWarmUpTimeField != null)
+            {
+                _attackWarmUpTimeField.SetValue(controller, attackWarmUpTime.Value);
+            }
+            if (canAttackWhileMoving.HasValue && _canAttackWhileMovingField != null)
+            {
+                _canAttackWhileMovingField.SetValue(controller, canAttackWhileMoving.Value);
+            }
+            if (shootAutomaticallyOnEnemiesWithinRange.HasValue && _shootAutomaticallyField != null)
+            {
+                _shootAutomaticallyField.SetValue(controller, shootAutomaticallyOnEnemiesWithinRange.Value);
+            }
+            if (defendPositionAggressivelyWhenIdle.HasValue && _defendPositionAggressivelyField != null)
+            {
+                _defendPositionAggressivelyField.SetValue(controller, defendPositionAggressivelyWhenIdle.Value);
+            }
+            if (rangeToChooseNewTargetAutomatically.HasValue && _rangeToChooseNewTargetField != null)
+            {
+                _rangeToChooseNewTargetField.SetValue(controller, rangeToChooseNewTargetAutomatically.Value);
+            }
+        }
+
+        private void ApplyEntityCombatEnhancements(
+            GameObject prefabClone,
+            ContentOnHitStatusEffectDefinition[] onHitStatusEffects,
+            float? criticalHitChance,
+            string entityId)
+        {
+            if (prefabClone == null) return;
+            Component controller = prefabClone.GetComponent(_entityControllerType);
+            if (controller == null) return;
+
+            string id = entityId;
+            if (string.IsNullOrEmpty(id) && _entityControllerIdField != null)
+            {
+                id = _entityControllerIdField.GetValue(controller) as string;
+            }
+
+            if (!string.IsNullOrEmpty(id) && onHitStatusEffects != null && onHitStatusEffects.Length > 0)
+            {
+                RegisterOnHitStatusEffects(id, onHitStatusEffects);
+            }
+
+            if (criticalHitChance.HasValue && criticalHitChance.Value > 0f &&
+                _critModType != null && _addCriticalHitChanceBonusMethod != null)
+            {
+                try
+                {
+                    object mod = Activator.CreateInstance(_critModType);
+                    FieldInfo additionField = _critModType.GetField("addition", BindingFlags.Instance | BindingFlags.Public);
+                    FieldInfo idField = _critModType.GetField("idToAvoidStacking", BindingFlags.Instance | BindingFlags.Public);
+                    if (additionField != null) additionField.SetValue(mod, criticalHitChance.Value);
+                    if (idField != null) idField.SetValue(mod, "rcl-crit-" + id);
+                    _addCriticalHitChanceBonusMethod.Invoke(controller, new object[] { mod });
+                }
+                catch (Exception ex)
+                {
+                    _log?.Invoke("[ContentPackRuntimeLoader] Could not apply criticalHitChance to " + id + ": " + ex.Message);
+                }
+            }
+        }
+
+        private static void RegisterEntityMechanicsProfile(
+            ContentUnitDefinition unit,
+            Dictionary<string, AssetBundle> bundles,
+            string packageName)
+        {
+            if (unit == null || string.IsNullOrWhiteSpace(unit.id))
+            {
+                return;
+            }
+
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = unit.id,
+                AiActivationTrigger = unit.activeSkills != null && unit.activeSkills.Length > 0 && unit.activeSkills[0] != null
+                    ? unit.activeSkills[0].aiActivationTrigger
+                    : null,
+                Healing = unit.healing,
+                Aura = unit.aura,
+                BaselineStatusEffects = unit.baselineStatusEffects,
+                StatusEffects = unit.statusEffects,
+                CombatBoosts = unit.combatBoosts,
+                Experience = unit.experience,
+                Synergies = unit.synergies,
+                Stealth = unit.stealth,
+                Command = unit.command,
+                ExperienceReward = unit.experienceReward,
+                AiBehavior = unit.aiBehavior,
+                MinAttackRange = unit.minAttackRange,
+                CriticalHitChance = unit.criticalHitChance,
+                OnHitStatusEffects = unit.onHitStatusEffects,
+                ShieldRegen = unit.shieldRegeneration,
+                VampiricLeech = unit.vampiricLeech,
+                Taunt = unit.tauntPulse,
+                ShieldOverloadNova = unit.shieldOverloadNova,
+                DamageReflect = unit.damageReflect,
+                DeathNova = unit.deathNova,
+                DefaultTacticalStance = unit.defaultTacticalStance,
+                StartingAffixes = unit.startingAffixes,
+                DefaultLoadout = unit.defaultLoadout,
+                StartingVeterancyRank = unit.startingVeterancyRank
+            };
+
+            RegisterUnitVariants(unit);
+            RegisterUnitVisualVariants(unit, bundles, packageName);
+            if (profile.HasAnyMechanics)
+            {
+                RuntimeUnitMechanicsDirector.RegisterProfile(unit.id, profile);
+            }
+        }
+
+        private static void RegisterUnitVariants(ContentUnitDefinition unit)
+        {
+            if (unit == null || string.IsNullOrWhiteSpace(unit.id))
+            {
+                return;
+            }
+
+            var variants = new List<RuntimeUnitVariant>();
+            if (unit.variants != null)
+            {
+                for (int i = 0; i < unit.variants.Length; i++)
+                {
+                    ContentUnitVariantDefinition source = unit.variants[i];
+                    if (source == null || string.IsNullOrWhiteSpace(source.id))
+                    {
+                        continue;
+                    }
+
+                    var overrides = new List<RuntimeUnitVariantOverride>();
+                    if (source.balanceOverrides != null)
+                    {
+                        for (int j = 0; j < source.balanceOverrides.Length; j++)
+                        {
+                            ContentBalanceOverride balanceOverride = source.balanceOverrides[j];
+                            if (balanceOverride != null)
+                            {
+                                overrides.Add(new RuntimeUnitVariantOverride(
+                                    balanceOverride.name,
+                                    balanceOverride.value));
+                            }
+                        }
+                    }
+
+                    variants.Add(new RuntimeUnitVariant(source.id, source.loadout, overrides));
+                }
+            }
+
+            RuntimeUnitVariantRegistry.Register(unit.id, variants);
+        }
+
+        private static void RegisterUnitVisualVariants(
+            ContentUnitDefinition unit,
+            Dictionary<string, AssetBundle> bundles,
+            string packageName)
+        {
+            if (unit == null || string.IsNullOrWhiteSpace(unit.id))
+            {
+                return;
+            }
+
+            var visualVariants = new List<RuntimeUnitVisualVariant>();
+            if (unit.visualVariants != null)
+            {
+                for (int i = 0; i < unit.visualVariants.Length; i++)
+                {
+                    ContentUnitVisualVariantDefinition source = unit.visualVariants[i];
+                    if (source == null || string.IsNullOrWhiteSpace(source.id))
+                    {
+                        continue;
+                    }
+
+                    bool isPrimary = (i == 0);
+                    string presetName = ExtractPresetNameFromVariantId(source.id);
+                    var modules = new List<RuntimeUnitVisualModule>();
+                    if (source.modules != null)
+                    {
+                        for (int moduleIndex = 0; moduleIndex < source.modules.Length; moduleIndex++)
+                        {
+                            ContentUnitVisualModuleDefinition module = source.modules[moduleIndex];
+                            if (module == null) continue;
+
+                            AssetBundle moduleBundle = GetBundle(bundles, unit.assetBundleId, packageName);
+                            GameObject prefab = LoadRequiredAsset(moduleBundle, module.assetName,
+                                typeof(GameObject), "visual-only hardpoint module prefab", packageName) as GameObject;
+                            string hardpointType;
+                            if (!RogueCommandExpansionLoader.Runtime.Visual.RogueCommandSocketCatalog.TryResolveHardpointType(
+                                module.slotId, out hardpointType))
+                            {
+                                throw new InvalidDataException("Unidad " + unit.id + ", variante " + source.id +
+                                    ": slot de módulo no canónico: " + module.slotId + ".");
+                            }
+
+                            modules.Add(new RuntimeUnitVisualModule(hardpointType, module.assetName, prefab));
+                        }
+                    }
+
+                    visualVariants.Add(new RuntimeUnitVisualVariant(
+                        source.id,
+                        unit.id,
+                        presetName,
+                        source.colorTint,
+                        source.scale,
+                        source.visualAssetName,
+                        source.visualRootPath,
+                        isPrimary,
+                        modules));
+                }
+            }
+
+            RuntimeUnitVisualVariantRegistry.Register(unit.id, visualVariants);
+        }
+
+        private static string ExtractPresetNameFromVariantId(string variantId)
+        {
+            if (string.IsNullOrWhiteSpace(variantId)) return string.Empty;
+            string id = variantId.Trim();
+            int colon = id.IndexOf(':');
+            string name = colon >= 0 ? id.Substring(colon + 1) : id;
+            return name.Replace('-', '_');
+        }
+
+        private static void RegisterBuildingMechanicsProfile(ContentBuildingDefinition building)
+        {
+            if (building == null || string.IsNullOrWhiteSpace(building.id))
+            {
+                return;
+            }
+
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = building.id,
+                MinAttackRange = building.minAttackRange,
+                CriticalHitChance = building.criticalHitChance,
+                OnHitStatusEffects = building.onHitStatusEffects
+            };
+
+            if (profile.HasAnyMechanics)
+            {
+                RuntimeUnitMechanicsDirector.RegisterProfile(building.id, profile);
+            }
+        }
+
+        private void ApplyEntityActiveSkills(
+            GameObject prefabClone,
+            ContentActiveSkillDefinition[] activeSkills,
+            string entityId)
+        {
+            if (prefabClone == null || activeSkills == null || activeSkills.Length == 0) return;
+            Component controller = prefabClone.GetComponent(_entityControllerType);
+            if (controller == null) return;
+
+            ContentActiveSkillDefinition skill = activeSkills[0];
+            if (skill == null) return;
+
+            if (_hasActiveSkillField != null)
+            {
+                _hasActiveSkillField.SetValue(controller, true);
+            }
+
+            if (_activeSkillOrProductionField != null)
+            {
+                Type enumType = _activeSkillOrProductionField.FieldType;
+                if (enumType.IsEnum)
+                {
+                    _activeSkillOrProductionField.SetValue(controller, Enum.ToObject(enumType, 0));
+                }
+            }
+
+            object targetOriginVal = null;
+            if (_targetOriginType != null)
+            {
+                string targetOriginName = skill.targetOrigin;
+                if (string.IsNullOrEmpty(targetOriginName))
+                {
+                    if (string.Equals(skill.skillType, "Target", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(skill.skillType, "TargetAoE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetOriginName = "ChosenEntity";
+                    }
+                    else if (string.Equals(skill.skillType, "Position", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(skill.skillType, "Location", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(skill.skillType, "LocationAoE", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(skill.skillType, "LocationMultiTargets", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetOriginName = "ChosenLocation";
+                    }
+                    else
+                    {
+                        targetOriginName = "Self";
+                    }
+                }
+
+                try
+                {
+                    targetOriginVal = Enum.Parse(_targetOriginType, targetOriginName, true);
+                }
+                catch
+                {
+                    targetOriginVal = Enum.ToObject(_targetOriginType, 0);
+                }
+
+                if (_activeSkillTypeField != null && targetOriginVal != null)
+                {
+                    _activeSkillTypeField.SetValue(controller, targetOriginVal);
+                }
+            }
+
+            if (_skillInfoType != null && _skillInfoField != null && targetOriginVal != null)
+            {
+                try
+                {
+                    ConstructorInfo ctor = _skillInfoType.GetConstructor(new[] { _targetOriginType, typeof(float) });
+                    if (ctor != null)
+                    {
+                        object skillInfoInstance = ctor.Invoke(new object[] { targetOriginVal, skill.manaCost });
+                        _skillInfoField.SetValue(controller, skillInfoInstance);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log("Could not instantiate SkillInfo for " + entityId + ": " + ex.Message);
+                }
+            }
+
+            bool helpAi = skill.helpAiToActivate ?? true;
+            if (_helpAiToActivateSkillField != null)
+            {
+                _helpAiToActivateSkillField.SetValue(controller, helpAi);
+            }
+
+            float aiCooldown = skill.aiSkillCooldown.HasValue ? skill.aiSkillCooldown.Value : skill.cooldown;
+            if (_aiSkillCooldownField != null)
+            {
+                _aiSkillCooldownField.SetValue(controller, aiCooldown);
+            }
+
+            if (helpAi && _skillActivationConditionType != null && _conditionToActivateSkillField != null)
+            {
+                try
+                {
+                    object condition = Activator.CreateInstance(_skillActivationConditionType);
+                    FieldInfo nameField = _skillActivationConditionType.GetField("entityIdentifierName");
+                    FieldInfo opField = _skillActivationConditionType.GetField("operation");
+                    FieldInfo numField = _skillActivationConditionType.GetField("numberOfEntities");
+
+                    string identName = "EnemiesInRange";
+                    if (nameField != null) nameField.SetValue(condition, identName);
+                    if (opField != null)
+                    {
+                        Type opEnumType = _skillActivationConditionType.GetNestedType("Operation");
+                        if (opEnumType != null)
+                        {
+                            opField.SetValue(condition, Enum.Parse(opEnumType, "Greater"));
+                        }
+                    }
+                    if (numField != null) numField.SetValue(condition, 0);
+
+                    _conditionToActivateSkillField.SetValue(controller, condition);
+
+                    if (_entityIdentifiersField != null && _entityIdentifierType != null)
+                    {
+                        System.Collections.IList idList = _entityIdentifiersField.GetValue(controller) as System.Collections.IList;
+                        if (idList == null)
+                        {
+                            Type listType = typeof(List<>).MakeGenericType(_entityIdentifierType);
+                            idList = Activator.CreateInstance(listType) as System.Collections.IList;
+                            _entityIdentifiersField.SetValue(controller, idList);
+                        }
+
+                        bool hasIdent = false;
+                        if (idList != null)
+                        {
+                            FieldInfo identNameField = _entityIdentifierType.GetField("name");
+                            for (int i = 0; i < idList.Count; i++)
+                            {
+                                object item = idList[i];
+                                if (item != null && identNameField != null &&
+                                    string.Equals(identNameField.GetValue(item) as string, identName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    hasIdent = true;
+                                    break;
+                                }
+                            }
+
+                            if (!hasIdent)
+                            {
+                                object newIdent = Activator.CreateInstance(_entityIdentifierType);
+                                if (identNameField != null) identNameField.SetValue(newIdent, identName);
+                                FieldInfo radField = _entityIdentifierType.GetField("radius");
+                                if (radField != null && radField.FieldType.IsEnum)
+                                {
+                                    try
+                                    {
+                                        radField.SetValue(newIdent, Enum.Parse(radField.FieldType, "SelfSkillRange"));
+                                    }
+                                    catch
+                                    {
+                                        // Ignore radius parse fallback
+                                    }
+                                }
+                                idList.Add(newIdent);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log("Could not configure conditionToActivateSkill for " + entityId + ": " + ex.Message);
+                }
+            }
+        }
+
+        private void ApplyEntityAudioBindings(
+            GameObject prefabClone,
+            AssetBundle bundle,
+            string selectionSoundAssetName,
+            string engineSoundAssetName,
+            string weaponSoundAssetName,
+            string entityId,
+            string packageName)
+        {
+            if (prefabClone == null) return;
+            Component controller = prefabClone.GetComponent(_entityControllerType);
+
+            if (!String.IsNullOrWhiteSpace(selectionSoundAssetName) && bundle != null)
+            {
+                AudioClip selectionClip = LoadRequiredAsset(bundle, selectionSoundAssetName,
+                    typeof(AudioClip), "AudioClip selection sound", packageName) as AudioClip;
+                if (selectionClip != null && controller != null && _selectionSoundField != null)
+                {
+                    AudioSource audioSource = _selectionSoundField.GetValue(controller) as AudioSource;
+                    if (audioSource == null)
+                    {
+                        audioSource = prefabClone.AddComponent<AudioSource>();
+                        audioSource.playOnAwake = false;
+                        _selectionSoundField.SetValue(controller, audioSource);
+                    }
+                    audioSource.clip = selectionClip;
+                }
+            }
+
+            if (!String.IsNullOrWhiteSpace(engineSoundAssetName) && bundle != null)
+            {
+                AudioClip engineClip = LoadRequiredAsset(bundle, engineSoundAssetName,
+                    typeof(AudioClip), "AudioClip engine sound", packageName) as AudioClip;
+                if (engineClip != null && controller != null && _movementSoundAudioSourceField != null)
+                {
+                    AudioSource audioSource = _movementSoundAudioSourceField.GetValue(controller) as AudioSource;
+                    if (audioSource == null)
+                    {
+                        audioSource = prefabClone.AddComponent<AudioSource>();
+                        audioSource.playOnAwake = false;
+                        audioSource.loop = true;
+                        audioSource.spatialBlend = 1f;
+                        _movementSoundAudioSourceField.SetValue(controller, audioSource);
+                    }
+                    audioSource.clip = engineClip;
+                }
+            }
+
+            if (!String.IsNullOrWhiteSpace(weaponSoundAssetName) && bundle != null)
+            {
+                AudioClip weaponClip = LoadRequiredAsset(bundle, weaponSoundAssetName,
+                    typeof(AudioClip), "AudioClip weapon sound", packageName) as AudioClip;
+                if (weaponClip != null && controller is EntityController entityCtrl && entityCtrl.Events != null)
+                {
+                    foreach (EntityEvent evt in entityCtrl.Events)
+                    {
+                        if (evt.actions != null)
+                        {
+                            foreach (IEntityAction action in evt.actions)
+                            {
+                                if (action is ShootProjectile shoot)
+                                {
+                                    if (shoot.shotSoundAudioSource == null)
+                                    {
+                                        AudioSource audioSource = prefabClone.AddComponent<AudioSource>();
+                                        audioSource.playOnAwake = false;
+                                        audioSource.spatialBlend = 1f;
+                                        shoot.shotSoundAudioSource = audioSource;
+                                    }
+                                    shoot.shotSoundAudioSource.clip = weaponClip;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void EnsureMuzzleFlashHierarchy(GameObject prefabClone)
+        {
+            if (prefabClone == null) return;
+            EntityController controller = prefabClone.GetComponent<EntityController>();
+            var firePointsTransforms = new List<Transform>();
+
+            // 1. Recursive search for candidate muzzle sockets in the entire hierarchy
+            List<Transform> candidateMuzzleSockets = FindTransformsRecursively(prefabClone.transform, t =>
+            {
+                if (t == null) return false;
+                string name = t.name;
+                string socketName;
+                if (Runtime.Visual.RogueCommandSocketCatalog.TryResolveCanonicalSocketName(name, out socketName))
+                {
+                    if (socketName.StartsWith("Socket_Muzzle", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                return name.StartsWith("Socket_Muzzle", StringComparison.OrdinalIgnoreCase) ||
+                       name.StartsWith("FirePoint", StringComparison.OrdinalIgnoreCase) ||
+                       string.Equals(name, "FirePoints", StringComparison.OrdinalIgnoreCase);
+            });
+
+            // 2. Discover all ShootProjectile actions on EntityController.Events
+            var shootActions = new List<ShootProjectile>();
+            if (controller != null && controller.Events != null)
+            {
+                foreach (EntityEvent evt in controller.Events)
+                {
+                    if (evt == null) continue;
+                    if (evt.actions != null)
+                    {
+                        foreach (IEntityAction action in evt.actions)
+                        {
+                            if (action is ShootProjectile shoot)
+                            {
+                                shootActions.Add(shoot);
+                            }
+                        }
+                    }
+                    if (evt.conditionalActions != null)
+                    {
+                        foreach (ConditionalEntityActions cond in evt.conditionalActions)
+                        {
+                            if (cond != null && cond.actions != null)
+                            {
+                                foreach (IEntityAction action in cond.actions)
+                                {
+                                    if (action is ShootProjectile shoot)
+                                    {
+                                        shootActions.Add(shoot);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Ensure every ShootProjectile has a valid non-null firePointsTransform
+            foreach (ShootProjectile shoot in shootActions)
+            {
+                if (shoot.firePointsTransform == null)
+                {
+                    Transform bestSocket = null;
+                    if (candidateMuzzleSockets.Count > 0)
+                    {
+                        bestSocket = candidateMuzzleSockets[0];
+                    }
+                    else
+                    {
+                        GameObject muzzleObj = new GameObject("Socket_MuzzlePrimary");
+                        muzzleObj.transform.SetParent(prefabClone.transform, false);
+                        muzzleObj.transform.localPosition = new Vector3(0f, 1f, 1f);
+                        muzzleObj.transform.localRotation = Quaternion.identity;
+                        bestSocket = muzzleObj.transform;
+                        candidateMuzzleSockets.Add(bestSocket);
+                    }
+                    shoot.firePointsTransform = bestSocket;
+                }
+
+                if (!firePointsTransforms.Contains(shoot.firePointsTransform))
+                {
+                    firePointsTransforms.Add(shoot.firePointsTransform);
+                }
+            }
+
+            // 4. Also validate any candidate muzzle sockets discovered in hierarchy
+            foreach (Transform muzzle in candidateMuzzleSockets)
+            {
+                if (muzzle != null && !firePointsTransforms.Contains(muzzle))
+                {
+                    firePointsTransforms.Add(muzzle);
+                }
+            }
+
+            // 5. Ensure valid ShootProjectile hierarchy on each firePointsTransform
+            for (int f = 0; f < firePointsTransforms.Count; f++)
+            {
+                Transform fpTransform = firePointsTransforms[f];
+                if (fpTransform == null) continue;
+
+                if (fpTransform.childCount == 0)
+                {
+                    GameObject fp0 = new GameObject("FirePoint_0");
+                    fp0.transform.SetParent(fpTransform, false);
+                    fp0.transform.localPosition = Vector3.zero;
+                    fp0.transform.localRotation = Quaternion.identity;
+                }
+
+                int count = fpTransform.childCount;
+                for (int i = 0; i < count; i++)
+                {
+                    Transform firePoint = fpTransform.GetChild(i);
+                    if (firePoint == null) continue;
+
+                    if (firePoint.childCount < 1)
+                    {
+                        GameObject fallbackChild = new GameObject("MuzzleFlash_Fallback");
+                        fallbackChild.transform.SetParent(firePoint, false);
+                        fallbackChild.transform.localPosition = Vector3.zero;
+                        fallbackChild.transform.localRotation = Quaternion.identity;
+                        ParticleSystem ps = fallbackChild.AddComponent<ParticleSystem>();
+                        var main = ps.main;
+                        main.playOnAwake = false;
+                        main.duration = 0.1f;
+                        ps.Stop();
+                    }
+                    else
+                    {
+                        Transform firstChild = firePoint.GetChild(0);
+                        if (firstChild != null && firstChild.GetComponent<ParticleSystem>() == null)
+                        {
+                            ParticleSystem ps = firstChild.gameObject.AddComponent<ParticleSystem>();
+                            var main = ps.main;
+                            main.playOnAwake = false;
+                            main.duration = 0.1f;
+                            ps.Stop();
+                        }
+                    }
+                }
+            }
+        }
+
+        private static List<Transform> FindTransformsRecursively(Transform root, Func<Transform, bool> predicate)
+        {
+            var results = new List<Transform>();
+            if (root == null) return results;
+            var queue = new Queue<Transform>();
+            queue.Enqueue(root);
+            while (queue.Count > 0)
+            {
+                Transform current = queue.Dequeue();
+                if (predicate(current))
+                {
+                    results.Add(current);
+                }
+                for (int i = 0; i < current.childCount; i++)
+                {
+                    queue.Enqueue(current.GetChild(i));
+                }
+            }
+            return results;
+        }
+
         private sealed class LoadedUnit
         {
             public LoadedUnit(
@@ -6801,7 +9610,9 @@ namespace RogueCommandExpansionLoader.Content
                 object balanceRow,
                 ContentUnitDefinition definition,
                 bool isProductionBuilding,
-                string productionFactoryId)
+                string productionFactoryId,
+                int prespawnCount = 20,
+                bool isStandaloneBuilding = false)
             {
                 Id = id;
                 PackId = packId;
@@ -6811,6 +9622,8 @@ namespace RogueCommandExpansionLoader.Content
                 Definition = definition;
                 IsProductionBuilding = isProductionBuilding;
                 ProductionFactoryId = productionFactoryId;
+                PrespawnCount = prespawnCount;
+                IsStandaloneBuilding = isStandaloneBuilding;
             }
 
             public string Id { get; private set; }
@@ -6821,6 +9634,8 @@ namespace RogueCommandExpansionLoader.Content
             public ContentUnitDefinition Definition { get; private set; }
             public bool IsProductionBuilding { get; private set; }
             public string ProductionFactoryId { get; private set; }
+            public int PrespawnCount { get; private set; }
+            public bool IsStandaloneBuilding { get; private set; }
         }
 
         private sealed class LoadedStage
@@ -6930,7 +9745,9 @@ namespace RogueCommandExpansionLoader.Content
                 string packId,
                 string resourceName,
                 List<object> behaviours,
-                GameObject prefab)
+                GameObject prefab,
+                int stageMin = 0,
+                int stageMax = -1)
             {
                 Definition = definition;
                 PackId = packId;
@@ -6947,6 +9764,8 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
                 ModuleIds = moduleIds.ToArray();
+                StageMin = stageMin;
+                StageMax = stageMax;
             }
 
             public ContentAiProfileDefinition Definition { get; private set; }
@@ -6955,8 +9774,12 @@ namespace RogueCommandExpansionLoader.Content
             public string ResourceName { get; private set; }
             public bool ScopeToReferencedStages { get { return Definition.scopeToReferencedStages; } }
             public string[] ModuleIds { get; private set; }
+            public string Doctrine => Definition?.doctrine;
+            public float? AggressionMultiplier => Definition?.aggressionMultiplier;
             public List<object> Behaviours { get; private set; }
             public GameObject Prefab { get; private set; }
+            public int StageMin { get; private set; }
+            public int StageMax { get; private set; }
         }
 
         private sealed class BoundAiRuntimeBehaviour

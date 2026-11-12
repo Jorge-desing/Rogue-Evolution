@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using RogueCommandExpansionLoader.Runtime;
 
 namespace RogueCommandExpansionLoader.Content
 {
@@ -26,18 +27,27 @@ namespace RogueCommandExpansionLoader.Content
         bool TryValidate(string moduleId, ContentModuleParameter[] parameters, out string diagnostic);
     }
 
+    public enum DiagnosticSeverity
+    {
+        Error,
+        Warning,
+        Info
+    }
+
     public sealed class ContentDiagnostic
     {
-        public ContentDiagnostic(string code, string path, string message)
+        public ContentDiagnostic(string code, string path, string message, DiagnosticSeverity severity = DiagnosticSeverity.Error)
         {
             Code = code;
             Path = path;
             Message = message;
+            Severity = severity;
         }
 
         public string Code { get; private set; }
         public string Path { get; private set; }
         public string Message { get; private set; }
+        public DiagnosticSeverity Severity { get; private set; }
 
         public override string ToString()
         {
@@ -57,8 +67,33 @@ namespace RogueCommandExpansionLoader.Content
         }
 
         public ContentPackDefinition Pack { get { return ContentPackCopy.DeepClone(pack); } }
-        public bool IsValid { get { return diagnostics.Count == 0; } }
+        public bool IsValid
+        {
+            get
+            {
+                foreach (ContentDiagnostic diagnostic in diagnostics)
+                {
+                    if (diagnostic.Severity == DiagnosticSeverity.Error)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
         public IReadOnlyList<ContentDiagnostic> Diagnostics { get { return diagnostics.AsReadOnly(); } }
+    }
+
+    internal sealed class CrossPackUnitGraphIssue
+    {
+        public CrossPackUnitGraphIssue(string packId, ContentDiagnostic diagnostic)
+        {
+            PackId = packId ?? String.Empty;
+            Diagnostic = diagnostic ?? throw new ArgumentNullException(nameof(diagnostic));
+        }
+
+        public string PackId { get; private set; }
+        public ContentDiagnostic Diagnostic { get; private set; }
     }
 
     /// <summary>
@@ -127,13 +162,16 @@ namespace RogueCommandExpansionLoader.Content
         }
         public const int MaxAssetBundlesPerPack = 128;
         public const int MaxBalanceOverridesPerDefinition = 64;
+        public const int MaxUnitVariantsPerUnit = 8;
         public const int MaxLocalizationsPerDefinition = 10;
         public const int MaxNeededExperienceLevel = 10000;
         public const int MaxAiModulesPerProfile = 8;
+        public const int MaxNativeRigRetargetMappings = 64;
         public const int MaxAiUnitEntriesPerProfile = 32;
         public const int MaxAiProductionBuildingEntriesPerProfile = 32;
         public const int MaxAiUnitDependenciesPerProfile = 64;
         public const int MaxRelicsPerPack = 128;
+        public const int MaxUpgradesPerPack = 128;
         public const int MaxAiUnitCountAtStart = 8;
         public const int MaxAiUnitMaxLiving = 32;
         public const int MaxAiBaseIndex = 31;
@@ -149,6 +187,38 @@ namespace RogueCommandExpansionLoader.Content
             StringComparer.Ordinal);
         private static readonly HashSet<string> SupportedUnitTypes = new HashSet<string>(
             new[] { "Ground", "Air", "Support", "Stationary" }, StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedUnitRarities = new HashSet<string>(
+            new[] { "Common", "Rare", "UltraRare" }, StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedUnitTechs = new HashSet<string>(
+            new[] { "None", "Colorless", "Mech", "Tank", "Ancient", "Specialist", "All" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedAttackTypes = new HashSet<string>(
+            new[] { "None", "Single", "AoE", "Multi", "MultiAoE", "Beam", "Artillery", "MultiArtillery" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedSkillTypes = new HashSet<string>(
+            new[] { "None", "Toggle", "Location", "LocationAoE", "LocationMultiTargets", "Self", "SelfAoE", "Target", "TargetMultiTarget", "TargetAoE", "SelfMultiTarget" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedUnitRoles = new HashSet<string>(
+            new[] {
+                "None", "Spawn", "Harvester", "FrontalAttacker", "MassDestruction", "Fire", "Sniper", "Supporter",
+                "Rock", "Robo", "Spawner", "PCXCard", "Building", "Factory", "Turret", "Refinery", "Unit",
+                "Heal", "Specialist", "Skill", "Engineer", "Bomb", "Scout", "Chest", "Tank", "Vehicle",
+                "Mech", "Tree", "Melee", "Research", "Crystal", "Builder", "Drop", "All"
+            }, StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedUnitSystemTags = new HashSet<string>(
+            new[] {
+                "Melee", "Shield", "Spawn", "Armor", "Mech", "Robo", "Heal", "Turret", "Fire",
+                "Bounty", "Panic", "Slow", "Stun", "Teleport", "AoE", "ManaUse", "Rush", "Turbo", "Strength",
+                "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration",
+                "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport"
+            }, StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedUnitStatusEffects = new HashSet<string>(
+            new[] {
+                "CombatBoost", "Defender", "SquadEffect", "Turbo", "SlowedDown", "Stun", "OnFire", "Spikes",
+                "CriticallyHitting", "Battered", "Reaper", "Regen", "Rage", "Attacker", "Invincible", "Leaking",
+                "Vampirism", "Robust", "Marked", "Rush", "Solo", "Stealth", "Taunt", "Armored", "AttackDeactivated",
+                "Panic", "Overclocked"
+            }, StringComparer.OrdinalIgnoreCase);
         private static readonly HashSet<string> SupportedRelicRarities = new HashSet<string>(
             new[] { "Common", "Rare", "UltraRare" }, StringComparer.Ordinal);
         private static readonly HashSet<string> SupportedRelicTechs = new HashSet<string>(
@@ -160,6 +230,29 @@ namespace RogueCommandExpansionLoader.Content
                 "Robust", "SkillRangeUse", "Bomb", "Tank", "Vehicle", "EffectDuration", "SpawnDuration",
                 "CriticalHits", "Stealth", "Zombo", "Sniper", "Regen", "EconomySupport", "All" },
             StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedRelicChangeableValues = new HashSet<string>(
+            new[] {
+                "Health", "Cost", "ProductionDuration", "MaxCapacity", "MaxHealth", "MaxShield", "MaxMana",
+                "MaxRank", "MoveSpeed", "SightRadius", "Damage1", "Damage2", "WeaponRange", "Attack1Cooldown",
+                "Attack2Cooldown", "EffectRadius1", "EffectRadius2", "SkillRange", "HealAmount1", "HealAmount2",
+                "GainCreditsAmount", "SkillManaCost", "Duration1", "SpawnTtl", "ManaRechargePerSecond",
+                "MaxArmor", "ArmorProtection"
+            }, StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedTypeFilterHandlings = new HashSet<string>(
+            new[] { "AllAllowed", "OnlyIfEntityHasType", "OnlyIfEntityHasNotType" },
+            StringComparer.Ordinal);
+        private static readonly HashSet<string> SupportedCombatStances = new HashSet<string>(
+            new[] { "Standard", "Aggressive", "Defensive", "HoldFire", "Kiting" },
+            StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedEliteAffixes = new HashSet<string>(
+            new[] { "Swift", "Bulwark", "Juggernaut", "Overcharged", "Vampiric", "Volatile" },
+            StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedAiDoctrines = new HashSet<string>(
+            new[] { "Standard", "Assault", "Siege", "Kiting", "Fortify" },
+            StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedLoadoutPresets = new HashSet<string>(
+            new[] { "Standard", "AP", "HE", "Speed", "Siege", "Reinforced" },
+            StringComparer.OrdinalIgnoreCase);
 
         public static ContentPackValidationResult Validate(
             ContentPackDefinition pack,
@@ -189,11 +282,13 @@ namespace RogueCommandExpansionLoader.Content
             var stages = RequireArray(pack.stages, "stages", diagnostics);
             var aiProfiles = RequireArray(pack.aiProfiles, "aiProfiles", diagnostics);
             ContentRelicDefinition[] relics = pack.relics ?? new ContentRelicDefinition[0];
+            ContentBuildingDefinition[] buildings = pack.buildings ?? new ContentBuildingDefinition[0];
+            ContentUpgradeDefinition[] upgrades = pack.upgrades ?? new ContentUpgradeDefinition[0];
 
-            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0 && relics.Length == 0)
+            if (units.Length == 0 && stages.Length == 0 && aiProfiles.Length == 0 && relics.Length == 0 && buildings.Length == 0 && upgrades.Length == 0)
             {
                 Add(diagnostics, "content.empty", "content.json",
-                    "A content pack must declare at least one unit, stage, or AI profile.");
+                    "A content pack must declare at least one unit, building, stage, AI profile, relic, or upgrade.");
             }
 
             if (assetBundles.Length > MaxAssetBundlesPerPack)
@@ -293,6 +388,18 @@ namespace RogueCommandExpansionLoader.Content
 
             for (int i = 0; i < units.Length; i++)
             {
+                if (units[i] != null)
+                {
+                    RegisterId(units[i].id, "units[" + i + "].id", "unit", allIds, registrySnapshot, diagnostics);
+                    if (IsNamespacedId(units[i].id))
+                    {
+                        unitIds.Add(units[i].id);
+                    }
+                }
+            }
+
+            for (int i = 0; i < units.Length; i++)
+            {
                 var unit = units[i];
                 string itemPath = "units[" + i + "]";
                 if (unit == null)
@@ -301,16 +408,10 @@ namespace RogueCommandExpansionLoader.Content
                     continue;
                 }
 
-                RegisterId(unit.id, itemPath + ".id", "unit", allIds, registrySnapshot, diagnostics);
                 if (!String.IsNullOrWhiteSpace(unit.unitType) && !SupportedUnitTypes.Contains(unit.unitType))
                 {
                     Add(diagnostics, "unit.type-invalid", itemPath + ".unitType", "Unit type must be one of the game's supported unit types.");
                 }
-                if (IsNamespacedId(unit.id))
-                {
-                    unitIds.Add(unit.id);
-                }
-
                 bool hasNativeTemplate = !String.IsNullOrWhiteSpace(unit.nativeTemplateId);
                 if (hasNativeTemplate)
                 {
@@ -336,18 +437,40 @@ namespace RogueCommandExpansionLoader.Content
                         ValidateVisualRootPath(unit.visualRootPath, itemPath + ".visualRootPath", diagnostics);
                     }
 
-                    if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName) || hasVisualAsset)
+                    bool hasAudioAsset = !String.IsNullOrWhiteSpace(unit.selectionSoundAssetName) ||
+                                         !String.IsNullOrWhiteSpace(unit.engineSoundAssetName) ||
+                                         !String.IsNullOrWhiteSpace(unit.weaponSoundAssetName);
+                    bool hasVisualModules = HasUnitVisualModules(unit.visualVariants);
+                    if (hasAudioAsset && String.IsNullOrWhiteSpace(unit.assetBundleId))
+                    {
+                        Add(diagnostics, "unit.audio-bundle-missing", itemPath,
+                            "Specifying audio assets requires declaring an assetBundleId.");
+                    }
+
+                    if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName) || hasVisualAsset || hasAudioAsset || hasVisualModules)
                     {
                         ValidateBundleReference(unit.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
                         if (!String.IsNullOrWhiteSpace(unit.cardImageAssetName))
                         {
                             ValidateAssetName(unit.cardImageAssetName, itemPath + ".cardImageAssetName", diagnostics);
                         }
+                        if (!String.IsNullOrWhiteSpace(unit.selectionSoundAssetName))
+                        {
+                            ValidateAssetName(unit.selectionSoundAssetName, itemPath + ".selectionSoundAssetName", diagnostics);
+                        }
+                        if (!String.IsNullOrWhiteSpace(unit.engineSoundAssetName))
+                        {
+                            ValidateAssetName(unit.engineSoundAssetName, itemPath + ".engineSoundAssetName", diagnostics);
+                        }
+                        if (!String.IsNullOrWhiteSpace(unit.weaponSoundAssetName))
+                        {
+                            ValidateAssetName(unit.weaponSoundAssetName, itemPath + ".weaponSoundAssetName", diagnostics);
+                        }
                     }
                     else if (!String.IsNullOrWhiteSpace(unit.assetBundleId))
                     {
                         Add(diagnostics, "unit.bundle-unused", itemPath + ".assetBundleId",
-                            "A native-template unit only declares a bundle when it supplies cardImageAssetName or a visual overlay.");
+                            "A native-template unit only declares a bundle when it supplies cardImageAssetName, a visual overlay, audio assets, or visual modules.");
                     }
                 }
                 else
@@ -364,19 +487,33 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
 
+                ValidateUnitNativeRigRetarget(
+                    unit.nativeRigRetarget,
+                    hasNativeTemplate,
+                    !String.IsNullOrWhiteSpace(unit.visualAssetName),
+                    !String.IsNullOrWhiteSpace(unit.visualRootPath),
+                    unit.visualRootPath,
+                    itemPath + ".nativeRigRetarget",
+                    diagnostics);
+
                 ValidateUnitLocalizations(unit, itemPath + ".localizations", hasNativeTemplate, diagnostics);
-                ValidateBalanceOverrides(unit.balanceOverrides, itemPath + ".balanceOverrides", "unit", "unit", diagnostics, false);
+                ValidateUnitBalanceOverrides(unit, itemPath + ".balanceOverrides", diagnostics);
+                ValidateUnitVariants(unit.variants, itemPath + ".variants", diagnostics);
+                ValidateUnitCustomBalance(unit.customBalance, itemPath + ".customBalance", diagnostics);
                 ValidateAbilities(unit.abilities, itemPath + ".abilities", diagnostics);
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
                 ValidateActiveSkills(unit.activeSkills, itemPath + ".activeSkills", diagnostics);
+                ValidateOnHitStatusEffects(unit.onHitStatusEffects, itemPath + ".onHitStatusEffects", diagnostics);
                 ValidateCombatBoosts(unit.combatBoosts, itemPath + ".combatBoosts", diagnostics);
-                ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", allIds, diagnostics);
+                ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", unitIds, registrySnapshot, diagnostics);
                 ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
-                ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", allIds, diagnostics);
-                ValidateUnitVisualVariants(unit.visualVariants, itemPath + ".visualVariants", bundleIds, diagnostics);
+                ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", unitIds, registrySnapshot, diagnostics);
+                ValidateUnitVisualVariants(unit.visualVariants, unit.assetBundleId,
+                    itemPath + ".visualVariants", bundleIds, diagnostics);
                 ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
                 ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
                 ValidateUnitProductionQueue(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
+                ValidateUnitProductionQueueFeasibility(unit.productionQueue, itemPath + ".productionQueue", diagnostics);
                 ValidateUnitResourceCosts(unit.resourceCosts, itemPath + ".resourceCosts", diagnostics);
                 ValidateUnitMovement(unit.movement, itemPath + ".movement", diagnostics);
                 ValidateUnitDetection(unit.detection, itemPath + ".detection", diagnostics);
@@ -389,10 +526,23 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateUnitAura(unit.aura, itemPath + ".aura", diagnostics);
                 ValidateUnitResourceGathering(unit.resourceGathering, itemPath + ".resourceGathering", diagnostics);
                 ValidateUnitAiBehavior(unit.aiBehavior, itemPath + ".aiBehavior", diagnostics);
+                ValidateShieldRegen(unit.shieldRegeneration, itemPath + ".shieldRegeneration", diagnostics);
+                ValidateVampiricLeech(unit.vampiricLeech, itemPath + ".vampiricLeech", diagnostics);
+                ValidateTaunt(unit.tauntPulse, itemPath + ".tauntPulse", diagnostics);
+                ValidateShieldOverloadNova(unit.shieldOverloadNova, itemPath + ".shieldOverloadNova", diagnostics);
+                ValidateDamageReflect(unit.damageReflect, itemPath + ".damageReflect", diagnostics);
+                ValidateDeathNova(unit.deathNova, itemPath + ".deathNova", diagnostics);
+                ValidateUnitBalancingParameters(unit, itemPath, diagnostics);
+                ValidateUnitTacticalStanceAndAffixes(unit, itemPath, diagnostics);
                 ValidateProductionBuilding(unit.productionBuilding, itemPath + ".productionBuilding",
                                     allIds, productionBuildingIds, bundleIds, registrySnapshot, diagnostics);
                 ValidateProfileCardEligibility(unit, itemPath, diagnostics);
             }
+
+            ValidateUnitUpgradeGraph(units, "units", diagnostics);
+            ValidateUnitSynergyGraph(units, "units", diagnostics);
+
+            ValidateUnitProductionBuildingIdsUnique(units, "units", diagnostics);
 
             for (int i = 0; i < aiProfiles.Length; i++)
             {
@@ -478,6 +628,9 @@ namespace RogueCommandExpansionLoader.Content
 
                     resourceName = profile.prefabAssetName;
                 }
+
+                ValidateAiProfileStageRangeContiguity(profile, itemPath, stages, diagnostics);
+                ValidateAiDoctrineAndAggression(profile, itemPath, diagnostics);
 
                 if (!String.IsNullOrWhiteSpace(resourceName) && !aiResourceNames.Add(resourceName))
                 {
@@ -648,6 +801,20 @@ namespace RogueCommandExpansionLoader.Content
                     registrySnapshot, diagnostics);
             }
 
+            if (upgrades.Length > MaxUpgradesPerPack)
+            {
+                Add(diagnostics, "upgrade.count-exceeds-limit", "upgrades",
+                    "A content pack can declare at most " + MaxUpgradesPerPack + " upgrades.");
+            }
+
+            for (int i = 0; i < upgrades.Length; i++)
+            {
+                ValidateUpgrade(upgrades[i], "upgrades[" + i + "]", allIds, bundleIds, unitIds,
+                    registrySnapshot, diagnostics);
+            }
+
+            ValidateBuildings(buildings, "buildings", allIds, bundleIds, registrySnapshot, diagnostics);
+
             for (int i = 0; i < stages.Length; i++)
             {
                 var stage = stages[i];
@@ -704,6 +871,8 @@ namespace RogueCommandExpansionLoader.Content
 
                 ValidateStagePoolEntries(stage.blueprintPoolEntries,
                     itemPath + ".blueprintPoolEntries", unitIds, registrySnapshot, diagnostics);
+
+                ValidateStageBlueprintPoolEntriesUnique(stage, itemPath, diagnostics);
 
                 var stageAiProfiles = RequireArray(stage.aiProfileIds, itemPath + ".aiProfileIds", diagnostics);
                 ValidateReferences(stageAiProfiles, itemPath + ".aiProfileIds", aiProfileIds, registrySnapshot, false, diagnostics);
@@ -798,6 +967,43 @@ namespace RogueCommandExpansionLoader.Content
 
                 Add(diagnostics, "reference.unit-unresolved", path + "[" + i + "]",
                     "Unit ID '" + id + "' is neither declared by this pack nor registered by the game.");
+            }
+        }
+
+        internal static void ValidateStageBlueprintPoolEntriesUnique(
+            ContentStageDefinition stage,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (stage == null || stage.blueprintPoolEntries == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < stage.blueprintPoolEntries.Length; i++)
+            {
+                ContentStagePoolEntryDefinition entry = stage.blueprintPoolEntries[i];
+                if (entry == null || entry.unitIds == null)
+                {
+                    continue;
+                }
+
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                for (int j = 0; j < entry.unitIds.Length; j++)
+                {
+                    string unitId = entry.unitIds[j];
+                    if (String.IsNullOrWhiteSpace(unitId))
+                    {
+                        continue;
+                    }
+
+                    if (!seen.Add(unitId))
+                    {
+                        Add(diagnostics, "stage.blueprint-pool-unit-id-duplicate",
+                            path + "[" + i + "].unitIds[" + j + "]",
+                            "A stage pool entry must not repeat the same unit ID.");
+                    }
+                }
             }
         }
 
@@ -1073,8 +1279,17 @@ namespace RogueCommandExpansionLoader.Content
             if (hasVisualAsset || hasVisualRoot ||
                 !String.IsNullOrWhiteSpace(productionBuilding.cardImageAssetName))
             {
-                ValidateBundleReference(productionBuilding.assetBundleId, path + ".assetBundleId",
-                    bundleIds, diagnostics);
+                if (String.IsNullOrWhiteSpace(productionBuilding.assetBundleId))
+                {
+                    Add(diagnostics, "production-building.asset-bundle-required",
+                        path + ".assetBundleId",
+                        "A production building that supplies a card image or visual overlay must declare an assetBundleId.");
+                }
+                else
+                {
+                    ValidateBundleReference(productionBuilding.assetBundleId, path + ".assetBundleId",
+                        bundleIds, diagnostics);
+                }
                 if (!String.IsNullOrWhiteSpace(productionBuilding.cardImageAssetName))
                 {
                     ValidateAssetName(productionBuilding.cardImageAssetName,
@@ -1100,6 +1315,98 @@ namespace RogueCommandExpansionLoader.Content
                     "A production building only declares a bundle when it supplies a card image or visual overlay.");
             }
 
+            if (productionBuilding.gridSize.HasValue)
+            {
+                if (productionBuilding.gridSize.Value != 1 && productionBuilding.gridSize.Value != 2)
+                {
+                    Add(diagnostics, "production-building.grid-size-invalid", path + ".gridSize",
+                        "gridSize must be 1 or 2.");
+                }
+            }
+
+            if (productionBuilding.maxCapacity.HasValue)
+            {
+                if (productionBuilding.maxCapacity.Value < 0 || productionBuilding.maxCapacity.Value > 100)
+                {
+                    Add(diagnostics, "production-building.max-capacity-invalid", path + ".maxCapacity",
+                        "maxCapacity must be an integer between 0 and 100.");
+                }
+            }
+
+            if (productionBuilding.cost.HasValue)
+            {
+                if (productionBuilding.cost.Value < 0)
+                {
+                    Add(diagnostics, "production-building.cost-invalid", path + ".cost",
+                        "cost must be a non-negative integer.");
+                }
+            }
+
+            if (productionBuilding.buildTime.HasValue)
+            {
+                if (Single.IsNaN(productionBuilding.buildTime.Value) || Single.IsInfinity(productionBuilding.buildTime.Value) || productionBuilding.buildTime.Value < 0f)
+                {
+                    Add(diagnostics, "production-building.build-time-invalid", path + ".buildTime",
+                        "buildTime must be a non-negative finite number.");
+                }
+            }
+
+            if (productionBuilding.combatValue.HasValue)
+            {
+                if (productionBuilding.combatValue.Value < 0)
+                {
+                    Add(diagnostics, "production-building.combat-value-invalid", path + ".combatValue",
+                        "combatValue must be a non-negative integer.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(productionBuilding.rarity))
+            {
+                if (!SupportedUnitRarities.Contains(productionBuilding.rarity))
+                {
+                    Add(diagnostics, "production-building.rarity-invalid", path + ".rarity",
+                        "rarity must be one of Common, Rare, UltraRare.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(productionBuilding.tech))
+            {
+                if (!SupportedUnitTechs.Contains(productionBuilding.tech))
+                {
+                    Add(diagnostics, "production-building.tech-invalid", path + ".tech",
+                        "tech must be one of the game's supported tech IDs.");
+                }
+            }
+
+            if (productionBuilding.neededExperienceLevel.HasValue)
+            {
+                if (productionBuilding.neededExperienceLevel.Value < 0 || productionBuilding.neededExperienceLevel.Value > 100)
+                {
+                    Add(diagnostics, "production-building.needed-experience-level-invalid", path + ".neededExperienceLevel",
+                        "neededExperienceLevel must be an integer between 0 and 100.");
+                }
+            }
+
+            if (productionBuilding.roles != null)
+            {
+                ValidateRolesList(productionBuilding.roles, path + ".roles", "production-building.roles-invalid", diagnostics);
+            }
+
+            if (productionBuilding.systemTags != null)
+            {
+                ValidateSystemTagsList(productionBuilding.systemTags, path + ".systemTags", "production-building.systemTags-invalid", "production-building.systemTags-duplicate", diagnostics);
+            }
+
+            if (productionBuilding.cardModelScalingFactor.HasValue)
+            {
+                float factor = productionBuilding.cardModelScalingFactor.Value;
+                if (Single.IsNaN(factor) || Single.IsInfinity(factor) || factor <= 0.01f || factor > 100f)
+                {
+                    Add(diagnostics, "production-building.card-model-scaling-factor-invalid", path + ".cardModelScalingFactor",
+                        "cardModelScalingFactor must be a finite positive number in range (0.01, 100.0].");
+                }
+            }
+
             ValidateBalanceOverrides(productionBuilding.balanceOverrides,
                 path + ".balanceOverrides", "production-building", "production building", diagnostics, true);
             ValidateLocalizations(productionBuilding.localizations, path + ".localizations",
@@ -1121,8 +1428,18 @@ namespace RogueCommandExpansionLoader.Content
             string buildingLevel;
             bool hasProductLevel = TryGetBalanceOverride(
                 unit.balanceOverrides, "neededExperienceLevel", out productLevel);
+            if (unit.neededExperienceLevel.HasValue)
+            {
+                hasProductLevel = true;
+                productLevel = unit.neededExperienceLevel.Value.ToString(CultureInfo.InvariantCulture);
+            }
             bool hasBuildingLevel = TryGetBalanceOverride(
                 building.balanceOverrides, "neededExperienceLevel", out buildingLevel);
+            if (building.neededExperienceLevel.HasValue)
+            {
+                hasBuildingLevel = true;
+                buildingLevel = building.neededExperienceLevel.Value.ToString(CultureInfo.InvariantCulture);
+            }
             if (!hasProductLevel || !hasBuildingLevel)
             {
                 Add(diagnostics, "unit.profile-unlock-required", path,
@@ -1147,8 +1464,18 @@ namespace RogueCommandExpansionLoader.Content
             string productRarity;
             string buildingRarity;
             bool hasProductRarity = TryGetBalanceOverride(unit.balanceOverrides, "rarity", out productRarity);
+            if (!String.IsNullOrEmpty(unit.rarity))
+            {
+                hasProductRarity = true;
+                productRarity = unit.rarity;
+            }
             bool hasBuildingRarity = TryGetBalanceOverride(
                 building.balanceOverrides, "rarity", out buildingRarity);
+            if (!String.IsNullOrEmpty(building.rarity))
+            {
+                hasBuildingRarity = true;
+                buildingRarity = building.rarity;
+            }
             if (!hasProductRarity || !hasBuildingRarity)
             {
                 Add(diagnostics, "unit.card-rarity-required", path,
@@ -1159,6 +1486,42 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit.card-rarity-mismatch",
                     path + ".productionBuilding.balanceOverrides.rarity",
                     "The production building and its unit must use the same card rarity.");
+            }
+        }
+
+        internal static void ValidateUnitProductionBuildingIdsUnique(
+            ContentUnitDefinition[] units,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (units == null)
+            {
+                return;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+            {
+                ContentUnitDefinition unit = units[i];
+                if (unit == null)
+                {
+                    continue;
+                }
+
+                string factoryId = unit.productionBuilding != null
+                    ? unit.productionBuilding.id
+                    : null;
+                if (String.IsNullOrWhiteSpace(factoryId))
+                {
+                    continue;
+                }
+
+                if (!seen.Add(factoryId))
+                {
+                    Add(diagnostics, "unit.production-building.id-duplicate",
+                        path + "[" + i + "].productionBuilding.id",
+                        "Each unit's production building must use a distinct ID within the pack.");
+                }
             }
         }
 
@@ -1299,12 +1662,107 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics,
             string diagnosticCode = "unit.visual-root-path-invalid")
         {
-            if (String.IsNullOrWhiteSpace(value) || value.StartsWith("/", StringComparison.Ordinal) ||
-                value.EndsWith("/", StringComparison.Ordinal) || value.IndexOf('\\') >= 0)
+            ValidateRelativeTransformPath(value, path, "visualRootPath", diagnostics, diagnosticCode);
+        }
+
+        private static void ValidateUnitNativeRigRetarget(
+            ContentNativeRigRetargetDefinition retarget,
+            bool hasNativeTemplate,
+            bool hasVisualAsset,
+            bool hasVisualRoot,
+            string visualRootPath,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (retarget == null)
+            {
+                return;
+            }
+
+            if (!hasNativeTemplate || !hasVisualAsset || !hasVisualRoot)
+            {
+                Add(diagnostics, "unit.native-rig-retarget-source-invalid", path,
+                    "nativeRigRetarget requires nativeTemplateId, visualAssetName, and visualRootPath.");
+            }
+
+            ContentNativeRigRetargetMappingDefinition[] mappings = retarget.mappings;
+            if (mappings == null || mappings.Length == 0)
+            {
+                Add(diagnostics, "unit.native-rig-retarget-mappings-empty", path + ".mappings",
+                    "nativeRigRetarget must declare at least one sourcePath/targetPath mapping.");
+                return;
+            }
+
+            if (mappings.Length > MaxNativeRigRetargetMappings)
+            {
+                Add(diagnostics, "unit.native-rig-retarget-mappings-limit", path + ".mappings",
+                    "nativeRigRetarget can declare at most " + MaxNativeRigRetargetMappings + " mappings.");
+            }
+
+            bool visualRootIsValid = IsValidRelativeTransformPath(visualRootPath);
+            var targetPaths = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < mappings.Length; i++)
+            {
+                ContentNativeRigRetargetMappingDefinition mapping = mappings[i];
+                string itemPath = path + ".mappings[" + i + "]";
+                if (mapping == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Retarget mapping entries cannot be null.");
+                    continue;
+                }
+
+                bool sourcePathIsValid = ValidateRelativeTransformPath(
+                    mapping.sourcePath,
+                    itemPath + ".sourcePath",
+                    "sourcePath",
+                    diagnostics,
+                    "unit.native-rig-retarget-source-path-invalid");
+                bool targetPathIsValid = ValidateRelativeTransformPath(
+                    mapping.targetPath,
+                    itemPath + ".targetPath",
+                    "targetPath",
+                    diagnostics,
+                    "unit.native-rig-retarget-target-path-invalid");
+
+                if (targetPathIsValid && !targetPaths.Add(mapping.targetPath))
+                {
+                    Add(diagnostics, "unit.native-rig-retarget-target-duplicate", itemPath + ".targetPath",
+                        "Each native rig retarget targetPath must be unique; sourcePath values may be reused.");
+                }
+
+                if (sourcePathIsValid && visualRootIsValid &&
+                    IsSameOrAncestorTransformPath(mapping.sourcePath, visualRootPath))
+                {
+                    Add(diagnostics, "unit.native-rig-retarget-source-overlap", itemPath + ".sourcePath",
+                        "A retarget sourcePath cannot be equal to or an ancestor of visualRootPath because the overlay already inherits that transform.");
+                }
+            }
+        }
+
+        private static bool ValidateRelativeTransformPath(
+            string value,
+            string path,
+            string fieldName,
+            List<ContentDiagnostic> diagnostics,
+            string diagnosticCode)
+        {
+            if (!IsValidRelativeTransformPath(value))
             {
                 Add(diagnostics, diagnosticCode, path,
-                    "visualRootPath must be a relative Unity Transform path using forward slashes.");
-                return;
+                    fieldName + " must be a relative Unity Transform path using forward slashes and cannot contain empty, current-directory, or parent-directory segments.");
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsValidRelativeTransformPath(string value)
+        {
+            if (String.IsNullOrWhiteSpace(value) || value.StartsWith("/", StringComparison.Ordinal) ||
+                value.EndsWith("/", StringComparison.Ordinal) || value.IndexOf('\\') >= 0 ||
+                value.IndexOf('\r') >= 0 || value.IndexOf('\n') >= 0)
+            {
+                return false;
             }
 
             string[] segments = value.Split('/');
@@ -1312,11 +1770,17 @@ namespace RogueCommandExpansionLoader.Content
             {
                 if (String.IsNullOrWhiteSpace(segments[i]) || segments[i] == "." || segments[i] == "..")
                 {
-                    Add(diagnostics, diagnosticCode, path,
-                        "visualRootPath cannot contain empty, current-directory, or parent-directory segments.");
-                    return;
+                    return false;
                 }
             }
+
+            return true;
+        }
+
+        private static bool IsSameOrAncestorTransformPath(string sourcePath, string visualRootPath)
+        {
+            return String.Equals(sourcePath, visualRootPath, StringComparison.Ordinal) ||
+                visualRootPath.StartsWith(sourcePath + "/", StringComparison.Ordinal);
         }
 
         private static void ValidateBalanceOverrides(
@@ -1360,6 +1824,77 @@ namespace RogueCommandExpansionLoader.Content
                 if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value, ownerLabel, isFactoryRow))
                 {
                     Add(diagnostics, codePrefix + ".balance-override-invalid", itemPath,
+                        "The override must target an allowlisted balance field and contain a valid invariant-culture value.");
+                }
+            }
+        }
+
+        private static void ValidateUnitBalanceOverrides(
+            ContentUnitDefinition unit,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (unit == null || unit.balanceOverrides == null)
+            {
+                return;
+            }
+
+            var parameterMap = UnitBalanceOverrideMapper.CreateBalanceParameterMap();
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < unit.balanceOverrides.Length; i++)
+            {
+                ContentBalanceOverride balanceOverride = unit.balanceOverrides[i];
+                string itemPath = path + "[" + i + "]";
+                if (balanceOverride == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath,
+                        "Balance override entries for a unit cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(balanceOverride.name) ||
+                    !names.Add(balanceOverride.name))
+                {
+                    Add(diagnostics, "unit.balance-override-name-invalid", itemPath + ".name",
+                        "Balance override names must be non-empty and unique within the unit.");
+                }
+
+                if (unit.customBalance != null)
+                {
+                    foreach (var parameter in parameterMap)
+                    {
+                        if (String.Equals(parameter.Value.RowFieldName, balanceOverride.name, StringComparison.Ordinal) &&
+                            unit.customBalance.ContainsKey(parameter.Key))
+                        {
+                            Add(diagnostics, "unit.balance-override-redundant-with-custom", itemPath,
+                                "This balance override is redundant because customBalance already defines the same parameter.");
+                            break;
+                        }
+                    }
+                }
+
+                bool structuredParameterAlreadySet =
+                    (balanceOverride.name == "combatValue" && unit.combatValue.HasValue) ||
+                    (balanceOverride.name == "gridSize" && unit.gridSize.HasValue) ||
+                    (balanceOverride.name == "cardModelScalingFactor" && unit.cardModelScalingFactor.HasValue) ||
+                    (balanceOverride.name == "coinsAmount" && unit.coinsAmount.HasValue) ||
+                    (balanceOverride.name == "firePointCount" && unit.firePointCount.HasValue) ||
+                    (balanceOverride.name == "copyUpgradesToEntityId" && !String.IsNullOrEmpty(unit.copyUpgradesToEntityId)) ||
+                    (balanceOverride.name == "attackType" && !String.IsNullOrEmpty(unit.attackType)) ||
+                    (balanceOverride.name == "skillType" && !String.IsNullOrEmpty(unit.skillType)) ||
+                    (balanceOverride.name == "rarity" && !String.IsNullOrEmpty(unit.rarity)) ||
+                    (balanceOverride.name == "tech" && !String.IsNullOrEmpty(unit.tech)) ||
+                    (balanceOverride.name == "neededExperienceLevel" && unit.neededExperienceLevel.HasValue) ||
+                    (balanceOverride.name == "offeredSystemTags" && unit.systemTags != null);
+                if (structuredParameterAlreadySet)
+                {
+                    Add(diagnostics, "unit.balance-override-redundant-with-structured", itemPath,
+                        "This balance override duplicates a structured unit field; declare the value only once.");
+                }
+
+                if (!TryValidateBalanceOverrideValue(balanceOverride.name, balanceOverride.value, "unit", false))
+                {
+                    Add(diagnostics, "unit.balance-override-invalid", itemPath,
                         "The override must target an allowlisted balance field and contain a valid invariant-culture value.");
                 }
             }
@@ -1437,21 +1972,72 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 ValidateNamespacedId(skill.id, itemPath + ".id", diagnostics);
                 if (String.IsNullOrWhiteSpace(skill.skillType) ||
-                    (skill.skillType != "Position" && skill.skillType != "Target" && skill.skillType != "Self"))
+                    (skill.skillType != "Position" && skill.skillType != "Target" && skill.skillType != "Self" &&
+                     skill.skillType != "Location" && skill.skillType != "LocationAoE" && skill.skillType != "LocationMultiTargets" &&
+                     skill.skillType != "SelfAoE" && skill.skillType != "TargetAoE" && skill.skillType != "Toggle"))
                 {
                     Add(diagnostics, "active-skill.type-invalid", itemPath + ".skillType",
-                        "Active skill type must be Position, Target, or Self.");
+                        "Active skill type must be Position, Target, Self, Location, LocationAoE, SelfAoE, TargetAoE, or Toggle.");
                 }
-                if (skill.cooldown < 0 || skill.cooldown > 300)
+                if (!IsFiniteSingle(skill.cooldown) || skill.cooldown < 0 || skill.cooldown > 300)
                 {
                     Add(diagnostics, "active-skill.cooldown-invalid", itemPath + ".cooldown",
-                        "Active skill cooldown must be between 0 and 300.");
+                        "Active skill cooldown must be finite and between 0 and 300.");
                 }
-                if (skill.manaCost < 0 || skill.manaCost > 1000)
+                if (!IsFiniteSingle(skill.manaCost) || skill.manaCost < 0 || skill.manaCost > 1000)
                 {
                     Add(diagnostics, "active-skill.manaCost-invalid", itemPath + ".manaCost",
-                        "Active skill mana cost must be between 0 and 1000.");
+                        "Active skill mana cost must be finite and between 0 and 1000.");
                 }
+                if (!string.IsNullOrEmpty(skill.targetOrigin) &&
+                    !string.Equals(skill.targetOrigin, "Self", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(skill.targetOrigin, "ChosenEntity", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(skill.targetOrigin, "ChosenLocation", StringComparison.OrdinalIgnoreCase))
+                {
+                    Add(diagnostics, "active-skill.targetOrigin-invalid", itemPath + ".targetOrigin",
+                        "Active skill targetOrigin must be Self, ChosenEntity, or ChosenLocation.");
+                }
+                if (skill.range.HasValue && (!IsFiniteSingle(skill.range.Value) || skill.range.Value < 0f || skill.range.Value > 100f))
+                {
+                    Add(diagnostics, "active-skill.range-invalid", itemPath + ".range",
+                        "Active skill range must be finite and between 0 and 100.");
+                }
+                if (skill.radius.HasValue && (!IsFiniteSingle(skill.radius.Value) || skill.radius.Value < 0f || skill.radius.Value > 50f))
+                {
+                    Add(diagnostics, "active-skill.radius-invalid", itemPath + ".radius",
+                        "Active skill radius must be finite and between 0 and 50.");
+                }
+                if (skill.aiSkillCooldown.HasValue && (!IsFiniteSingle(skill.aiSkillCooldown.Value) || skill.aiSkillCooldown.Value < 0f || skill.aiSkillCooldown.Value > 300f))
+                {
+                    Add(diagnostics, "active-skill.aiSkillCooldown-invalid", itemPath + ".aiSkillCooldown",
+                        "Active skill aiSkillCooldown must be finite and between 0 and 300.");
+                }
+                if (!string.IsNullOrEmpty(skill.aiActivationTrigger) &&
+                    !string.Equals(skill.aiActivationTrigger, "EnemiesInRange", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(skill.aiActivationTrigger, "LowHealth", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(skill.aiActivationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase))
+                {
+                    Add(diagnostics, "active-skill.aiActivationTrigger-invalid", itemPath + ".aiActivationTrigger",
+                        "Active skill aiActivationTrigger must be EnemiesInRange, LowHealth, or CombatEngaged.");
+                }
+                ValidateActiveSkillEffectValue(skill, itemPath, diagnostics);
+            }
+        }
+
+        private static void ValidateActiveSkillEffectValue(
+            ContentActiveSkillDefinition skill,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (skill == null)
+            {
+                return;
+            }
+
+            if (Single.IsNaN(skill.effectValue) || Single.IsInfinity(skill.effectValue))
+            {
+                Add(diagnostics, "active-skill.effect-value-invalid", path + ".effectValue",
+                    "Active skill effect value must be finite.");
             }
         }
 
@@ -1476,22 +2062,23 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "combat-boost.statName-required", itemPath + ".statName",
                         "Combat boost stat name must be non-empty.");
                 }
-                if (boost.multiplier < 0 || boost.multiplier > 10)
+                if (!IsFiniteSingle(boost.multiplier) || boost.multiplier < 0 || boost.multiplier > 10)
                 {
                     Add(diagnostics, "combat-boost.multiplier-invalid", itemPath + ".multiplier",
-                        "Combat boost multiplier must be between 0 and 10.");
+                        "Combat boost multiplier must be finite and between 0 and 10.");
                 }
-                if (boost.duration < 0 || boost.duration > 300)
+                if (!IsFiniteSingle(boost.duration) || boost.duration < 0 || boost.duration > 300)
                 {
                     Add(diagnostics, "combat-boost.duration-invalid", itemPath + ".duration",
-                        "Combat boost duration must be between 0 and 300.");
+                        "Combat boost duration must be finite and between 0 and 300.");
                 }
             }
         }
         private static void ValidateUnitUpgrades(
             ContentUnitUpgradeDefinition[] upgrades,
             string path,
-            HashSet<string> allIds,
+            HashSet<string> localUnitIds,
+            IContentRegistrySnapshot registrySnapshot,
             List<ContentDiagnostic> diagnostics)
         {
             if (upgrades == null) return;
@@ -1509,7 +2096,8 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-upgrade.target-required", itemPath + ".targetUnitId",
                         "Upgrade target unit ID must be non-empty.");
                 }
-                else if (!allIds.Contains(upgrade.targetUnitId))
+                else if (!localUnitIds.Contains(upgrade.targetUnitId) &&
+                    (registrySnapshot == null || !registrySnapshot.ContainsUnit(upgrade.targetUnitId)))
                 {
                     Add(diagnostics, "unit-upgrade.target-unknown", itemPath + ".targetUnitId",
                         "Upgrade target unit must be a declared or native unit ID.");
@@ -1519,10 +2107,10 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-upgrade.level-invalid", itemPath + ".requiredExperienceLevel",
                         "Required experience level must be non-negative.");
                 }
-                if (upgrade.cost < 0)
+                if (!IsFiniteSingle(upgrade.cost) || upgrade.cost < 0)
                 {
                     Add(diagnostics, "unit-upgrade.cost-invalid", itemPath + ".cost",
-                        "Upgrade cost must be non-negative.");
+                        "Upgrade cost must be finite and non-negative.");
                 }
             }
         }
@@ -1543,22 +2131,24 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-experience.max-level-invalid", path + ".maxLevel",
                     "Max level must be between 0 and 100.");
             }
-            if (experience.experienceGainMultiplier < 0 || experience.experienceGainMultiplier > 10)
+            if (!IsFiniteSingle(experience.experienceGainMultiplier) ||
+                experience.experienceGainMultiplier < 0 || experience.experienceGainMultiplier > 10)
             {
                 Add(diagnostics, "unit-experience.gain-multiplier-invalid", path + ".experienceGainMultiplier",
-                    "Experience gain multiplier must be between 0 and 10.");
+                    "Experience gain multiplier must be finite and between 0 and 10.");
             }
-            if (experience.levelUpBonus < 0)
+            if (!IsFiniteSingle(experience.levelUpBonus) || experience.levelUpBonus < 0)
             {
                 Add(diagnostics, "unit-experience.level-up-bonus-invalid", path + ".levelUpBonus",
-                    "Level up bonus must be non-negative.");
+                    "Level up bonus must be finite and non-negative.");
             }
         }
 
         private static void ValidateUnitSynergies(
             ContentUnitSynergyDefinition[] synergies,
             string path,
-            HashSet<string> allIds,
+            HashSet<string> localUnitIds,
+            IContentRegistrySnapshot registrySnapshot,
             List<ContentDiagnostic> diagnostics)
         {
             if (synergies == null) return;
@@ -1577,33 +2167,453 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-synergy.statName-required", itemPath + ".statName",
                         "Synergy stat name must be non-empty.");
                 }
-                if (synergy.multiplier < 0 || synergy.multiplier > 10)
+                if (!IsFiniteSingle(synergy.multiplier) || synergy.multiplier < 0 || synergy.multiplier > 10)
                 {
                     Add(diagnostics, "unit-synergy.multiplier-invalid", itemPath + ".multiplier",
-                        "Synergy multiplier must be between 0 and 10.");
+                        "Synergy multiplier must be finite and between 0 and 10.");
                 }
-                if (synergy.radius < 0)
-                {
-                    Add(diagnostics, "unit-synergy.radius-invalid", itemPath + ".radius",
-                        "Synergy radius must be non-negative.");
-                }
+                ValidateSynergyRadius(synergy, itemPath, diagnostics);
                 if (synergy.targetUnitIds != null)
                 {
                     for (int j = 0; j < synergy.targetUnitIds.Length; j++)
                     {
+                        bool isWildcard = String.Equals(synergy.targetUnitIds[j], "*", StringComparison.Ordinal);
                         if (String.IsNullOrWhiteSpace(synergy.targetUnitIds[j]) ||
-                            !allIds.Contains(synergy.targetUnitIds[j]))
+                            (!isWildcard && !localUnitIds.Contains(synergy.targetUnitIds[j]) &&
+                                (registrySnapshot == null || !registrySnapshot.ContainsUnit(synergy.targetUnitIds[j]))))
                         {
                             Add(diagnostics, "unit-synergy.target-unknown", itemPath + ".targetUnitIds[" + j + "]",
-                                "Synergy target unit must be a declared or native unit ID.");
+                                "Synergy target unit must be '*', a declared unit ID, or a native unit ID.");
                         }
                     }
                 }
             }
         }
 
+        internal static IReadOnlyList<CrossPackUnitGraphIssue> ValidateCrossPackUnitReferenceGraphs(
+            IReadOnlyList<ContentPackDefinition> packs)
+        {
+            var issues = new List<CrossPackUnitGraphIssue>();
+            if (packs == null || packs.Count == 0)
+            {
+                return issues;
+            }
+
+            var validPacks = new List<ContentPackDefinition>();
+            var unitIdCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int packIndex = 0; packIndex < packs.Count; packIndex++)
+            {
+                ContentPackDefinition pack = packs[packIndex];
+                if (pack == null || !IsNamespacedId(pack.packId))
+                {
+                    continue;
+                }
+
+                validPacks.Add(pack);
+                foreach (ContentUnitDefinition unit in pack.units ?? new ContentUnitDefinition[0])
+                {
+                    if (unit == null || !IsNamespacedId(unit.id))
+                    {
+                        continue;
+                    }
+
+                    unitIdCounts.TryGetValue(unit.id, out int count);
+                    unitIdCounts[unit.id] = count + 1;
+                }
+            }
+
+            validPacks.Sort((left, right) => StringComparer.Ordinal.Compare(left.packId, right.packId));
+            var mergedUnits = new List<ContentUnitDefinition>();
+            var mergedPackIds = new List<string>();
+            var mergedUnitIndexes = new List<int>();
+            var localIssueKeys = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (ContentPackDefinition pack in validPacks)
+            {
+                ContentUnitDefinition[] packUnits = pack.units ?? new ContentUnitDefinition[0];
+                var localDiagnostics = new List<ContentDiagnostic>();
+                ValidateUnitUpgradeGraph(packUnits, "units", localDiagnostics);
+                ValidateUnitSynergyGraph(packUnits, "units", localDiagnostics);
+                foreach (ContentDiagnostic diagnostic in localDiagnostics)
+                {
+                    if (TryGetUnitIndexFromGraphPath(diagnostic.Path, out int unitIndex) &&
+                        unitIndex < packUnits.Length && packUnits[unitIndex] != null &&
+                        unitIdCounts.TryGetValue(packUnits[unitIndex].id, out int count) && count == 1)
+                    {
+                        localIssueKeys.Add(CrossPackGraphIssueKey(packUnits[unitIndex].id, diagnostic.Code));
+                    }
+                }
+
+                for (int unitIndex = 0; unitIndex < packUnits.Length; unitIndex++)
+                {
+                    ContentUnitDefinition unit = packUnits[unitIndex];
+                    if (unit == null || !IsNamespacedId(unit.id) ||
+                        !unitIdCounts.TryGetValue(unit.id, out int count) || count != 1)
+                    {
+                        continue;
+                    }
+
+                    mergedUnits.Add(unit);
+                    mergedPackIds.Add(pack.packId);
+                    mergedUnitIndexes.Add(unitIndex);
+                }
+            }
+
+            ContentUnitDefinition[] graphUnits = mergedUnits.ToArray();
+            var graphDiagnostics = new List<ContentDiagnostic>();
+            ValidateUnitUpgradeGraph(graphUnits, "units", graphDiagnostics, markCycleAncestors: false);
+            ValidateUnitSynergyGraph(graphUnits, "units", graphDiagnostics, markCycleAncestors: false);
+            var issueKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (ContentDiagnostic diagnostic in graphDiagnostics)
+            {
+                if (!TryGetUnitIndexFromGraphPath(diagnostic.Path, out int mergedIndex) ||
+                    mergedIndex >= mergedPackIds.Count)
+                {
+                    continue;
+                }
+
+                ContentUnitDefinition unit = graphUnits[mergedIndex];
+                if (localIssueKeys.Contains(CrossPackGraphIssueKey(unit.id, diagnostic.Code)))
+                {
+                    continue;
+                }
+
+                string packId = mergedPackIds[mergedIndex];
+                string issueKey = packId + "\u001f" + diagnostic.Code + "\u001f" + unit.id;
+                if (!issueKeys.Add(issueKey))
+                {
+                    continue;
+                }
+
+                string relationshipPath = diagnostic.Path.EndsWith(".upgrades", StringComparison.Ordinal)
+                    ? "upgrades"
+                    : "synergies";
+                var mappedDiagnostic = new ContentDiagnostic(diagnostic.Code,
+                    "units[" + mergedUnitIndexes[mergedIndex].ToString(CultureInfo.InvariantCulture) + "]." + relationshipPath,
+                    diagnostic.Message, diagnostic.Severity);
+                issues.Add(new CrossPackUnitGraphIssue(packId, mappedDiagnostic));
+            }
+
+            issues.Sort((left, right) =>
+            {
+                int compare = StringComparer.Ordinal.Compare(left.PackId, right.PackId);
+                if (compare != 0) return compare;
+                compare = StringComparer.Ordinal.Compare(left.Diagnostic.Code, right.Diagnostic.Code);
+                if (compare != 0) return compare;
+                return StringComparer.Ordinal.Compare(left.Diagnostic.Path, right.Diagnostic.Path);
+            });
+            return issues;
+        }
+
+        private static string CrossPackGraphIssueKey(string unitId, string diagnosticCode)
+        {
+            return unitId + "\u001f" + diagnosticCode;
+        }
+
+        private static bool TryGetUnitIndexFromGraphPath(string path, out int unitIndex)
+        {
+            unitIndex = -1;
+            if (String.IsNullOrEmpty(path))
+            {
+                return false;
+            }
+
+            int openBracket = path.IndexOf('[');
+            int closeBracket = openBracket >= 0 ? path.IndexOf(']', openBracket + 1) : -1;
+            return openBracket >= 0 && closeBracket > openBracket + 1 &&
+                Int32.TryParse(path.Substring(openBracket + 1, closeBracket - openBracket - 1),
+                    NumberStyles.None, CultureInfo.InvariantCulture, out unitIndex) && unitIndex >= 0;
+        }
+
+        private const int MaxUpgradeChainDepth = 5;
+        private const int MaxSynergyChainDepth = 5;
+
+        private sealed class UnitReferenceGraphFrame
+        {
+            public UnitReferenceGraphFrame(string id) { Id = id; }
+            public string Id;
+            public int NextTarget;
+            public int MaximumChildDepth;
+        }
+
+        private static void AnalyzeUnitReferenceGraph(ContentUnitDefinition[] units,
+            Dictionary<string, List<string>> graph, string path, string cycleCode,
+            string depthCode, int maxDepth, bool depthOnCycles, List<ContentDiagnostic> diagnostics,
+            bool markCycleAncestors = true)
+        {
+            var indexes = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+                if (units[i] != null && !String.IsNullOrWhiteSpace(units[i].id) && !indexes.ContainsKey(units[i].id))
+                    indexes.Add(units[i].id, i);
+
+            var state = new byte[units.Length];
+            var depths = new int[units.Length];
+            var cycles = new bool[units.Length];
+            var stack = new List<UnitReferenceGraphFrame>();
+            for (int root = 0; root < units.Length; root++)
+            {
+                if (units[root] == null || String.IsNullOrWhiteSpace(units[root].id) || state[root] != 0) continue;
+                state[root] = 1;
+                stack.Add(new UnitReferenceGraphFrame(units[root].id));
+                while (stack.Count != 0)
+                {
+                    UnitReferenceGraphFrame frame = stack[stack.Count - 1];
+                    if (graph.TryGetValue(frame.Id, out List<string> targets) && frame.NextTarget < targets.Count)
+                    {
+                        string target = targets[frame.NextTarget++];
+                        if (!indexes.TryGetValue(target, out int child)) continue;
+                        if (state[child] == 0)
+                        {
+                            state[child] = 1;
+                            stack.Add(new UnitReferenceGraphFrame(target));
+                            continue;
+                        }
+                        if (state[child] == 1)
+                        {
+                            for (int j = stack.Count - 1; j >= 0; j--)
+                            {
+                                cycles[indexes[stack[j].Id]] = true;
+                                if (String.Equals(stack[j].Id, target, StringComparison.Ordinal)) break;
+                            }
+                            continue;
+                        }
+                        int parent = indexes[frame.Id];
+                        if (markCycleAncestors)
+                        {
+                            cycles[parent] |= cycles[child];
+                        }
+                        frame.MaximumChildDepth = Math.Max(frame.MaximumChildDepth, 1 + depths[child]);
+                        continue;
+                    }
+
+                    int completed = indexes[frame.Id];
+                    depths[completed] = frame.MaximumChildDepth;
+                    state[completed] = 2;
+                    stack.RemoveAt(stack.Count - 1);
+                    if (stack.Count != 0)
+                    {
+                        UnitReferenceGraphFrame parent = stack[stack.Count - 1];
+                        int parentIndex = indexes[parent.Id];
+                        if (markCycleAncestors)
+                        {
+                            cycles[parentIndex] |= cycles[completed];
+                        }
+                        parent.MaximumChildDepth = Math.Max(parent.MaximumChildDepth, 1 + depths[completed]);
+                    }
+                }
+            }
+
+            bool upgrade = String.Equals(cycleCode, "unit-upgrade.cycle-detected", StringComparison.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+            {
+                if (units[i] == null || String.IsNullOrWhiteSpace(units[i].id) || !graph.ContainsKey(units[i].id)) continue;
+                string itemPath = path + "[" + i + "]." + (upgrade ? "upgrades" : "synergies");
+                if (cycles[i]) Add(diagnostics, cycleCode, itemPath,
+                    upgrade ? "Unit upgrade chain contains a circular reference." : "Unit synergy graph contains a circular reference.");
+                if (depths[i] > maxDepth && (!cycles[i] || depthOnCycles))
+                    Add(diagnostics, depthCode, itemPath,
+                        (upgrade ? "Unit upgrade chain" : "Unit synergy chain") + " exceeds maximum depth of " + maxDepth + ".");
+            }
+        }
+
+        private static void ValidateUnitUpgradeGraph(
+            ContentUnitDefinition[] units,
+            string path,
+            List<ContentDiagnostic> diagnostics,
+            bool markCycleAncestors = true)
+        {
+            if (units == null)
+            {
+                return;
+            }
+
+            var adjacency = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+            {
+                ContentUnitDefinition unit = units[i];
+                if (unit == null || String.IsNullOrWhiteSpace(unit.id))
+                {
+                    continue;
+                }
+
+                foreach (ContentUnitUpgradeDefinition upgrade in unit.upgrades ?? new ContentUnitUpgradeDefinition[0])
+                {
+                    if (upgrade == null || String.IsNullOrWhiteSpace(upgrade.targetUnitId))
+                    {
+                        continue;
+                    }
+
+                    if (!adjacency.TryGetValue(unit.id, out List<string> targets))
+                    {
+                        targets = new List<string>();
+                        adjacency[unit.id] = targets;
+                    }
+
+                    targets.Add(upgrade.targetUnitId);
+                }
+            }
+
+            AnalyzeUnitReferenceGraph(units, adjacency, path, "unit-upgrade.cycle-detected",
+                "unit-upgrade.depth-exceeded", MaxUpgradeChainDepth, depthOnCycles: true, diagnostics,
+                markCycleAncestors: markCycleAncestors);
+        }
+
+
+        private static void ValidateUnitSynergyGraph(
+            ContentUnitDefinition[] units,
+            string path,
+            List<ContentDiagnostic> diagnostics,
+            bool markCycleAncestors = true)
+        {
+            if (units == null)
+            {
+                return;
+            }
+
+            var adjacency = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            for (int i = 0; i < units.Length; i++)
+            {
+                ContentUnitDefinition unit = units[i];
+                if (unit == null || String.IsNullOrWhiteSpace(unit.id))
+                {
+                    continue;
+                }
+
+                foreach (ContentUnitSynergyDefinition synergy in unit.synergies ?? new ContentUnitSynergyDefinition[0])
+                {
+                    if (synergy == null || synergy.targetUnitIds == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (string target in synergy.targetUnitIds)
+                    {
+                        if (String.IsNullOrWhiteSpace(target))
+                        {
+                            continue;
+                        }
+
+                        if (!adjacency.TryGetValue(unit.id, out List<string> targets))
+                        {
+                            targets = new List<string>();
+                            adjacency[unit.id] = targets;
+                        }
+
+                        targets.Add(target);
+                    }
+                }
+            }
+
+            AnalyzeUnitReferenceGraph(units, adjacency, path, "unit-synergy.cycle-detected",
+                "unit-synergy.depth-exceeded", MaxSynergyChainDepth, depthOnCycles: false, diagnostics,
+                markCycleAncestors: markCycleAncestors);
+        }
+
+
+        private static void ValidateUnitProductionQueueFeasibility(
+            ContentUnitProductionQueueDefinition queue,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (queue == null)
+            {
+                return;
+            }
+
+            bool hasBuildTime = queue.buildTime > 0;
+            bool hasResourceCost = queue.resourceCost > 0;
+            bool hasQueueSize = queue.queueSize > 0;
+
+            if (hasBuildTime != hasResourceCost)
+            {
+                Add(diagnostics, "unit-production-queue.resource-cost-required",
+                    path, "Production queue must specify both buildTime and resourceCost, or neither.",
+                    DiagnosticSeverity.Warning);
+            }
+
+            if (hasBuildTime && !hasQueueSize)
+            {
+                Add(diagnostics, "unit-production-queue.queue-size-required",
+                    path, "Production queue must specify queueSize when buildTime is positive.",
+                    DiagnosticSeverity.Warning);
+            }
+
+            if (hasQueueSize && !hasBuildTime)
+            {
+                Add(diagnostics, "unit-production-queue.build-time-required",
+                    path, "Production queue must specify buildTime when queueSize is positive.",
+                    DiagnosticSeverity.Warning);
+            }
+        }
+
+
+        private static void ValidateUnitVariants(
+            ContentUnitVariantDefinition[] variants,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (variants == null)
+            {
+                return;
+            }
+
+            if (variants.Length > MaxUnitVariantsPerUnit)
+            {
+                Add(diagnostics, "unit.variants-limit", path,
+                    "A unit can declare at most " + MaxUnitVariantsPerUnit + " loadout variants.");
+            }
+
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < variants.Length; i++)
+            {
+                ContentUnitVariantDefinition variant = variants[i];
+                string itemPath = path + "[" + i + "]";
+                if (variant == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Unit loadout variants cannot be null.");
+                    continue;
+                }
+
+                if (!IsValidUnitVariantId(variant.id) || !ids.Add(variant.id))
+                {
+                    Add(diagnostics, "unit.variant-id-invalid", itemPath + ".id",
+                        "Variant IDs must be unique lowercase ASCII local IDs of at most 64 characters.");
+                }
+
+                if (variant.loadout != null && variant.loadout != "AP" && variant.loadout != "HE")
+                {
+                    Add(diagnostics, "unit.variant-loadout-invalid", itemPath + ".loadout",
+                        "A declared variant loadout must be AP or HE.");
+                }
+
+                ValidateBalanceOverrides(variant.balanceOverrides, itemPath + ".balanceOverrides",
+                    "unit.variant", "unit", diagnostics, false);
+            }
+        }
+
+        private static bool IsValidUnitVariantId(string id)
+        {
+            if (String.IsNullOrEmpty(id) || id.Length > 64 || id[0] < 'a' || id[0] > 'z')
+            {
+                return false;
+            }
+
+            for (int i = 1; i < id.Length; i++)
+            {
+                char c = id[i];
+                if ((c < 'a' || c > 'z') && (c < '0' || c > '9') &&
+                    c != '.' && c != '_' && c != '-')
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static void ValidateUnitVisualVariants(
             ContentUnitVisualVariantDefinition[] variants,
+            string assetBundleId,
             string path,
             HashSet<string> bundleIds,
             List<ContentDiagnostic> diagnostics)
@@ -1619,6 +2629,11 @@ namespace RogueCommandExpansionLoader.Content
                     continue;
                 }
                 ValidateNamespacedId(variant.id, itemPath + ".id", diagnostics);
+                if (i == 0 && variant.modules != null && variant.modules.Length > 0)
+                {
+                    Add(diagnostics, "unit.visual-module-primary", itemPath + ".modules",
+                        "The first visual variant is the Level 1 primary chassis and cannot replace Level 2 hardpoint modules.");
+                }
                 if (!String.IsNullOrWhiteSpace(variant.visualAssetName))
                 {
                     ValidateAssetName(variant.visualAssetName, itemPath + ".visualAssetName", diagnostics);
@@ -1627,12 +2642,60 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     ValidateVisualRootPath(variant.visualRootPath, itemPath + ".visualRootPath", diagnostics);
                 }
-                if (variant.scale < 0 || variant.scale > 10)
+                ValidateVisualVariantScale(variant, itemPath, diagnostics);
+
+                if (variant.modules == null) continue;
+                if (variant.modules.Length > 4)
                 {
-                    Add(diagnostics, "unit-visual-variant.scale-invalid", itemPath + ".scale",
-                        "Visual variant scale must be between 0 and 10.");
+                    Add(diagnostics, "unit.visual-module-count-invalid", itemPath + ".modules",
+                        "A visual variant can declare at most one module for each of the four canonical hardpoints.");
+                }
+                var seenSlots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int moduleIndex = 0; moduleIndex < variant.modules.Length; moduleIndex++)
+                {
+                    ContentUnitVisualModuleDefinition module = variant.modules[moduleIndex];
+                    string modulePath = itemPath + ".modules[" + moduleIndex + "]";
+                    if (module == null)
+                    {
+                        Add(diagnostics, "entry.null", modulePath, "Visual module entries cannot be null.");
+                        continue;
+                    }
+
+                    string hardpointType;
+                    if (!RogueCommandExpansionLoader.Runtime.Visual.RogueCommandSocketCatalog.TryResolveHardpointType(
+                        module.slotId, out hardpointType))
+                    {
+                        Add(diagnostics, "unit.visual-module-slot-invalid", modulePath + ".slotId",
+                            "Visual modules must use a canonical hardpoint type: ERA, APS, Sponsons, or FuelDrums.");
+                    }
+                    else if (!seenSlots.Add(hardpointType))
+                    {
+                        Add(diagnostics, "unit.visual-module-slot-duplicate", modulePath + ".slotId",
+                            "A visual variant can declare at most one module per canonical hardpoint.");
+                    }
+
+                    ValidateAssetName(module.assetName, modulePath + ".assetName", diagnostics);
+                }
+
+                if (variant.modules.Length > 0)
+                {
+                    ValidateBundleReference(assetBundleId, itemPath + ".modules", bundleIds, diagnostics);
                 }
             }
+        }
+
+        private static bool HasUnitVisualModules(ContentUnitVisualVariantDefinition[] variants)
+        {
+            if (variants == null) return false;
+            for (int i = 0; i < variants.Length; i++)
+            {
+                if (variants[i] != null && variants[i].modules != null && variants[i].modules.Length > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ValidateUnitSpawn(
@@ -1641,20 +2704,20 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (spawn == null) return;
-            if (spawn.spawnRate < 0)
+            if (!IsFiniteSingle(spawn.spawnRate) || spawn.spawnRate < 0)
             {
                 Add(diagnostics, "unit-spawn.rate-invalid", path + ".spawnRate",
-                    "Spawn rate must be non-negative.");
+                    "Spawn rate must be finite and non-negative.");
             }
             if (spawn.maxSpawnCount < 0)
             {
                 Add(diagnostics, "unit-spawn.max-count-invalid", path + ".maxSpawnCount",
                     "Max spawn count must be non-negative.");
             }
-            if (spawn.spawnCooldown < 0)
+            if (!IsFiniteSingle(spawn.spawnCooldown) || spawn.spawnCooldown < 0)
             {
                 Add(diagnostics, "unit-spawn.cooldown-invalid", path + ".spawnCooldown",
-                    "Spawn cooldown must be non-negative.");
+                    "Spawn cooldown must be finite and non-negative.");
             }
         }
 
@@ -1664,6 +2727,11 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (effects == null) return;
+            if (effects.Length > 16)
+            {
+                Add(diagnostics, "unit-status-effect.count-invalid", path,
+                    "A unit can declare at most 16 status effects.");
+            }
             for (int i = 0; i < effects.Length; i++)
             {
                 var effect = effects[i];
@@ -1679,10 +2747,52 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-status-effect.type-required", itemPath + ".effectType",
                         "Status effect type must be non-empty.");
                 }
-                if (effect.duration < 0)
+                if (!IsFiniteSingle(effect.duration) || effect.duration < 0 || effect.duration > 300f)
                 {
                     Add(diagnostics, "unit-status-effect.duration-invalid", itemPath + ".duration",
-                        "Status effect duration must be non-negative.");
+                        "Status effect duration must be finite and between 0 and 300 seconds.");
+                }
+                ValidateStatusEffectMagnitude(effect, itemPath, diagnostics);
+            }
+        }
+
+        private static readonly HashSet<string> ValidStatusEffects = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "CombatBoost", "Defender", "SquadEffect", "Turbo", "SlowedDown", "Stun", "OnFire", "Spikes",
+            "CriticallyHitting", "Battered", "Reaper", "Regen", "Rage", "Attacker", "Invincible", "Leaking",
+            "Vampirism", "Robust", "Marked", "Rush", "Solo", "Stealth", "Taunt", "Armored", "AttackDeactivated",
+            "Panic", "Overclocked"
+        };
+
+        private static void ValidateOnHitStatusEffects(
+            ContentOnHitStatusEffectDefinition[] effects,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (effects == null) return;
+            for (int i = 0; i < effects.Length; i++)
+            {
+                var effect = effects[i];
+                string itemPath = path + "[" + i + "]";
+                if (effect == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "On-hit status effect entries cannot be null.");
+                    continue;
+                }
+                if (string.IsNullOrWhiteSpace(effect.statusEffect) || !ValidStatusEffects.Contains(effect.statusEffect))
+                {
+                    Add(diagnostics, "on-hit-status-effect.type-invalid", itemPath + ".statusEffect",
+                        "statusEffect must be a valid StatusEffect flag (e.g. Stun, OnFire, SlowedDown, Battered, Marked, Leaking, AttackDeactivated, Panic).");
+                }
+                if (!IsFiniteSingle(effect.duration) || effect.duration < 0.05f || effect.duration > 300f)
+                {
+                    Add(diagnostics, "on-hit-status-effect.duration-invalid", itemPath + ".duration",
+                        "On-hit status effect duration must be a finite float between 0.05 and 300.");
+                }
+                if (!IsFiniteSingle(effect.chance) || effect.chance < 0f || effect.chance > 1.0f)
+                {
+                    Add(diagnostics, "on-hit-status-effect.chance-invalid", itemPath + ".chance",
+                        "On-hit status effect chance must be a finite float between 0 and 1.");
                 }
             }
         }
@@ -1693,15 +2803,15 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (queue == null) return;
-            if (queue.buildTime < 0)
+            if (!IsFiniteSingle(queue.buildTime) || queue.buildTime < 0)
             {
                 Add(diagnostics, "unit-production-queue.build-time-invalid", path + ".buildTime",
-                    "Build time must be non-negative.");
+                    "Build time must be finite and non-negative.");
             }
-            if (queue.resourceCost < 0)
+            if (!IsFiniteSingle(queue.resourceCost) || queue.resourceCost < 0)
             {
                 Add(diagnostics, "unit-production-queue.resource-cost-invalid", path + ".resourceCost",
-                    "Resource cost must be non-negative.");
+                    "Resource cost must be finite and non-negative.");
             }
             if (queue.queueSize < 0)
             {
@@ -1735,10 +2845,10 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-resource-cost.type-required", itemPath + ".resourceType",
                         "Resource type must be non-empty.");
                 }
-                if (cost.amount < 0)
+                if (!IsFiniteSingle(cost.amount) || cost.amount < 0)
                 {
                     Add(diagnostics, "unit-resource-cost.amount-invalid", itemPath + ".amount",
-                        "Resource amount must be non-negative.");
+                        "Resource amount must be finite and non-negative.");
                 }
             }
         }
@@ -1769,16 +2879,36 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static void ValidateUnitCustomBalance(
+            Dictionary<string, double> customBalance,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (customBalance == null) return;
+            foreach (KeyValuePair<string, double> parameter in customBalance)
+            {
+                if (!UnitBalanceOverrideMapper.TryValidateCustomBalanceValue(
+                        parameter.Key, parameter.Value, out string diagnostic))
+                {
+                    string parameterPath = path + "." + (String.IsNullOrEmpty(parameter.Key) ? "<empty>" : parameter.Key);
+                    string code = UnitBalanceOverrideMapper.TryGetBalanceParameterDefinition(parameter.Key, out _)
+                        ? "unit-custom-balance.value-invalid"
+                        : "unit-custom-balance.parameter-invalid";
+                    Add(diagnostics, code, parameterPath, diagnostic);
+                }
+            }
+        }
+
         private static void ValidateUnitDetection(
             ContentUnitDetectionDefinition detection,
             string path,
             List<ContentDiagnostic> diagnostics)
         {
             if (detection == null) return;
-            if (detection.detectionRange < 0)
+            if (!IsFiniteSingle(detection.detectionRange) || detection.detectionRange < 0)
             {
                 Add(diagnostics, "unit-detection.range-invalid", path + ".detectionRange",
-                    "Detection range must be non-negative.");
+                    "Detection range must be finite and non-negative.");
             }
             if (!String.IsNullOrWhiteSpace(detection.sensorType) &&
                 detection.sensorType != "Visual" && detection.sensorType != "Radar" &&
@@ -1809,20 +2939,20 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-weapon.type-required", itemPath + ".weaponType",
                         "Weapon type must be non-empty.");
                 }
-                if (weapon.damage < 0)
+                if (!IsFiniteSingle(weapon.damage) || weapon.damage < 0)
                 {
                     Add(diagnostics, "unit-weapon.damage-invalid", itemPath + ".damage",
-                        "Weapon damage must be non-negative.");
+                        "Weapon damage must be finite and non-negative.");
                 }
-                if (weapon.range < 0)
+                if (!IsFiniteSingle(weapon.range) || weapon.range < 0)
                 {
                     Add(diagnostics, "unit-weapon.range-invalid", itemPath + ".range",
-                        "Weapon range must be non-negative.");
+                        "Weapon range must be finite and non-negative.");
                 }
-                if (weapon.fireRate < 0)
+                if (!IsFiniteSingle(weapon.fireRate) || weapon.fireRate < 0)
                 {
                     Add(diagnostics, "unit-weapon.fire-rate-invalid", itemPath + ".fireRate",
-                        "Weapon fire rate must be non-negative.");
+                        "Weapon fire rate must be finite and non-negative.");
                 }
             }
         }
@@ -1840,20 +2970,21 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-armor.type-invalid", path + ".armorType",
                     "Armor type must be Light, Medium, Heavy, or Energy.");
             }
-            if (armor.armorValue < 0)
+            if (Single.IsNaN(armor.armorValue) || Single.IsInfinity(armor.armorValue) || armor.armorValue < 0)
             {
                 Add(diagnostics, "unit-armor.value-invalid", path + ".armorValue",
-                    "Armor value must be non-negative.");
+                    "Armor value must be finite and non-negative.");
             }
-            if (armor.shieldValue < 0)
+            if (Single.IsNaN(armor.shieldValue) || Single.IsInfinity(armor.shieldValue) || armor.shieldValue < 0)
             {
                 Add(diagnostics, "unit-armor.shield-invalid", path + ".shieldValue",
-                    "Shield value must be non-negative.");
+                    "Shield value must be finite and non-negative.");
             }
-            if (armor.damageReduction < 0 || armor.damageReduction > 1)
+            if (Single.IsNaN(armor.damageReduction) || Single.IsInfinity(armor.damageReduction) ||
+                armor.damageReduction < 0 || armor.damageReduction > 1)
             {
                 Add(diagnostics, "unit-armor.reduction-invalid", path + ".damageReduction",
-                    "Damage reduction must be between 0 and 1.");
+                    "Damage reduction must be finite and between 0 and 1.");
             }
         }
 
@@ -1863,25 +2994,25 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (healing == null) return;
-            if (healing.healAmount < 0)
+            if (!IsFiniteSingle(healing.healAmount) || healing.healAmount < 0)
             {
                 Add(diagnostics, "unit-healing.amount-invalid", path + ".healAmount",
-                    "Heal amount must be non-negative.");
+                    "Heal amount must be finite and non-negative.");
             }
-            if (healing.healRange < 0)
+            if (!IsFiniteSingle(healing.healRange) || healing.healRange < 0)
             {
                 Add(diagnostics, "unit-healing.range-invalid", path + ".healRange",
-                    "Heal range must be non-negative.");
+                    "Heal range must be finite and non-negative.");
             }
-            if (healing.healRate < 0)
+            if (!IsFiniteSingle(healing.healRate) || healing.healRate < 0)
             {
                 Add(diagnostics, "unit-healing.rate-invalid", path + ".healRate",
-                    "Heal rate must be non-negative.");
+                    "Heal rate must be finite and non-negative.");
             }
-            if (healing.repairAmount < 0)
+            if (!IsFiniteSingle(healing.repairAmount) || healing.repairAmount < 0)
             {
                 Add(diagnostics, "unit-healing.repair-invalid", path + ".repairAmount",
-                    "Repair amount must be non-negative.");
+                    "Repair amount must be finite and non-negative.");
             }
         }
 
@@ -1891,20 +3022,21 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (stealth == null) return;
-            if (stealth.stealthLevel < 0 || stealth.stealthLevel > 10)
+            if (!IsFiniteSingle(stealth.stealthLevel) || stealth.stealthLevel < 0 || stealth.stealthLevel > 10)
             {
                 Add(diagnostics, "unit-stealth.level-invalid", path + ".stealthLevel",
-                    "Stealth level must be between 0 and 10.");
+                    "Stealth level must be finite and between 0 and 10.");
             }
-            if (stealth.cloakDuration < 0)
+            if (!IsFiniteSingle(stealth.cloakDuration) || stealth.cloakDuration < 0)
             {
                 Add(diagnostics, "unit-stealth.duration-invalid", path + ".cloakDuration",
-                    "Cloak duration must be non-negative.");
+                    "Cloak duration must be finite and non-negative.");
             }
-            if (stealth.detectionReduction < 0 || stealth.detectionReduction > 1)
+            if (!IsFiniteSingle(stealth.detectionReduction) ||
+                stealth.detectionReduction < 0 || stealth.detectionReduction > 1)
             {
                 Add(diagnostics, "unit-stealth.reduction-invalid", path + ".detectionReduction",
-                    "Detection reduction must be between 0 and 1.");
+                    "Detection reduction must be finite and between 0 and 1.");
             }
         }
 
@@ -1914,10 +3046,10 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (command == null) return;
-            if (command.commandRange < 0)
+            if (!IsFiniteSingle(command.commandRange) || command.commandRange < 0)
             {
                 Add(diagnostics, "unit-command.range-invalid", path + ".commandRange",
-                    "Command range must be non-negative.");
+                    "Command range must be finite and non-negative.");
             }
             if (!String.IsNullOrWhiteSpace(command.commandType) &&
                 command.commandType != "Move" && command.commandType != "Attack" &&
@@ -1949,10 +3081,10 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-experience-reward.type-invalid", path + ".experienceType",
                     "Experience type must be non-empty when provided.");
             }
-            if (reward.bonusMultiplier < 0)
+            if (!IsFiniteSingle(reward.bonusMultiplier) || reward.bonusMultiplier < 0)
             {
                 Add(diagnostics, "unit-experience-reward.bonus-multiplier-invalid", path + ".bonusMultiplier",
-                    "Bonus multiplier must be non-negative.");
+                    "Bonus multiplier must be finite and non-negative.");
             }
         }
 
@@ -1962,10 +3094,10 @@ namespace RogueCommandExpansionLoader.Content
             List<ContentDiagnostic> diagnostics)
         {
             if (aura == null) return;
-            if (aura.auraRadius < 0)
+            if (!IsFiniteSingle(aura.auraRadius) || aura.auraRadius < 0)
             {
                 Add(diagnostics, "unit-aura.radius-invalid", path + ".auraRadius",
-                    "Aura radius must be non-negative.");
+                    "Aura radius must be finite and non-negative.");
             }
             if (!String.IsNullOrWhiteSpace(aura.auraType) &&
                 aura.auraType != "Buff" && aura.auraType != "Debuff" &&
@@ -1974,10 +3106,10 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-aura.type-invalid", path + ".auraType",
                     "Aura type must be Buff, Debuff, Heal, or Shield.");
             }
-            if (aura.buffAmount < 0)
+            if (!IsFiniteSingle(aura.buffAmount) || aura.buffAmount < 0)
             {
                 Add(diagnostics, "unit-aura.buff-invalid", path + ".buffAmount",
-                    "Buff amount must be non-negative.");
+                    "Buff amount must be finite and non-negative.");
             }
         }
 
@@ -1992,20 +3124,20 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-gathering.type-required", path + ".resourceType",
                     "Resource type is required.");
             }
-            if (gathering.gatherRate < 0)
+            if (!IsFiniteSingle(gathering.gatherRate) || gathering.gatherRate < 0)
             {
                 Add(diagnostics, "unit-gathering.rate-invalid", path + ".gatherRate",
-                    "Gather rate must be non-negative.");
+                    "Gather rate must be finite and non-negative.");
             }
             if (gathering.carryCapacity < 0)
             {
                 Add(diagnostics, "unit-gathering.capacity-invalid", path + ".carryCapacity",
                     "Carry capacity must be non-negative.");
             }
-            if (gathering.gatherRange < 0)
+            if (!IsFiniteSingle(gathering.gatherRange) || gathering.gatherRange < 0)
             {
                 Add(diagnostics, "unit-gathering.range-invalid", path + ".gatherRange",
-                    "Gather range must be non-negative.");
+                    "Gather range must be finite and non-negative.");
             }
         }
 
@@ -2020,15 +3152,632 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-ai.cap-invalid", path + ".unitCap",
                     "Unit cap must be non-negative.");
             }
+            else if (aiBehavior.unitCap > RuntimeUnitAiBehaviorPolicy.MaxPerUnitCap)
+            {
+                Add(diagnostics, "unit-ai.cap-too-large", path + ".unitCap",
+                    "Unit cap must not exceed " + RuntimeUnitAiBehaviorPolicy.MaxPerUnitCap + ".");
+            }
             if (aiBehavior.combatUnitCap < 0)
             {
                 Add(diagnostics, "unit-ai.combat-cap-invalid", path + ".combatUnitCap",
                     "Combat unit cap must be non-negative.");
             }
-            if (aiBehavior.skillActivationCheckInterval < 0)
+            else if (aiBehavior.combatUnitCap > RuntimeUnitAiBehaviorPolicy.MaxPerUnitCap)
+            {
+                Add(diagnostics, "unit-ai.combat-cap-too-large", path + ".combatUnitCap",
+                    "Combat unit cap must not exceed " + RuntimeUnitAiBehaviorPolicy.MaxPerUnitCap + ".");
+            }
+            if (!IsFiniteSingle(aiBehavior.skillActivationCheckInterval) ||
+                aiBehavior.skillActivationCheckInterval < 0)
             {
                 Add(diagnostics, "unit-ai.interval-invalid", path + ".skillActivationCheckInterval",
-                    "Skill activation check interval must be non-negative.");
+                    "Skill activation check interval must be finite and non-negative.");
+            }
+            else if (aiBehavior.skillActivationCheckInterval > RuntimeUnitAiBehaviorPolicy.MaxSkillActivationCheckInterval)
+            {
+                Add(diagnostics, "unit-ai.interval-too-large", path + ".skillActivationCheckInterval",
+                    "Skill activation check interval must not exceed " +
+                    RuntimeUnitAiBehaviorPolicy.MaxSkillActivationCheckInterval + " seconds.");
+            }
+        }
+
+        private static void ValidateShieldRegen(
+            ContentUnitShieldRegenDefinition shieldRegen,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (shieldRegen == null) return;
+            if (!IsFiniteSingle(shieldRegen.rechargeDelay) || shieldRegen.rechargeDelay < 0f || shieldRegen.rechargeDelay > 60f)
+            {
+                Add(diagnostics, "unit-shield-regen.delay-invalid", path + ".rechargeDelay",
+                    "Shield recharge delay must be finite and between 0 and 60 seconds.");
+            }
+            if (!IsFiniteSingle(shieldRegen.rechargeRate) || shieldRegen.rechargeRate <= 0f || shieldRegen.rechargeRate > 1000f)
+            {
+                Add(diagnostics, "unit-shield-regen.rate-invalid", path + ".rechargeRate",
+                    "Shield recharge rate must be finite and between 0 and 1000 shield points per second.");
+            }
+            if (!IsFiniteSingle(shieldRegen.burstAmount) || shieldRegen.burstAmount < 0f || shieldRegen.burstAmount > 500f)
+            {
+                Add(diagnostics, "unit-shield-regen.burst-invalid", path + ".burstAmount",
+                    "Shield recharge burst amount must be finite and between 0 and 500.");
+            }
+        }
+
+        private static void ValidateVampiricLeech(
+            ContentUnitVampiricLeechDefinition leech,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (leech == null) return;
+            if (!IsFiniteSingle(leech.siphonRatio) || leech.siphonRatio <= 0f || leech.siphonRatio > 1.0f)
+            {
+                Add(diagnostics, "unit-vampiric-leech.ratio-invalid", path + ".siphonRatio",
+                    "Vampiric leech siphon ratio must be finite and between 0 (exclusive) and 1.0 (100%).");
+            }
+            if (!IsFiniteSingle(leech.maxSiphonPerHit) || leech.maxSiphonPerHit < 0f)
+            {
+                Add(diagnostics, "unit-vampiric-leech.max-invalid", path + ".maxSiphonPerHit",
+                    "Vampiric leech max siphon per hit must be finite and non-negative.");
+            }
+        }
+
+        private static void ValidateTaunt(
+            ContentUnitTauntDefinition taunt,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (taunt == null) return;
+            if (!IsFiniteSingle(taunt.pulseInterval) || taunt.pulseInterval < 0.5f || taunt.pulseInterval > 60f)
+            {
+                Add(diagnostics, "unit-taunt.interval-invalid", path + ".pulseInterval",
+                    "Taunt pulse interval must be finite and between 0.5 and 60 seconds.");
+            }
+            if (!IsFiniteSingle(taunt.tauntRadius) || taunt.tauntRadius < 1.0f || taunt.tauntRadius > 60f)
+            {
+                Add(diagnostics, "unit-taunt.radius-invalid", path + ".tauntRadius",
+                    "Taunt radius must be finite and between 1.0 and 60 meters.");
+            }
+            if (!IsFiniteSingle(taunt.duration) || taunt.duration <= 0f || taunt.duration > 30f)
+            {
+                Add(diagnostics, "unit-taunt.duration-invalid", path + ".duration",
+                    "Taunt duration must be finite and between 0 and 30 seconds.");
+            }
+            if (taunt.maxTargets < 0 || taunt.maxTargets > 32)
+            {
+                Add(diagnostics, "unit-taunt.max-targets-invalid", path + ".maxTargets",
+                    "Taunt max targets must be between 0 and 32.");
+            }
+        }
+
+        private static void ValidateShieldOverloadNova(
+            ContentUnitShieldOverloadNovaDefinition nova,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (nova == null) return;
+            if (!IsFiniteSingle(nova.novaRadius) || nova.novaRadius < 1.0f || nova.novaRadius > 50f)
+            {
+                Add(diagnostics, "unit-shield-nova.radius-invalid", path + ".novaRadius",
+                    "Shield overload nova radius must be finite and between 1.0 and 50 meters.");
+            }
+            if (!IsFiniteSingle(nova.damage) || nova.damage < 0f || nova.damage > 500f)
+            {
+                Add(diagnostics, "unit-shield-nova.damage-invalid", path + ".damage",
+                    "Shield overload nova damage must be finite and between 0 and 500.");
+            }
+            if (!IsFiniteSingle(nova.stunDuration) || nova.stunDuration < 0f || nova.stunDuration > 15f)
+            {
+                Add(diagnostics, "unit-shield-nova.stun-invalid", path + ".stunDuration",
+                    "Shield overload nova stun duration must be finite and between 0 and 15 seconds.");
+            }
+            if (!IsFiniteSingle(nova.cooldown) || nova.cooldown < 1.0f || nova.cooldown > 120f)
+            {
+                Add(diagnostics, "unit-shield-nova.cooldown-invalid", path + ".cooldown",
+                    "Shield overload nova cooldown must be finite and between 1.0 and 120 seconds.");
+            }
+        }
+
+        private static void ValidateDamageReflect(
+            ContentUnitDamageReflectDefinition reflect,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (reflect == null) return;
+            if (!IsFiniteSingle(reflect.reflectRatio) || reflect.reflectRatio <= 0f || reflect.reflectRatio > 1.0f)
+            {
+                Add(diagnostics, "unit-damage-reflect.ratio-invalid", path + ".reflectRatio",
+                    "Damage reflect ratio must be finite and between 0 (exclusive) and 1.0 (100%).");
+            }
+            if (!IsFiniteSingle(reflect.maxReflectPerHit) || reflect.maxReflectPerHit < 0f)
+            {
+                Add(diagnostics, "unit-damage-reflect.max-invalid", path + ".maxReflectPerHit",
+                    "Damage reflect max per hit must be finite and non-negative.");
+            }
+        }
+
+        private static void ValidateDeathNova(
+            ContentUnitDeathNovaDefinition nova,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (nova == null) return;
+            if (!IsFiniteSingle(nova.novaRadius) || nova.novaRadius < 1.0f || nova.novaRadius > 50f)
+            {
+                Add(diagnostics, "unit-death-nova.radius-invalid", path + ".novaRadius",
+                    "Death nova radius must be finite and between 1.0 and 50 meters.");
+            }
+            if (!IsFiniteSingle(nova.damage) || nova.damage < 0f || nova.damage > 500f)
+            {
+                Add(diagnostics, "unit-death-nova.damage-invalid", path + ".damage",
+                    "Death nova damage must be finite and between 0 and 500.");
+            }
+            if (!IsFiniteSingle(nova.stunDuration) || nova.stunDuration < 0f || nova.stunDuration > 15f)
+            {
+                Add(diagnostics, "unit-death-nova.stun-invalid", path + ".stunDuration",
+                    "Death nova stun duration must be finite and between 0 and 15 seconds.");
+            }
+            if (!IsFiniteSingle(nova.slowDuration) || nova.slowDuration < 0f || nova.slowDuration > 15f)
+            {
+                Add(diagnostics, "unit-death-nova.slow-invalid", path + ".slowDuration",
+                    "Death nova slow duration must be finite and between 0 and 15 seconds.");
+            }
+            if (nova.maxTargets < 0 || nova.maxTargets > 32)
+            {
+                Add(diagnostics, "unit-death-nova.max-targets-invalid", path + ".maxTargets",
+                    "Death nova max targets must be between 0 and 32.");
+            }
+        }
+
+        private static void ValidateUnitBalancingParameters(
+            ContentUnitDefinition unit,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (unit == null)
+            {
+                return;
+            }
+
+            if (unit.combatValue.HasValue)
+            {
+                if (unit.combatValue.Value < 0 ||
+                    unit.combatValue.Value > UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger)
+                {
+                    Add(diagnostics, "unit.combatValue-invalid", path + ".combatValue",
+                        "combatValue must be a non-negative integer <= " +
+                        UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger + ".");
+                }
+            }
+
+            if (unit.maxCapacity.HasValue)
+            {
+                if (unit.maxCapacity.Value < 0 || unit.maxCapacity.Value > 100)
+                {
+                    Add(diagnostics, "unit.maxCapacity-invalid", path + ".maxCapacity",
+                        "maxCapacity must be an integer between 0 and 100.");
+                }
+            }
+
+            if (unit.gridSize.HasValue)
+            {
+                if (unit.gridSize.Value < 1 || unit.gridSize.Value > 16)
+                {
+                    Add(diagnostics, "unit.gridSize-invalid", path + ".gridSize",
+                        "gridSize must be an integer between 1 and 16.");
+                }
+            }
+
+            if (unit.cardModelScalingFactor.HasValue)
+            {
+                float factor = unit.cardModelScalingFactor.Value;
+                if (Single.IsNaN(factor) || Single.IsInfinity(factor) || factor <= 0.01f || factor > 100f)
+                {
+                    Add(diagnostics, "unit.cardModelScalingFactor-invalid", path + ".cardModelScalingFactor",
+                        "cardModelScalingFactor must be a finite positive number in range (0.01, 100.0].");
+                }
+            }
+
+            if (unit.coinsAmount.HasValue)
+            {
+                if (unit.coinsAmount.Value < 0 ||
+                    unit.coinsAmount.Value > UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger)
+                {
+                    Add(diagnostics, "unit.coinsAmount-invalid", path + ".coinsAmount",
+                        "coinsAmount must be a non-negative integer <= " +
+                        UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger + ".");
+                }
+            }
+
+            if (unit.firePointCount.HasValue)
+            {
+                if (unit.firePointCount.Value < 1 || unit.firePointCount.Value > 64)
+                {
+                    Add(diagnostics, "unit.firePointCount-invalid", path + ".firePointCount",
+                        "firePointCount must be an integer between 1 and 64.");
+                }
+            }
+
+            if (unit.rotationDegreesPerSecond.HasValue)
+            {
+                float rot = unit.rotationDegreesPerSecond.Value;
+                if (Single.IsNaN(rot) || Single.IsInfinity(rot) || rot < 10.0f || rot > 720.0f)
+                {
+                    Add(diagnostics, "unit.rotationDegreesPerSecond-invalid", path + ".rotationDegreesPerSecond",
+                        "rotationDegreesPerSecond must be a finite number between 10.0 and 720.0.");
+                }
+            }
+
+            if (unit.collisionRadius.HasValue)
+            {
+                float col = unit.collisionRadius.Value;
+                if (Single.IsNaN(col) || Single.IsInfinity(col) || col < 0.5f || col > 50.0f)
+                {
+                    Add(diagnostics, "unit.collisionRadius-invalid", path + ".collisionRadius",
+                        "collisionRadius must be a finite number between 0.5 and 50.0.");
+                }
+            }
+
+            if (unit.attackWarmUpTime.HasValue)
+            {
+                float warm = unit.attackWarmUpTime.Value;
+                if (Single.IsNaN(warm) || Single.IsInfinity(warm) || warm < 0.0f || warm > 10.0f)
+                {
+                    Add(diagnostics, "unit.attackWarmUpTime-invalid", path + ".attackWarmUpTime",
+                        "attackWarmUpTime must be a finite non-negative number between 0.0 and 10.0.");
+                }
+            }
+
+            if (unit.rangeToChooseNewTargetAutomatically.HasValue)
+            {
+                int range = unit.rangeToChooseNewTargetAutomatically.Value;
+                if (range < -1 || range > 1000)
+                {
+                    Add(diagnostics, "unit.rangeToChooseNewTargetAutomatically-invalid", path + ".rangeToChooseNewTargetAutomatically",
+                        "rangeToChooseNewTargetAutomatically must be an integer between -1 and 1000.");
+                }
+            }
+
+            if (unit.minAttackRange.HasValue)
+            {
+                float minRange = unit.minAttackRange.Value;
+                if (!IsFiniteSingle(minRange) || minRange < 0f || minRange > 200f)
+                {
+                    Add(diagnostics, "unit.minAttackRange-invalid", path + ".minAttackRange",
+                        "minAttackRange must be a finite float between 0 and 200.");
+                }
+            }
+
+            if (unit.criticalHitChance.HasValue)
+            {
+                float crit = unit.criticalHitChance.Value;
+                if (!IsFiniteSingle(crit) || crit < 0f || crit > 1f)
+                {
+                    Add(diagnostics, "unit.criticalHitChance-invalid", path + ".criticalHitChance",
+                        "criticalHitChance must be a finite float between 0 and 1.");
+                }
+            }
+
+            if (unit.prespawnCount.HasValue)
+            {
+                int count = unit.prespawnCount.Value;
+                if (count < 0 || count > 100)
+                {
+                    Add(diagnostics, "unit.prespawnCount-invalid", path + ".prespawnCount",
+                        "prespawnCount must be an integer between 0 and 100.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.copyUpgradesToEntityId))
+            {
+                if (String.IsNullOrWhiteSpace(unit.copyUpgradesToEntityId) ||
+                    String.Equals(unit.copyUpgradesToEntityId, unit.id, StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "unit.copyUpgradesToEntityId-invalid", path + ".copyUpgradesToEntityId",
+                        "copyUpgradesToEntityId must be a valid non-empty identifier distinct from the unit's own ID.");
+                }
+            }
+
+            if (unit.roles != null)
+            {
+                if (unit.roles.Length > 16)
+                {
+                    Add(diagnostics, "unit.roles-invalid", path + ".roles",
+                        "roles list cannot exceed 16 elements.");
+                }
+
+                HashSet<string> seenRoles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < unit.roles.Length; i++)
+                {
+                    string role = unit.roles[i];
+                    string rolePath = path + ".roles[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(role) || !SupportedUnitRoles.Contains(role))
+                    {
+                        Add(diagnostics, "unit.roles-invalid", rolePath,
+                            "Each role must be a supported UnitRole name.");
+                    }
+                    else if (!seenRoles.Add(role))
+                    {
+                        Add(diagnostics, "unit.roles-invalid", rolePath,
+                            "Duplicate role '" + role + "' is not permitted.");
+                    }
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.attackType))
+            {
+                if (!SupportedAttackTypes.Contains(unit.attackType))
+                {
+                    Add(diagnostics, "unit.attackType-invalid", path + ".attackType",
+                        "attackType must match a supported native AttackType enum name.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.skillType))
+            {
+                if (!SupportedSkillTypes.Contains(unit.skillType))
+                {
+                    Add(diagnostics, "unit.skillType-invalid", path + ".skillType",
+                        "skillType must match a supported native SkillType enum name.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.rarity))
+            {
+                if (!SupportedUnitRarities.Contains(unit.rarity))
+                {
+                    Add(diagnostics, "unit.rarity-invalid", path + ".rarity",
+                        "rarity must be 'Common', 'Rare', or 'UltraRare'.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(unit.tech))
+            {
+                if (!SupportedUnitTechs.Contains(unit.tech))
+                {
+                    Add(diagnostics, "unit.tech-invalid", path + ".tech",
+                        "tech must match a supported native Tech enum name.");
+                }
+            }
+
+            if (unit.neededExperienceLevel.HasValue)
+            {
+                if (unit.neededExperienceLevel.Value < 0 || unit.neededExperienceLevel.Value > 100)
+                {
+                    Add(diagnostics, "unit.neededExperienceLevel-invalid", path + ".neededExperienceLevel",
+                        "neededExperienceLevel must be an integer between 0 and 100.");
+                }
+            }
+
+            if (unit.systemTags != null)
+            {
+                if (unit.systemTags.Length > 16)
+                {
+                    Add(diagnostics, "unit.systemTags-invalid", path + ".systemTags",
+                        "systemTags list cannot exceed 16 elements.");
+                }
+
+                HashSet<string> seenTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < unit.systemTags.Length; i++)
+                {
+                    string tag = unit.systemTags[i];
+                    string tagPath = path + ".systemTags[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(tag) || !SupportedUnitSystemTags.Contains(tag))
+                    {
+                        Add(diagnostics, "unit.systemTags-invalid", tagPath,
+                            "Each systemTag must match a supported native SystemTags enum flag.");
+                    }
+                    else if (!seenTags.Add(tag))
+                    {
+                        Add(diagnostics, "unit.systemTags-duplicate", tagPath,
+                            "Duplicate systemTag '" + tag + "' is not permitted.");
+                    }
+                }
+            }
+
+            if (unit.baselineStatusEffects != null)
+            {
+                if (unit.baselineStatusEffects.Length > 16)
+                {
+                    Add(diagnostics, "unit.baselineStatusEffects-invalid", path + ".baselineStatusEffects",
+                        "baselineStatusEffects list cannot exceed 16 elements.");
+                }
+
+                HashSet<string> seenEffects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < unit.baselineStatusEffects.Length; i++)
+                {
+                    string effect = unit.baselineStatusEffects[i];
+                    string effectPath = path + ".baselineStatusEffects[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(effect) || !SupportedUnitStatusEffects.Contains(effect))
+                    {
+                        Add(diagnostics, "unit.baselineStatusEffects-invalid", effectPath,
+                            "Each baselineStatusEffect must match a supported native StatusEffect enum flag.");
+                    }
+                    else if (!seenEffects.Add(effect))
+                    {
+                        Add(diagnostics, "unit.baselineStatusEffects-duplicate", effectPath,
+                            "Duplicate baselineStatusEffect '" + effect + "' is not permitted.");
+                    }
+                }
+            }
+        }
+
+        private static void ValidateUnitTacticalStanceAndAffixes(
+            ContentUnitDefinition unit,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (unit == null) return;
+
+            if (!String.IsNullOrWhiteSpace(unit.defaultTacticalStance))
+            {
+                string stance = unit.defaultTacticalStance.Trim();
+                if (!SupportedCombatStances.Contains(stance))
+                {
+                    Add(diagnostics, "unit.defaultTacticalStance-invalid", path + ".defaultTacticalStance",
+                        "defaultTacticalStance '" + stance + "' must be one of Standard, Aggressive, Defensive, HoldFire, Kiting.");
+                }
+            }
+
+            if (unit.startingAffixes != null)
+            {
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < unit.startingAffixes.Length; i++)
+                {
+                    string affix = unit.startingAffixes[i];
+                    string affixPath = path + ".startingAffixes[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(affix))
+                    {
+                        Add(diagnostics, "unit.startingAffixes-empty", affixPath,
+                            "startingAffixes element cannot be empty or whitespace.");
+                        continue;
+                    }
+
+                    string trimmed = affix.Trim();
+                    if (!SupportedEliteAffixes.Contains(trimmed))
+                    {
+                        Add(diagnostics, "unit.startingAffixes-invalid", affixPath,
+                            "startingAffixes element '" + trimmed + "' must be one of Swift, Bulwark, Juggernaut, Overcharged, Vampiric, Volatile.");
+                    }
+                    else if (!seen.Add(trimmed))
+                    {
+                        Add(diagnostics, "unit.startingAffixes-duplicate", affixPath,
+                            "Duplicate startingAffix '" + trimmed + "' is not permitted.");
+                    }
+                }
+            }
+
+            if (unit.defaultLoadout != null)
+            {
+                if (String.IsNullOrWhiteSpace(unit.defaultLoadout))
+                {
+                    Add(diagnostics, "unit.defaultLoadout-invalid", path + ".defaultLoadout",
+                        "defaultLoadout cannot be empty or whitespace.");
+                }
+                else
+                {
+                    string loadout = unit.defaultLoadout.Trim();
+                    bool matchesDeclaredVariant = false;
+                    if (unit.variants != null)
+                    {
+                        for (int i = 0; i < unit.variants.Length; i++)
+                        {
+                            if (unit.variants[i] != null &&
+                                !String.IsNullOrWhiteSpace(unit.variants[i].id) &&
+                                String.Equals(unit.variants[i].id.Trim(), loadout, StringComparison.OrdinalIgnoreCase))
+                            {
+                                matchesDeclaredVariant = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!SupportedLoadoutPresets.Contains(loadout) && !matchesDeclaredVariant)
+                    {
+                        Add(diagnostics, "unit.defaultLoadout-invalid", path + ".defaultLoadout",
+                            "defaultLoadout '" + loadout + "' must be one of Standard, AP, HE, Speed, Siege, Reinforced, or match a declared variants[].id on this unit.");
+                    }
+                }
+            }
+
+            if (unit.startingVeterancyRank.HasValue)
+            {
+                if (unit.startingVeterancyRank.Value < 0 || unit.startingVeterancyRank.Value > 5)
+                {
+                    Add(diagnostics, "unit.startingVeterancyRank-invalid", path + ".startingVeterancyRank",
+                        "startingVeterancyRank must be an integer between 0 and 5.");
+                }
+            }
+        }
+
+        private static void ValidateAiDoctrineAndAggression(
+            ContentAiProfileDefinition profile,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (profile == null) return;
+
+            if (!String.IsNullOrWhiteSpace(profile.doctrine))
+            {
+                string doctrine = profile.doctrine.Trim();
+                if (!SupportedAiDoctrines.Contains(doctrine))
+                {
+                    Add(diagnostics, "ai-profile.doctrine-invalid", path + ".doctrine",
+                        "doctrine '" + doctrine + "' must be one of Standard, Assault, Siege, Kiting, Fortify.");
+                }
+            }
+
+            if (profile.aggressionMultiplier.HasValue)
+            {
+                float mult = profile.aggressionMultiplier.Value;
+                if (float.IsNaN(mult) || float.IsInfinity(mult) || mult < 0.1f || mult > 5.0f)
+                {
+                    Add(diagnostics, "ai-profile.aggressionMultiplier-range", path + ".aggressionMultiplier",
+                        "aggressionMultiplier must be a finite number between 0.1 and 5.0.");
+                }
+            }
+
+            if (profile.defaultUnitStance != null)
+            {
+                string stance = profile.defaultUnitStance.Trim();
+                if (String.IsNullOrWhiteSpace(stance) || !SupportedCombatStances.Contains(stance))
+                {
+                    Add(diagnostics, "ai-profile.defaultUnitStance-invalid", path + ".defaultUnitStance",
+                        "defaultUnitStance '" + stance + "' must be one of Standard, Aggressive, Defensive, HoldFire, Kiting.");
+                }
+            }
+
+            if (profile.defaultUnitLoadout != null)
+            {
+                string loadout = profile.defaultUnitLoadout.Trim();
+                if (String.IsNullOrWhiteSpace(loadout) || !SupportedLoadoutPresets.Contains(loadout))
+                {
+                    Add(diagnostics, "ai-profile.defaultUnitLoadout-invalid", path + ".defaultUnitLoadout",
+                        "defaultUnitLoadout '" + loadout + "' must be one of Standard, AP, HE, Speed, Siege, Reinforced.");
+                }
+            }
+
+            if (profile.startingUnitAffixes != null)
+            {
+                if (profile.startingUnitAffixes.Length > 4)
+                {
+                    Add(diagnostics, "ai-profile.startingUnitAffixes-limit", path + ".startingUnitAffixes",
+                        "startingUnitAffixes cannot exceed 4 elements.");
+                }
+
+                var seenAffixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < profile.startingUnitAffixes.Length; i++)
+                {
+                    string affix = profile.startingUnitAffixes[i];
+                    string affixPath = path + ".startingUnitAffixes[" + i + "]";
+                    if (String.IsNullOrWhiteSpace(affix))
+                    {
+                        Add(diagnostics, "ai-profile.startingUnitAffixes-empty", affixPath,
+                            "startingUnitAffixes element cannot be empty or whitespace.");
+                        continue;
+                    }
+
+                    string trimmed = affix.Trim();
+                    if (!SupportedEliteAffixes.Contains(trimmed))
+                    {
+                        Add(diagnostics, "ai-profile.startingUnitAffixes-invalid", affixPath,
+                            "startingUnitAffixes element '" + trimmed + "' must be one of Swift, Bulwark, Juggernaut, Overcharged, Vampiric, Volatile.");
+                    }
+                    else if (!seenAffixes.Add(trimmed))
+                    {
+                        Add(diagnostics, "ai-profile.startingUnitAffixes-duplicate", affixPath,
+                            "Duplicate startingUnitAffix '" + trimmed + "' is not permitted.");
+                    }
+                }
+            }
+
+            if (profile.startingUnitVeterancyRank.HasValue)
+            {
+                if (profile.startingUnitVeterancyRank.Value < 0 || profile.startingUnitVeterancyRank.Value > 5)
+                {
+                    Add(diagnostics, "ai-profile.startingUnitVeterancyRank-invalid", path + ".startingUnitVeterancyRank",
+                        "startingUnitVeterancyRank must be an integer between 0 and 5.");
+                }
             }
         }
 
@@ -2093,6 +3842,12 @@ namespace RogueCommandExpansionLoader.Content
                     "Relic experience level must be between 0 and " + MaxNeededExperienceLevel + ".");
             }
 
+            if (relic.coinsAmount < 0)
+            {
+                Add(diagnostics, "relic.coins-amount-invalid", path + ".coinsAmount",
+                    "Relic coins amount cannot be negative.");
+            }
+
             ValidateRelicLocalizations(relic.localizations, path + ".localizations", diagnostics);
 
             ContentCardChangeDefinition[] changes = RequireArray(relic.cardChanges,
@@ -2119,10 +3874,11 @@ namespace RogueCommandExpansionLoader.Content
                     continue;
                 }
 
-                if (!String.Equals(change.valueToChange, "Health", StringComparison.Ordinal))
+                if (String.IsNullOrWhiteSpace(change.valueToChange) ||
+                    !SupportedRelicChangeableValues.Contains(change.valueToChange))
                 {
                     Add(diagnostics, "relic.change-value-unsupported", changePath + ".valueToChange",
-                        "Data-only relics currently support the Health changeable value (mapped to native MaxHealth).");
+                        "Card change valueToChange must be one of the game's supported ChangeableValue attributes.");
                 }
 
                 if (!String.Equals(change.operation, "Add", StringComparison.Ordinal) &&
@@ -2162,22 +3918,417 @@ namespace RogueCommandExpansionLoader.Content
                         "A meta progression multiplier key must be non-empty when provided.");
                 }
 
-                string[] targetIds = RequireArray(change.onlyForTheseEntityIds,
-                    changePath + ".onlyForTheseEntityIds", diagnostics);
-                if (targetIds.Length == 0)
+                ValidateRelicRoleFilter(change.cardMustHaveAllOfTheseRoles, changePath + ".cardMustHaveAllOfTheseRoles", diagnostics);
+                ValidateRelicRoleFilter(change.cardMustHaveOneOfTheseRoles, changePath + ".cardMustHaveOneOfTheseRoles", diagnostics);
+                ValidateRelicRoleFilter(change.cardMustNotHaveOneOfTheseRoles, changePath + ".cardMustNotHaveOneOfTheseRoles", diagnostics);
+
+                if (change.cardMustNotHaveOneOfTheseTechs != null)
+                {
+                    if (change.cardMustNotHaveOneOfTheseTechs.Length > 16)
+                    {
+                        Add(diagnostics, "relic.tech-filter-limit", changePath + ".cardMustNotHaveOneOfTheseTechs",
+                            "A card change can declare at most 16 excluded tech flags.");
+                    }
+                    var seenTechs = new HashSet<string>(StringComparer.Ordinal);
+                    for (int t = 0; t < change.cardMustNotHaveOneOfTheseTechs.Length; t++)
+                    {
+                        string techName = change.cardMustNotHaveOneOfTheseTechs[t];
+                        if (String.IsNullOrWhiteSpace(techName) || !SupportedUnitTechs.Contains(techName))
+                        {
+                            Add(diagnostics, "relic.tech-filter-invalid", changePath + ".cardMustNotHaveOneOfTheseTechs[" + t + "]",
+                                "Excluded tech must match one of the supported Tech values.");
+                        }
+                        else if (!seenTechs.Add(techName))
+                        {
+                            Add(diagnostics, "relic.tech-filter-duplicate", changePath + ".cardMustNotHaveOneOfTheseTechs[" + t + "]",
+                                "Duplicate tech '" + techName + "' in excluded tech list.");
+                        }
+                    }
+                }
+
+                bool hasTargetIds = change.onlyForTheseEntityIds != null && change.onlyForTheseEntityIds.Length > 0;
+                bool hasRoleFilter = (change.cardMustHaveAllOfTheseRoles != null && change.cardMustHaveAllOfTheseRoles.Length > 0) ||
+                                     (change.cardMustHaveOneOfTheseRoles != null && change.cardMustHaveOneOfTheseRoles.Length > 0);
+                bool hasSideFilter = String.Equals(change.side, "False", StringComparison.Ordinal) ||
+                                     String.Equals(change.side, "True", StringComparison.Ordinal);
+
+                if (hasTargetIds)
+                {
+                    if (change.onlyForTheseEntityIds.Length > 128)
+                    {
+                        Add(diagnostics, "relic.change-target-limit", changePath + ".onlyForTheseEntityIds",
+                            "A card change can target at most 128 unit IDs.");
+                    }
+
+                    ValidateReferences(change.onlyForTheseEntityIds, changePath + ".onlyForTheseEntityIds",
+                        unitIds, registrySnapshot, true, diagnostics);
+                }
+                else if (!hasRoleFilter && !hasSideFilter && !String.Equals(change.side, "Irrelevant", StringComparison.Ordinal))
                 {
                     Add(diagnostics, "relic.change-target-required", changePath + ".onlyForTheseEntityIds",
-                        "Every card change must target at least one namespaced unit ID.");
+                        "Every card change must specify target unit IDs, role filters, or a target side.");
                 }
 
-                if (targetIds.Length > 128)
+                if (change.entityIdsNotAllowed != null && change.entityIdsNotAllowed.Length > 0)
                 {
-                    Add(diagnostics, "relic.change-target-limit", changePath + ".onlyForTheseEntityIds",
-                        "A card change can target at most 128 unit IDs.");
+                    if (change.entityIdsNotAllowed.Length > 128)
+                    {
+                        Add(diagnostics, "relic.excluded-target-limit", changePath + ".entityIdsNotAllowed",
+                            "A card change can exclude at most 128 unit IDs.");
+                    }
+
+                    ValidateReferences(change.entityIdsNotAllowed, changePath + ".entityIdsNotAllowed",
+                        unitIds, registrySnapshot, true, diagnostics);
+                }
+            }
+        }
+
+        private static void ValidateRelicRoleFilter(
+            string[] roles,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (roles == null)
+            {
+                return;
+            }
+
+            if (roles.Length > 16)
+            {
+                Add(diagnostics, "relic.role-filter-limit", path,
+                    "A card change can declare at most 16 role flags per filter.");
+            }
+
+            var seenRoles = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < roles.Length; i++)
+            {
+                string role = roles[i];
+                if (String.IsNullOrWhiteSpace(role) || !SupportedUnitRoles.Contains(role))
+                {
+                    Add(diagnostics, "relic.role-filter-invalid", path + "[" + i + "]",
+                        "Relic role filter must be one of the supported UnitRole values.");
+                }
+                else if (!seenRoles.Add(role))
+                {
+                    Add(diagnostics, "relic.role-filter-duplicate", path + "[" + i + "]",
+                        "Duplicate role '" + role + "' in relic role filter.");
+                }
+            }
+        }
+
+        private static void ValidateUpgradeRoleFilter(string[] roles, string path, List<ContentDiagnostic> diagnostics)
+        {
+            if (roles == null)
+            {
+                return;
+            }
+
+            if (roles.Length > 16)
+            {
+                Add(diagnostics, "upgrade.role-filter-limit", path,
+                    "A card upgrade can declare at most 16 role flags per filter.");
+            }
+
+            var seenRoles = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < roles.Length; i++)
+            {
+                string role = roles[i];
+                if (String.IsNullOrWhiteSpace(role) || !SupportedUnitRoles.Contains(role))
+                {
+                    Add(diagnostics, "upgrade.role-filter-invalid", path + "[" + i + "]",
+                        "Upgrade role filter must be one of the supported UnitRole values.");
+                }
+                else if (!seenRoles.Add(role))
+                {
+                    Add(diagnostics, "upgrade.role-filter-duplicate", path + "[" + i + "]",
+                        "Duplicate role '" + role + "' in upgrade role filter.");
+                }
+            }
+        }
+
+        private static void ValidateUpgradeLocalizations(
+            ContentUpgradeLocalizationDefinition[] localizations,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (localizations == null || localizations.Length == 0)
+            {
+                Add(diagnostics, "upgrade.localization-required", path,
+                    "An upgrade must provide at least its en-US name and description.");
+                return;
+            }
+
+            if (localizations.Length > MaxLocalizationsPerDefinition)
+            {
+                Add(diagnostics, "upgrade.localization-limit", path,
+                    "An upgrade can declare at most " + MaxLocalizationsPerDefinition + " localizations.");
+            }
+
+            var languages = new HashSet<string>(StringComparer.Ordinal);
+            bool hasEnglish = false;
+            for (int i = 0; i < localizations.Length; i++)
+            {
+                ContentUpgradeLocalizationDefinition localization = localizations[i];
+                string itemPath = path + "[" + i + "]";
+                if (localization == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Upgrade localization entries cannot be null.");
+                    continue;
                 }
 
-                ValidateReferences(targetIds, changePath + ".onlyForTheseEntityIds",
-                    unitIds, registrySnapshot, true, diagnostics);
+                if (String.IsNullOrWhiteSpace(localization.language) ||
+                    !SupportedUnitLocalizationLanguages.Contains(localization.language))
+                {
+                    Add(diagnostics, "upgrade.localization-language-unsupported", itemPath + ".language",
+                        "Upgrade localization language must match one of the game's supported language IDs exactly.");
+                }
+                else if (!languages.Add(localization.language))
+                {
+                    Add(diagnostics, "upgrade.localization-language-duplicate", itemPath + ".language",
+                        "An upgrade can declare at most one localization for each language.");
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.name))
+                {
+                    Add(diagnostics, "upgrade.localization-name-required", itemPath + ".name",
+                        "Every upgrade localization must include a non-empty display name.");
+                }
+                else if (String.Equals(localization.language, "en-US", StringComparison.Ordinal))
+                {
+                    hasEnglish = true;
+                }
+
+                if (String.IsNullOrWhiteSpace(localization.description))
+                {
+                    Add(diagnostics, "upgrade.localization-description-required", itemPath + ".description",
+                        "Every upgrade localization must include a non-empty description.");
+                }
+            }
+
+            if (!hasEnglish)
+            {
+                Add(diagnostics, "upgrade.localization-english-required", path,
+                    "Upgrade localizations must include an en-US name and description for fallback.");
+            }
+        }
+
+        private static void ValidateUpgrade(
+            ContentUpgradeDefinition upgrade,
+            string path,
+            HashSet<string> allIds,
+            HashSet<string> bundleIds,
+            HashSet<string> unitIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (upgrade == null)
+            {
+                Add(diagnostics, "entry.null", path, "Upgrade entries cannot be null.");
+                return;
+            }
+
+            RegisterId(upgrade.id, path + ".id", "upgrade", allIds, registrySnapshot, diagnostics);
+            ValidateBundleReference(upgrade.assetBundleId, path + ".assetBundleId", bundleIds, diagnostics);
+            ValidateAssetName(upgrade.imageAssetName, path + ".imageAssetName", diagnostics);
+
+            if (String.IsNullOrWhiteSpace(upgrade.rarity) || !SupportedRelicRarities.Contains(upgrade.rarity))
+            {
+                Add(diagnostics, "upgrade.rarity-invalid", path + ".rarity",
+                    "Upgrade rarity must be one of the game's supported rarity IDs.");
+            }
+
+            if (String.IsNullOrWhiteSpace(upgrade.tech) || !SupportedRelicTechs.Contains(upgrade.tech))
+            {
+                Add(diagnostics, "upgrade.tech-invalid", path + ".tech",
+                    "Upgrade tech must be one of the game's supported tech IDs.");
+            }
+
+            if (String.IsNullOrWhiteSpace(upgrade.offeredSystemTags) ||
+                !SupportedRelicSystemTags.Contains(upgrade.offeredSystemTags))
+            {
+                Add(diagnostics, "upgrade.offered-system-tags-invalid", path + ".offeredSystemTags",
+                    "Upgrade offeredSystemTags must be one supported system tag.");
+            }
+
+            if (String.IsNullOrWhiteSpace(upgrade.neededSystemTags) ||
+                !SupportedRelicSystemTags.Contains(upgrade.neededSystemTags))
+            {
+                Add(diagnostics, "upgrade.needed-system-tags-invalid", path + ".neededSystemTags",
+                    "Upgrade neededSystemTags must be one supported system tag.");
+            }
+
+            if (upgrade.neededExperienceLevel < 0 || upgrade.neededExperienceLevel > MaxNeededExperienceLevel)
+            {
+                Add(diagnostics, "upgrade.experience-level-invalid", path + ".neededExperienceLevel",
+                    "Upgrade experience level must be between 0 and " + MaxNeededExperienceLevel + ".");
+            }
+
+            if (upgrade.coinsAmount < 0)
+            {
+                Add(diagnostics, "upgrade.coins-amount-invalid", path + ".coinsAmount",
+                    "Upgrade coins amount cannot be negative.");
+            }
+
+            if (!String.IsNullOrWhiteSpace(upgrade.attackTypeFilterHandling) &&
+                !SupportedTypeFilterHandlings.Contains(upgrade.attackTypeFilterHandling))
+            {
+                Add(diagnostics, "upgrade.attack-filter-handling-invalid", path + ".attackTypeFilterHandling",
+                    "Upgrade attackTypeFilterHandling must be AllAllowed, OnlyIfEntityHasType, or OnlyIfEntityHasNotType.");
+            }
+
+            if (!String.IsNullOrWhiteSpace(upgrade.attackTypeFilter) &&
+                !SupportedAttackTypes.Contains(upgrade.attackTypeFilter))
+            {
+                Add(diagnostics, "upgrade.attack-filter-invalid", path + ".attackTypeFilter",
+                    "Upgrade attackTypeFilter must be a supported AttackType.");
+            }
+
+            if (!String.IsNullOrWhiteSpace(upgrade.skillTypeFilterHandling) &&
+                !SupportedTypeFilterHandlings.Contains(upgrade.skillTypeFilterHandling))
+            {
+                Add(diagnostics, "upgrade.skill-filter-handling-invalid", path + ".skillTypeFilterHandling",
+                    "Upgrade skillTypeFilterHandling must be AllAllowed, OnlyIfEntityHasType, or OnlyIfEntityHasNotType.");
+            }
+
+            if (!String.IsNullOrWhiteSpace(upgrade.skillTypeFilter) &&
+                !SupportedSkillTypes.Contains(upgrade.skillTypeFilter))
+            {
+                Add(diagnostics, "upgrade.skill-filter-invalid", path + ".skillTypeFilter",
+                    "Upgrade skillTypeFilter must be a supported SkillType.");
+            }
+
+            ValidateUpgradeRoleFilter(upgrade.entityMustHaveOneOfTheseRoles, path + ".entityMustHaveOneOfTheseRoles", diagnostics);
+            ValidateUpgradeRoleFilter(upgrade.entityMustNotHaveOneOfTheseRoles, path + ".entityMustNotHaveOneOfTheseRoles", diagnostics);
+
+            ValidateUpgradeLocalizations(upgrade.localizations, path + ".localizations", diagnostics);
+
+            ContentCardChangeDefinition[] changes = RequireArray(upgrade.cardChanges,
+                path + ".cardChanges", diagnostics);
+            if (changes.Length == 0)
+            {
+                Add(diagnostics, "upgrade.card-change-required", path + ".cardChanges",
+                    "An upgrade must declare at least one native card change.");
+            }
+
+            if (changes.Length > 16)
+            {
+                Add(diagnostics, "upgrade.card-change-limit", path + ".cardChanges",
+                    "An upgrade can declare at most 16 card changes.");
+            }
+
+            for (int i = 0; i < changes.Length; i++)
+            {
+                ContentCardChangeDefinition change = changes[i];
+                string changePath = path + ".cardChanges[" + i + "]";
+                if (change == null)
+                {
+                    Add(diagnostics, "entry.null", changePath, "Card change entries cannot be null.");
+                    continue;
+                }
+
+                if (String.IsNullOrWhiteSpace(change.valueToChange) ||
+                    !SupportedRelicChangeableValues.Contains(change.valueToChange))
+                {
+                    Add(diagnostics, "upgrade.change-value-unsupported", changePath + ".valueToChange",
+                        "Card change valueToChange must be one of the game's supported ChangeableValue attributes.");
+                }
+
+                if (!String.Equals(change.operation, "Add", StringComparison.Ordinal) &&
+                    !String.Equals(change.operation, "Multiply", StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "upgrade.change-operation-invalid", changePath + ".operation",
+                        "Card change operation must be Add or Multiply.");
+                }
+
+                if (Single.IsNaN(change.value) || Single.IsInfinity(change.value) ||
+                    change.value <= 0f || change.value > 10000f)
+                {
+                    Add(diagnostics, "upgrade.change-value-invalid", changePath + ".value",
+                        "Card change value must be greater than 0 and at most 10000.");
+                }
+
+                if (change.multiplyValueWithCurrentHeatLevel)
+                {
+                    Add(diagnostics, "upgrade.heat-scaling-unsupported",
+                        changePath + ".multiplyValueWithCurrentHeatLevel",
+                        "Pack-authored upgrade changes must keep Heat scaling disabled until the per-level balance budget is validated.");
+                }
+
+                if (!String.Equals(change.side, "False", StringComparison.Ordinal) &&
+                    !String.Equals(change.side, "True", StringComparison.Ordinal) &&
+                    !String.Equals(change.side, "Irrelevant", StringComparison.Ordinal))
+                {
+                    Add(diagnostics, "upgrade.change-side-invalid", changePath + ".side",
+                        "Card change side must match the game's False, True, or Irrelevant value.");
+                }
+
+                if (change.multiplyValueWithMetaProgressionMultiplier != null &&
+                    String.IsNullOrWhiteSpace(change.multiplyValueWithMetaProgressionMultiplier))
+                {
+                    Add(diagnostics, "upgrade.meta-progression-invalid",
+                        changePath + ".multiplyValueWithMetaProgressionMultiplier",
+                        "A meta progression multiplier key must be non-empty when provided.");
+                }
+
+                ValidateUpgradeRoleFilter(change.cardMustHaveAllOfTheseRoles, changePath + ".cardMustHaveAllOfTheseRoles", diagnostics);
+                ValidateUpgradeRoleFilter(change.cardMustHaveOneOfTheseRoles, changePath + ".cardMustHaveOneOfTheseRoles", diagnostics);
+                ValidateUpgradeRoleFilter(change.cardMustNotHaveOneOfTheseRoles, changePath + ".cardMustNotHaveOneOfTheseRoles", diagnostics);
+
+                if (change.cardMustNotHaveOneOfTheseTechs != null)
+                {
+                    if (change.cardMustNotHaveOneOfTheseTechs.Length > 16)
+                    {
+                        Add(diagnostics, "upgrade.tech-filter-limit", changePath + ".cardMustNotHaveOneOfTheseTechs",
+                            "A card change can declare at most 16 excluded tech flags.");
+                    }
+                    var seenTechs = new HashSet<string>(StringComparer.Ordinal);
+                    for (int t = 0; t < change.cardMustNotHaveOneOfTheseTechs.Length; t++)
+                    {
+                        string techName = change.cardMustNotHaveOneOfTheseTechs[t];
+                        if (String.IsNullOrWhiteSpace(techName) || !SupportedUnitTechs.Contains(techName))
+                        {
+                            Add(diagnostics, "upgrade.tech-filter-invalid", changePath + ".cardMustNotHaveOneOfTheseTechs[" + t + "]",
+                                "Excluded tech must match one of the supported Tech values.");
+                        }
+                        else if (!seenTechs.Add(techName))
+                        {
+                            Add(diagnostics, "upgrade.tech-filter-duplicate", changePath + ".cardMustNotHaveOneOfTheseTechs[" + t + "]",
+                                "Duplicate tech '" + techName + "' in excluded tech list.");
+                        }
+                    }
+                }
+
+                bool hasTargetIds = change.onlyForTheseEntityIds != null && change.onlyForTheseEntityIds.Length > 0;
+                bool hasRoleFilter = (change.cardMustHaveAllOfTheseRoles != null && change.cardMustHaveAllOfTheseRoles.Length > 0) ||
+                                     (change.cardMustHaveOneOfTheseRoles != null && change.cardMustHaveOneOfTheseRoles.Length > 0);
+
+                if (!hasTargetIds && !hasRoleFilter)
+                {
+                    Add(diagnostics, "upgrade.target-unspecified", changePath,
+                        "A card change must declare either target entity IDs or at least one role filter.");
+                }
+
+                if (hasTargetIds)
+                {
+                    if (change.onlyForTheseEntityIds.Length > 64)
+                    {
+                        Add(diagnostics, "upgrade.target-ids-limit", changePath + ".onlyForTheseEntityIds",
+                            "A card change can declare at most 64 target entity IDs.");
+                    }
+                    ValidateReferences(change.onlyForTheseEntityIds, changePath + ".onlyForTheseEntityIds",
+                        unitIds, registrySnapshot, false, diagnostics);
+                }
+
+                if (change.entityIdsNotAllowed != null && change.entityIdsNotAllowed.Length > 0)
+                {
+                    if (change.entityIdsNotAllowed.Length > 64)
+                    {
+                        Add(diagnostics, "upgrade.excluded-ids-limit", changePath + ".entityIdsNotAllowed",
+                            "A card change can declare at most 64 excluded entity IDs.");
+                    }
+                    ValidateReferences(change.entityIdsNotAllowed, changePath + ".entityIdsNotAllowed",
+                        unitIds, registrySnapshot, false, diagnostics);
+                }
             }
         }
 
@@ -2358,7 +4509,9 @@ namespace RogueCommandExpansionLoader.Content
                 case "gridSize":
                     int integerValue;
                     return Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture,
-                        out integerValue) && integerValue >= 0;
+                        out integerValue) && integerValue >= 0 &&
+                        (!UnitBalanceOverrideMapper.IsNativeIntegerBalanceRowField(name) ||
+                            integerValue <= UnitBalanceOverrideMapper.MaximumContiguousSingleExactInteger);
                 case "neededExperienceLevel":
                     int experienceLevel;
                     return Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture,
@@ -2637,6 +4790,50 @@ namespace RogueCommandExpansionLoader.Content
             catch (Exception exception)
             {
                 Add(diagnostics, "module.validator-failed", path, "AI module validation failed: " + exception.Message);
+            }
+        }
+
+        internal static void ValidateAiProfileStageRangeContiguity(
+            ContentAiProfileDefinition profile,
+            string path,
+            ContentStageDefinition[] stages,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (profile == null || !profile.scopeToReferencedStages || stages == null ||
+                String.IsNullOrWhiteSpace(profile.id))
+            {
+                return;
+            }
+
+            var indices = new List<int>();
+            for (int i = 0; i < stages.Length; i++)
+            {
+                ContentStageDefinition stage = stages[i];
+                if (stage == null || stage.aiProfileIds == null)
+                {
+                    continue;
+                }
+
+                for (int j = 0; j < stage.aiProfileIds.Length; j++)
+                {
+                    if (String.Equals(stage.aiProfileIds[j], profile.id, StringComparison.Ordinal))
+                    {
+                        indices.Add(i);
+                        break;
+                    }
+                }
+            }
+
+            indices.Sort();
+            for (int i = 1; i < indices.Count; i++)
+            {
+                if (indices[i] != indices[i - 1] + 1)
+                {
+                    Add(diagnostics, "ai-profile.stage-range-not-contiguous",
+                        path,
+                        "A stage-scoped AI profile must reference a contiguous range of stage indices.");
+                    break;
+                }
             }
         }
 
@@ -2977,9 +5174,452 @@ namespace RogueCommandExpansionLoader.Content
             return trimmed + Path.DirectorySeparatorChar;
         }
 
-        private static void Add(List<ContentDiagnostic> diagnostics, string code, string path, string message)
+        private static void ValidateStatusEffectMagnitude(
+            ContentUnitStatusEffectDefinition effect,
+            string path,
+            List<ContentDiagnostic> diagnostics)
         {
-            diagnostics.Add(new ContentDiagnostic(code, path, message));
+            if (effect == null)
+            {
+                return;
+            }
+
+            if (Single.IsNaN(effect.magnitude) || Single.IsInfinity(effect.magnitude))
+            {
+                Add(diagnostics, "unit-status-effect.magnitude-invalid", path + ".magnitude",
+                    "Status effect magnitude must be finite.");
+            }
+        }
+
+        private static void ValidateVisualVariantScale(
+            ContentUnitVisualVariantDefinition variant,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (variant == null)
+            {
+                return;
+            }
+
+            if (Single.IsNaN(variant.scale) || Single.IsInfinity(variant.scale) ||
+                variant.scale < 0 || variant.scale > 10)
+            {
+                Add(diagnostics, "unit-visual-variant.scale-invalid", path + ".scale",
+                    "Visual variant scale must be finite and between 0 and 10.");
+            }
+        }
+
+        private static void ValidateSynergyRadius(
+            ContentUnitSynergyDefinition synergy,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (synergy == null)
+            {
+                return;
+            }
+
+            if (Single.IsNaN(synergy.radius) || Single.IsInfinity(synergy.radius) || synergy.radius < 0)
+            {
+                Add(diagnostics, "unit-synergy.radius-invalid", path + ".radius",
+                    "Synergy radius must be finite and non-negative.");
+            }
+        }
+
+        private static bool IsFiniteSingle(float value)
+        {
+            return !Single.IsNaN(value) && !Single.IsInfinity(value);
+        }
+
+        private static void Add(List<ContentDiagnostic> diagnostics, string code, string path, string message, DiagnosticSeverity severity = DiagnosticSeverity.Error)
+        {
+            diagnostics.Add(new ContentDiagnostic(code, path, message, severity));
+        }
+        private static void ValidateRolesList(
+            string[] roles,
+            string path,
+            string diagnosticCode,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (roles == null)
+            {
+                return;
+            }
+
+            if (roles.Length > 16)
+            {
+                Add(diagnostics, diagnosticCode, path, "roles list cannot exceed 16 elements.");
+            }
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < roles.Length; i++)
+            {
+                string role = roles[i];
+                string rolePath = path + "[" + i + "]";
+                if (String.IsNullOrWhiteSpace(role) || !SupportedUnitRoles.Contains(role))
+                {
+                    Add(diagnostics, diagnosticCode, rolePath, "Each role must be a supported UnitRole name.");
+                }
+                else if (!seen.Add(role))
+                {
+                    Add(diagnostics, diagnosticCode, rolePath, "Duplicate role '" + role + "' is not permitted.");
+                }
+            }
+        }
+
+        private static void ValidateSystemTagsList(
+            string[] systemTags,
+            string path,
+            string invalidCode,
+            string duplicateCode,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (systemTags == null)
+            {
+                return;
+            }
+
+            if (systemTags.Length > 16)
+            {
+                Add(diagnostics, invalidCode, path, "systemTags list cannot exceed 16 elements.");
+            }
+
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < systemTags.Length; i++)
+            {
+                string tag = systemTags[i];
+                string tagPath = path + "[" + i + "]";
+                if (String.IsNullOrWhiteSpace(tag) || !SupportedUnitSystemTags.Contains(tag))
+                {
+                    Add(diagnostics, invalidCode, tagPath, "Each systemTag must match a supported native SystemTags enum flag.");
+                }
+                else if (!seen.Add(tag))
+                {
+                    Add(diagnostics, duplicateCode, tagPath, "Duplicate systemTag '" + tag + "' is not permitted.");
+                }
+            }
+        }
+
+        private static void ValidateBuildings(
+            ContentBuildingDefinition[] buildings,
+            string path,
+            HashSet<string> allIds,
+            HashSet<string> bundleIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (buildings == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < buildings.Length; i++)
+            {
+                ContentBuildingDefinition building = buildings[i];
+                string itemPath = path + "[" + i + "]";
+                if (building == null)
+                {
+                    Add(diagnostics, "entry.null", itemPath, "Building entries cannot be null.");
+                    continue;
+                }
+
+                RegisterId(building.id, itemPath + ".id", "building", allIds, registrySnapshot, diagnostics);
+                ValidateAssetName(building.nativeTemplateId, itemPath + ".nativeTemplateId", diagnostics);
+                if (!String.IsNullOrWhiteSpace(building.nativeTemplateId) && building.nativeTemplateId.Length > 256)
+                {
+                    Add(diagnostics, "building.template-id-too-long", itemPath + ".nativeTemplateId",
+                        "Native building template IDs cannot exceed 256 characters.");
+                }
+
+                bool hasVisualAsset = !String.IsNullOrWhiteSpace(building.visualAssetName);
+                bool hasVisualRoot = !String.IsNullOrWhiteSpace(building.visualRootPath);
+                if (hasVisualAsset != hasVisualRoot)
+                {
+                    Add(diagnostics, "building.visual-source-invalid", itemPath,
+                        "A building visual requires visualAssetName and visualRootPath together.");
+                }
+
+                bool hasAudioAsset = !String.IsNullOrWhiteSpace(building.selectionSoundAssetName) ||
+                                         !String.IsNullOrWhiteSpace(building.engineSoundAssetName) ||
+                                         !String.IsNullOrWhiteSpace(building.weaponSoundAssetName);
+                if (hasAudioAsset && String.IsNullOrWhiteSpace(building.assetBundleId))
+                {
+                    Add(diagnostics, "building.audio-bundle-missing", itemPath,
+                        "Specifying audio assets requires declaring an assetBundleId.");
+                }
+
+                if (hasVisualAsset || hasVisualRoot || !String.IsNullOrWhiteSpace(building.cardImageAssetName) || hasAudioAsset)
+                {
+                    ValidateBundleReference(building.assetBundleId, itemPath + ".assetBundleId", bundleIds, diagnostics);
+                    if (!String.IsNullOrWhiteSpace(building.cardImageAssetName))
+                    {
+                        ValidateAssetName(building.cardImageAssetName, itemPath + ".cardImageAssetName", diagnostics);
+                    }
+                    if (hasVisualAsset)
+                    {
+                        ValidateAssetName(building.visualAssetName, itemPath + ".visualAssetName", diagnostics);
+                    }
+                    if (hasVisualRoot)
+                    {
+                        ValidateVisualRootPath(building.visualRootPath, itemPath + ".visualRootPath", diagnostics,
+                            "building.visual-root-path-invalid");
+                    }
+                    if (!String.IsNullOrWhiteSpace(building.selectionSoundAssetName))
+                    {
+                        ValidateAssetName(building.selectionSoundAssetName, itemPath + ".selectionSoundAssetName", diagnostics);
+                    }
+                    if (!String.IsNullOrWhiteSpace(building.engineSoundAssetName))
+                    {
+                        ValidateAssetName(building.engineSoundAssetName, itemPath + ".engineSoundAssetName", diagnostics);
+                    }
+                    if (!String.IsNullOrWhiteSpace(building.weaponSoundAssetName))
+                    {
+                        ValidateAssetName(building.weaponSoundAssetName, itemPath + ".weaponSoundAssetName", diagnostics);
+                    }
+                }
+                else if (!String.IsNullOrWhiteSpace(building.assetBundleId))
+                {
+                    Add(diagnostics, "building.bundle-unused", itemPath + ".assetBundleId",
+                        "A building only declares a bundle when it supplies a card image, visual overlay, or audio assets.");
+                }
+
+                ValidateOnHitStatusEffects(building.onHitStatusEffects, itemPath + ".onHitStatusEffects", diagnostics);
+                ValidateStructuredBuildingParameters(building, itemPath, diagnostics);
+                ValidateBalanceOverrides(building.balanceOverrides, itemPath + ".balanceOverrides",
+                    "building", "building", diagnostics, true);
+                ValidateLocalizations(building.localizations, itemPath + ".localizations",
+                    false, "building", "Building", diagnostics);
+            }
+        }
+
+        private static void ValidateStructuredBuildingParameters(
+            ContentBuildingDefinition building,
+            string path,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (building == null)
+            {
+                return;
+            }
+
+            if (building.gridSize.HasValue)
+            {
+                if (building.gridSize.Value != 1 && building.gridSize.Value != 2)
+                {
+                    Add(diagnostics, "building.grid-size-invalid", path + ".gridSize",
+                        "gridSize must be 1 or 2.");
+                }
+            }
+
+            if (building.maxCapacity.HasValue)
+            {
+                if (building.maxCapacity.Value < 0 || building.maxCapacity.Value > 100)
+                {
+                    Add(diagnostics, "building.max-capacity-invalid", path + ".maxCapacity",
+                        "maxCapacity must be an integer between 0 and 100.");
+                }
+            }
+
+            if (building.cost.HasValue)
+            {
+                if (building.cost.Value < 0)
+                {
+                    Add(diagnostics, "building.cost-invalid", path + ".cost",
+                        "cost must be a non-negative integer.");
+                }
+            }
+
+            if (building.buildTime.HasValue)
+            {
+                if (Single.IsNaN(building.buildTime.Value) || Single.IsInfinity(building.buildTime.Value) || building.buildTime.Value < 0f)
+                {
+                    Add(diagnostics, "building.build-time-invalid", path + ".buildTime",
+                        "buildTime must be a non-negative finite number.");
+                }
+            }
+
+            if (building.combatValue.HasValue)
+            {
+                if (building.combatValue.Value < 0)
+                {
+                    Add(diagnostics, "building.combat-value-invalid", path + ".combatValue",
+                        "combatValue must be a non-negative integer.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(building.rarity))
+            {
+                if (!SupportedUnitRarities.Contains(building.rarity))
+                {
+                    Add(diagnostics, "building.rarity-invalid", path + ".rarity",
+                        "rarity must be one of Common, Rare, UltraRare.");
+                }
+            }
+
+            if (!String.IsNullOrEmpty(building.tech))
+            {
+                if (!SupportedUnitTechs.Contains(building.tech))
+                {
+                    Add(diagnostics, "building.tech-invalid", path + ".tech",
+                        "tech must be one of the game's supported tech IDs.");
+                }
+            }
+
+            if (building.neededExperienceLevel.HasValue)
+            {
+                if (building.neededExperienceLevel.Value < 0 || building.neededExperienceLevel.Value > 100)
+                {
+                    Add(diagnostics, "building.needed-experience-level-invalid", path + ".neededExperienceLevel",
+                        "neededExperienceLevel must be an integer between 0 and 100.");
+                }
+            }
+
+            if (building.roles != null)
+            {
+                ValidateRolesList(building.roles, path + ".roles", "building.roles-invalid", diagnostics);
+            }
+
+            if (building.systemTags != null)
+            {
+                ValidateSystemTagsList(building.systemTags, path + ".systemTags", "building.systemTags-invalid", "building.systemTags-duplicate", diagnostics);
+            }
+
+            if (building.cardModelScalingFactor.HasValue)
+            {
+                float factor = building.cardModelScalingFactor.Value;
+                if (Single.IsNaN(factor) || Single.IsInfinity(factor) || factor <= 0.01f || factor > 100f)
+                {
+                    Add(diagnostics, "building.card-model-scaling-factor-invalid", path + ".cardModelScalingFactor",
+                        "cardModelScalingFactor must be a finite positive number in range (0.01, 100.0].");
+                }
+            }
+
+            if (building.firePointCount.HasValue)
+            {
+                if (building.firePointCount.Value < 1 || building.firePointCount.Value > 64)
+                {
+                    Add(diagnostics, "building.fire-point-count-invalid", path + ".firePointCount",
+                        "firePointCount must be an integer between 1 and 64.");
+                }
+            }
+
+            ValidateNonNegativeFinite(building.damage1, path + ".damage1", "damage1", diagnostics);
+            ValidateNonNegativeFinite(building.attackCooldown, path + ".attackCooldown", "attackCooldown", diagnostics);
+            ValidateNonNegativeFinite(building.weaponRange, path + ".weaponRange", "weaponRange", diagnostics);
+            ValidateNonNegativeFinite(building.damage2, path + ".damage2", "damage2", diagnostics);
+            ValidateNonNegativeFinite(building.attack2Cooldown, path + ".attack2Cooldown", "attack2Cooldown", diagnostics);
+
+            if (!String.IsNullOrEmpty(building.attackType) && !SupportedAttackTypes.Contains(building.attackType))
+            {
+                Add(diagnostics, "building.attack-type-invalid", path + ".attackType",
+                    "attackType must match a supported native AttackType enum name.");
+            }
+
+            if (!String.IsNullOrEmpty(building.skillType) && !SupportedSkillTypes.Contains(building.skillType))
+            {
+                Add(diagnostics, "building.skill-type-invalid", path + ".skillType",
+                    "skillType must match a supported native SkillType enum name.");
+            }
+
+            if (building.skillRange.HasValue && building.skillRange.Value < 0)
+            {
+                Add(diagnostics, "building.skill-range-invalid", path + ".skillRange",
+                    "skillRange must be a non-negative integer.");
+            }
+
+            ValidateNonNegativeFinite(building.skillManaCost, path + ".skillManaCost", "skillManaCost", diagnostics);
+            ValidateNonNegativeFinite(building.healAmount1, path + ".healAmount1", "healAmount1", diagnostics);
+            ValidateNonNegativeFinite(building.healAmount2, path + ".healAmount2", "healAmount2", diagnostics);
+            ValidateNonNegativeFinite(building.effectRadius1, path + ".effectRadius1", "effectRadius1", diagnostics);
+            ValidateNonNegativeFinite(building.effectRadius2, path + ".effectRadius2", "effectRadius2", diagnostics);
+            ValidateNonNegativeFinite(building.duration1, path + ".duration1", "duration1", diagnostics);
+            ValidateNonNegativeFinite(building.duration2, path + ".duration2", "duration2", diagnostics);
+
+            if (building.rotationDegreesPerSecond.HasValue)
+            {
+                float rot = building.rotationDegreesPerSecond.Value;
+                if (Single.IsNaN(rot) || Single.IsInfinity(rot) || rot < 10.0f || rot > 720.0f)
+                {
+                    Add(diagnostics, "building.rotationDegreesPerSecond-invalid", path + ".rotationDegreesPerSecond",
+                        "rotationDegreesPerSecond must be a finite number between 10.0 and 720.0.");
+                }
+            }
+
+            if (building.collisionRadius.HasValue)
+            {
+                float col = building.collisionRadius.Value;
+                if (Single.IsNaN(col) || Single.IsInfinity(col) || col < 0.5f || col > 50.0f)
+                {
+                    Add(diagnostics, "building.collisionRadius-invalid", path + ".collisionRadius",
+                        "collisionRadius must be a finite number between 0.5 and 50.0.");
+                }
+            }
+
+            if (building.attackWarmUpTime.HasValue)
+            {
+                float warm = building.attackWarmUpTime.Value;
+                if (Single.IsNaN(warm) || Single.IsInfinity(warm) || warm < 0.0f || warm > 10.0f)
+                {
+                    Add(diagnostics, "building.attackWarmUpTime-invalid", path + ".attackWarmUpTime",
+                        "attackWarmUpTime must be a finite non-negative number between 0.0 and 10.0.");
+                }
+            }
+
+            if (building.rangeToChooseNewTargetAutomatically.HasValue)
+            {
+                int range = building.rangeToChooseNewTargetAutomatically.Value;
+                if (range < -1 || range > 1000)
+                {
+                    Add(diagnostics, "building.rangeToChooseNewTargetAutomatically-invalid", path + ".rangeToChooseNewTargetAutomatically",
+                        "rangeToChooseNewTargetAutomatically must be an integer between -1 and 1000.");
+                }
+            }
+
+            if (building.minAttackRange.HasValue)
+            {
+                float minRange = building.minAttackRange.Value;
+                if (!IsFiniteSingle(minRange) || minRange < 0f || minRange > 200f)
+                {
+                    Add(diagnostics, "building.minAttackRange-invalid", path + ".minAttackRange",
+                        "minAttackRange must be a finite float between 0 and 200.");
+                }
+            }
+
+            if (building.criticalHitChance.HasValue)
+            {
+                float crit = building.criticalHitChance.Value;
+                if (!IsFiniteSingle(crit) || crit < 0f || crit > 1f)
+                {
+                    Add(diagnostics, "building.criticalHitChance-invalid", path + ".criticalHitChance",
+                        "criticalHitChance must be a finite float between 0 and 1.");
+                }
+            }
+
+            if (building.prespawnCount.HasValue)
+            {
+                int count = building.prespawnCount.Value;
+                if (count < 0 || count > 100)
+                {
+                    Add(diagnostics, "building.prespawnCount-invalid", path + ".prespawnCount",
+                        "prespawnCount must be an integer between 0 and 100.");
+                }
+            }
+        }
+
+        private static void ValidateNonNegativeFinite(
+            float? value,
+            string path,
+            string fieldName,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (value.HasValue)
+            {
+                if (Single.IsNaN(value.Value) || Single.IsInfinity(value.Value) || value.Value < 0f)
+                {
+                    Add(diagnostics, "building." + fieldName + "-invalid", path,
+                        fieldName + " must be a non-negative finite number.");
+                }
+            }
         }
     }
 }

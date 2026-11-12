@@ -1,5 +1,6 @@
 /.venv/
 /.tools/
+/node_modules/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -9,6 +10,7 @@ Desktop.ini
 /htmlcov/
 /build/
 /dist/
+/.hermes/
 /artifacts/
 content/source-art/*.blend1
 **/bin/

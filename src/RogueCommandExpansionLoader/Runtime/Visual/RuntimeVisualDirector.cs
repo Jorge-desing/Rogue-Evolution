@@ -25,6 +25,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private Transform _socketRecoilPrimary;
         private Transform _socketMuzzlePrimary;
         private Animator _animator;
+        private RuntimeAnimatorController _cachedAnimatorController;
+        private float _nextAnimatorParameterCacheRetryAt;
+        private NativeRigRetargetProfile _nativeRigRetargetProfile;
         private readonly Dictionary<string, Transform> _socketHardpoints = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Transform> _attachmentGroups = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, UniqueSocketRoleBinding<Transform>> _socketRoleBindings =
@@ -61,18 +64,59 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private bool _isDamagedStateActive;
         private bool _isCriticalStateActive;
         private bool _isTurretJammed;
+        private bool _isStunnedVisualActive;
+        private bool _isOnFireVisualActive;
+        private bool _isBoostedVisualActive;
+        private string _activeTacticalStanceVisual = "Standard";
+        private string _activeVisualVariantId;
+        private string _activePresetName;
+        private Color? _activeColorTint;
+        private List<Renderer> _cachedRenderers;
+        private readonly Dictionary<Renderer, RendererTintBaseline> _rendererTintBaselines =
+            new Dictionary<Renderer, RendererTintBaseline>();
+        private readonly List<GameObject> _activeVisualModuleInstances = new List<GameObject>();
+        private Vector3 _intactMeshBaseLocalScale = Vector3.one;
+        private bool _hasIntactMeshBaseLocalScale;
+        private bool? _turretJammedOverride;
+        private float? _doorOpenOverride;
+
+        private sealed class RendererTintBaseline
+        {
+            public Material[] Materials;
+            public MaterialPropertyBlock[] Blocks;
+        }
+
+        private static MethodInfo _hasActiveStatusEffectMethod;
+        private static object _stunStatusEffect;
+        private static object _onFireStatusEffect;
+        private static object _combatBoostStatusEffect;
+        private static object _overclockedStatusEffect;
+        private static object _turboStatusEffect;
+        [ThreadStatic] private static object[] _singleArgStatusEffect;
+        [ThreadStatic] private static object[] _singleArgCandidate;
         private bool _hasMovementAnimationParameter;
         private bool _hasFireAnimationParameter;
         private bool _hasDeathAnimationParameter;
         private bool _deathAnimationTriggered;
+        private bool _deathAnimationRequestedForDestruction;
+        private bool _deathVisualRetirementPending;
+        private bool _deathVisualRetirementUsesUnscaledTime;
+        private float _deathVisualRetirementRemainingSeconds;
         private bool _hasLastAnimationPosition;
         private Vector3 _lastAnimationPosition;
+        private float _movementAnimationHoldRemainingSeconds;
         private float _doorOpenProgress;
         private Vector3 _doorClosedLocalPos;
 
         private const string MovementAnimationParameter = "RCL_IsMoving";
         private const string FireAnimationParameter = "RCL_Fire";
         private const string DeathAnimationParameter = "RCL_Death";
+        private const float AnimatorParameterCacheRetryInterval = 0.5f;
+        private const float DeathVisualRetirementTransitionPaddingSeconds = 0.15f;
+        private const float MaximumDeathVisualRetirementSeconds = 15f;
+
+        public bool DeathVisualRetirementPending => _deathVisualRetirementPending;
+        public float DeathVisualRetirementRemainingSeconds => _deathVisualRetirementRemainingSeconds;
 
         private static PropertyInfo _healthRatioProp;
         private static PropertyInfo _currentHealthProp;
@@ -119,6 +163,27 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        public static void OnEntityReused(object entityObj)
+        {
+            EntityController entity = entityObj as EntityController;
+            if (entity == null || entity.gameObject == null)
+            {
+                return;
+            }
+
+            RuntimeVisualDirector director = entity.gameObject.GetComponent<RuntimeVisualDirector>();
+            if (director == null)
+            {
+                AttachIfApplicable(entity);
+                director = entity.gameObject.GetComponent<RuntimeVisualDirector>();
+            }
+
+            if (director != null)
+            {
+                director.ResetForReuse(entity);
+            }
+        }
+
         private static bool HasCompatibleVisualSockets(Transform root)
         {
             if (root == null) return false;
@@ -155,7 +220,21 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             _entity = entity;
             DiscoverSocketsAndMeshes(transform);
+            EnsureCanonicalHardpointGroups();
             CacheAnimatorParameters();
+            _nativeRigRetargetProfile = GetComponent<NativeRigRetargetProfile>();
+            if (_nativeRigRetargetProfile != null)
+            {
+                _nativeRigRetargetProfile.Bind(_entity);
+            }
+
+            if (_intactMeshObject != null)
+            {
+                _intactMeshBaseLocalScale = _intactMeshObject.transform.localScale;
+                _hasIntactMeshBaseLocalScale = true;
+            }
+
+            CacheTintRenderers();
 
             if (_socketRecoilPrimary != null)
             {
@@ -171,10 +250,100 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _audioBindingStartedAt = Time.unscaledTime;
         }
 
+        private void ResetForReuse(EntityController entity)
+        {
+            _entity = entity;
+            RefreshAnimatorParameterCacheIfNeeded();
+            _deathAnimationTriggered = false;
+            _deathAnimationRequestedForDestruction = false;
+            _deathVisualRetirementPending = false;
+            _deathVisualRetirementUsesUnscaledTime = false;
+            _deathVisualRetirementRemainingSeconds = 0f;
+            _isMoving = false;
+            _movementAnimationHoldRemainingSeconds = 0f;
+            _lastShotTimestamp = -1f;
+            _lastVelocity = Vector3.zero;
+            _lastAcceleration = Vector3.zero;
+            _hasLastPosition = false;
+            _hasLastAnimationPosition = entity != null;
+            if (entity != null && entity.transform != null)
+            {
+                _lastPosition = entity.transform.position;
+                _lastAnimationPosition = entity.transform.position;
+            }
+
+            if (_animator != null)
+            {
+                try
+                {
+                    _animator.Rebind();
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    if (_hasMovementAnimationParameter)
+                    {
+                        _animator.SetBool(MovementAnimationParameter, false);
+                    }
+                    if (_hasFireAnimationParameter)
+                    {
+                        _animator.ResetTrigger(FireAnimationParameter);
+                    }
+                    if (_hasDeathAnimationParameter)
+                    {
+                        _animator.ResetTrigger(DeathAnimationParameter);
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            if (_nativeRigRetargetProfile != null)
+            {
+                _nativeRigRetargetProfile.ResetForReuse();
+            }
+        }
+
         private void CacheAnimatorParameters()
         {
-            _animator = GetComponentInChildren<Animator>(true);
-            if (_animator == null || _animator.runtimeAnimatorController == null) return;
+            _hasMovementAnimationParameter = false;
+            _hasFireAnimationParameter = false;
+            _hasDeathAnimationParameter = false;
+
+            Animator preferredAnimator = null;
+            Transform[] hierarchyTransforms = GetComponentsInChildren<Transform>(true);
+            for (int animatorIndex = 0; animatorIndex < hierarchyTransforms.Length; animatorIndex++)
+            {
+                Transform candidateTransform = hierarchyTransforms[animatorIndex];
+                if (candidateTransform == null ||
+                    !candidateTransform.name.StartsWith("RCL_Visual_", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                Animator candidateAnimator = candidateTransform.GetComponentInChildren<Animator>(true);
+                if (candidateAnimator != null && candidateAnimator.runtimeAnimatorController != null)
+                {
+                    preferredAnimator = candidateAnimator;
+                    break;
+                }
+            }
+
+            _animator = preferredAnimator != null ? preferredAnimator : GetComponentInChildren<Animator>(true);
+            RuntimeAnimatorController controller = _animator != null ? _animator.runtimeAnimatorController : null;
+            if (controller == null)
+            {
+                _cachedAnimatorController = null;
+                _nextAnimatorParameterCacheRetryAt = Time.unscaledTime + AnimatorParameterCacheRetryInterval;
+                return;
+            }
+
+            _cachedAnimatorController = controller;
+            _nextAnimatorParameterCacheRetryAt = 0f;
 
             foreach (AnimatorControllerParameter parameter in _animator.parameters)
             {
@@ -195,10 +364,37 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
             }
 
+            if (!_hasMovementAnimationParameter || !_hasFireAnimationParameter || !_hasDeathAnimationParameter)
+            {
+                _nextAnimatorParameterCacheRetryAt = Time.unscaledTime + AnimatorParameterCacheRetryInterval;
+            }
+
             if (_entity != null)
             {
                 _lastAnimationPosition = _entity.transform.position;
                 _hasLastAnimationPosition = true;
+            }
+        }
+
+        private void RefreshAnimatorParameterCacheIfNeeded()
+        {
+            RuntimeAnimatorController controller = _animator != null ? _animator.runtimeAnimatorController : null;
+            if (controller != null)
+            {
+                if (!ReferenceEquals(controller, _cachedAnimatorController))
+                {
+                    CacheAnimatorParameters();
+                    return;
+                }
+            }
+
+            bool missingExpectedParameter = !_hasMovementAnimationParameter ||
+                !_hasFireAnimationParameter ||
+                !_hasDeathAnimationParameter;
+            if ((controller == null || missingExpectedParameter) &&
+                Time.unscaledTime >= _nextAnimatorParameterCacheRetryAt)
+            {
+                CacheAnimatorParameters();
             }
         }
 
@@ -378,6 +574,65 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             binding.Add(candidate);
         }
 
+        private void EnsureCanonicalHardpointGroups()
+        {
+            string[] hardpointTypes = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            for (int i = 0; i < hardpointTypes.Length; i++)
+            {
+                string type = hardpointTypes[i];
+                UniqueSocketRoleBinding<Transform> socketRole;
+                if (!_socketRoleBindings.TryGetValue("hardpoint:" + type, out socketRole) ||
+                    socketRole == null || socketRole.IsAmbiguous || socketRole.Value == null)
+                {
+                    continue;
+                }
+
+                UniqueSocketRoleBinding<Transform> groupRole;
+                _socketRoleBindings.TryGetValue("attachment_group:" + type, out groupRole);
+                if (groupRole != null && groupRole.IsAmbiguous) continue;
+
+                Transform group = groupRole != null ? groupRole.Value : null;
+                if (group == null)
+                {
+                    GameObject groupObject = new GameObject("RCL_AttachmentGroup_" + type);
+                    group = groupObject.transform;
+                    group.SetParent(socketRole.Value, false);
+                    group.localPosition = Vector3.zero;
+                    group.localRotation = Quaternion.identity;
+                    group.localScale = Vector3.one;
+                    AddSocketRoleCandidate("attachment_group:" + type, group);
+                }
+                else if (group.parent != socketRole.Value)
+                {
+                    ReparentAttachmentGroupPreservingChildren(group, socketRole.Value);
+                }
+
+                _attachmentGroups[type] = group;
+            }
+        }
+
+        private void ReparentAttachmentGroupPreservingChildren(Transform group, Transform socket)
+        {
+            if (group == null || socket == null) return;
+            var children = new List<Transform>();
+            while (group.childCount > 0)
+            {
+                Transform child = group.GetChild(0);
+                children.Add(child);
+                child.SetParent(transform, true);
+            }
+
+            group.SetParent(socket, false);
+            group.localPosition = Vector3.zero;
+            group.localRotation = Quaternion.identity;
+            group.localScale = Vector3.one;
+            for (int i = 0; i < children.Count; i++)
+            {
+                Transform child = children[i];
+                if (child != null) child.SetParent(group, true);
+            }
+        }
+
         private Transform GetSocketRoleValue(string role)
         {
             UniqueSocketRoleBinding<Transform> binding;
@@ -498,6 +753,18 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _isEnemyMethod = ecType.GetMethod("IsEnemy", BindingFlags.Public | BindingFlags.Instance,
                 null, new[] { ecType }, null);
 
+            Type statusEffectType = ecType.Assembly.GetType("StatusEffect", false);
+            if (statusEffectType != null)
+            {
+                _hasActiveStatusEffectMethod = ecType.GetMethod("HasActiveStatusEffect",
+                    BindingFlags.Public | BindingFlags.Instance, null, new[] { statusEffectType }, null);
+                try { _stunStatusEffect = Enum.Parse(statusEffectType, "Stun", true); } catch { }
+                try { _onFireStatusEffect = Enum.Parse(statusEffectType, "OnFire", true); } catch { }
+                try { _combatBoostStatusEffect = Enum.Parse(statusEffectType, "CombatBoost", true); } catch { }
+                try { _overclockedStatusEffect = Enum.Parse(statusEffectType, "Overclocked", true); } catch { }
+                try { _turboStatusEffect = Enum.Parse(statusEffectType, "Turbo", true); } catch { }
+            }
+
             Type movementType = ecType.Assembly.GetType("EntityFlockingMovement", false);
             if (movementType != null)
             {
@@ -553,20 +820,40 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void Update()
         {
+            if (_deathVisualRetirementPending)
+            {
+                UpdateDeathVisualRetirement();
+                return;
+            }
+
             if (_entity == null) return;
 
+            RefreshAnimatorParameterCacheIfNeeded();
+            bool isDead = IsEntityDead();
+            UpdateHealthAndDamageTransitions(isDead);
+            if (isDead)
+            {
+                if (_nativeRigRetargetProfile != null)
+                {
+                    _nativeRigRetargetProfile.SuspendForDeath();
+                }
+                return;
+            }
+
             UpdateNativeAudioBindings();
+            UpdateMotionSample(Time.deltaTime);
             UpdateLocomotionAnimation();
-            UpdateHealthAndDamageTransitions();
+            UpdateStatusEffectAndStanceReactions();
             UpdateRadarSweep();
             UpdateTurretAiming();
             UpdateFactoryDeployAnimation();
             UpdateAutomaticWeaponFeedback();
             UpdateRecoilRecovery();
-            UpdateMotionSample(Time.deltaTime);
             UpdateAntennaWobble(Time.deltaTime);
             UpdateVtolThrusterVectoring(Time.deltaTime);
         }
+
+        private bool _isMoving;
 
         private void UpdateLocomotionAnimation()
         {
@@ -574,9 +861,17 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             Vector3 currentPosition = _entity.transform.position;
             float deltaTime = Time.deltaTime;
-            bool isMoving = _hasLastAnimationPosition && deltaTime > Mathf.Epsilon &&
-                (currentPosition - _lastAnimationPosition).sqrMagnitude > (0.15f * deltaTime) * (0.15f * deltaTime);
+            float positionDeltaSquared = _hasLastAnimationPosition
+                ? (currentPosition - _lastAnimationPosition).sqrMagnitude
+                : 0f;
+            float velocitySquared = _hasLastPosition ? _lastVelocity.sqrMagnitude : 0f;
+            bool isMoving = LocomotionAnimationPolicy.EvaluateWithMovementGrace(
+                positionDeltaSquared,
+                deltaTime,
+                velocitySquared,
+                ref _movementAnimationHoldRemainingSeconds);
 
+            _isMoving = isMoving;
             _animator.SetBool(MovementAnimationParameter, isMoving);
             _lastAnimationPosition = currentPosition;
             _hasLastAnimationPosition = true;
@@ -610,8 +905,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void UpdateHealthAndDamageTransitions()
         {
+            UpdateHealthAndDamageTransitions(IsEntityDead());
+        }
+
+        private void UpdateHealthAndDamageTransitions(bool isDead)
+        {
             float ratio = GetHealthRatio();
-            bool isDead = IsEntityDead();
 
             // 1. Reactive Armor (ERA) Detonation on initial heavy impact (<= 75% HP)
             if (ratio <= 0.75f && !isDead)
@@ -793,15 +1092,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     _authoredDamageSmoke.Stop(true, ParticleSystemStopBehavior.StopEmitting);
                 }
 
-                if (!_deathAnimationTriggered && _animator != null && _hasDeathAnimationParameter)
-                {
-                    _deathAnimationTriggered = true;
-                    if (_hasMovementAnimationParameter)
-                    {
-                        _animator.SetBool(MovementAnimationParameter, false);
-                    }
-                    _animator.SetTrigger(DeathAnimationParameter);
-                }
+                TriggerDeathAnimation();
 
                 if (_fireVfxInstance != null)
                 {
@@ -813,6 +1104,189 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     UnityEngine.Object.Destroy(_smokeVfxInstance, 8.0f);
                     _smokeVfxInstance = null;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Issues the authored death trigger before EntityController.Destroy removes or pools
+        /// this visual. The native destruction hook calls this because lethal damage can destroy
+        /// an entity before this director receives another Update with its health at zero.
+        /// </summary>
+        public void TriggerDeathAnimationForDestruction()
+        {
+            TriggerDeathAnimation();
+            _deathAnimationRequestedForDestruction = _deathAnimationTriggered;
+        }
+
+        /// <summary>
+        /// Keeps the death pose alive after native destruction bookkeeping has completed. The
+        /// native entity is already marked destroyed; gameplay behaviours, colliders, and rigid
+        /// bodies are disabled while the authored Action_Death clip finishes.
+        /// </summary>
+        public bool TryBeginDeathVisualRetirementForDestruction()
+        {
+            if (_deathVisualRetirementPending || !_deathAnimationRequestedForDestruction ||
+                !_deathAnimationTriggered || !_hasDeathAnimationParameter ||
+                _entity == null || !IsEntityDead() || _animator == null || !_animator.enabled ||
+                !_animator.isActiveAndEnabled || _animator.runtimeAnimatorController == null)
+            {
+                return false;
+            }
+
+            float animatorSpeed = _animator.speed;
+            if (animatorSpeed <= 0.0001f || float.IsNaN(animatorSpeed) || float.IsInfinity(animatorSpeed))
+            {
+                return false;
+            }
+
+            AnimationClip deathClip = FindDeathAnimationClip(_animator.runtimeAnimatorController);
+            if (deathClip == null || deathClip.length <= 0f || float.IsNaN(deathClip.length) ||
+                float.IsInfinity(deathClip.length))
+            {
+                return false;
+            }
+
+            float retirementSeconds = (deathClip.length / animatorSpeed) +
+                DeathVisualRetirementTransitionPaddingSeconds;
+            if (retirementSeconds <= 0f || retirementSeconds > MaximumDeathVisualRetirementSeconds ||
+                float.IsNaN(retirementSeconds) || float.IsInfinity(retirementSeconds))
+            {
+                return false;
+            }
+
+            UpdateHealthAndDamageTransitions(true);
+            DisableGameplayForDeathVisualRetirement();
+            _deathVisualRetirementUsesUnscaledTime = _animator.updateMode == AnimatorUpdateMode.UnscaledTime;
+            _deathVisualRetirementRemainingSeconds = retirementSeconds;
+            _deathVisualRetirementPending = true;
+            return true;
+        }
+
+        private static AnimationClip FindDeathAnimationClip(RuntimeAnimatorController controller)
+        {
+            if (controller == null)
+            {
+                return null;
+            }
+
+            AnimationClip[] clips = controller.animationClips;
+            AnimationClip selected = null;
+            if (clips == null)
+            {
+                return null;
+            }
+
+            for (int i = 0; i < clips.Length; i++)
+            {
+                AnimationClip candidate = clips[i];
+                if (candidate == null ||
+                    candidate.name.IndexOf("Action_Death", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                if (selected == null || candidate.length > selected.length)
+                {
+                    selected = candidate;
+                }
+            }
+
+            return selected;
+        }
+
+        private void DisableGameplayForDeathVisualRetirement()
+        {
+            MonoBehaviour[] scripts = gameObject.GetComponentsInChildren<MonoBehaviour>(true);
+            for (int i = 0; i < scripts.Length; i++)
+            {
+                MonoBehaviour script = scripts[i];
+                if (script != null && script != this)
+                {
+                    script.StopAllCoroutines();
+                    script.CancelInvoke();
+                }
+            }
+
+            Behaviour[] behaviours = gameObject.GetComponentsInChildren<Behaviour>(true);
+            for (int i = 0; i < behaviours.Length; i++)
+            {
+                Behaviour behaviour = behaviours[i];
+                if (behaviour != null && behaviour != this && behaviour != _animator)
+                {
+                    behaviour.enabled = false;
+                }
+            }
+
+            Collider[] colliders = gameObject.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                if (colliders[i] != null)
+                {
+                    colliders[i].enabled = false;
+                }
+            }
+
+            Rigidbody[] rigidbodies = gameObject.GetComponentsInChildren<Rigidbody>(true);
+            for (int i = 0; i < rigidbodies.Length; i++)
+            {
+                Rigidbody body = rigidbodies[i];
+                if (body != null)
+                {
+                    body.velocity = Vector3.zero;
+                    body.angularVelocity = Vector3.zero;
+                    body.detectCollisions = false;
+                    body.isKinematic = true;
+                }
+            }
+        }
+
+        private void UpdateDeathVisualRetirement()
+        {
+            float deltaTime = _deathVisualRetirementUsesUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+            if (deltaTime > 0f)
+            {
+                _deathVisualRetirementRemainingSeconds = Mathf.Max(
+                    0f,
+                    _deathVisualRetirementRemainingSeconds - deltaTime);
+            }
+
+            if (_deathVisualRetirementRemainingSeconds <= 0f)
+            {
+                _deathVisualRetirementPending = false;
+                UnityEngine.Object.Destroy(gameObject);
+            }
+        }
+
+        private void TriggerDeathAnimation()
+        {
+            _isMoving = false;
+            _movementAnimationHoldRemainingSeconds = 0f;
+
+            if (_deathAnimationTriggered || _animator == null || !_hasDeathAnimationParameter)
+            {
+                return;
+            }
+
+            if (_hasMovementAnimationParameter)
+            {
+                try
+                {
+                    _animator.SetBool(MovementAnimationParameter, false);
+                }
+                catch
+                {
+                    // The death trigger should still be issued if locomotion reset fails.
+                }
+            }
+
+            try
+            {
+                _animator.SetTrigger(DeathAnimationParameter);
+                _deathAnimationTriggered = true;
+            }
+            catch
+            {
+                // Unity may already be tearing down the Animator during a native destroy.
             }
         }
 
@@ -838,17 +1312,118 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        private void UpdateStatusEffectAndStanceReactions()
+        {
+            if (_entity == null || IsEntityDead()) return;
+
+            bool hasStun = false;
+            bool hasOnFire = false;
+            bool hasBoost = false;
+
+            try
+            {
+                if (_entity.HasActiveStatusEffect(StatusEffect.Stun)) hasStun = true;
+                if (_entity.HasActiveStatusEffect(StatusEffect.OnFire)) hasOnFire = true;
+                if (_entity.HasActiveStatusEffect(StatusEffect.CombatBoost)) hasBoost = true;
+                if (!hasBoost && _entity.HasActiveStatusEffect(StatusEffect.Overclocked)) hasBoost = true;
+                if (!hasBoost && _entity.HasActiveStatusEffect(StatusEffect.Turbo)) hasBoost = true;
+            }
+            catch
+            {
+                if (_hasActiveStatusEffectMethod != null)
+                {
+                    try
+                    {
+                        if (_singleArgStatusEffect == null) _singleArgStatusEffect = new object[1];
+                        if (_stunStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _stunStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasStun = true;
+                        }
+                        if (_onFireStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _onFireStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasOnFire = true;
+                        }
+                        if (_combatBoostStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _combatBoostStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasBoost = true;
+                        }
+                        if (!hasBoost && _overclockedStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _overclockedStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasBoost = true;
+                        }
+                        if (!hasBoost && _turboStatusEffect != null)
+                        {
+                            _singleArgStatusEffect[0] = _turboStatusEffect;
+                            if ((bool)_hasActiveStatusEffectMethod.Invoke(_entity, _singleArgStatusEffect)) hasBoost = true;
+                        }
+                        _singleArgStatusEffect[0] = null;
+                    }
+                    catch
+                    {
+                        if (_singleArgStatusEffect != null) _singleArgStatusEffect[0] = null;
+                    }
+                }
+            }
+
+            _isStunnedVisualActive = hasStun;
+            _isOnFireVisualActive = hasOnFire;
+            _isBoostedVisualActive = hasBoost;
+
+            if (hasStun)
+            {
+                _isTurretJammed = true;
+                _isMoving = false;
+                _movementAnimationHoldRemainingSeconds = 0f;
+                if (_animator != null && _hasMovementAnimationParameter)
+                {
+                    _animator.SetBool(MovementAnimationParameter, false);
+                }
+            }
+
+            if (hasOnFire && !_isCriticalStateActive)
+            {
+                if (_authoredDamageFire != null && !_authoredDamageFire.isPlaying)
+                {
+                    _authoredDamageFire.Play(true);
+                }
+                else if (_fireVfxInstance == null)
+                {
+                    Transform fireMount = _socketDamageFire ?? transform;
+                    _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
+                }
+                ApplyProceduralScorch(true);
+            }
+
+            try
+            {
+                string key = _entity.UniqueEntityId.ToString();
+                string stance = RuntimeGameplayCommandDirector.GetUnitTacticalStance(key);
+                if (!string.IsNullOrEmpty(stance))
+                {
+                    SetTacticalStanceVisual(stance);
+                }
+            }
+            catch { }
+        }
+
         private void UpdateRadarSweep()
         {
-            if (_socketRadarMast == null || IsEntityDead()) return;
-            // Calibrate to true 30 RPM: 30 * 360 deg / 60 sec = 180 deg/sec
-            float degPerSec = _radarRpm * 6.0f;
+            if (_socketRadarMast == null || IsEntityDead() || _isStunnedVisualActive) return;
+            float effectiveRpm = _isBoostedVisualActive ? _radarRpm * 2.5f : _radarRpm;
+            float degPerSec = effectiveRpm * 6.0f;
             _socketRadarMast.Rotate(Vector3.up, degPerSec * Time.deltaTime, Space.Self);
         }
 
         private void UpdateTurretAiming()
         {
-            if (_socketTurretPivot == null || _isTurretJammed || IsEntityDead()) return;
+            if (_isMoving) return;
+            if (string.Equals(_activeTacticalStanceVisual, "HoldFire", StringComparison.OrdinalIgnoreCase)) return;
+            bool effectiveJammed = _turretJammedOverride.HasValue ? _turretJammedOverride.Value : (_isTurretJammed || _isStunnedVisualActive);
+            if (_socketTurretPivot == null || effectiveJammed || IsEntityDead()) return;
 
             Transform target = ResolveEntityTarget();
             if (target == null) return;
@@ -856,11 +1431,42 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             Vector3 toTarget = target.position - _socketTurretPivot.position;
             toTarget.y = 0f; // Horizontal planar azimuth
 
+            // Turrets only track hostile targets inside the native weapon range.
+            // ResolveEntityTarget already verified hostility via IsEnemy; this gate
+            // adds the range (and min-range deadzone) check before any rotation.
+            float weaponRangeCells = 0f;
+            try
+            {
+                weaponRangeCells = _entity != null ? _entity.WeaponRange : 0f;
+            }
+            catch
+            {
+                return;
+            }
+            float? minRangeCells = null;
+            try
+            {
+                string entityId = _entity != null ? _entity.EntityId : null;
+                if (!string.IsNullOrEmpty(entityId) && RuntimeHooks.MinAttackRangeResolver != null)
+                {
+                    minRangeCells = RuntimeHooks.MinAttackRangeResolver(entityId);
+                }
+            }
+            catch { }
+            float worldDistance = toTarget.magnitude;
+            if (!TurretAimPolicy.IsInWeaponRange(worldDistance, weaponRangeCells, minRangeCells))
+            {
+                return;
+            }
+
             if (toTarget.sqrMagnitude > 0.01f)
             {
                 Quaternion targetRot = Quaternion.LookRotation(toTarget, Vector3.up);
+                float effectiveTraverseSpeed = string.Equals(_activeTacticalStanceVisual, "Aggressive", StringComparison.OrdinalIgnoreCase)
+                    ? _turretTraverseSpeed * 1.5f
+                    : _turretTraverseSpeed;
                 _socketTurretPivot.rotation = Quaternion.RotateTowards(
-                    _socketTurretPivot.rotation, targetRot, _turretTraverseSpeed * Time.deltaTime);
+                    _socketTurretPivot.rotation, targetRot, effectiveTraverseSpeed * Time.deltaTime);
             }
         }
 
@@ -868,8 +1474,16 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_socketDeployUnit == null || IsEntityDead()) return;
 
-            bool isProducing = CheckIfProducing();
-            float targetProgress = isProducing ? 1.0f : 0.0f;
+            float targetProgress;
+            if (_doorOpenOverride.HasValue)
+            {
+                targetProgress = Mathf.Clamp01(_doorOpenOverride.Value);
+            }
+            else
+            {
+                bool isProducing = CheckIfProducing();
+                targetProgress = isProducing ? 1.0f : 0.0f;
+            }
             _doorOpenProgress = Mathf.MoveTowards(_doorOpenProgress, targetProgress, Time.deltaTime * 1.8f);
 
             // Door slides upward along local Y
@@ -889,6 +1503,408 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 _socketRecoilPrimary.localPosition = _recoilBaseLocalPos;
             }
+        }
+
+        public bool IsDamagedStateActive => _isDamagedStateActive;
+        public bool IsCriticalStateActive => _isCriticalStateActive;
+        public bool IsTurretJammed => _turretJammedOverride.HasValue ? _turretJammedOverride.Value : _isTurretJammed;
+        public float CurrentRecoilOffset => _currentRecoilOffset;
+        public float DoorOpenProgress => _doorOpenProgress;
+        public bool IsStunnedVisualActive => _isStunnedVisualActive;
+        public bool IsOnFireVisualActive => _isOnFireVisualActive;
+        public bool IsBoostedVisualActive => _isBoostedVisualActive;
+        public string ActiveTacticalStanceVisual => _activeTacticalStanceVisual;
+        public string ActiveVisualVariantId => _activeVisualVariantId;
+        public string ActivePresetName => _activePresetName;
+        public Color? ActiveColorTint => _activeColorTint;
+
+        public bool TryApplyVisualVariant(RuntimeUnitVisualVariant variant)
+        {
+            if (variant == null)
+            {
+                ResetVisualVariant();
+                return true;
+            }
+
+            var stagedModules = new List<KeyValuePair<GameObject, bool>>();
+            var stagedSlots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                IReadOnlyList<RuntimeUnitVisualModule> modules = variant.Modules;
+                if (modules != null)
+                {
+                    for (int i = 0; i < modules.Count; i++)
+                    {
+                        RuntimeUnitVisualModule module = modules[i];
+                        if (module == null || module.Prefab == null)
+                        {
+                            DestroyStagedVisualModules(stagedModules);
+                            return false;
+                        }
+
+                        string hardpointType;
+                        Transform mount;
+                        if (!RogueCommandSocketCatalog.TryResolveHardpointType(module.SlotId, out hardpointType) ||
+                            !stagedSlots.Add(hardpointType) ||
+                            !TryGetVisualModuleMount(hardpointType, out mount))
+                        {
+                            DestroyStagedVisualModules(stagedModules);
+                            return false;
+                        }
+
+                        bool shouldBeActive = module.Prefab.activeSelf;
+                        GameObject instance = UnityEngine.Object.Instantiate(module.Prefab) as GameObject;
+                        if (instance == null)
+                        {
+                            DestroyStagedVisualModules(stagedModules);
+                            return false;
+                        }
+
+                        instance.SetActive(false);
+                        instance.name = "RCL_RuntimeModule_" + hardpointType + "_" +
+                            SanitizeVisualVariantName(variant.VariantId);
+                        instance.transform.SetParent(mount, false);
+                        stagedModules.Add(new KeyValuePair<GameObject, bool>(instance, shouldBeActive));
+                        ApplyColorTintToRenderers(
+                            instance.GetComponentsInChildren<Renderer>(true), variant.ColorTint);
+                    }
+                }
+            }
+            catch
+            {
+                DestroyStagedVisualModules(stagedModules);
+                return false;
+            }
+
+            // All module references and mounts have been resolved. Commit by retiring only
+            // instances owned by the previous visual variant, preserving group active state.
+            RemoveActiveVisualModules();
+            for (int i = 0; i < stagedModules.Count; i++)
+            {
+                GameObject instance = stagedModules[i].Key;
+                if (instance == null) continue;
+                _activeVisualModuleInstances.Add(instance);
+                instance.SetActive(stagedModules[i].Value);
+            }
+
+            _activeVisualVariantId = variant.VariantId;
+            _activePresetName = variant.PresetName;
+            _activeColorTint = variant.ColorTint;
+            ApplyColorTintToRenderers(variant.ColorTint);
+
+            if (_intactMeshObject != null)
+            {
+                if (!_hasIntactMeshBaseLocalScale)
+                {
+                    _intactMeshBaseLocalScale = _intactMeshObject.transform.localScale;
+                    _hasIntactMeshBaseLocalScale = true;
+                }
+                float scale = variant.Scale > 0.01f ? variant.Scale : 1f;
+                _intactMeshObject.transform.localScale = _intactMeshBaseLocalScale * scale;
+            }
+
+            return true;
+        }
+
+        public void ResetVisualVariant()
+        {
+            RemoveActiveVisualModules();
+            _activeVisualVariantId = null;
+            _activePresetName = null;
+            _activeColorTint = null;
+            ApplyColorTintToRenderers(new Color(1f, 1f, 1f, 1f));
+            if (_intactMeshObject != null && _hasIntactMeshBaseLocalScale)
+            {
+                _intactMeshObject.transform.localScale = _intactMeshBaseLocalScale;
+            }
+        }
+
+        public int ActiveVisualModuleCount => _activeVisualModuleInstances.Count;
+
+        private bool TryGetVisualModuleMount(string hardpointType, out Transform mount)
+        {
+            mount = null;
+            UniqueSocketRoleBinding<Transform> groupRole;
+            if (_socketRoleBindings.TryGetValue("attachment_group:" + hardpointType, out groupRole) &&
+                groupRole != null && groupRole.IsAmbiguous)
+            {
+                return false;
+            }
+
+            Transform socket;
+            Transform group;
+            if (!_socketHardpoints.TryGetValue(hardpointType, out socket) || socket == null ||
+                !_attachmentGroups.TryGetValue(hardpointType, out group) || group == null)
+            {
+                return false;
+            }
+
+            mount = group;
+            return true;
+        }
+
+        private static string SanitizeVisualVariantName(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return "variant";
+            return value.Replace(':', '_').Replace('/', '_').Replace('\\', '_');
+        }
+
+        private void DestroyStagedVisualModules(List<KeyValuePair<GameObject, bool>> stagedModules)
+        {
+            if (stagedModules == null) return;
+            for (int i = 0; i < stagedModules.Count; i++)
+            {
+                GameObject instance = stagedModules[i].Key;
+                if (instance != null)
+                {
+                    RestoreAndForgetTintRenderers(instance.GetComponentsInChildren<Renderer>(true));
+                    UnityEngine.Object.Destroy(instance);
+                }
+            }
+            stagedModules.Clear();
+        }
+
+        private void RemoveActiveVisualModules()
+        {
+            for (int i = 0; i < _activeVisualModuleInstances.Count; i++)
+            {
+                GameObject instance = _activeVisualModuleInstances[i];
+                if (instance == null) continue;
+                RestoreAndForgetTintRenderers(instance.GetComponentsInChildren<Renderer>(true));
+                instance.SetActive(false);
+                UnityEngine.Object.Destroy(instance);
+            }
+            _activeVisualModuleInstances.Clear();
+        }
+
+        private void CacheTintRenderers()
+        {
+            if (_cachedRenderers != null) return;
+            _cachedRenderers = new List<Renderer>();
+            Renderer[] allRenderers = GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < allRenderers.Length; i++)
+            {
+                Renderer renderer = allRenderers[i];
+                if (renderer == null || renderer is ParticleSystemRenderer) continue;
+                string rendererName = renderer.name ?? string.Empty;
+                if (rendererName.StartsWith("RCL_RuntimeModule_", StringComparison.OrdinalIgnoreCase) ||
+                    rendererName.EndsWith("_COLLIDER", StringComparison.OrdinalIgnoreCase) ||
+                    rendererName.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                _cachedRenderers.Add(renderer);
+            }
+        }
+
+        private void ApplyColorTintToRenderers(Color tintColor)
+        {
+            CacheTintRenderers();
+            ApplyColorTintToRenderers(_cachedRenderers, tintColor);
+        }
+
+        private void ApplyColorTintToRenderers(IReadOnlyList<Renderer> renderers, Color tintColor)
+        {
+            if (renderers == null) return;
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                ApplyColorTintToRenderer(renderers[i], tintColor);
+            }
+        }
+
+        private void ApplyColorTintToRenderer(Renderer renderer, Color tintColor)
+        {
+            if (renderer == null) return;
+            RendererTintBaseline baseline = GetOrCaptureTintBaseline(renderer);
+            bool restore = IsWhiteTint(tintColor);
+            for (int materialIndex = 0; materialIndex < baseline.Blocks.Length; materialIndex++)
+            {
+                MaterialPropertyBlock baselineBlock = baseline.Blocks[materialIndex];
+                if (baseline.Materials.Length == 0)
+                {
+                    renderer.SetPropertyBlock(baselineBlock);
+                    continue;
+                }
+
+                renderer.SetPropertyBlock(baselineBlock, materialIndex);
+                if (restore) continue;
+
+                Material material = baseline.Materials[materialIndex];
+                if (material == null) continue;
+                var workingBlock = new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(workingBlock, materialIndex);
+                bool usesTeamColorMask = material.HasProperty("_TeamColor");
+                if (usesTeamColorMask)
+                {
+                    workingBlock.SetColor("_TeamColor", tintColor);
+                }
+                else if (material.HasProperty("_BaseColor"))
+                {
+                    workingBlock.SetColor("_BaseColor", material.GetColor("_BaseColor") * tintColor);
+                }
+                else if (material.HasProperty("_Color"))
+                {
+                    workingBlock.SetColor("_Color", material.GetColor("_Color") * tintColor);
+                }
+                renderer.SetPropertyBlock(workingBlock, materialIndex);
+            }
+        }
+
+        private RendererTintBaseline GetOrCaptureTintBaseline(Renderer renderer)
+        {
+            RendererTintBaseline baseline;
+            if (_rendererTintBaselines.TryGetValue(renderer, out baseline)) return baseline;
+
+            Material[] materials = renderer.sharedMaterials ?? Array.Empty<Material>();
+            var blocks = new MaterialPropertyBlock[Math.Max(1, materials.Length)];
+            for (int i = 0; i < blocks.Length; i++)
+            {
+                blocks[i] = new MaterialPropertyBlock();
+                if (materials.Length == 0)
+                {
+                    renderer.GetPropertyBlock(blocks[i]);
+                }
+                else
+                {
+                    renderer.GetPropertyBlock(blocks[i], i);
+                }
+            }
+
+            baseline = new RendererTintBaseline { Materials = materials, Blocks = blocks };
+            _rendererTintBaselines.Add(renderer, baseline);
+            return baseline;
+        }
+
+        private void RestoreAndForgetTintRenderers(IReadOnlyList<Renderer> renderers)
+        {
+            if (renderers == null) return;
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null) continue;
+                RendererTintBaseline baseline;
+                if (!_rendererTintBaselines.TryGetValue(renderer, out baseline)) continue;
+                for (int materialIndex = 0; materialIndex < baseline.Blocks.Length; materialIndex++)
+                {
+                    if (baseline.Materials.Length == 0) renderer.SetPropertyBlock(baseline.Blocks[materialIndex]);
+                    else renderer.SetPropertyBlock(baseline.Blocks[materialIndex], materialIndex);
+                }
+                _rendererTintBaselines.Remove(renderer);
+            }
+        }
+
+        private static bool IsWhiteTint(Color tintColor)
+        {
+            return Math.Abs(tintColor.r - 1f) < 0.0001f &&
+                Math.Abs(tintColor.g - 1f) < 0.0001f &&
+                Math.Abs(tintColor.b - 1f) < 0.0001f &&
+                Math.Abs(tintColor.a - 1f) < 0.0001f;
+        }
+
+        public void SetTacticalStanceVisual(string stance)
+        {
+            if (string.IsNullOrEmpty(stance)) return;
+            string previousStance = _activeTacticalStanceVisual;
+            _activeTacticalStanceVisual = stance;
+
+            bool wasDefensive = string.Equals(previousStance, "Defensive", StringComparison.OrdinalIgnoreCase);
+            bool isDefensive = string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase);
+
+            bool wasAggressive = string.Equals(previousStance, "Aggressive", StringComparison.OrdinalIgnoreCase);
+            bool isAggressive = string.Equals(stance, "Aggressive", StringComparison.OrdinalIgnoreCase);
+
+            if (isDefensive && !wasDefensive)
+            {
+                SetAttachmentActive("Armor", true);
+                SetAttachmentActive("Shield", true);
+                SetAttachmentActive("APS", true);
+                SetAttachmentActive("ERA", true);
+            }
+            else if (!isDefensive && wasDefensive)
+            {
+                SetAttachmentActive("Armor", false);
+                SetAttachmentActive("Shield", false);
+                SetAttachmentActive("APS", false);
+                SetAttachmentActive("ERA", false);
+            }
+
+            if (isAggressive && !wasAggressive)
+            {
+                SetAttachmentActive("Sponsons", true);
+                SetAttachmentActive("FuelDrums", true);
+            }
+            else if (!isAggressive && wasAggressive)
+            {
+                SetAttachmentActive("Sponsons", false);
+                SetAttachmentActive("FuelDrums", false);
+            }
+        }
+
+        public void SetTurretJammedOverride(bool? jammed)
+        {
+            _turretJammedOverride = jammed;
+            if (jammed.HasValue && jammed.Value && _socketTurretPivot != null)
+            {
+                _socketTurretPivot.localRotation *= Quaternion.Euler(4.5f, 0f, 3.8f);
+            }
+        }
+
+        public void SetDoorOpenOverride(float? progress)
+        {
+            _doorOpenOverride = progress;
+        }
+
+        public bool TrySetAttachmentState(string attachmentType, bool active)
+        {
+            if (string.IsNullOrWhiteSpace(attachmentType)) return false;
+            Transform visual;
+            if (TryGetHardpointVisual(attachmentType, out visual) && visual != null)
+            {
+                visual.gameObject.SetActive(active);
+                return true;
+            }
+            return false;
+        }
+
+        public void TriggerFootstepFeedback(string footSocketName = null)
+        {
+            Transform foot = null;
+            if (!string.IsNullOrWhiteSpace(footSocketName))
+            {
+                Transform[] all = GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < all.Length; i++)
+                {
+                    if (string.Equals(all[i].name, footSocketName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        foot = all[i];
+                        break;
+                    }
+                }
+            }
+            if (foot == null)
+            {
+                Transform[] all = GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < all.Length; i++)
+                {
+                    if (all[i].name.StartsWith("Socket_FootContact", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foot = all[i];
+                        break;
+                    }
+                }
+            }
+            if (foot != null)
+            {
+                RuntimeVisualVfxFallback.TriggerMuzzleFlashAt(transform, foot.position, Quaternion.identity);
+            }
+        }
+
+        public string GetVisualStatusSummary()
+        {
+            string variant = _activeVisualVariantId ?? "none";
+            string preset = _activePresetName ?? "default";
+            return $"damaged={_isDamagedStateActive},critical={_isCriticalStateActive},jammed={IsTurretJammed},stunned={_isStunnedVisualActive},fire={_isOnFireVisualActive},boosted={_isBoostedVisualActive},stance={_activeTacticalStanceVisual},variant={variant},preset={preset},modules={ActiveVisualModuleCount},recoil={_currentRecoilOffset:F2},door={_doorOpenProgress:F2}";
         }
 
         public void TriggerWeaponFeedback(float recoilDistance = 0.22f)
@@ -968,15 +1984,23 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (candidate == null || candidate.gameObject == null || !candidate.gameObject.activeInHierarchy) return false;
             try
             {
-                if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(candidate, null)) return false;
+                if (candidate.IsDestroyed || candidate.DestroyHasBeenStarted) return false;
                 if (_stillExistsProp != null && !(bool)_stillExistsProp.GetValue(candidate, null)) return false;
+                if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(candidate, null)) return false;
                 if (_destroyHasBeenStartedProp != null && (bool)_destroyHasBeenStartedProp.GetValue(candidate, null)) return false;
                 if (_isEnemyMethod != null)
                 {
-                    return (bool)_isEnemyMethod.Invoke(_entity, new object[] { candidate });
+                    if (_singleArgCandidate == null) _singleArgCandidate = new object[1];
+                    _singleArgCandidate[0] = candidate;
+                    bool result = (bool)_isEnemyMethod.Invoke(_entity, _singleArgCandidate);
+                    _singleArgCandidate[0] = null;
+                    return result;
                 }
             }
-            catch { }
+            catch
+            {
+                if (_singleArgCandidate != null) _singleArgCandidate[0] = null;
+            }
             return false; // Unknown hostility is not enough to authorize visual targeting.
         }
 
@@ -1082,6 +2106,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_entity == null) return 1f;
             try
             {
+                if (_entity.MaxHealth > 0.001f)
+                {
+                    return Mathf.Clamp01(_entity.CurrentHealth / _entity.MaxHealth);
+                }
                 if (_healthRatioProp != null)
                 {
                     return (float)_healthRatioProp.GetValue(_entity, null);
@@ -1096,18 +2124,26 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private float GetCurrentHealth()
         {
-            if (_currentHealthProp != null && _entity != null)
+            if (_entity != null)
             {
-                try { return (float)_currentHealthProp.GetValue(_entity, null); } catch { }
+                try { return _entity.CurrentHealth; } catch { }
+                if (_currentHealthProp != null)
+                {
+                    try { return (float)_currentHealthProp.GetValue(_entity, null); } catch { }
+                }
             }
             return 100f;
         }
 
         private float GetMaxHealth()
         {
-            if (_maxHealthProp != null && _entity != null)
+            if (_entity != null)
             {
-                try { return (float)_maxHealthProp.GetValue(_entity, null); } catch { }
+                try { return _entity.MaxHealth; } catch { }
+                if (_maxHealthProp != null)
+                {
+                    try { return (float)_maxHealthProp.GetValue(_entity, null); } catch { }
+                }
             }
             return 100f;
         }
@@ -1117,6 +2153,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_entity == null) return true;
             try
             {
+                if (_entity.IsDestroyed || _entity.DestroyHasBeenStarted) return true;
                 if (_stillExistsProp != null && !(bool)_stillExistsProp.GetValue(_entity, null)) return true;
                 if (_isDestroyedProp != null && (bool)_isDestroyedProp.GetValue(_entity, null)) return true;
                 if (_destroyHasBeenStartedProp != null && (bool)_destroyHasBeenStartedProp.GetValue(_entity, null)) return true;

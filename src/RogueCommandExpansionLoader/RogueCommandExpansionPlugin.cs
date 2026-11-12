@@ -4,6 +4,7 @@ using RogueCommandExpansionLoader.Compatibility;
 using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Modules;
 using RogueCommandExpansionLoader.Runtime;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace RogueCommandExpansionLoader
@@ -13,10 +14,12 @@ namespace RogueCommandExpansionLoader
     {
         public const string PluginGuid = "roguecommand.expansionloader";
         public const string PluginName = "Rogue Command Expansion Loader";
-        public const string PluginVersion = "1.19.0";
+        public const string PluginVersion = "1.20.10";
 
         private ContentPackRuntimeLoader _contentLoader;
         private RuntimeOverlayUi _overlay;
+        private RangeDisplayRuntime _rangeDisplay;
+        private LoaderDiagnosticsComponent _diagnostics;
         private bool _sceneDiagnosticsSubscribed;
 
         private void Awake()
@@ -38,15 +41,10 @@ namespace RogueCommandExpansionLoader
                 SceneManager.activeSceneChanged += OnActiveSceneChanged;
                 _sceneDiagnosticsSubscribed = true;
                 Logger.LogInfo("[ExpansionLoader] Scene transition diagnostics subscribed.");
+                InitializeRangeDisplay();
 
-                var modules = new AiModuleRegistry();
-                modules.Register(new TraceDefaultAiModule());
-                modules.Register(new ScheduledBaseBuildAiModule());
-                modules.Register(new ReactiveBaseDefenseAiModule());
-                modules.Register(new HarvesterRaiderAiModule());
-                modules.Register(new SiegeAssaultAiModule());
-                modules.Register(new RetreatAndRegroupAiModule());
-                modules.Register(new PatrolAndInterceptAiModule());
+                var modules = AiModuleRegistry.CreateDefault();
+                AiModuleRegistry.Active = modules;
 
                 string packsRoot = System.IO.Path.Combine(
                     Paths.PluginPath,
@@ -84,10 +82,39 @@ namespace RogueCommandExpansionLoader
             }
         }
 
+        private void InitializeRangeDisplay()
+        {
+            try
+            {
+                _rangeDisplay = gameObject.AddComponent<RangeDisplayRuntime>();
+                _rangeDisplay.Initialize(Config, message => Logger.LogWarning(message));
+                Logger.LogInfo("[ExpansionLoader] Range display initialized (disabled by default; toggle key is configurable).");
+            }
+            catch (Exception exception)
+            {
+                if (_rangeDisplay != null)
+                {
+                    UnityEngine.Object.Destroy(_rangeDisplay);
+                    _rangeDisplay = null;
+                }
+                Logger.LogWarning("[ExpansionLoader] Range display is unavailable: " +
+                    exception.GetType().Name + ": " + exception.Message);
+            }
+        }
+
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             Logger.LogInfo("[ExpansionLoader] Scene loaded: '" + scene.name + "' (buildIndex=" +
                 scene.buildIndex + ", mode=" + mode + ").");
+
+            if (_contentLoader != null && RuntimeDiagnosticsScenePlacement.ShouldEnsureOnSceneLoaded(
+                _diagnostics != null,
+                scene.name,
+                mode == LoadSceneMode.Single,
+                _diagnostics != null && _diagnostics.gameObject.scene.handle == scene.handle))
+            {
+                EnsureDiagnosticsComponent(_contentLoader, scene);
+            }
         }
 
         private void OnActiveSceneChanged(Scene previous, Scene next)
@@ -98,6 +125,12 @@ namespace RogueCommandExpansionLoader
 
         private void OnDestroy()
         {
+            if (_rangeDisplay != null)
+            {
+                UnityEngine.Object.Destroy(_rangeDisplay);
+                _rangeDisplay = null;
+            }
+
             if (_sceneDiagnosticsSubscribed)
             {
                 SceneManager.sceneLoaded -= OnSceneLoaded;
@@ -118,6 +151,7 @@ namespace RogueCommandExpansionLoader
                 }
 
                 _contentLoader.ShutdownRuntimeBehaviours();
+                _contentLoader.ShutdownBundles();
             }
         }
 
@@ -138,12 +172,67 @@ namespace RogueCommandExpansionLoader
                     provider,
                     PluginVersion,
                     patchResult,
+                    Config,
                     compatibilityError,
                     message => Logger.LogWarning(message));
+
+                EnsureDiagnosticsComponent(provider, SceneManager.GetActiveScene());
             }
             catch (Exception exception)
             {
                 Logger.LogWarning("[ExpansionLoader] No se pudo inicializar el inspector: " +
+                    exception.GetType().Name + ": " + exception.Message);
+            }
+        }
+
+        private void EnsureDiagnosticsComponent(IRuntimeContentProvider provider, Scene scene)
+        {
+            try
+            {
+                if (provider == null || !scene.IsValid() || !scene.isLoaded)
+                {
+                    return;
+                }
+
+                if (_diagnostics == null)
+                {
+                    var host = new GameObject("LoaderDiagnostics");
+                    if (host.scene.handle != scene.handle &&
+                        !RuntimeDiagnosticsScenePlacement.TryMoveHostToScene(host, scene))
+                    {
+                        Logger.LogWarning("[ExpansionLoader] Diagnostics host could not be moved into loaded scene '" + scene.name + "'.");
+                        UnityEngine.Object.Destroy(host);
+                        return;
+                    }
+
+                    _diagnostics = host.AddComponent<LoaderDiagnosticsComponent>();
+                }
+                else
+                {
+                    if (_diagnostics.gameObject.scene.handle != scene.handle &&
+                        !RuntimeDiagnosticsScenePlacement.TryMoveHostToScene(_diagnostics.gameObject, scene))
+                    {
+                        Logger.LogWarning("[ExpansionLoader] Existing diagnostics host could not be moved into loaded scene '" + scene.name + "'.");
+                        return;
+                    }
+
+                    if (_diagnostics.gameObject.scene.handle != scene.handle)
+                    {
+                        return;
+                    }
+                }
+
+                _diagnostics.Initialize(provider, _overlay, _rangeDisplay);
+            }
+            catch (Exception exception)
+            {
+                if (_diagnostics != null)
+                {
+                    UnityEngine.Object.Destroy(_diagnostics.gameObject);
+                    _diagnostics = null;
+                }
+
+                Logger.LogWarning("[ExpansionLoader] No se pudo adjuntar el componente de diagnóstico: " +
                     exception.GetType().Name + ": " + exception.Message);
             }
         }

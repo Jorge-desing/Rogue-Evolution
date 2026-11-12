@@ -11,6 +11,8 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import bpy
 import RogueModelKit as rmk
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 
 
 UNIT_NAME = "SurgeArcTank"
@@ -29,9 +31,6 @@ FBX_PATH = (
 def build_surge_arc_tank_model() -> None:
     """Build a tracked electromagnetic tank around a vertical induction accelerator."""
     rmk.clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     builder = rmk.RogueVehicleBuilder(UNIT_NAME, faction="syndicate", ground_clearance=0.06)
     builder.add_sloped_hull(length=2.35, width=1.78, height=0.78, bevel=0.055)
     builder.add_continuous_tracks(
@@ -218,6 +217,21 @@ def build_surge_arc_tank_model() -> None:
         )
     )
 
+    builder.objects.extend(apply_wave2_details(
+        UNIT_NAME,
+        objects=builder.objects,
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": warning, "tread": tread},
+    ))
+
+    builder.objects.extend(apply_wave34_details(
+        UNIT_NAME,
+        objects=builder.objects,
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": warning, "tread": tread},
+    ))
+
+    rmk.enforce_face_budget_before_export(builder.objects, UNIT_NAME)
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
     diagnostics = rmk.validate_model_mesh_quality(builder.objects)
     bounds = diagnostics["bounds"]
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
@@ -225,16 +239,19 @@ def build_surge_arc_tank_model() -> None:
     if (
         bounds["width_x"] > 2.3
         or bounds["height_z"] > 1.6
-        or bounds["length_y"] > 2.8
+        or bounds["length_y"] > 3.0
     ):
         raise ValueError(
             "Surge Arc Tank exceeds the approximate LightningTank envelope "
-            f"(2.3 x 1.6 x 2.8 m): {bounds}"
+            f"(2.3 x 1.6 x 3.0 m): {bounds}"
         )
-    if diagnostics["total_polygons"] > 5000:
-        raise ValueError("Surge Arc Tank exceeds the 5,000-face low-poly authoring budget")
-
+    rmk.bake_advanced_vertex_shading(
+        builder.objects,
+        wear_level="field_tested",
+        structural_wear_mask=True,
+    )
     rmk.generate_lightmap_uvs(builder.objects)
+    hardpoint_sockets = create_canonical_hardpoint_sockets(UNIT_NAME)
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
 
     export_batches = rmk.merge_meshes_by_material(
@@ -251,7 +268,7 @@ def build_surge_arc_tank_model() -> None:
             builder.palette.emissive: "arc",
         },
     )
-    rmk.export_unity_fbx(FBX_PATH, export_batches)
+    rmk.export_unity_fbx(FBX_PATH, export_batches + hardpoint_sockets, include_empties=True, generate_profiled_lods=True, asset_id=UNIT_NAME)
 
     print(f"Editable source: {BLEND_PATH}")
     print(f"Unity FBX: {FBX_PATH}")

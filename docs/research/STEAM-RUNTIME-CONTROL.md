@@ -4,11 +4,11 @@ Este runbook es obligatorio antes de interactuar con una partida de Rogue Comman
 
 ## Ruta de control
 
-Usa el puente **BepInEx MCP** para inspeccionar y controlar una partida. En la sesión del 18 de octubre de 2026, el puente conectado ejecutó consultas y llamadas de Unity sin que Rogue Command tuviera que estar enfocado; no hace falta Computer Use para dar foco o para los controles que expone el puente. Recurre a control visual solo si una observación no está disponible por el puente y el usuario lo solicita.
+Usa el puente **BepInEx MCP** para inspeccionar y controlar una partida sin Computer Use ni capturas. El plugin establece `Application.runInBackground=true`; el puente puede operar aunque la ventana no tenga foco. Para menús usa `diagnostics_get_ui_accessibility_census`, `diagnostics_wait_for_ui_text` y `diagnostics_ui_click_text`; para cadenas acotadas usa `automation_run_sequence`. Si una observación no está expuesta, amplía la telemetría MCP o clasifica la comprobación como `BLOCKED`/`UNKNOWN`; no sustituyas el dato con una captura.
 
-Si tras dos intentos una consulta/control sigue fallando o el resultado del puente contradice el estado visible, detén los intentos a ciegas y aplica la skill `screenshot` como diagnóstico visual. Prefiere `tools/Capture-RogueCommand-Background.ps1`, que usa `PrintWindow` sin activar la ventana; registra la ruta de salida y compara el HWND en primer plano antes y después para demostrar que la captura no robó el foco. La captura complementa las lecturas del puente, no sustituye la comprobación de flags o del reloj del juego.
+Si tras dos intentos una consulta/control sigue fallando o contradice otra lectura MCP, detén los intentos a ciegas. Re-resuelve la escena y el componente, reduce el censo/lote, comprueba PID y conexión con `system_get_game_process_state`/`system_wait_for_game_bridge`, y conserva los payloads de error. No uses Computer Use ni captures como respaldo de diagnóstico.
 
-No inicies `RogueCommand.exe` directamente. La partida de aceptación debe venir de Steam. Si ya hay una instancia abierta, inspecciona esa instancia y no la reinicies para repetir una prueba.
+Inicia la partida con `system_launch_game`, que usa el AppID de Steam `1461910`, o desde Steam. No inicies `Rogue Command.exe` directamente. La herramienta no cambia ni crea perfiles. Si ya hay una instancia abierta, inspecciónala y no la reinicies para repetir una prueba. Para salir con normalidad usa `diagnostics_request_graceful_exit` con `confirmExit=true`, verifica luego el proceso con `system_get_game_process_state` y conserva la política de checkpoint de perfiles.
 
 ## Pausa segura y control de botones
 
@@ -107,16 +107,14 @@ El script valida las rutas confinadas a `.tools/BepInExMCP`, instala una versió
 
 Un `ping` correcto solo demuestra que responde el endpoint. Si una lectura grande se trunca, reduce profundidad/número de nodos y consulta campos concretos. Si falla un helper PowerShell/C# local, clasifica primero si falló la compilación del helper o la llamada MCP; un error de `Add-Type` (por ejemplo, un `using System` ausente) no demuestra que BepInEx esté caído.
 
-### Captura visual como respaldo de diagnóstico
+### Automatización de menús sin capturas
 
-Si dos intentos independientes de inspección fallan o devuelven estados contradictorios, deja de repetir la misma llamada y consulta la skill `screenshot` (`C:\Users\Alex\.codex\skills\screenshot\SKILL.md`). Para una captura de escritorio normal, su helper es `scripts/take_screenshot.ps1`; para análisis temporal usa `-Mode temp`. Si el juego está cubierto por otra ventana y no quieres activarlo, usa `tools/Capture-RogueCommand-Background.ps1`: llama `PrintWindow(hwnd, memoryDC, 2)` directamente, no llama `SetForegroundWindow`, guarda el PNG en `%TEMP%` y registra el handle de primer plano antes y después. Ejemplo:
-
-```powershell
-$shot = Join-Path $env:TEMP ("rogue-command-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.png')
-.\tools\Capture-RogueCommand-Background.ps1 -OutputPath $shot
-```
-
-El script busca exactamente un proceso `Rogue Command.exe`; si hay varios, vuelve a resolver el PID con `Get-CimInstance Win32_Process` y pásalo en `-ProcessId`. Inspecciona la imagen resultante: `PrintWindow` puede no producir contenido útil con una ventana minimizada o ciertos renderizadores. Si la captura falla, reporta su resultado y usa la skill para capturar la pantalla visible; no cambies el foco de la ventana sin autorización. Conserva una copia bajo `artifacts/runtime-smoke/` únicamente si aporta evidencia útil. Correlaciona imagen, escena, log y lecturas del puente; la imagen no demuestra estado interno que no se vea.
+- `diagnostics_get_ui_accessibility_census` devuelve controles `Selectable`, etiquetas Unity Text/TMP, escena, ruta jerárquica, estado visible/interactable y rectángulos calculados desde transforms. El censo no captura ni interpreta píxeles; `gameObjectId` es efímero y `hierarchyPath` debe re-resolverse tras cada transición.
+- `diagnostics_ui_click_text` exige una etiqueta única o una `hierarchyPath` exacta de escena (también admite controles sin etiqueta). Los duplicados fallan cerrados. La entrega sigue la ruta real de EventSystem/raycast y falla ante controles inactivos, fuera de pantalla, sin handlers u ocluidos. No llama `Button.onClick` directamente.
+- `diagnostics_wait_for_ui_text` espera hasta 30 segundos por etiqueta o ruta jerárquica exacta y puede exigir que el control esté interactuable y dentro de pantalla. `automation_run_sequence` ejecuta hasta 16 herramientas diagnósticas ordenadas, con límites de duración y parada por fallo.
+- `system_launch_game` solo lanza a través de Steam y conserva el selector/perfil actual. `system_wait_for_game_bridge` exige ping y una consulta de escena Unity, no solo un endpoint HTTP. `diagnostics_request_graceful_exit` solicita cierre normal; su persistencia debe tratarse con el checkpoint de perfil y Cloud.
+- `diagnostics_get_steam_cloud_state` lee los toggles de cuenta y de Rogue Command. `diagnostics_set_steam_cloud_enabled` modifica solo el toggle de esta app y exige autorización explícita del usuario; nunca desactives Cloud de toda la cuenta. Después de restaurar la copia elegida y relanzar, lee el estado y vuelve a habilitarlo solo cuando la copia local coincida con la fuente seleccionada.
+- Si un control no tiene componente `Selectable` o etiqueta Text/TMP, inspecciona su jerarquía y expón un selector específico mediante MCP. Mantén los resultados internos del runtime como telemetría; este flujo no prueba apariencia renderizada.
 
 Identidad observada en esta sesión: Rogue Command 1.0.9; Unity 2021.3.45f2; BepInEx 5.4.23.5 Mono x64; `Assembly-CSharp.dll` SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`; MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. Son valores de referencia, no sustituyen la comprobación de cada sesión.
 
@@ -126,46 +124,18 @@ En el `Assembly-CSharp.dll` de esta identidad, el inicializador de `ProfileManag
 
 En la lectura en vivo del 2026-10-18, el selector de `LocalLow` valía `1`, mientras los dos archivos de la instalación valían `2` y `3`. El perfil activo era `Profile1`; al iniciar no tenía `savegame.dat`. `Profile2` y `Profile3` sí tenían guardados. Es una fotografía histórica, no el estado actual. Vuelve a resolver el selector real y los perfiles en cada sesión; los selectores heredados de la instalación no se usan.
 
-### Omitir FirstRun solo en un perfil QA aislado
+### Continuar o iniciar una corrida con el tutorial completado
 
-El bypass de tutorial para aceptación de contenido está permitido únicamente en un perfil QA separado. Nunca completes el tutorial en el perfil activo del usuario ni modifiques sus flags, guardados o progreso. La ruta exacta del selector se obtiene de `ProfileManager.CurrentProfileTextPath` bajo `Application.persistentDataPath`, no de archivos heredados en la carpeta de instalación.
+No inicies ni restablezcas un perfil limpio o vacío para pruebas: puede reactivar el tutorial y cambiar su progreso. Conserva el tutorial completado; nunca uses métodos nativos para finalizarlo/restablecerlo ni edites `tutorialState.txt`. Resuelve el selector activo en `ProfileManager.CurrentProfileTextPath` bajo `Application.persistentDataPath`; los selectores heredados de la carpeta de instalación no son autoritativos.
 
-1. No interrumpas una partida abierta. Primero inspecciona el proceso y su estado con las operaciones de lectura de este runbook. Si el juego ya está corriendo, no cambies su selector, no abandones el run y no apliques el bypass; espera a que el juego cierre normalmente o limita la sesión a lectura.
-2. Con el juego cerrado, registra el valor original del selector real y los SHA-256 de todos los archivos de todos los perfiles del usuario. Conserva un inventario de ruta, tamaño y hash bajo `artifacts/runtime-smoke/`. No uses los selectores de la instalación.
-3. Inicia por Steam y, sin empezar una corrida ni aplicar el bypass, crea/selecciona un perfil QA distinto mediante el flujo nativo de administración de perfiles. Cierra el juego normalmente. Con el proceso cerrado, confirma que el selector real apunta al QA nuevo, que no contiene `savegame.dat` ni un run guardado y que todos los hashes de perfiles del usuario siguen iguales. No clones un perfil del usuario ni edites manualmente sus datos. Si no puedes demostrar aislamiento o crear QA sin sobrescribir datos, detente; no cambies el tutorial del usuario como alternativa.
-4. Vuelve a iniciar por Steam y confirma otra vez el selector/perfil efectivo, el proceso, la escena y que QA sigue sin run guardado. Para el bypass, permanece en `MainMenu` o `RunSetup`, antes de iniciar una corrida. No abandones una partida activa para alcanzar ese estado.
-5. Antes de usar firmas nativas, verifica juntos la versión de Rogue Command, SHA-256 y MVID de `Assembly-CSharp.dll`. En la identidad observada de Rogue Command `1.0.9` (SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`), la inspección estática encontró `TutorialState.FinishMainTutorial()` y `TutorialState.OnPlayerHasFinishedLevel1()`. La primera persiste la finalización del tutorial principal y llama a `AutoFinishCustomTutorialsWithMainTutorial()`; la segunda persiste el indicador que hace que `GameBalancingStore.DetermineLevelProgressionModeForNewRun()` deje de escoger `FirstRun`. Estos métodos nativos no usan Harmony ni escriben XP. Si cualquier elemento de la identidad cambia, vuelve a inspeccionar las firmas y efectos y no reutilices esta referencia a ciegas.
-6. Solo en QA, invoca cada método una vez si su flag sigue falso, directamente por el puente si está disponible. Si hace falta un helper temporal, usa uno, llama una vez a `Apply()`, lee ambos flags y el modo de próxima corrida, llama `Remove()` y confirma que ya no aparece en `inspect_components`. El helper de referencia es:
+1. Si Rogue Command ya está abierto, inspecciona su estado de solo lectura. No cambies el selector, no abandones la partida y no la reinicies sin autorización explícita.
+2. Con el juego cerrado, crea un checkpoint con selector, ruta, tamaño y SHA-256 de todos los archivos de todos los perfiles. Incluye el perfil fuente y el destino QA; guarda el checkpoint bajo `artifacts/runtime-smoke/`.
+3. Para continuar, inicia por Steam y selecciona con la interfaz nativa un perfil cuyo tutorial ya esté completado. Para una corrida nueva, requiere autorización explícita del usuario: conserva intacto un perfil fuente con ambos flags de tutorial completado, respalda el destino QA autorizado y clona el perfil completo al destino mientras el juego está cerrado. Verifica los hashes de origen/destino y los dos flags del clon antes de iniciar.
+4. Inicia por Steam, confirma el perfil efectivo y selecciónalo mediante la interfaz nativa. Al empezar una corrida nueva, lee el diálogo de sobrescritura completo antes de confirmar. Nunca elijas un perfil limpio como atajo.
+5. Verifica la identidad completa del juego antes de depender de firmas reflejadas. Usa BepInEx MCP para las lecturas y mutaciones autorizadas; documenta por separado configuración, actividad del perfil AI y comportamiento observado. No infieras ejecución de contadores de instalación, directorios vacíos o filas futuras de la secuencia.
+6. Al salir, confirma que el proceso terminó. Guarda bajo `artifacts/runtime-smoke/` una copia/manifiesto de los archivos generados por el run, restaura el slot QA a su respaldo original y devuelve el selector a su valor original. Exige que el verificador de checkpoint reporte todos los archivos y el selector iguales. No cambies Steam Cloud salvo autorización explícita.
 
-   ```csharp
-   using UnityEngine;
-
-   public sealed class RclTutorialCompletion : MonoBehaviour
-   {
-       public bool mainTutorialFinished;
-       public bool playerHasFinishedLevel1;
-       public string nextRunMode;
-
-       public void Apply()
-       {
-           var tutorial = Game.TutorialState;
-           if (!tutorial.IsMainTutorialFinished)
-               tutorial.FinishMainTutorial();
-           if (!tutorial.PlayerHasFinishedLevel1)
-               tutorial.OnPlayerHasFinishedLevel1();
-
-           mainTutorialFinished = tutorial.IsMainTutorialFinished;
-           playerHasFinishedLevel1 = tutorial.PlayerHasFinishedLevel1;
-           nextRunMode = GameBalancingStore.DetermineLevelProgressionModeForNewRun().ToString();
-       }
-
-       public void Remove() => Destroy(this);
-   }
-   ```
-7. Confirma en QA `IsMainTutorialFinished=true`, `PlayerHasFinishedLevel1=true` y modo `Default` o `Heat`; tras iniciar, confirma `Game.CurrentLevelProgressionMode != FirstRun`. Si no se cumple, detente. No avances tutoriales manualmente ni modifiques el perfil del usuario.
-8. Al terminar, cierra el juego normalmente y confirma que el proceso salió. Restaura el selector real al valor original y verifica por SHA-256 que todos los archivos de los perfiles del usuario coinciden con el inventario previo. Si algún archivo del usuario cambió, conserva evidencia y detén la limpieza automática para investigar la causa. El estado QA puede conservar la finalización del tutorial; no elimines el perfil QA. Restaura por hash los archivos temporales de instalación y retira helpers/sondas.
-
-Las firmas y efectos anteriores tienen **inspección estática** para la identidad indicada; no demuestran que el bypass se haya ejecutado en QA. El procedimiento vigente exige perfil QA aislado y nunca autoriza alterar el tutorial del usuario.
+Si no puedes verificar el perfil fuente tutorial-completo, aislar el destino, leer el diálogo o restaurar exactamente el checkpoint, detente antes de iniciar o continuar mutaciones y reporta el estado como `BLOCKED` o `UNKNOWN`.
 
 ## Inspección primero
 
@@ -180,14 +150,41 @@ Anota escena, ruta/ID del GameObject, componente, perfil, modo de progresión y 
 
 ### Pulsar controles de Unity
 
-Un `ButtonManager` puede tener listeners que abren diálogos o avanzan una secuencia, sin iniciar todavía la partida. Antes de invocarlo:
+Para un control, primero consulta `diagnostics_get_ui_accessibility_census` y espera el estado adecuado con `diagnostics_wait_for_ui_text`. Pulsa una etiqueta única o usa su `hierarchyPath` exacta con `diagnostics_ui_click_text`; los controles sin etiqueta requieren la ruta. El click valida `interactable`, actividad, bounds y oclusión mediante EventSystem/raycast, sin screenshot ni llamada directa a `Button.onClick`.
 
-1. Lee `onClick` y enumera sus listeners persistentes (`GetPersistentTarget`, `GetPersistentMethodName`) con un único componente de inspección temporal.
-2. Verifica `IsActive()` e `IsInteractable()` y revisa que el listener sea el esperado.
-3. Invoca una sola vez mediante el componente temporal o el método específico expuesto por el puente. Comprueba escena y jerarquía después.
-4. Destruye el componente temporal y confirma que ya no aparece en `inspect_components`.
+Un `ButtonManager` puede tener listeners que abren diálogos o avanzan una secuencia, sin iniciar todavía la partida. Antes de accionar uno, inspecciona sus listeners por reflexión con las herramientas MCP y confirma el target/método esperado. Usa el click por etiqueta para entregar una pulsación auténtica; si el objeto no es un `Selectable`/no tiene etiqueta accesible, añade un endpoint MCP tipado y específico, con postcondiciones observables. No uses componentes temporales para invocar listeners a ciegas.
 
 No confirmes el diálogo de sobrescritura de una partida guardada. `StartNewRun.OnClick()` comprueba si existe el archivo del perfil; si existe, ofrece sobrescribirlo. Usa solo un perfil QA aislado verificado y sin `savegame.dat`; conserva un inventario previo de QA y hashes de todos los perfiles del usuario. Nunca llames a `Game.Init`, `MetaGame.AddExperiencePoints` ni escribas campos de progresión como atajo para demostrar una recompensa real.
+
+**Avance sintético de estado autorizado (2026-11-08)**: el usuario autorizó explícitamente
+falsificar estado del juego para automatización de validación runtime. Reglas vigentes:
+seams sancionados en el loader, fail-closed, etiquetas `synthetic=true` en cada resultado,
+nunca tocan perfil/save, y solo bajo la disciplina de checkpoint del perfil QA Profile2
+(selector y todos los ficheros hasheados antes de abrir el juego; verificación de match
+exacto al cerrar). La cadena verificada en vivo para entrar al nivel de combate desde el
+mapa de intermission (nodo no choosable, `LaunchButton` Michsky inactivo,
+`IsCurrentLevelFinished=True`) es ahora, en orden de preferencia: vía natural del director
+(`TryEnterLevelNodeWorkflow`) → **una sola llamada nativa `LoadScene.LoadLevel()`** sobre el
+GO `LoadNextLevel` **sin jump previo** en el mapa conservado (el mundo de la etapa actual ya
+está generado y `InitMap.MapIsReady` es verdadero) → aparece la intro `LoadingHider` → botón
+`INICIAR` (Unity `UI.Button` "Button", **no** el LaunchButton Michsky del mapa) → gameplay con
+`timeScale=1`. Verificado el 2026-11-08 (`artifacts/runtime-smoke/live-reads-20261108-nojump/`):
+Intermission stage 0/nivel 3 → un `LoadLevel()` → censo stage 0/nivel 4 con `LoadingHider`
+GO 1008320 activo → `Button` GO 1008136 clic real en 960/322.3 → snapshot 46/46 con 14
+entidades en campo. La cadena histórica con jump (`StageMap.JumpTo(4)` + corrutina + `LoadLevel()`)
+queda como último recurso sintético para etapas sin generar (evidencia antigua en
+`artifacts/runtime-smoke/ui-click-20261108g/level4-entry-evidence.json`).
+
+**Por qué el jump se cuelga (causa raíz estática, no reintentar)**: tras `JumpTo` + `Reset`,
+`LoadNextLevel` espera sin timeout a `InitMap.MapIsReady_Static()`, y la única generación de
+mapa conocida (`LevelProgression.InitMapIfBossComesNext`, solo boss) no se dispara — ver
+`docs/research/LOADLEVEL-PRECONDITIONS.md`. En 1 de ~5 corridas entre procesos transicionó
+(excepción que confiaba en un mundo ya listo); en las restantes, pantalla de carga
+("Cargando...", barra vacía, spinner) sin poblar `LoadingHider` ni dejar error en
+`BepInEx/LogOutput.log` ni en `Player.log`. Detén los reintentos ciegos: usa la matriz de
+precondiciones antes de cualquier reintento. Nota: los triángulos grandes del mapa
+(`BossTriangle`, MeshFilter/MeshRenderer sin collider ni handlers) son escenario
+decorativo; no son clicables ni el "nodo siguiente".
 
 En una ejecución observada, el botón `Start Run Button` de `RunSetup` abrió `RunOpenerStoryCanvas`; su botón `ConfirmButton` avanzó la secuencia y llevó a `Game`. Ese recorrido terminó en `FirstRun`, nivel de run 4. No asumir que este flujo equivale a una partida normal ni que la pantalla de inicio es una oferta de recompensa.
 
@@ -230,4 +227,8 @@ Para afirmar que una carta apareció, registra la oferta que realmente se render
 - **Validación local:** 132/133 checks del harness pasaron; el único omitido fue la fixture de symlink por falta de privilegio de Windows. El validador resolvió 10/10 referencias de Sprite/prefab y el preflight estático resolvió 5/5 raíces visuales. Son pruebas locales, no de oferta o renderizado en partida.
 - **Sondas:** los componentes temporales `Rcl*Probe`, el helper `RclRuntimeTimeControl` y la acción temporal se retiraron. La lista final de componentes de `InGameMenuCanvas` contenía solo componentes del juego. Las salidas de validación están bajo `artifacts/`.
 
-Las notas de ejecución anteriores describen perfiles y procesos observados en sesiones pasadas. Para la siguiente aceptación que omita `FirstRun`, sigue el procedimiento QA aislado de arriba: registra el selector actual, usa un perfil QA sin run guardado y restaura el selector original después de cerrar el juego. No cambies a Profile 2 ni sobrescribas o elimines perfiles para volver a un estado limpio.
+Las notas de ejecución anteriores describen perfiles y procesos observados en sesiones pasadas. Para cualquier aceptación que necesite una corrida nueva, sigue el procedimiento de clon tutorial-completo anterior. No cambies a Profile 2 ni sobrescribas o elimines perfiles para volver a un estado limpio.
+
+## Opener `LoadingHider` tras la carga de nivel (2026-11-11)
+
+La escena `Game` puede estar activa con `Time.timeScale=1` mientras `LoadingHider` todavía tapa el mapa y espera el botón nativo `Iniciar`. Antes de interpretar órdenes Move, verifica el objeto y el estado `interactable` de su botón; actívalo por el EventSystem/UI nativo. Una orden emitida antes de despejar el opener no demuestra que la unidad haya empezado a moverse. En la pasada d576 de fábrica, el producto Walker solo se desplazó después de invocar ese botón. Informe: [RETARGET-D576-FACTORY-WALK-RUNTIME-2026-11-11.md](RETARGET-D576-FACTORY-WALK-RUNTIME-2026-11-11.md).

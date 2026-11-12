@@ -78,3 +78,14 @@ The project's pinned Unity prefab builder (`Assets/Editor/VehiclePrefabBuilder.c
 2. Creates `<UnitName>_Controller.controller` in `Assets/RogueCommandExpansionSample/Animations/`.
 3. Populates states with imported clips matching `Action_Idle`, `Action_Walk` / `Action_Drive`, `Action_FireRecoil`, and `Action_Death`.
 4. Hooks parameter transitions with standard blend times ($0.15\text{s}$ walk blend, $0.20\text{s}$ stop blend).
+
+
+## 5. Builder Pitfalls
+
+When a rigged FBX imports both canonical clips (`Action_Walk`) and armature-prefixed duplicates (`<Unit>_Armature|<Unit>_Action_Walk`), `ConfigureAnimationController` creates an `AnimatorState` for **every** clip and `FindAnimationClip` returns the **first** match. Consequences and fixes:
+
+- **Clip selection ambiguity.** `FindAnimationClip(clips, "Walk")` can resolve to a legacy/empty clip instead of the skinned `Action_Walk` clip. Always prefer the `Action_*` names first (`Action_Idle`, `Action_Walk`/`Action_Drive`, `Action_FireRecoil`, `Action_Death`) and fall back to the simple names.
+- **Transitions target the wrong state.** If `Idle` is wired to a state whose clip is actually `Action_Death` (or any non-walk clip), the unit's feet never animate even though `RCL_IsMoving` toggles correctly. Verify the serialized controller's `m_DstState` fileID resolves to the intended `Action_*` state, not a duplicate.
+- **FireRecoil must return to walk when still moving.** An unconditional exit from `FireRecoil` to `Idle` leaves the firing animation playing (or the unit stuck) while moving. Add a second exit with `hasExitTime = true`, `exitTime = 1`, conditioned on `RCL_IsMoving = If`, targeting `Action_Walk`, ahead of the unconditional `Idle` fallback.
+- **Duplicate Animators.** A rigged FBX can carry its own `Animator`. Destroy every imported `Animator` on the model instance (`GetComponentsInChildren<Animator>(true)`) before `SetupAnimatorIfAvailable`, otherwise the prefab/bundle retains two Animators that fight over the same rig.
+- **YAML empty names.** Unity serializes empty transition names as `m_Name: ` with a trailing space. Preserve that when hand-editing controller YAML.

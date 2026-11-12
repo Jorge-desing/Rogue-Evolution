@@ -1,0 +1,103 @@
+"""Declared localization inventory in the offline registry report (not runtime fallback)."""
+
+import contextlib
+import importlib.util
+import io
+import json
+import sys
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from tests.python.helpers import load_tool_module
+
+validator = load_tool_module("validate_loader_registry_localization", "validate_loader_registry.py")
+
+
+class LoaderRegistryLocalizationTests(unittest.TestCase):
+    def test_report_separates_declared_product_and_factory_fields(self):
+        pack = {
+            "packId": "sample:pack",
+            "units": [
+                {
+                    "id": "sample:unit",
+                    "nativeTemplateId": "PCXBaseTank",
+                    "localizations": [
+                        {"language": "es-XL", "name": "Unidad", "description": "Texto"},
+                        {"language": "en-US", "name": "Unit", "skillDescription": "Skill"},
+                    ],
+                    "productionBuilding": {
+                        "id": "sample:factory", "nativeTemplateId": "PCXBaseTankFactory",
+                        "localizations": [{"language": "en-US", "name": "Factory"}],
+                    },
+                },
+                {"id": "sample:untranslated", "nativeTemplateId": "PCXBaseTank"},
+            ],
+        }
+        report = validator.build_pack_report(pack, Path("sample/content.json"))
+        self.assertEqual(report["unitLocalizations"], [
+            {
+                "unitId": "sample:factory", "nameLanguages": ["en-US"],
+                "descriptionLanguages": [], "skillDescriptionLanguages": [],
+                "hasEnglishName": True, "hasNativeTemplate": True,
+            },
+            {
+                "unitId": "sample:unit", "nameLanguages": ["en-US", "es-XL"],
+                "descriptionLanguages": ["es-XL"], "skillDescriptionLanguages": ["en-US"],
+                "hasEnglishName": True, "hasNativeTemplate": True,
+            },
+            {
+                "unitId": "sample:untranslated", "nameLanguages": [],
+                "descriptionLanguages": [], "skillDescriptionLanguages": [],
+                "hasEnglishName": False, "hasNativeTemplate": True,
+            },
+        ])
+
+    def test_text_report_keeps_registry_output_without_runtime_localization_claims(self):
+        pack = {
+            "packId": "sample:pack",
+            "units": [{"id": "sample:unit", "productionBuilding": {"id": "sample:factory"},
+                       "localizations": [{"language": "en-US", "name": "Unit"}]}],
+        }
+        output = io.StringIO()
+        root = mock.Mock()
+        root.glob.return_value = [Path("sample/content.json")]
+        with mock.patch.object(validator, "PACKS_ROOT", root), \
+             mock.patch.object(validator, "load_pack", return_value=pack), \
+             contextlib.redirect_stdout(output):
+            exit_code = validator.main([])
+        self.assertEqual(exit_code, 0)
+        self.assertIn("INFO sample:pack unit sample:unit -> sample:factory", output.getvalue())
+        self.assertNotIn("resolved fallback", output.getvalue())
+
+    def test_json_inventory_does_not_reject_descriptive_relations_or_partial_queue(self):
+        pack = {
+            "packId": "sample:pack",
+            "units": [
+                {"id": "sample:a", "productionBuilding": {"id": "sample:a-factory"},
+                 "productionQueue": {"buildTime": 10},
+                 "synergies": [{"targetUnitIds": ["sample:b"]}]},
+                {"id": "sample:b", "productionBuilding": {"id": "sample:b-factory"},
+                 "synergies": [{"targetUnitIds": ["sample:a"]}]},
+            ],
+        }
+        output = io.StringIO()
+        root = mock.Mock()
+        root.glob.return_value = [Path("sample/content.json")]
+        with mock.patch.object(validator, "PACKS_ROOT", root), \
+             mock.patch.object(validator, "load_pack", return_value=pack), \
+             contextlib.redirect_stdout(output):
+            exit_code = validator.main(["--json"])
+        result = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(result["summary"]["issueCount"], 0)
+        self.assertTrue(result["summary"]["registryValid"])
+        self.assertEqual(result["packs"][0]["unitLocalizations"][0]["unitId"], "sample:a")
+        self.assertIn(
+            "this static report does not prove runtime loading, map assignment, or offers.",
+            " ".join(result["limitations"]).lower(),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

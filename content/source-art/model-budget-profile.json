@@ -1,0 +1,1027 @@
+{
+  "schemaVersion": 1,
+  "profileId": "rogue-command-local-pc-dense-rts-60fps",
+  "calibrationStatus": "uncalibrated",
+  "targetFps": 60.0,
+  "targetFrameTimeMs": 16.666666666666668,
+  "hardware": {
+    "cpu": "AMD Ryzen 5 5500",
+    "gpu": "NVIDIA GeForce RTX 4060"
+  },
+  "calibration": {
+    "resolutionWidth": 1920,
+    "resolutionHeight": 1080,
+    "cameraReference": "Main Camera21, 1920x1080, display-backed perspective Game camera; position (-180.495209,147.800003,234.495285), rotation (48.000004,135,0), FOV 26.231289.",
+    "sceneMix": "Level 4 boss gameplay, Default mode, stage 0 (StageParameters_Pools_Level4), plus 12 temporary diagnostic units across Bulwark, Gravitas Breaker, Arachnid Hexapod, and Command Relay; see hashed runtime evidence context for changing AI population.",
+    "maximumVisibleInstances": 12,
+    "samples": [
+      {
+        "triangles": 110175,
+        "p95UnscaledFrameIntervalMs": 12.093465,
+        "captureStartedUtc": "2026-11-12T03:17:55.4469807Z",
+        "scene": "Game",
+        "camera": "Main Camera21",
+        "cameraSettings": [
+          26.231289,
+          false,
+          42.0,
+          1.777778,
+          6025015,
+          "Game",
+          false,
+          [
+            -180.495209,
+            147.800003,
+            234.495285
+          ],
+          [
+            48.000004,
+            135.0,
+            0.0
+          ]
+        ],
+        "pixelWidth": 1920,
+        "pixelHeight": 1080,
+        "unityVersion": "2021.3.45f2",
+        "timeScaleAtStart": 1.0,
+        "sampleCount": 120,
+        "measurementSource": "runtime-model-budget-probe-v3",
+        "measurementContext": {
+          "sceneReference": {
+            "sceneId": "level4-boss-default-1920x1080",
+            "unitySceneName": "Game",
+            "level": 4,
+            "stageIndex": 0,
+            "stageParametersId": "StageParameters_Pools_Level4",
+            "mode": "Default"
+          },
+          "cameraReference": {
+            "name": "Main Camera21",
+            "pixelWidth": 1920,
+            "pixelHeight": 1080,
+            "fieldOfView": 26.231289,
+            "orthographic": false,
+            "orthographicSize": 42,
+            "aspect": 1.777778,
+            "cullingMask": 6025015,
+            "position": [
+              -180.495209,
+              147.800003,
+              234.495285
+            ],
+            "rotationEuler": [
+              48.000004,
+              135,
+              0
+            ]
+          },
+          "sceneMix": "Level 4 boss gameplay in Default mode; observed existing battlefield plus 12 temporary diagnostic units (3 each Bulwark, Gravitas Breaker, Arachnid Hexapod, Command Relay), native AI units and AI buildings; camera 1920x1080.",
+          "maximumVisibleInstances": 12,
+          "capacityEligible": false,
+          "capacityIneligibilityReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+          "capturePairing": {
+            "status": "uncontrolled-population-change",
+            "lowLoadEntityCensus": {
+              "total": 15,
+              "player": 1,
+              "aiUnits": 5,
+              "aiBuildings": 9
+            },
+            "highLoadEntityCensus": {
+              "total": 35,
+              "player": 13,
+              "aiUnits": 12,
+              "aiBuildings": 10,
+              "diagnosticPlayerUnits": 12
+            },
+            "diagnosticUnitMix": {
+              "tactical-operations:bulwark-siege-tank": 3,
+              "tactical-operations:gravitas-breaker": 3,
+              "sample-native:arachnid-hexapod": 3,
+              "tactical-operations:command-relay": 3
+            }
+          },
+          "limitation": "Frame intervals are realized Unity pacing. Frustum triangles exclude occlusion, particles, terrain-specific paths, shadows and GPU-instanced draws; no CPU/GPU timing is collected."
+        },
+        "evidenceReportPath": "level4-stable-low-01.json",
+        "evidenceReportSha256": "a6712f8accca9b52ad17f98a7fbf8318eedfc1da36366f65253940e3e44b8d2f",
+        "captureGroup": "low-load",
+        "entityCensus": {
+          "total": 15,
+          "player": 1,
+          "aiUnits": 5,
+          "aiBuildings": 9
+        },
+        "evidenceNote": "Original schema-v3 report verified by SHA-256; context recorded independently from runtime census."
+      },
+      {
+        "triangles": 401462,
+        "p95UnscaledFrameIntervalMs": 12.1293,
+        "captureStartedUtc": "2026-11-12T03:23:59.7374260Z",
+        "scene": "Game",
+        "camera": "Main Camera21",
+        "cameraSettings": [
+          26.231289,
+          false,
+          42.0,
+          1.777778,
+          6025015,
+          "Game",
+          false,
+          [
+            -180.495209,
+            147.800003,
+            234.495285
+          ],
+          [
+            48.000004,
+            135.0,
+            0.0
+          ]
+        ],
+        "pixelWidth": 1920,
+        "pixelHeight": 1080,
+        "unityVersion": "2021.3.45f2",
+        "timeScaleAtStart": 1.0,
+        "sampleCount": 120,
+        "measurementSource": "runtime-model-budget-probe-v3",
+        "measurementContext": {
+          "sceneReference": {
+            "sceneId": "level4-boss-default-1920x1080",
+            "unitySceneName": "Game",
+            "level": 4,
+            "stageIndex": 0,
+            "stageParametersId": "StageParameters_Pools_Level4",
+            "mode": "Default"
+          },
+          "cameraReference": {
+            "name": "Main Camera21",
+            "pixelWidth": 1920,
+            "pixelHeight": 1080,
+            "fieldOfView": 26.231289,
+            "orthographic": false,
+            "orthographicSize": 42,
+            "aspect": 1.777778,
+            "cullingMask": 6025015,
+            "position": [
+              -180.495209,
+              147.800003,
+              234.495285
+            ],
+            "rotationEuler": [
+              48.000004,
+              135,
+              0
+            ]
+          },
+          "sceneMix": "Level 4 boss gameplay in Default mode; observed existing battlefield plus 12 temporary diagnostic units (3 each Bulwark, Gravitas Breaker, Arachnid Hexapod, Command Relay), native AI units and AI buildings; camera 1920x1080.",
+          "maximumVisibleInstances": 12,
+          "capacityEligible": false,
+          "capacityIneligibilityReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+          "capturePairing": {
+            "status": "uncontrolled-population-change",
+            "lowLoadEntityCensus": {
+              "total": 15,
+              "player": 1,
+              "aiUnits": 5,
+              "aiBuildings": 9
+            },
+            "highLoadEntityCensus": {
+              "total": 35,
+              "player": 13,
+              "aiUnits": 12,
+              "aiBuildings": 10,
+              "diagnosticPlayerUnits": 12
+            },
+            "diagnosticUnitMix": {
+              "tactical-operations:bulwark-siege-tank": 3,
+              "tactical-operations:gravitas-breaker": 3,
+              "sample-native:arachnid-hexapod": 3,
+              "tactical-operations:command-relay": 3
+            }
+          },
+          "limitation": "Frame intervals are realized Unity pacing. Frustum triangles exclude occlusion, particles, terrain-specific paths, shadows and GPU-instanced draws; no CPU/GPU timing is collected."
+        },
+        "evidenceReportPath": "level4-stable-high-01.json",
+        "evidenceReportSha256": "615a70455c7b055e1fde4971a954bd39b3ab3ae1d33e76f3410f8b031060ae2a",
+        "captureGroup": "high-load-repeat",
+        "entityCensus": {
+          "total": 35,
+          "player": 13,
+          "aiUnits": 12,
+          "aiBuildings": 10,
+          "diagnosticPlayerUnits": 12
+        },
+        "evidenceNote": "Original schema-v3 report verified by SHA-256; context recorded independently from runtime census."
+      },
+      {
+        "triangles": 401462,
+        "p95UnscaledFrameIntervalMs": 12.1604,
+        "captureStartedUtc": "2026-11-12T03:25:06.0549713Z",
+        "scene": "Game",
+        "camera": "Main Camera21",
+        "cameraSettings": [
+          26.231289,
+          false,
+          42.0,
+          1.777778,
+          6025015,
+          "Game",
+          false,
+          [
+            -180.495209,
+            147.800003,
+            234.495285
+          ],
+          [
+            48.000004,
+            135.0,
+            0.0
+          ]
+        ],
+        "pixelWidth": 1920,
+        "pixelHeight": 1080,
+        "unityVersion": "2021.3.45f2",
+        "timeScaleAtStart": 1.0,
+        "sampleCount": 120,
+        "measurementSource": "runtime-model-budget-probe-v3",
+        "measurementContext": {
+          "sceneReference": {
+            "sceneId": "level4-boss-default-1920x1080",
+            "unitySceneName": "Game",
+            "level": 4,
+            "stageIndex": 0,
+            "stageParametersId": "StageParameters_Pools_Level4",
+            "mode": "Default"
+          },
+          "cameraReference": {
+            "name": "Main Camera21",
+            "pixelWidth": 1920,
+            "pixelHeight": 1080,
+            "fieldOfView": 26.231289,
+            "orthographic": false,
+            "orthographicSize": 42,
+            "aspect": 1.777778,
+            "cullingMask": 6025015,
+            "position": [
+              -180.495209,
+              147.800003,
+              234.495285
+            ],
+            "rotationEuler": [
+              48.000004,
+              135,
+              0
+            ]
+          },
+          "sceneMix": "Level 4 boss gameplay in Default mode; observed existing battlefield plus 12 temporary diagnostic units (3 each Bulwark, Gravitas Breaker, Arachnid Hexapod, Command Relay), native AI units and AI buildings; camera 1920x1080.",
+          "maximumVisibleInstances": 12,
+          "capacityEligible": false,
+          "capacityIneligibilityReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+          "capturePairing": {
+            "status": "uncontrolled-population-change",
+            "lowLoadEntityCensus": {
+              "total": 15,
+              "player": 1,
+              "aiUnits": 5,
+              "aiBuildings": 9
+            },
+            "highLoadEntityCensus": {
+              "total": 35,
+              "player": 13,
+              "aiUnits": 12,
+              "aiBuildings": 10,
+              "diagnosticPlayerUnits": 12
+            },
+            "diagnosticUnitMix": {
+              "tactical-operations:bulwark-siege-tank": 3,
+              "tactical-operations:gravitas-breaker": 3,
+              "sample-native:arachnid-hexapod": 3,
+              "tactical-operations:command-relay": 3
+            }
+          },
+          "limitation": "Frame intervals are realized Unity pacing. Frustum triangles exclude occlusion, particles, terrain-specific paths, shadows and GPU-instanced draws; no CPU/GPU timing is collected."
+        },
+        "evidenceReportPath": "level4-stable-high-02.json",
+        "evidenceReportSha256": "f99800359fed9ee8019c1521128366c41d47c8cc1dbba4c9f05ac68cc71255bc",
+        "captureGroup": "high-load-repeat",
+        "entityCensus": {
+          "total": 35,
+          "player": 13,
+          "aiUnits": 12,
+          "aiBuildings": 10,
+          "diagnosticPlayerUnits": 12
+        },
+        "evidenceNote": "Original schema-v3 report verified by SHA-256; context recorded independently from runtime census."
+      }
+    ],
+    "minimumSamples": 3,
+    "sampleMetric": "p95 UnityEngine.Time.unscaledDeltaTime interval in ms, paired with a one-time camera-frustum mesh triangle count; realized frame pacing, not a CPU/GPU breakdown",
+    "geometryMetric": "enabled MeshRenderer and SkinnedMeshRenderer sharedMesh triangles intersecting the reference camera frustum; excludes occlusion, particles, terrain-specific paths, shadows, and GPU-instanced draws",
+    "sceneReference": {
+      "sceneId": "level4-boss-default-1920x1080",
+      "unitySceneName": "Game",
+      "level": 4,
+      "stageIndex": 0,
+      "stageParametersId": "StageParameters_Pools_Level4",
+      "mode": "Default"
+    },
+    "measurementContext": {
+      "sceneReference": {
+        "sceneId": "level4-boss-default-1920x1080",
+        "unitySceneName": "Game",
+        "level": 4,
+        "stageIndex": 0,
+        "stageParametersId": "StageParameters_Pools_Level4",
+        "mode": "Default"
+      },
+      "cameraReference": {
+        "name": "Main Camera21",
+        "pixelWidth": 1920,
+        "pixelHeight": 1080,
+        "fieldOfView": 26.231289,
+        "orthographic": false,
+        "orthographicSize": 42,
+        "aspect": 1.777778,
+        "cullingMask": 6025015,
+        "position": [
+          -180.495209,
+          147.800003,
+          234.495285
+        ],
+        "rotationEuler": [
+          48.000004,
+          135,
+          0
+        ]
+      },
+      "sceneMix": "Level 4 boss gameplay in Default mode; observed existing battlefield plus 12 temporary diagnostic units (3 each Bulwark, Gravitas Breaker, Arachnid Hexapod, Command Relay), native AI units and AI buildings; camera 1920x1080.",
+      "maximumVisibleInstances": 12,
+      "capacityEligible": false,
+      "capacityIneligibilityReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+      "capturePairing": {
+        "status": "uncontrolled-population-change",
+        "lowLoadEntityCensus": {
+          "total": 15,
+          "player": 1,
+          "aiUnits": 5,
+          "aiBuildings": 9
+        },
+        "highLoadEntityCensus": {
+          "total": 35,
+          "player": 13,
+          "aiUnits": 12,
+          "aiBuildings": 10,
+          "diagnosticPlayerUnits": 12
+        },
+        "diagnosticUnitMix": {
+          "tactical-operations:bulwark-siege-tank": 3,
+          "tactical-operations:gravitas-breaker": 3,
+          "sample-native:arachnid-hexapod": 3,
+          "tactical-operations:command-relay": 3
+        }
+      },
+      "limitation": "Frame intervals are realized Unity pacing. Frustum triangles exclude occlusion, particles, terrain-specific paths, shadows and GPU-instanced draws; no CPU/GPU timing is collected."
+    },
+    "capacityModel": {
+      "method": "conservative-measured-incremental-envelope-v1",
+      "reserveFraction": 0.25,
+      "description": "75% of the measured low-to-high frustum-triangle range; no frame-time slope extrapolation. Candidate only until the load populations are controlled."
+    }
+  },
+  "scenes": [],
+  "assetInventory": {
+    "capturedUtc": "2026-11-11T00:20:32.907926-07:00",
+    "method": "Blender 4.5.14 FBX import; source polygon faces and triangulated Unity geometry counted separately",
+    "tool": "tools/inspect_fbx_geometry.py",
+    "fileCount": 61,
+    "assets": [
+      {
+        "assetId": "ArachnidHexapod",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/ArachnidHexapod.fbx",
+        "sourceFaces": 5672,
+        "sourceTriangles": 13834,
+        "meshObjects": 9,
+        "vertices": 7335,
+        "sha256": "ae8afb87cd9b8170ee8ced8388aa51d8c59af99e6f0d023a11dafe5c8ecca657"
+      },
+      {
+        "assetId": "ArachnidHexapodFactory",
+        "assetClass": "production-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/ArachnidHexapodFactory.fbx",
+        "sourceFaces": 2486,
+        "sourceTriangles": 5028,
+        "meshObjects": 7,
+        "vertices": 2624,
+        "sha256": "62c886353866417a9621e35e1153889dbf139c5c2275b4c49624a956d7e93f43"
+      },
+      {
+        "assetId": "ArcLanceWalker",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/ArcLanceWalker.fbx",
+        "sourceFaces": 3472,
+        "sourceTriangles": 6412,
+        "meshObjects": 5,
+        "vertices": 3368,
+        "sha256": "f69b9953ae2ed39368630e8fffaa80ee691faa97760cc926e05a10ce0b8bef52"
+      },
+      {
+        "assetId": "AtlasCraneMech",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/AtlasCraneMech.fbx",
+        "sourceFaces": 5646,
+        "sourceTriangles": 10548,
+        "meshObjects": 7,
+        "vertices": 5552,
+        "sha256": "94f62f1b6e2b0dd5efee2082644e9125cbe7f8e0aae82c064fa08fcde900d5b5"
+      },
+      {
+        "assetId": "BastionSiegeMech",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BastionSiegeMech.fbx",
+        "sourceFaces": 6260,
+        "sourceTriangles": 11808,
+        "meshObjects": 7,
+        "vertices": 6184,
+        "sha256": "5fccc34329d60dcd56c1138a8e41366d82ea474f133f7df675808a564a00d248"
+      },
+      {
+        "assetId": "BulwarkSiegeTank",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx",
+        "sourceFaces": 9319,
+        "sourceTriangles": 17848,
+        "meshObjects": 8,
+        "vertices": 9372,
+        "sha256": "40bd754c4e8197ddbced3d175299516f2f3d98854adea3e652da7afa524b4d36"
+      },
+      {
+        "assetId": "ColossusSiegePlatform",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/ColossusSiegePlatform.fbx",
+        "sourceFaces": 6835,
+        "sourceTriangles": 12844,
+        "meshObjects": 8,
+        "vertices": 6742,
+        "sha256": "c5e412a5616191ea57065cb49f35aa2050401499251eaa5a174a9d7b597fe3f3"
+      },
+      {
+        "assetId": "CommandRelay",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/CommandRelay.fbx",
+        "sourceFaces": 7464,
+        "sourceTriangles": 15796,
+        "meshObjects": 8,
+        "vertices": 8442,
+        "sha256": "9844686abee2007dd7174620fa18c6d7ce8a5c720cc52b38e07e48eb72e8dd0b"
+      },
+      {
+        "assetId": "DeepSpaceRelay",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/DeepSpaceRelay.fbx",
+        "sourceFaces": 3570,
+        "sourceTriangles": 6484,
+        "meshObjects": 7,
+        "vertices": 3424,
+        "sha256": "947e184f7bf2aba62d12e7f5c56a41805317e47c35748a36bdb146ad2aafb324"
+      },
+      {
+        "assetId": "FieldMedicRover",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/FieldMedicRover.fbx",
+        "sourceFaces": 7262,
+        "sourceTriangles": 13480,
+        "meshObjects": 7,
+        "vertices": 7132,
+        "sha256": "8b1bedf5e23b56b17fd8d71b9fd26599ac122cbfdccc33d02d7e9b6b50c12fb3"
+      },
+      {
+        "assetId": "GravitasBreaker",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/GravitasBreaker.fbx",
+        "sourceFaces": 12398,
+        "sourceTriangles": 27206,
+        "meshObjects": 10,
+        "vertices": 14505,
+        "sha256": "7945a61e44bc3b85b0a9436bb8c4e1ae13c8d93688217ed8362f30c2c79b4f24"
+      },
+      {
+        "assetId": "IroncladWalker",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/IroncladWalker.fbx",
+        "sourceFaces": 4396,
+        "sourceTriangles": 8472,
+        "meshObjects": 5,
+        "vertices": 4448,
+        "sha256": "6fd212810e38b6559357fdd03f2ef000bca5c55304a6b7cdd5494dec82841249"
+      },
+      {
+        "assetId": "LongshotTankette",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/LongshotTankette.fbx",
+        "sourceFaces": 10697,
+        "sourceTriangles": 19996,
+        "meshObjects": 10,
+        "vertices": 10554,
+        "sha256": "3fe412247351f64e833a9477b33f4cbf076373a495230405f2ea8d78457a021f"
+      },
+      {
+        "assetId": "MinefieldSower",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/MinefieldSower.fbx",
+        "sourceFaces": 11521,
+        "sourceTriangles": 22412,
+        "meshObjects": 13,
+        "vertices": 12084,
+        "sha256": "a1e22466a137762d9a1f546e2f93c20c27b09f1a5de5396860220a1a185917c8"
+      },
+      {
+        "assetId": "OverlordCommandHQ",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/OverlordCommandHQ.fbx",
+        "sourceFaces": 7798,
+        "sourceTriangles": 15128,
+        "meshObjects": 7,
+        "vertices": 8084,
+        "sha256": "3db3e9f19bebc0c683e7619f72634ad22054ba85e00630de504e8bdf5388baa1"
+      },
+      {
+        "assetId": "OverlordCommandHQFactory",
+        "assetClass": "production-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/OverlordCommandHQFactory.fbx",
+        "sourceFaces": 5310,
+        "sourceTriangles": 10504,
+        "meshObjects": 7,
+        "vertices": 5460,
+        "sha256": "106c4a2ff096f1f065c78c0a103ded08041681496551a19c4968f167c0f225b7"
+      },
+      {
+        "assetId": "SalvageHauler",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SalvageHauler.fbx",
+        "sourceFaces": 7978,
+        "sourceTriangles": 14860,
+        "meshObjects": 8,
+        "vertices": 7836,
+        "sha256": "6dcea1483254946f856a27da8386b7453f3c9fb8f2202de2e76219d56854ee1e"
+      },
+      {
+        "assetId": "SandlanceScout",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SandlanceScout.fbx",
+        "sourceFaces": 6946,
+        "sourceTriangles": 13276,
+        "meshObjects": 7,
+        "vertices": 7016,
+        "sha256": "70f0dda14d96aa55a0f3d15d5c6b578a51a22cc3fe1391a28968b9b4d25626c7"
+      },
+      {
+        "assetId": "ScoutTank",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/ScoutTank.fbx",
+        "sourceFaces": 4872,
+        "sourceTriangles": 9260,
+        "meshObjects": 5,
+        "vertices": 4876,
+        "sha256": "987c62e774e3d9d0f4d106898754b987218155441dea9ba4295b026f024b4615"
+      },
+      {
+        "assetId": "SentinelRelay",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SentinelRelay.fbx",
+        "sourceFaces": 6253,
+        "sourceTriangles": 13504,
+        "meshObjects": 9,
+        "vertices": 7194,
+        "sha256": "e97b0e8676f863aa80fdc6f19a4f53ddd77d06525c48ead0b9360d26e5c3053b"
+      },
+      {
+        "assetId": "SkirmishStrikeBike",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SkirmishStrikeBike.fbx",
+        "sourceFaces": 3910,
+        "sourceTriangles": 7456,
+        "meshObjects": 7,
+        "vertices": 3888,
+        "sha256": "024bca4e8e65547b78ca2d4fe6aa77ddd73f5796bf72b95134dcbcb0ba4d21f0"
+      },
+      {
+        "assetId": "SkyguardSAM",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SkyguardSAM.fbx",
+        "sourceFaces": 7550,
+        "sourceTriangles": 14040,
+        "meshObjects": 7,
+        "vertices": 7424,
+        "sha256": "4e385f0b87ff9a239cc7acbbbba1a6c3b5474e35166e7fc539121f7099aef37d"
+      },
+      {
+        "assetId": "SubterraneanMole",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SubterraneanMole.fbx",
+        "sourceFaces": 11755,
+        "sourceTriangles": 22108,
+        "meshObjects": 14,
+        "vertices": 11620,
+        "sha256": "8fed28f6c2aa06f69b48f1fbbad2130b579f56c2d64ea349ef594b89c3e3e9ae"
+      },
+      {
+        "assetId": "SurgeArcTank",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SurgeArcTank.fbx",
+        "sourceFaces": 6885,
+        "sourceTriangles": 13064,
+        "meshObjects": 8,
+        "vertices": 6836,
+        "sha256": "e20f4becf3340b760cb50496b0214d6178deed05a9eb8e4b34c91ed8d63c9b01"
+      },
+      {
+        "assetId": "TidebreakerHovercraft",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/TidebreakerHovercraft.fbx",
+        "sourceFaces": 6529,
+        "sourceTriangles": 12112,
+        "meshObjects": 6,
+        "vertices": 6340,
+        "sha256": "61e30b409a80e2b77e7e57b7a9abf09ccc3a4f20cefb6f666d812531cbc58f83"
+      },
+      {
+        "assetId": "WraithStealthWing",
+        "assetClass": "vehicle-or-structure",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/WraithStealthWing.fbx",
+        "sourceFaces": 3892,
+        "sourceTriangles": 7740,
+        "meshObjects": 1,
+        "vertices": 3934,
+        "sha256": "2ae1964b91a2908d735195985a91a083fc2fc75fa9a75e56ef06b8c871e8c703"
+      },
+      {
+        "assetId": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_arachnid_hexapod_pulsar_magnetic_shield.fbx",
+        "sourceFaces": 326,
+        "sourceTriangles": 596,
+        "meshObjects": 3,
+        "vertices": 312,
+        "sha256": "99001898690092a0568e94fe348bfd327524afb26ef41c79c072707d1f830665"
+      },
+      {
+        "assetId": "RCLModule_arachnid_hexapod_stealth_void_composite",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_arachnid_hexapod_stealth_void_composite.fbx",
+        "sourceFaces": 274,
+        "sourceTriangles": 508,
+        "meshObjects": 3,
+        "vertices": 264,
+        "sha256": "451ddb86d95f98ebd0af2d5d9e4caf88177e9a4f9493db91fe09a3d262322f47"
+      },
+      {
+        "assetId": "RCLModule_arc_lance_walker_plasma_arc_containment",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_arc_lance_walker_plasma_arc_containment.fbx",
+        "sourceFaces": 660,
+        "sourceTriangles": 1272,
+        "meshObjects": 3,
+        "vertices": 648,
+        "sha256": "e29b17ae9296b9eb52c1e224354832970b559f2db54c10b47a36dd92cf47bb73"
+      },
+      {
+        "assetId": "RCLModule_assault_walker_orbital_drop_pod_cermet",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_assault_walker_orbital_drop_pod_cermet.fbx",
+        "sourceFaces": 648,
+        "sourceTriangles": 1344,
+        "meshObjects": 3,
+        "vertices": 768,
+        "sha256": "496b567482e0c86adabd27af26f4dc902d3ebc16a9ab034aeb6332593571d9bf"
+      },
+      {
+        "assetId": "RCLModule_assault_walker_plasma_cinder_ablative",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_assault_walker_plasma_cinder_ablative.fbx",
+        "sourceFaces": 474,
+        "sourceTriangles": 972,
+        "meshObjects": 3,
+        "vertices": 552,
+        "sha256": "b4c279edd9ffa50a5d688753432ba17fd48c629db8c47af6f9896070041bfb49"
+      },
+      {
+        "assetId": "RCLModule_atlas_crane_mech_zero_g_docking_alloy",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_atlas_crane_mech_zero_g_docking_alloy.fbx",
+        "sourceFaces": 374,
+        "sourceTriangles": 692,
+        "meshObjects": 3,
+        "vertices": 360,
+        "sha256": "ff6773e852ffce44a8b562d7b5363e201b5f67eea2e45fa3b2e14868e72ce606"
+      },
+      {
+        "assetId": "RCLModule_bastion_siege_mech_cryo_glacier_camo",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_bastion_siege_mech_cryo_glacier_camo.fbx",
+        "sourceFaces": 358,
+        "sourceTriangles": 724,
+        "meshObjects": 2,
+        "vertices": 408,
+        "sha256": "180a5e35c07426c84e8c36bd65eb29ad64449793a0b173cab2226e1a4f04dad6"
+      },
+      {
+        "assetId": "RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite.fbx",
+        "sourceFaces": 274,
+        "sourceTriangles": 508,
+        "meshObjects": 3,
+        "vertices": 264,
+        "sha256": "0705c963f920a82ef614a37cfc2742b92e4b9932bc1e615b6c50491917d8cf29"
+      },
+      {
+        "assetId": "RCLModule_bulwark_siege_tank_battleship_tungsten",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_bulwark_siege_tank_battleship_tungsten.fbx",
+        "sourceFaces": 648,
+        "sourceTriangles": 1344,
+        "meshObjects": 2,
+        "vertices": 768,
+        "sha256": "00982966a73de20725b9c896aff4af8d501d647465897fb77f5db36b1bee78cf"
+      },
+      {
+        "assetId": "RCLModule_bulwark_siege_tank_minefield_ordnance_carrier",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_bulwark_siege_tank_minefield_ordnance_carrier.fbx",
+        "sourceFaces": 832,
+        "sourceTriangles": 1840,
+        "meshObjects": 3,
+        "vertices": 960,
+        "sha256": "d90ff7ff409a0f6fb3bbe3d331b4d6847587bb2a683653f9c04f5044f9ebefb1"
+      },
+      {
+        "assetId": "RCLModule_command_relay_beryllium_mirror_hull",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_command_relay_beryllium_mirror_hull.fbx",
+        "sourceFaces": 474,
+        "sourceTriangles": 972,
+        "meshObjects": 2,
+        "vertices": 552,
+        "sha256": "a000e59283959310dfa0bc16e0e8818f6e452b675cb80e186e032417cd817766"
+      },
+      {
+        "assetId": "RCLModule_command_relay_cyber_nanoweave",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_command_relay_cyber_nanoweave.fbx",
+        "sourceFaces": 274,
+        "sourceTriangles": 508,
+        "meshObjects": 3,
+        "vertices": 264,
+        "sha256": "87f6615afa7409a353998602b38b6057e063528f21b22990f9630cbc9564a99b"
+      },
+      {
+        "assetId": "RCLModule_field_medic_rover_nanite_repair_chitin",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_field_medic_rover_nanite_repair_chitin.fbx",
+        "sourceFaces": 456,
+        "sourceTriangles": 864,
+        "meshObjects": 3,
+        "vertices": 456,
+        "sha256": "3f319b67a242e16b095f09a3d9d8077bcbde5e873dcf7df96deb322384ad9f22"
+      },
+      {
+        "assetId": "RCLModule_gravitas_breaker_cryogenic_fuel_shroud",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_gravitas_breaker_cryogenic_fuel_shroud.fbx",
+        "sourceFaces": 670,
+        "sourceTriangles": 1468,
+        "meshObjects": 3,
+        "vertices": 768,
+        "sha256": "cec88beff32809f7d5eca47cc866ce86c1c1520978cd8c78c6ce34e1ebd74358"
+      },
+      {
+        "assetId": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_gravitas_breaker_quantum_hyperdrive_alloy.fbx",
+        "sourceFaces": 660,
+        "sourceTriangles": 1272,
+        "meshObjects": 3,
+        "vertices": 648,
+        "sha256": "342d6838b83021bef7263ad27a94a5e718ef66696c59e0278bf0f07af3e17443"
+      },
+      {
+        "assetId": "RCLModule_heavy_artillery_battleship_tungsten",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_heavy_artillery_battleship_tungsten.fbx",
+        "sourceFaces": 358,
+        "sourceTriangles": 724,
+        "meshObjects": 2,
+        "vertices": 408,
+        "sha256": "16da5e512adcb72eb6f519d0ff2f3afbad401d21b1f34682f7df0a8a78be8eb3"
+      },
+      {
+        "assetId": "RCLModule_heavy_artillery_martian_iron_rust",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_heavy_artillery_martian_iron_rust.fbx",
+        "sourceFaces": 648,
+        "sourceTriangles": 1344,
+        "meshObjects": 2,
+        "vertices": 768,
+        "sha256": "e43ea1f01896b89a114a8ac61f2855e2114ec042451746b87218c9c90098da4d"
+      },
+      {
+        "assetId": "RCLModule_heavy_artillery_subterranean_mole_borer",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_heavy_artillery_subterranean_mole_borer.fbx",
+        "sourceFaces": 478,
+        "sourceTriangles": 940,
+        "meshObjects": 3,
+        "vertices": 480,
+        "sha256": "f4a13d9f56b7e8e86aee5b457a8e987a5bb372bd2b4b965e268581555ba6fe3d"
+      },
+      {
+        "assetId": "RCLModule_heavy_artillery_tungsten_heavy_flak_plating",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_heavy_artillery_tungsten_heavy_flak_plating.fbx",
+        "sourceFaces": 1270,
+        "sourceTriangles": 2404,
+        "meshObjects": 3,
+        "vertices": 1248,
+        "sha256": "6b7bd751d9e8fa7af92b9421e9c1b56719a58cd6118c692d4a57747364c92f64"
+      },
+      {
+        "assetId": "RCLModule_overlord_command_hq_solar_gold_radiator",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_overlord_command_hq_solar_gold_radiator.fbx",
+        "sourceFaces": 568,
+        "sourceTriangles": 976,
+        "meshObjects": 3,
+        "vertices": 528,
+        "sha256": "312da4089f57247e0765b9d30e7123008105620b1c67ca8ff25ca86dbd44d796"
+      },
+      {
+        "assetId": "RCLModule_salvage_hauler_hazard_industrial",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_salvage_hauler_hazard_industrial.fbx",
+        "sourceFaces": 326,
+        "sourceTriangles": 596,
+        "meshObjects": 3,
+        "vertices": 312,
+        "sha256": "e0d72cb95306fce1a835e934621a0686cc8c8023eca0670a063cde4a9815007b"
+      },
+      {
+        "assetId": "RCLModule_salvage_hauler_minefield_ordnance_carrier",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_salvage_hauler_minefield_ordnance_carrier.fbx",
+        "sourceFaces": 832,
+        "sourceTriangles": 1840,
+        "meshObjects": 3,
+        "vertices": 960,
+        "sha256": "ddcb3653e1ca49da263df7886d5c6af041ffe6d63dfe5d1cd690d1fbd9bea11f"
+      },
+      {
+        "assetId": "RCLModule_scout_tank_desert_camo",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_scout_tank_desert_camo.fbx",
+        "sourceFaces": 358,
+        "sourceTriangles": 724,
+        "meshObjects": 3,
+        "vertices": 408,
+        "sha256": "45dea63d8a0d8e8a99db67bb83607d63c66030f61df4254662dfca78b39827b2"
+      },
+      {
+        "assetId": "RCLModule_scout_tank_gunmetal_chassis",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_scout_tank_gunmetal_chassis.fbx",
+        "sourceFaces": 358,
+        "sourceTriangles": 724,
+        "meshObjects": 3,
+        "vertices": 408,
+        "sha256": "bfb0fcae7100cb2816b3225364c4a6c96dabae3f784fe2839f802ca0a9b0aacc"
+      },
+      {
+        "assetId": "RCLModule_scout_tank_longshot_sniper_camo",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_scout_tank_longshot_sniper_camo.fbx",
+        "sourceFaces": 274,
+        "sourceTriangles": 508,
+        "meshObjects": 3,
+        "vertices": 264,
+        "sha256": "3f884a131dd34fb053020cce1bc58353f3fa4242432ae6d39e57be742a6e7c41"
+      },
+      {
+        "assetId": "RCLModule_sentinel_relay_beryllium_mirror_hull",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_sentinel_relay_beryllium_mirror_hull.fbx",
+        "sourceFaces": 358,
+        "sourceTriangles": 724,
+        "meshObjects": 2,
+        "vertices": 408,
+        "sha256": "6159a8212f1bc2e0915b13145ca75de3e34ca8ceb8a5a861561ab39fd15fd2ce"
+      },
+      {
+        "assetId": "RCLModule_sentinel_relay_stealth_void_composite",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_sentinel_relay_stealth_void_composite.fbx",
+        "sourceFaces": 274,
+        "sourceTriangles": 508,
+        "meshObjects": 3,
+        "vertices": 264,
+        "sha256": "ea40135943251f3877eb53e3c0230977c5756be9ca1e2f2dc5a4ffbdfc760dc2"
+      },
+      {
+        "assetId": "RCLModule_skirmish_bike_cerberus_white_ceramic",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_skirmish_bike_cerberus_white_ceramic.fbx",
+        "sourceFaces": 474,
+        "sourceTriangles": 972,
+        "meshObjects": 3,
+        "vertices": 552,
+        "sha256": "1fca876e78257ccb9d96327699d3947be311267948a0cabef039d0d8132cf442"
+      },
+      {
+        "assetId": "RCLModule_skirmish_bike_cyber_nanoweave",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_skirmish_bike_cyber_nanoweave.fbx",
+        "sourceFaces": 274,
+        "sourceTriangles": 508,
+        "meshObjects": 3,
+        "vertices": 264,
+        "sha256": "c36502087ac8ab89cecbc42c78e079814b4b44ab2768225734ddce3a2892c15a"
+      },
+      {
+        "assetId": "RCLModule_skyguard_sam_longshot_sniper_camo",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_skyguard_sam_longshot_sniper_camo.fbx",
+        "sourceFaces": 274,
+        "sourceTriangles": 508,
+        "meshObjects": 3,
+        "vertices": 264,
+        "sha256": "4b1217a12b8bee83929feff2588fbe418e800c92c9e2f767f5a67d33d8eb28b8"
+      },
+      {
+        "assetId": "RCLModule_skyguard_sam_solar_flare_radiation_shield",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_skyguard_sam_solar_flare_radiation_shield.fbx",
+        "sourceFaces": 274,
+        "sourceTriangles": 508,
+        "meshObjects": 3,
+        "vertices": 264,
+        "sha256": "d7d9655bd716aa338d89ec273b6ca7be2a4616e444745133567adbd37bc56029"
+      },
+      {
+        "assetId": "RCLModule_surge_tank_antimatter_containment_lattice",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_surge_tank_antimatter_containment_lattice.fbx",
+        "sourceFaces": 660,
+        "sourceTriangles": 1272,
+        "meshObjects": 3,
+        "vertices": 648,
+        "sha256": "ed420d91c1dd47e6e64a7c567a428dbd21c0f7a6928eee602dc89ac0858ee454"
+      },
+      {
+        "assetId": "RCLModule_surge_tank_ion_thruster_titanium_grate",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_surge_tank_ion_thruster_titanium_grate.fbx",
+        "sourceFaces": 516,
+        "sourceTriangles": 888,
+        "meshObjects": 3,
+        "vertices": 480,
+        "sha256": "f6ee7b1e5884bc9c07bcdeac38622eccac2f4e771f728160aa281cf79a9efca5"
+      },
+      {
+        "assetId": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_tidebreaker_skirmisher_cryo_glacier_camo.fbx",
+        "sourceFaces": 474,
+        "sourceTriangles": 972,
+        "meshObjects": 2,
+        "vertices": 552,
+        "sha256": "ebba3dceacedd3bc5cd354d99ebc710a2242203313eec67524cc8af0e9d69ec0"
+      },
+      {
+        "assetId": "RCLModule_tidebreaker_skirmisher_tachyon_warp_radiator",
+        "assetClass": "visual-module",
+        "sourcePath": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Source/RCLModule_tidebreaker_skirmisher_tachyon_warp_radiator.fbx",
+        "sourceFaces": 516,
+        "sourceTriangles": 888,
+        "meshObjects": 3,
+        "vertices": 480,
+        "sha256": "1aa3fe523ad53aeb3909607a61b80b7ab66f7f8f7e6b42e83c0834ca892bae7c"
+      }
+    ]
+  },
+  "calibrationFailureReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+  "measurementCapacityEstimate": {
+    "targetFps": 60.0,
+    "targetFrameTimeMs": 16.666666666666668,
+    "fitMethod": "conservative-measured-incremental-envelope-v1",
+    "capacityScope": "incremental-asset-geometry-above-lowest-observed-load",
+    "observedBaselineTriangles": 110175,
+    "observedMaximumTriangles": 401462,
+    "observedTriangleRange": 291287,
+    "sceneTriangleCapacity": 218465,
+    "reservedTriangleHeadroom": 72822,
+    "safetyReserveFraction": 0.25,
+    "maxMeasuredP95FrameIntervalMs": 12.1604,
+    "extrapolationUsed": false,
+    "estimateStatus": "measured-envelope-candidate"
+  }
+}

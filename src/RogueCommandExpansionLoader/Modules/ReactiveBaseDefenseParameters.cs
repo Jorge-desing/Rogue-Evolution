@@ -12,6 +12,7 @@ namespace RogueCommandExpansionLoader.Modules
         public float CooldownSeconds;
         public float DefenseRadiusCells;
         public int MaximumResponders;
+        public string ProtectedTargetType;
     }
 
     /// <summary>
@@ -26,6 +27,7 @@ namespace RogueCommandExpansionLoader.Modules
         private const float DefaultCooldownSeconds = 1f;
         private const float DefaultDefenseRadiusCells = 12f;
         private const int DefaultMaximumResponders = 2;
+        private const string DefaultProtectedTargetType = "Buildings";
 
         public static bool TryParse(
             ContentModuleParameter[] parameters,
@@ -46,7 +48,8 @@ namespace RogueCommandExpansionLoader.Modules
                 }
 
                 if (parameter.name != "unitId" && parameter.name != "baseIndex" && parameter.name != "cooldownSeconds" &&
-                    parameter.name != "defenseRadiusCells" && parameter.name != "maxResponders")
+                    parameter.name != "defenseRadiusCells" && parameter.name != "maxResponders" &&
+                    parameter.name != "protectedTargetType")
                 {
                     diagnostic = "Unknown parameter '" + parameter.name + "' for module " + ModuleId + ".";
                     return false;
@@ -99,13 +102,26 @@ namespace RogueCommandExpansionLoader.Modules
                 return false;
             }
 
+            string protectedTargetType;
+            if (!values.TryGetValue("protectedTargetType", out protectedTargetType))
+            {
+                protectedTargetType = DefaultProtectedTargetType;
+            }
+            else if (protectedTargetType != "Buildings" && protectedTargetType != "Harvesters" &&
+                protectedTargetType != "BuildingsAndHarvesters")
+            {
+                diagnostic = "protectedTargetType must be Buildings, Harvesters, or BuildingsAndHarvesters.";
+                return false;
+            }
+
             settings = new ReactiveBaseDefenseSettings
             {
                 UnitId = unitId,
                 BaseIndex = baseIndex,
                 CooldownSeconds = cooldownSeconds,
                 DefenseRadiusCells = defenseRadiusCells,
-                MaximumResponders = maximumResponders
+                MaximumResponders = maximumResponders,
+                ProtectedTargetType = protectedTargetType
             };
             diagnostic = null;
             return true;

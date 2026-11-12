@@ -21,6 +21,31 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
         _SootStrength ("Thermal Soot Strength (Blue)", Range(0.0, 2.0)) = 1.0
         _TeamColor ("Team Color Tint (Alpha Mask)", Color) = (1,1,1,1)
 
+        [Header(Procedural Ground Mud and Dust)]
+        _MudAmount ("Mud & Dust Intensity", Range(0.0, 1.0)) = 0.40
+        _MudColor ("Mud Color Tint", Color) = (0.28, 0.22, 0.16, 1.0)
+        _MudHeight ("Mud Splatter Height", Float) = 0.55
+        _MudSmoothness ("Mud Surface Smoothness", Range(0.0, 1.0)) = 0.20
+
+        [Header(Procedural Weld Beads)]
+        _WeldBeadStrength ("Weld Bead Strength", Range(0.0, 2.0)) = 0.6
+        _WeldBeadScale ("Weld Bead Scale", Float) = 24.0
+        _WeldBeadWidth ("Weld Bead Width", Range(0.01, 0.5)) = 0.12
+
+        [Header(Thermal Tempering and Crevice Dust)]
+        _ThermalTemperingIntensity ("Thermal Tempering (Heat Bluing)", Range(0.0, 1.0)) = 0.75
+        _CreviceDustIntensity ("Crevice Micro-Dust Softening", Range(0.0, 1.0)) = 0.50
+        _ZenithBleach ("Zenith Sun Bleach", Range(0.0, 1.0)) = 0.35
+
+        [Header(Spacecraft Aero Alloy Sheen)]
+        _AeroSheenIntensity ("Glancing Aero Sheen", Range(0.0, 1.0)) = 0.35
+        _AeroSheenTint ("Aero Sheen Color", Color) = (0.78, 0.88, 1.0, 1.0)
+
+        [Header(Micro Surface Detail RNM)]
+        [Normal] _DetailBumpMap ("Micro Detail Normal", 2D) = "bump" {}
+        _DetailBumpScale ("Detail Normal Scale", Range(0.0, 2.0)) = 0.5
+        _DetailTiling ("Detail Map Tiling", Float) = 16.0
+
         _Cutoff ("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
         [HideInInspector] _Surface ("Surface", Float) = 0
@@ -75,16 +100,40 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half4 _BaseColor;
                 half4 _EmissionColor;
                 half4 _TeamColor;
+                half4 _MudColor;
                 half _Metallic;
                 half _Smoothness;
                 half _GlossMapScale;
                 half _BumpScale;
+                half _DetailBumpScale;
+                half _DetailTiling;
                 half _AoStrength;
                 half _WearStrength;
                 half _SootStrength;
+                half _MudAmount;
+                half _MudHeight;
+                half _MudSmoothness;
+                half _WeldBeadStrength;
+                half _WeldBeadScale;
+                half _WeldBeadWidth;
+                half _ThermalTemperingIntensity;
+                half _CreviceDustIntensity;
+                half4 _AeroSheenTint;
+                half _AeroSheenIntensity;
+                half _ZenithBleach;
                 half _Cutoff;
                 half _Surface;
             CBUFFER_END
+
+            TEXTURE2D(_DetailBumpMap);
+            SAMPLER(sampler_DetailBumpMap);
+
+            half3 BlendNormalsRNM(half3 n1, half3 n2)
+            {
+                half3 t = n1 + half3(0.0h, 0.0h, 1.0h);
+                half3 u = n2 * half3(-1.0h, -1.0h, 1.0h);
+                return t * dot(t, u) / max(0.0001h, t.z) - u;
+            }
 
             struct VehicleAttributes
             {
@@ -149,21 +198,117 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                     surfaceData.smoothness = _Smoothness;
                 #endif
 
-                half ao = saturate(lerp(1.0h, input.vertexColor.r, _AoStrength));
-                half wear = saturate(input.vertexColor.g * _WearStrength);
-                half soot = saturate(input.vertexColor.b * _SootStrength);
-                surfaceData.albedo = lerp(surfaceData.albedo,
-                    surfaceData.albedo * _TeamColor.rgb, input.vertexColor.a);
-                surfaceData.albedo *= ao * (1.0h - soot * 0.75h);
-                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.72h, 0.74h, 0.76h), wear * 0.85h);
-                surfaceData.metallic = saturate(surfaceData.metallic + wear * 0.6h);
-                surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.82h, wear * 0.75h));
+                // If the mesh has no authored vertex colors (Unity supplies all zeros), default to clean unweathered baseline (R=1 cavity AO, G=0 wear, B=0 soot, A=0 team mask)
+                half4 vColor = input.vertexColor;
+                if (dot(vColor, vColor) < 0.0001h)
+                {
+                    vColor = half4(1.0h, 0.0h, 0.0h, 0.0h);
+                }
 
-                surfaceData.normalTS = SampleNormal(input.uv,
+                half ao = saturate(lerp(1.0h, vColor.r, _AoStrength));
+                half wear = saturate(vColor.g * _WearStrength);
+                half soot = saturate(vColor.b * _SootStrength);
+
+                // Team color modulation
+                surfaceData.albedo = lerp(surfaceData.albedo,
+                    surfaceData.albedo * _TeamColor.rgb, vColor.a);
+
+                // Cavity AO and Thermal Soot darkening
+                surfaceData.albedo *= ao * (1.0h - soot * 0.75h);
+
+                // Thermal tempering fringe (straw and blue oxide rings) at the boundary of thermal soot
+                half temperMask = smoothstep(0.10h, 0.32h, soot) * (1.0h - smoothstep(0.48h, 0.72h, soot)) * _ThermalTemperingIntensity;
+                half blueMask = smoothstep(0.25h, 0.45h, soot) * (1.0h - smoothstep(0.55h, 0.75h, soot));
+                half3 temperColor = lerp(half3(0.83h, 0.69h, 0.22h), half3(0.26h, 0.33h, 0.53h), blueMask);
+                surfaceData.albedo = lerp(surfaceData.albedo, temperColor, temperMask * 0.70h);
+                surfaceData.metallic = saturate(surfaceData.metallic + temperMask * 0.30h);
+
+                // Crevice micro-dust softening: deep recesses lose specular gloss due to trapped dry micro-dust
+                half creviceDust = (1.0h - ao) * _CreviceDustIntensity;
+                surfaceData.smoothness = saturate(surfaceData.smoothness * (1.0h - creviceDust * 0.45h));
+
+                // Zenith sun bleach on upward-facing armor surfaces
+                half zenithBleach = saturate(input.normalWS.y - 0.55h) * (1.0h - soot) * _ZenithBleach * 0.25h;
+                surfaceData.albedo = lerp(surfaceData.albedo, surfaceData.albedo * 1.12h + half3(0.02h, 0.02h, 0.02h), zenithBleach);
+
+                // Two-tier edge wear: oxidized dark primer border (#2c2724) + bare bright alloy ridge (#c7ccd6)
+                half primerMask = smoothstep(0.12h, 0.45h, wear) * (1.0h - smoothstep(0.50h, 0.85h, wear));
+                half steelMask = smoothstep(0.42h, 0.90h, wear);
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.17h, 0.15h, 0.14h), primerMask * 0.85h);
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.78h, 0.80h, 0.84h), steelMask * 0.95h);
+
+                // Physical response: Bare steel boosts metallic/smoothness; primer dulls; carbon soot extinguishes specularity
+                surfaceData.metallic = saturate(surfaceData.metallic * (1.0h - primerMask * 0.5h) + steelMask * 0.85h);
+                surfaceData.metallic = saturate(surfaceData.metallic - soot * 0.40h);
+
+                surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.85h, steelMask * 0.8h) * (1.0h - primerMask * 0.4h));
+                // Procedural weld bead oxidation along high edge-wear regions
+                half weldPhase = (input.uv.x + input.uv.y) * _WeldBeadScale;
+                half weldProfile = smoothstep(0.5h - _WeldBeadWidth, 0.5h + _WeldBeadWidth,
+                    sin(weldPhase) * 0.5h + 0.5h);
+                half weldBeadSoot = weldProfile * steelMask;
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.10h, 0.09h, 0.08h), weldBeadSoot * 0.5h);
+                surfaceData.smoothness = saturate(surfaceData.smoothness * (1.0h - weldBeadSoot * 0.4h));
+                surfaceData.smoothness *= (1.0h - soot * 0.65h);
+
+                // Micro-detail sample, shared by mud breakup and the normal blend below
+                half detailFade = 1.0h - saturate((length(_WorldSpaceCameraPos - input.positionWS) - 18.0h) / 40.0h);
+                half4 detailPacked = SAMPLE_TEXTURE2D(_DetailBumpMap, sampler_DetailBumpMap, input.uv * _DetailTiling);
+
+                // Procedural ground mud & road dust accumulation on chassis, tracks, and lower hull.
+                // The splatter edge is broken up with the detail map so it is not a clean gradient band.
+                half mudNoise = detailPacked.r * 0.6h + detailPacked.g * 0.4h;
+                half heightFactor = saturate(1.0h - (input.positionWS.y / max(0.05h, _MudHeight))
+                    + (mudNoise - 0.5h) * 0.35h);
+                half mudFactor = heightFactor * heightFactor * _MudAmount;
+                surfaceData.albedo = lerp(surfaceData.albedo, _MudColor.rgb, mudFactor * 0.85h);
+                surfaceData.metallic *= (1.0h - mudFactor);
+                surfaceData.smoothness = lerp(surfaceData.smoothness, _MudSmoothness, mudFactor * 0.85h);
+
+                // Toksvig anti-shimmer factor for distant isometric RTS camera
+                half distToCam = length(_WorldSpaceCameraPos - input.positionWS);
+                half shimmerDamping = saturate(distToCam * 0.012h);
+                surfaceData.smoothness = lerp(surfaceData.smoothness, surfaceData.smoothness * 0.75h, shimmerDamping);
+
+                // Micro-surface normal sampling with Reoriented Normal Mapping (RNM)
+                // Procedural weld bead: raised bead normal along high edge-wear (steel) regions
+                // The bead height is a smoothed sine ridge; its slope (cosine) tilts the normal across the
+                // bead so it catches light. Uniform (0,0,k) vectors would be a no-op after normalization.
+                half weldSlope = cos(weldPhase) * weldProfile * steelMask * _WeldBeadStrength * 0.30h;
+                half3 weldNormalTS = normalize(half3(-weldSlope, -weldSlope, 1.0h));
+
+                // Procedural hard-surface edge highlight (rim) on bare steel
+                half3 viewDirWS = GetWorldSpaceNormalizeViewDir(input.positionWS);
+                half NdotV = saturate(dot(input.normalWS, viewDirWS));
+                half rim = pow(1.0h - NdotV, 3.0h);
+                half edgeHighlight = rim * steelMask * 0.35h;
+
+                // Spacecraft glancing aero-alloy specular sheen on metallic orbital hulls
+                half aeroSheen = pow(1.0h - NdotV, 3.5h) * surfaceData.metallic * _AeroSheenIntensity;
+                surfaceData.albedo = lerp(surfaceData.albedo, surfaceData.albedo + _AeroSheenTint.rgb * 0.16h, aeroSheen);
+                surfaceData.smoothness = saturate(surfaceData.smoothness + aeroSheen * 0.10h);
+
+                half3 baseNormalTS = SampleNormal(input.uv,
                     TEXTURE2D_ARGS(_BumpMap, sampler_BumpMap), _BumpScale);
+                // Sampled directly (not via SampleNormal) so micro-relief works without the _NORMALMAP keyword.
+                // Fades with distance so far RTS views do not shimmer.
+                half3 detailNormalTS = UnpackNormalScale(detailPacked, _DetailBumpScale * detailFade);
+                surfaceData.normalTS = BlendNormalsRNM(baseNormalTS, detailNormalTS);
+                surfaceData.normalTS = BlendNormalsRNM(surfaceData.normalTS, weldNormalTS);
                 surfaceData.emission = SampleEmission(input.uv, _EmissionColor.rgb,
                     TEXTURE2D_ARGS(_EmissionMap, sampler_EmissionMap));
-                surfaceData.occlusion = 1.0h;
+                surfaceData.emission += edgeHighlight * half3(1.0h, 0.95h, 0.85h);
+                // Specular anti-aliasing (Kaplanyan/Toksvig style): widen the lobe where the interpolated
+                // normal changes quickly across the pixel, which tames shimmer on curved armor and edges.
+                half3 dNdx = ddx(input.normalWS);
+                half3 dNdy = ddy(input.normalWS);
+                half normalVariance = min(0.18h, 0.5h * (dot(dNdx, dNdx) + dot(dNdy, dNdy)));
+                half roughness = 1.0h - surfaceData.smoothness;
+                surfaceData.smoothness = 1.0h - saturate(sqrt(roughness * roughness + normalVariance));
+
+                // Cavity AO already darkens albedo; feed a softened copy to indirect/ambient light so
+                // recesses also lose environment fill without double-darkening direct light.
+                surfaceData.occlusion = lerp(1.0h, ao, 0.5h);
                 surfaceData.specular = half3(0, 0, 0);
                 surfaceData.clearCoatMask = 0.0h;
                 surfaceData.clearCoatSmoothness = 0.0h;
@@ -190,10 +335,10 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
             ENDHLSL
         }
 
-        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
-        UsePass "Universal Render Pipeline/Lit/DepthOnly"
-        UsePass "Universal Render Pipeline/Lit/DepthNormals"
+        UsePass "Universal Render Pipeline/Simple Lit/ShadowCaster"
+        UsePass "Universal Render Pipeline/Simple Lit/DepthOnly"
+        UsePass "Universal Render Pipeline/Simple Lit/DepthNormals"
     }
 
-    FallBack "Universal Render Pipeline/Lit"
+    FallBack "Universal Render Pipeline/Simple Lit"
 }

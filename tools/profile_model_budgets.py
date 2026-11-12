@@ -1,0 +1,324 @@
+"""Compile an authoring profile into calibrated scene and per-asset LOD budgets."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+from pathlib import Path
+import sys
+
+from tools.model_budget_policy import (
+    ModelBudgetError,
+    calibrate_profile,
+    load_budget_profile,
+)
+
+
+def _read_samples(path: Path) -> list[dict[str, object]]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ModelBudgetError(f"cannot read calibration sample file: {path}") from exc
+    evidence_context: dict[str, object] | None = None
+    if isinstance(value, dict) and value.get("schema") == "rogue-command/runtime-geometry-evidence/v1":
+        context = value.get("context")
+        references = value.get("reports")
+        if not isinstance(context, dict) or not isinstance(references, list) or not references:
+            raise ModelBudgetError(f"{path}: runtime evidence bundle needs context and report references")
+        scene_reference = context.get("sceneReference")
+        camera_reference = context.get("cameraReference")
+        if (not isinstance(scene_reference, dict) or not scene_reference.get("sceneId") or
+                scene_reference.get("unitySceneName") != "Game" or
+                not isinstance(camera_reference, dict) or not context.get("sceneMix")):
+            raise ModelBudgetError(f"{path}: evidence context must bind to a named Game scene, camera, and scene mix")
+        evidence_context = context
+        reports = []
+        bundle_root = path.parent.resolve()
+        for index, reference in enumerate(references):
+            if not isinstance(reference, dict):
+                raise ModelBudgetError(f"{path}: reports[{index}] must be an evidence reference object")
+            report_name = str(reference.get("reportPath", ""))
+            report_path = Path(report_name)
+            if not report_name or report_path.is_absolute() or ".." in report_path.parts:
+                raise ModelBudgetError(f"{path}: reports[{index}].reportPath must be a safe path relative to the bundle")
+            resolved = (bundle_root / report_path).resolve()
+            if resolved.parent != bundle_root:
+                raise ModelBudgetError(f"{path}: reports[{index}].reportPath must stay beside the evidence bundle")
+            try:
+                raw_bytes = resolved.read_bytes()
+                expected_sha = str(reference["sha256"]).lower()
+                actual_sha = hashlib.sha256(raw_bytes).hexdigest()
+                if expected_sha != actual_sha:
+                    raise ModelBudgetError(f"{path}: SHA-256 mismatch for {report_name}")
+                report = json.loads(raw_bytes.decode("utf-8-sig"))
+            except ModelBudgetError:
+                raise
+            except (OSError, KeyError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ModelBudgetError(f"{path}: cannot verify referenced runtime report {report_name}") from exc
+            if not isinstance(report, dict):
+                raise ModelBudgetError(f"{path}: referenced runtime report {report_name} must be an object")
+            reports.append((report, reference, report_name, actual_sha))
+    elif isinstance(value, dict) and value.get("schema") == "rogue-command/runtime-geometry-sample/v3":
+        reports = [(value, None, "", "")]
+    elif isinstance(value, dict) and "reports" in value:
+        input_reports = value.get("reports")
+        if not isinstance(input_reports, list):
+            raise ModelBudgetError("runtime capture input 'reports' must be an array")
+        reports = [(report, None, "", "") for report in input_reports]
+    elif isinstance(value, list):
+        reports = [(report, None, "", "") for report in value]
+    else:
+        raise ModelBudgetError("calibration input must be a schema-v3 runtime report, {reports:[...]}, or a runtime evidence bundle")
+    if not reports or not all(isinstance(report, dict) for report, _, _, _ in reports):
+        raise ModelBudgetError("runtime capture reports must be a nonempty array of objects")
+    rows: list[dict[str, object]] = []
+    for report, reference, report_name, report_sha in reports:
+        row = _sample_from_runtime_capture(report, path, evidence_context)
+        if reference is not None and evidence_context is not None:
+            row["measurementContext"] = evidence_context
+            row["evidenceReportPath"] = report_name
+            row["evidenceReportSha256"] = report_sha
+            row["captureGroup"] = str(reference.get("captureGroup", ""))
+            if isinstance(reference.get("entityCensus"), dict):
+                row["entityCensus"] = reference["entityCensus"]
+            row["evidenceNote"] = str(reference.get("evidenceNote", ""))
+        rows.append(row)
+    capture_keys = {
+        (
+            row["scene"], row["camera"], row["pixelWidth"], row["pixelHeight"],
+            row["unityVersion"], row["cameraSettings"],
+        )
+        for row in rows
+    }
+    if len(capture_keys) != 1:
+        raise ModelBudgetError(f"{path}: runtime reports must use one scene, camera pose, Unity version, and resolution")
+    return rows
+
+
+def _sample_from_runtime_capture(
+    report: object,
+    path: Path,
+    evidence_context: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Validate one complete, unpaused runtime capture and extract its fit row."""
+    if not isinstance(report, dict) or report.get("schema") != "rogue-command/runtime-geometry-sample/v3":
+        raise ModelBudgetError(f"{path}: runtime report schema must be rogue-command/runtime-geometry-sample/v3")
+    capture = report.get("capture")
+    camera = report.get("camera")
+    sample = report.get("fitSample")
+    if not isinstance(capture, dict) or not isinstance(camera, dict) or not isinstance(sample, dict):
+        raise ModelBudgetError(f"{path}: runtime report is missing capture, camera, or fitSample metadata")
+    if report.get("status") != "complete" or sample.get("calibrationReady") is not True:
+        raise ModelBudgetError(f"{path}: runtime capture is incomplete or not eligible for calibration")
+    if report.get("scene") != "Game":
+        raise ModelBudgetError(f"{path}: runtime captures from menus, intermissions, or other scenes cannot calibrate gameplay geometry")
+    if not report.get("captureStartedUtc") or not report.get("unityVersion"):
+        raise ModelBudgetError(f"{path}: runtime report must identify capture time and Unity version")
+    if capture.get("frameIntervalMetric") != "UnityEngine.Time.unscaledDeltaTime" or capture.get("frameIntervalUnit") != "ms":
+        raise ModelBudgetError(f"{path}: runtime capture must measure unscaled frame intervals in milliseconds")
+    if capture.get("geometryMetric") != "cameraFrustumMeshTriangles":
+        raise ModelBudgetError(f"{path}: runtime capture must count camera-frustum mesh triangles")
+    try:
+        sample_count = int(capture["sampleCount"])
+        requested_frames = int(capture["requestedFrames"])
+        time_scale = float(capture["timeScaleAtStart"])
+        pixel_width = int(camera["pixelWidth"])
+        pixel_height = int(camera["pixelHeight"])
+        triangles = int(sample["triangles"])
+        interval = float(sample["p95UnscaledFrameIntervalMs"])
+        field_of_view = float(camera["fieldOfView"])
+        orthographic_size = float(camera["orthographicSize"])
+        camera_aspect = float(camera["aspect"])
+        camera_culling_mask = int(camera["cullingMask"])
+        camera_position = tuple(float(component) for component in camera["position"])
+        camera_rotation = tuple(float(component) for component in camera["rotationEuler"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ModelBudgetError(f"{path}: runtime capture metadata is invalid") from exc
+    frame_intervals = report.get("frameIntervalsMs")
+    if sample_count < 120 or sample_count != requested_frames or not isinstance(frame_intervals, list) or len(frame_intervals) != sample_count:
+        raise ModelBudgetError(f"{path}: runtime capture needs the full requested set of at least 120 rendered frames")
+    try:
+        intervals = [float(value) for value in frame_intervals]
+    except (TypeError, ValueError) as exc:
+        raise ModelBudgetError(f"{path}: runtime frame interval samples are invalid") from exc
+    if any(not math.isfinite(value) or value <= 0.0 for value in intervals):
+        raise ModelBudgetError(f"{path}: runtime frame intervals must be finite and positive")
+    intervals.sort()
+    measured_p95 = intervals[max(0, math.ceil(0.95 * sample_count) - 1)]
+    if not math.isclose(measured_p95, interval, rel_tol=1e-6, abs_tol=0.001):
+        raise ModelBudgetError(f"{path}: fitSample p95 does not match the captured frame intervals")
+    if not math.isfinite(time_scale) or time_scale <= 0.0:
+        raise ModelBudgetError(f"{path}: paused or timeScale-zero captures cannot calibrate performance")
+    if (capture.get("timeScaleStayedPositive") is not True or capture.get("cameraStable") is not True or
+            capture.get("geometryLoadStable") is not True):
+        raise ModelBudgetError(f"{path}: capture is not eligible because time scale, camera, or geometry load changed")
+    try:
+        stability_checks = int(capture["geometryStabilityChecks"])
+        geometry_signature = int(capture["geometrySignature"])
+        candidate_renderers = int(capture["candidateMeshRenderers"])
+        counted_renderers = int(capture["countedMeshRenderers"])
+        unsupported_renderers = int(capture["unsupportedMeshRenderers"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ModelBudgetError(f"{path}: runtime geometry stability check metadata is invalid") from exc
+    if stability_checks < math.ceil(sample_count / 30):
+        raise ModelBudgetError(f"{path}: runtime capture has too few periodic geometry stability checks")
+    if geometry_signature == 0:
+        raise ModelBudgetError(f"{path}: runtime capture is missing its renderer-set stability signature")
+    if (candidate_renderers <= 0 or counted_renderers <= 0 or unsupported_renderers < 0 or
+            counted_renderers + unsupported_renderers != candidate_renderers):
+        raise ModelBudgetError(f"{path}: runtime geometry census does not reconcile candidate, counted, and unsupported renderers")
+    if camera.get("cameraType") != "Game" or camera.get("usesRenderTexture") is not False:
+        raise ModelBudgetError(f"{path}: runtime capture must use a Game camera rendering to the display")
+    if (pixel_width <= 0 or pixel_height <= 0 or not report.get("scene") or not camera.get("name") or
+            len(camera_position) != 3 or len(camera_rotation) != 3):
+        raise ModelBudgetError(f"{path}: runtime capture needs a scene, camera pose, and positive resolution")
+    if (triangles <= 0 or not math.isfinite(field_of_view) or not math.isfinite(orthographic_size) or
+            not math.isfinite(camera_aspect) or camera_aspect <= 0.0 or
+            not all(math.isfinite(value) for value in camera_position + camera_rotation) or not interval > 0.0):
+        raise ModelBudgetError(f"{path}: runtime capture needs positive camera-frustum triangles and frame interval")
+    summary = report.get("summary")
+    try:
+        summary_triangles = int(summary["cameraFrustumMeshTriangles"]) if isinstance(summary, dict) else -1
+        counted_renderers = int(capture["countedMeshRenderers"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ModelBudgetError(f"{path}: runtime geometry census metadata is invalid") from exc
+    if summary_triangles != triangles:
+        raise ModelBudgetError(f"{path}: fitSample triangles do not match the runtime geometry census")
+    if counted_renderers <= 0:
+        raise ModelBudgetError(f"{path}: runtime geometry census must count at least one mesh renderer")
+    if not isinstance(camera.get("orthographic"), bool):
+        raise ModelBudgetError(f"{path}: camera projection mode is invalid")
+    if evidence_context is not None:
+        scene_reference = evidence_context.get("sceneReference")
+        camera_reference = evidence_context.get("cameraReference")
+        if not isinstance(scene_reference, dict) or scene_reference.get("unitySceneName") != report.get("scene"):
+            raise ModelBudgetError(f"{path}: runtime scene does not match the evidence bundle's sceneReference")
+        if not isinstance(camera_reference, dict):
+            raise ModelBudgetError(f"{path}: runtime evidence bundle has no cameraReference")
+        checks = {
+            "name": camera.get("name"),
+            "pixelWidth": pixel_width,
+            "pixelHeight": pixel_height,
+            "fieldOfView": field_of_view,
+            "orthographic": bool(camera["orthographic"]),
+            "orthographicSize": orthographic_size,
+            "aspect": camera_aspect,
+            "cullingMask": camera_culling_mask,
+            "position": list(camera_position),
+            "rotationEuler": list(camera_rotation),
+        }
+        for field, observed in checks.items():
+            expected = camera_reference.get(field)
+            if isinstance(observed, float):
+                try:
+                    matches = math.isclose(float(expected), observed, rel_tol=1e-7, abs_tol=1e-5)
+                except (TypeError, ValueError):
+                    matches = False
+            elif isinstance(observed, list):
+                try:
+                    values = [float(value) for value in expected]
+                    matches = len(values) == len(observed) and all(
+                        math.isclose(actual, target, rel_tol=1e-7, abs_tol=1e-5)
+                        for actual, target in zip(values, observed)
+                    )
+                except (TypeError, ValueError):
+                    matches = False
+            else:
+                matches = expected == observed
+            if not matches:
+                raise ModelBudgetError(f"{path}: runtime camera {field} does not match the evidence bundle reference")
+    camera_settings = (
+        field_of_view,
+        bool(camera.get("orthographic")),
+        orthographic_size,
+        camera_aspect,
+        camera_culling_mask,
+        camera.get("cameraType"),
+        camera.get("usesRenderTexture"),
+        camera_position,
+        camera_rotation,
+    )
+    return {
+        "triangles": triangles,
+        "p95UnscaledFrameIntervalMs": interval,
+        "captureStartedUtc": report.get("captureStartedUtc", ""),
+        "scene": report.get("scene", ""),
+        "camera": camera.get("name", ""),
+        "cameraSettings": camera_settings,
+        "pixelWidth": pixel_width,
+        "pixelHeight": pixel_height,
+        "unityVersion": report.get("unityVersion", ""),
+        "timeScaleAtStart": time_scale,
+        "sampleCount": sample_count,
+        "measurementSource": "runtime-model-budget-probe-v3",
+    }
+
+
+def compile_profile(profile_path: Path, samples_path: Path | None = None) -> dict[str, object]:
+    profile = load_budget_profile(profile_path)
+    if samples_path is not None:
+        calibration = profile.get("calibration")
+        if not isinstance(calibration, dict):
+            raise ModelBudgetError("profile calibration metadata must be an object before samples can be added")
+        samples = _read_samples(samples_path)
+        try:
+            width = int(calibration["resolutionWidth"])
+            height = int(calibration["resolutionHeight"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ModelBudgetError("profile resolution must be set before runtime reports can be ingested") from exc
+        if any(sample["pixelWidth"] != width or sample["pixelHeight"] != height for sample in samples):
+            raise ModelBudgetError("runtime capture resolution does not match the authoring profile")
+        for field in ("cameraReference", "sceneMix"):
+            description = str(calibration.get(field, "")).strip()
+            if not description or description.lower().startswith(("pending", "unknown", "unverified")):
+                raise ModelBudgetError(f"profile calibration.{field} must be authored before runtime reports can be ingested")
+        contexts = [sample.get("measurementContext") for sample in samples]
+        if not all(isinstance(context, dict) for context in contexts):
+            raise ModelBudgetError("profile calibration requires a hashed runtime evidence bundle with an explicit scene and camera binding")
+        context = contexts[0]
+        if any(item != context for item in contexts[1:]):
+            raise ModelBudgetError("runtime reports must share one evidence context")
+        authored_scene = calibration.get("sceneReference")
+        measured_scene = context.get("sceneReference") if isinstance(context, dict) else None
+        if authored_scene is not None and authored_scene != measured_scene:
+            raise ModelBudgetError("runtime evidence sceneReference does not match the profile")
+        calibration["sceneReference"] = measured_scene
+        calibration["measurementContext"] = context
+        calibration["samples"] = samples
+    compiled = calibrate_profile(profile)
+    return compiled
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profile", type=Path, default=Path("content/source-art/model-budget-profile.json"))
+    parser.add_argument("--samples", type=Path, help="Hashed runtime evidence bundle, schema-v3 report, or JSON object {reports:[report,...]}")
+    parser.add_argument("--output", type=Path, required=True, help="Compiled profile JSON output path")
+    args = parser.parse_args(argv)
+    try:
+        compiled = compile_profile(args.profile, args.samples)
+    except ModelBudgetError as exc:
+        print(f"model-budget profile error: {exc}", file=sys.stderr)
+        return 2
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(compiled, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    status = str(compiled.get("calibrationStatus", "uncalibrated"))
+    if status != "calibrated":
+        print(f"calibrationStatus={status}; reason={compiled.get('calibrationFailureReason', 'not measured')}")
+        return 2
+    report = compiled["budgetReport"]
+    print(json.dumps({
+        "calibrationStatus": status,
+        "targetFps": compiled["targetFps"],
+        "targetFrameTimeMs": report["targetFrameTimeMs"],
+        "sceneCount": len(report["scenes"]),
+        "sceneBudgetPassed": all(scene["sceneBudgetPassed"] for scene in report["scenes"]),
+        "output": str(args.output),
+    }, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

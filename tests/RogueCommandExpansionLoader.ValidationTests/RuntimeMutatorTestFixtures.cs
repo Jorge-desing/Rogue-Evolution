@@ -15,6 +15,33 @@ public struct EntityBalancingParameters
 {
     public string entityId;
     public NullableString factoryForEntityId;
+    // The 25 per-unit balance row fields, mirroring the pinned
+    // EntityBalancingParameters shape read by EntityBalancingStore.GetOriginal*.
+    public int cost;
+    public float productionDuration;
+    public int maxCapacity;
+    public int maxHealth;
+    public int maxShield;
+    public int maxMana;
+    public int maxRank;
+    public float moveSpeed;
+    public int sightRadius;
+    public float damage1;
+    public float damage2;
+    public float weaponRange;
+    public float attackCooldown;
+    public float attack2Cooldown;
+    public float effectRadius1;
+    public float effectRadius2;
+    public int skillRange;
+    public float healAmount1;
+    public float healAmount2;
+    public float gainCreditsAmount;
+    public float skillManaCost;
+    public float duration1;
+    public float duration2;
+    public float maxArmor;
+    public float armorProtection;
     public UnitRole roles;
     public SystemTags offeredSystemTags;
 }
@@ -85,8 +112,59 @@ public static class EntityBalancingStore
     public static Dictionary<string, Dictionary<ChangeableValue, int>> ChangeableIntValueCache = new(StringComparer.Ordinal);
     public static Dictionary<string, Dictionary<ChangeableValue, float>> ChangeableFloatValueCache = new(StringComparer.Ordinal);
     public static HashSet<string> BuildingEntityIds = new(StringComparer.Ordinal);
+    public static Dictionary<string, UnitRole> RolesOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> MaxManaOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, int> CostOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, int> MaxHealthOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, int> MaxShieldOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, int> MaxRankOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> MaxArmorOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> MoveSpeedOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> WeaponRangeOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> DpsOf = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> Damage1Of = new(StringComparer.Ordinal);
+    public static Dictionary<string, float> Damage2Of = new(StringComparer.Ordinal);
 
+    public static List<string> AllEntityIdsOfUnits() => new(RolesOf.Keys);
+    public static List<string> AllEntityIdsOfBuildings() => new(BuildingEntityIds);
+    public static List<string> AllEntityIdsOfFactories() => new(FactoryEntityIdOf.Values);
+    public static List<string> AllEntityIds()
+    {
+        var set = new HashSet<string>(RolesOf.Keys, StringComparer.Ordinal);
+        set.UnionWith(BuildingEntityIds);
+        return new List<string>(set);
+    }
     public static bool IsBuilding(string entityId) => BuildingEntityIds.Contains(entityId);
+    public static int Cost(string entityId, bool includeModified = false) =>
+        CostOf.TryGetValue(entityId, out var c) ? c : 100;
+    public static bool HasRole(string entityId, UnitRole role) =>
+        RolesOf.TryGetValue(entityId, out var r) ? (r & role) == role : false;
+    public static float MaxMana(string entityId, bool includeModified = false) =>
+        MaxManaOf.TryGetValue(entityId, out var m) ? m : 100f;
+    public static int MaxHealth(string entityId, bool includeModified = false) =>
+        MaxHealthOf.TryGetValue(entityId, out var v) ? v : 100;
+    public static int MaxShield(string entityId, bool includeModified = false) =>
+        MaxShieldOf.TryGetValue(entityId, out var v) ? v : 0;
+    public static int MaxRank(string entityId, bool includeModified = false) =>
+        MaxRankOf.TryGetValue(entityId, out var v) ? v : 1;
+    public static float MaxArmor(string entityId, bool includeModified = false) =>
+        MaxArmorOf.TryGetValue(entityId, out var v) ? v : 0f;
+    public static float MoveSpeed(string entityId, bool includeModified = false) =>
+        MoveSpeedOf.TryGetValue(entityId, out var v) ? v : 1f;
+    public static float WeaponRange(string entityId, bool includeModified = false) =>
+        WeaponRangeOf.TryGetValue(entityId, out var v) ? v : 0f;
+    public static float Dps(string entityId) =>
+        DpsOf.TryGetValue(entityId, out var v) ? v : 0f;
+    public static float Damage1(string entityId, bool includeModified = false) =>
+        Damage1Of.TryGetValue(entityId, out var v) ? v : 0f;
+    public static float Damage2(string entityId, bool includeModified = false) =>
+        Damage2Of.TryGetValue(entityId, out var v) ? v : 0f;
+
+    public static void InvalidateCache(string entityId)
+    {
+        ChangeableIntValueCache[entityId].Clear();
+        ChangeableFloatValueCache[entityId].Clear();
+    }
 
     public static void Reset(IEqualityComparer<string> indexComparer = null)
     {
@@ -97,6 +175,18 @@ public static class EntityBalancingStore
         ChangeableIntValueCache = new Dictionary<string, Dictionary<ChangeableValue, int>>(StringComparer.Ordinal);
         ChangeableFloatValueCache = new Dictionary<string, Dictionary<ChangeableValue, float>>(StringComparer.Ordinal);
         BuildingEntityIds.Clear();
+        RolesOf.Clear();
+        MaxManaOf.Clear();
+        CostOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        MaxHealthOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        MaxShieldOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        MaxRankOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        MaxArmorOf = new Dictionary<string, float>(StringComparer.Ordinal);
+        MoveSpeedOf = new Dictionary<string, float>(StringComparer.Ordinal);
+        WeaponRangeOf = new Dictionary<string, float>(StringComparer.Ordinal);
+        DpsOf = new Dictionary<string, float>(StringComparer.Ordinal);
+        Damage1Of = new Dictionary<string, float>(StringComparer.Ordinal);
+        Damage2Of = new Dictionary<string, float>(StringComparer.Ordinal);
     }
 }
 
@@ -118,18 +208,15 @@ public sealed class Stage
     public StageParametersScriptableObject stageParameters = new();
 }
 
-public sealed class OpenReward
+public struct StageCardReward
 {
-    public string poolId;
-    public int count;
-    public float weight;
 }
 
 public sealed class StageParametersScriptableObject
 {
     public bool fillFirstLevelWithCardRewards;
     public bool putDefaultCardRewardInCenter;
-    public OpenReward cardReward = new();
+    public StageCardReward cardReward;
     public BlueprintPoolList blueprintPoolList = new();
 }
 
@@ -169,9 +256,64 @@ public sealed class AiBehaviour
     public float detectionRange = 10.0f;
 }
 
-public sealed class AiBehaviourManager
+public class AiBehaviourManager : UnityEngine.MonoBehaviour
 {
+    private static AiBehaviourManager _instance;
+    public static AiBehaviourManager Instance => _instance ??= new AiBehaviourManager();
+
     public AiBehaviour activeBehaviour;
+    public static readonly Priority_Queue.SimplePriorityQueue<string> ConstructionQueue = new();
+    public static int CurrentAttackWaveNumber { get; set; } = 3;
+    public float tickDuration = 0.5f;
+    public bool showAiTags = false;
+    public bool showCurrentCommands = false;
+
+    public System.Collections.Generic.List<object> attackCommands = new System.Collections.Generic.List<object> { new object() };
+    public System.Collections.Generic.List<object> defendCommands = new System.Collections.Generic.List<object>();
+    public System.Collections.Generic.List<object> scoutCommands = new System.Collections.Generic.List<object>();
+    public System.Collections.Generic.List<object> buildCommands = new System.Collections.Generic.List<object>();
+    public System.Collections.Generic.List<object> produceCommands = new System.Collections.Generic.List<object>();
+    public System.Collections.Generic.List<object> otherCommands = new System.Collections.Generic.List<object>();
+
+    public AiBehaviourManager()
+    {
+        _instance = this;
+    }
+
+    public static void IncrementAttackWaveNumber_Static()
+    {
+        CurrentAttackWaveNumber++;
+    }
+
+    public static void ToggleShowAiTags_Static()
+    {
+        Instance.showAiTags = !Instance.showAiTags;
+    }
+
+    public static void ToggleCurrentCommands_Static()
+    {
+        Instance.showCurrentCommands = !Instance.showCurrentCommands;
+    }
+
+    public static string ConstructionQueueToString_Static()
+    {
+        return "Factory_Assault x1, Turret_Heavy x2";
+    }
+}
+
+namespace Priority_Queue
+{
+    public sealed class SimplePriorityQueue<TItem> : IEnumerable<TItem>
+    {
+        private readonly List<TItem> _items = new();
+        public int Count => _items.Count;
+        public void Enqueue(TItem item, float priority) { if (!_items.Contains(item)) _items.Add(item); }
+        public bool Contains(TItem item) => _items.Contains(item);
+        public TItem Dequeue() { var item = _items[0]; _items.RemoveAt(0); return item; }
+        public void Clear() => _items.Clear();
+        public IEnumerator<TItem> GetEnumerator() => _items.GetEnumerator();
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => _items.GetEnumerator();
+    }
 }
 
 public sealed class DefaultAiBehaviour
@@ -209,9 +351,66 @@ public struct EntityInAiDeck
     public int MaxLiving { get; set; }
 }
 
-internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider,
-    IBlueprintRewardFactoryScopeProvider
+public sealed class OpenReward
 {
+    public string blueprintPoolId;
+}
+
+public static class Game
+{
+    public static bool AtLeastOneBlueprintHasBeenAddedByPlayer = true;
+    public static List<string> CardsInDeck { get; set; } = new();
+    public static List<OpenReward> OpenCardRewards = new();
+    public static List<string> Relics { get; set; } = new();
+    public static int CurrentLevel { get; set; } = 1;
+    public static bool IsLastLevel { get; set; } = false;
+    public static bool IsFirstLevelOrGameHasBeenResetted { get; set; } = false;
+    public static object StageMap { get; set; }
+    public static string CurrentLevelProgressionMode { get; set; } = "Default";
+}
+
+public sealed class MetaGame
+{
+    public static MetaGame Instance { get; set; } = new();
+    public int CurrentExperienceLevel { get; set; }
+    public int CurrentAscensionLevel { get; set; }
+    public int CurrentHeat { get; set; }
+    public string CurrentAscensionAndHeatLevelString { get; set; } = "Ascension 0";
+}
+
+namespace Shapes2D
+{
+    public static class Game { }
+}
+
+internal sealed class RuntimeMutatorTestProvider : IRuntimeContentProvider, IBlueprintPoolRuntimeProvider,
+    IBlueprintRewardFactoryScopeProvider, IGuaranteedModCardRewardProvider
+{
+    public HashSet<string> ModProducts { get; } = new(StringComparer.Ordinal);
+    public string GuaranteedModProduct { get; set; }
+    public bool RequireRegisteredModProduct { get; set; }
+    public string LastPoolId { get; private set; }
+    public bool LastStartingSelection { get; private set; }
+    public int LastCurrentXpLevel { get; private set; }
+    public HashSet<string> LastExcludedProductIds { get; private set; } = new(StringComparer.Ordinal);
+    public bool IsModUnitProduct(string productId) => !string.IsNullOrEmpty(productId) && ModProducts.Contains(productId);
+    public bool TryGetGuaranteedModRewardProduct(
+        string poolId,
+        bool isStartingSelection,
+        int currentXpLevel,
+        ICollection<string> excludedProductIds,
+        out string modProductId)
+    {
+        LastPoolId = poolId;
+        LastStartingSelection = isStartingSelection;
+        LastCurrentXpLevel = currentXpLevel;
+        LastExcludedProductIds = excludedProductIds == null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(excludedProductIds, StringComparer.Ordinal);
+        modProductId = GuaranteedModProduct;
+        return !string.IsNullOrEmpty(modProductId) &&
+            (!RequireRegisteredModProduct || EntityBalancingStore.ParameterListIndexOf.ContainsKey(modProductId));
+    }
     public Dictionary<string, string> PoolLocalizationAliases { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<object, string> PoolIds { get; } = new();
     public BlueprintRewardFactoryScope RewardFactoryScope { get; set; }

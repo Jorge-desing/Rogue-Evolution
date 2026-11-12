@@ -1,9 +1,21 @@
 # Rogue Command 3D Model Authoring — Technical Architecture & Enhancements
 
-**Updated:** 2026-10-18  
+**Updated:** 2026-11-11
 **Repository:** Mod Rogue Command  
 **Applies to:** `.agents/skills/rogue-command-3d-model-authoring`, `tools/RogueModelKit.py`, `tools/generate_unit_model.py`  
 **Tooling Baseline:** Blender 4.5.14 LTS (pinned in `.tools/Blender-4.5.14/`), Unity 2021.3.45f2 (pinned in `unity/RogueCommandAssetAuthoring/`)
+
+---
+
+## 2026-11-11 Dynamic Geometry Budgets and Gravitas Breaker Hardflow Pilot
+
+The former 6,500-face vehicle, 2,000-face module, and 10,000-face structure ceilings are retired. `content/source-art/model-budget-profile.json` now defines the shared authoring policy. It allocates finite per-asset LOD triangle targets from measured p95 unscaled frame-interval headroom, expected visible instances, projected screen size, and role priority. Blender source faces remain separate report fields. Prefab and package builders require a calibrated 60-FPS profile, passing scene aggregates, and a `PASS` allocation for every demanded asset; missing or infeasible data fails closed. The generated local profile has a real Blender 4.5.14 FBX inventory for 61 assets but remains **uncalibrated** until complete, unpaused schema-v2 runtime captures and scene demands are recorded. The observed frame interval is realized pacing, not CPU/GPU timing; the camera geometry count is a frustum estimate, not an occlusion query. Do not build or publish new bundles until calibration succeeds.
+
+Use the temporary `tools/RuntimeModelBudgetProbe.cs` through BepInEx MCP to make one camera-frustum triangle count and capture at least 120 unscaled frame intervals. It is not part of the loader and must be removed from the live scene after capture. Save at least three complete reports from two or more triangle loads with the same scene, camera pose, Unity version, resolution, and authored scene mix. Feed a report or `{ "reports": [...] }` file to `python -m tools.profile_model_budgets --profile content/source-art/model-budget-profile.json --samples artifacts/model-budget-captures.json --output content/source-art/model-budget-profile.json`; ingestion rejects paused, incomplete, mixed-viewpoint, wrong-resolution, and raw unverified rows. Each compiled sample records `triangles` and `p95UnscaledFrameIntervalMs`. Each scene asset demand records source Blender faces, Unity triangles, maximum visible instances, screen-height fraction, role priority, and three screen-relative LOD thresholds. Unity uses the authored LOD screen thresholds at runtime and performs no mesh generation.
+
+The optional Hardflow 1.23.0 pilot is reproducible with `powershell -NoProfile -ExecutionPolicy Bypass -File tools/Run-GravitasBreakerHardflowPilot.ps1`. In an isolated copy of the current Gravitas Breaker source it completed 10 exact Boolean cuts on the power-core, turret shell, and cannon bore, added 32 vents, service inserts, louvers, and fasteners, and recorded zero non-manifold edges, degenerate faces, or loose vertices on the three targets. Hardflow's Boolean and Smart Sharpen APIs drive the review candidate; the production builder replays the same recipe with Blender's built-in Boolean and two-stage bevel operations. Four camera previews and a pilot report remain under ignored `artifacts/model-budget-hardflow-pilot/`. The original source blend and tracked Gravitas FBX, atlas FBX, and gameplay JSON hashes were unchanged. No profile-calibrated LOD, prefab, or bundle was produced, and this local Blender preview is not in-game appearance evidence.
+
+Historical sections below describe the fixed-cap versions that were current when written; the dynamic profile above supersedes those budgets and their acceptance claims.
 
 ---
 
@@ -44,59 +56,42 @@ bpy.ops.export_scene.fbx(
 
 ## 2. Art Direction & The 3-Tier RTS Visual Hierarchy
 
-Assets are viewed from an elevated orthographic/isometric camera ($45^\circ - 60^\circ$ pitch) at 30–120 pixel heights. Keep the macro silhouette easy to parse, but refine generated blockouts so visible hulls and housings do not read as unmodified boxes or disconnected primitives. Use tapered profiles, compound transitions, plausible panel thickness, and restrained curvature on cast or formed components. Keep planar facets when they describe armor construction.
+Target grounded, stylized military sci-fi realism: original silhouettes, believable mass, connected mechanisms, and surfaces that communicate their construction while remaining readable from the elevated RTS camera. The 30–120 pixel review range is an internal heuristic; check the actual game camera and unit size before accepting detail.
 
-```
-+-------------------------------------------------------------------------+
-| TIER 1: Macro Silhouette (65% of visual read)                           |
-| - Bold volume, aspect ratio, stance, ground clearance                   |
-| - Must pass the "Squint Test" in < 250ms at 50px rendering              |
-+-------------------------------------------------------------------------+
-                                    |
-                                    v
-+-------------------------------------------------------------------------+
-| TIER 2: Meso Mechanical Construction (25% of visual read)               |
-| - Hull transitions, suspension, weapon mounts, cooling, and access      |
-| - Explains how the vehicle is built and operated                        |
-+-------------------------------------------------------------------------+
-                                    |
-                                    v
-+-------------------------------------------------------------------------+
-| TIER 3: Micro High-Contrast Accents (10% of visual read)                |
-| - Recessed emissive optics, hazard stripes, whip antennas, rivets       |
-| - Catches specular highlights and guides player combat focus            |
-+-------------------------------------------------------------------------+
-```
+- **Tier 1 — Macro silhouette and stance:** role, mobility, proportion, weapon placement, ground clearance.
+- **Tier 2 — Meso construction:** hull transitions, joints, support paths, cooling, access.
+- **Tier 3 — Micro cues:** selective seams, optics, labels, wear, and service detail.
 
-### The 4 Core Visual Rules
-1. **The Squint Test**: Zooming out the Blender viewport until the model is 50 pixels tall must clearly communicate archetype, role, and heading within 250 ms.
-2. **Scale-Aware Edge Treatment**: Do not apply a universal bevel to every edge. Use a crisp 1-segment chamfer for a deliberately cut or protected plate edge; use 2–4 segments for a visible rolled radius on cast or formed parts. Scale the width to the part, keep broad armor planes clean, and review the shading in neutral grazing light. A bevel must describe construction and catch light without making the panels look inflated.
-3. **Smart Angle Smoothing**: Cylindrical parts (barrels, wheels, exhausts) use `bpy.ops.object.shade_smooth_by_angle(angle=math.radians(38.0))`, keeping chamfers sharp while smoothing round surfaces without edge-split modifiers.
-4. **Recessed Emissive Optics**: Sensor glass and headlamps are recessed inside armored brow hoods and assigned real-time emissive materials (`_EMISSION` keyword with HDR multipliers 1.5×–2.5×) that pierce the post-processing bloom filter.
+Use this hierarchy as a composition aid, not as a fixed percentage target. Generate a functional blockout first, then refine the visible primary shells. Replace primitive stacks where they define a whole body; retain boxes, cylinders, and rods when they are appropriate plates, axles, barrels, joints, tanks, or supports. Use broad facets for fabricated armor, controlled curvature for cast or formed parts, and purposeful asymmetry where it supports the role.
+
+Allocate detail by its screen-space job: geometry defines the outline, cross-section changes, mechanical gaps, and visible articulation; the current PBR maps carry material identity, markings, and microrelief only when it survives at gameplay scale. Any high-to-low normal-bake technique must remain within the mandatory Material Maker workflow and existing four-map contract. After boolean or panel-cut operations, inspect highlight continuity and repair pinching or stepped curvature before UV and atlas work.
+
+### The 5 Core Visual Rules
+
+1. **Readability gate**: Compare a black silhouette from the elevated gameplay view and front/side/top. Test at actual on-screen sizes and distinguish the unit from neighboring classes before adding micro-detail. Preview its intended color grouping against light, dark, and similar-hue terrain values; this is an authoring preview, not proof of runtime team tinting.
+2. **Scale-aware edge treatment**: Choose bevel width and segments for the part and its visible radius. Use crisp chamfers for plate breaks and rounded transitions only where a formed or cast part calls for them; do not bevel every edge uniformly.
+3. **Curvature and shading**: After booleans or dense cuts, inspect the shell under a moving grazing highlight from multiple angles and repair pinching or lumpy transitions. Flat-shade deliberate armor facets and smooth curved surfaces by intent. Authored and weighted normals stabilize a modeled form; they do not repair a weak silhouette or justify smoothing every armor boundary.
+4. **Functional detail**: Test a rough movement or articulation envelope while the model is still a blockout. Connect visible equipment to its support and clearance. Recess optics where the housing allows it, and keep emissive regions legible without relying on unverified renderer or bloom assumptions.
+5. **Material hierarchy**: Give intact paint, bare metal, rubber, glazing, and powered lights distinct surface responses. Use low metallic response for non-metal coatings and rubber, higher metallic response for exposed metal, and vary smoothness by finish. Keep emission on actual lamps, displays, or energy hardware instead of using bright outlines around every panel.
+
+These project rules adapt public hard-surface and RTS art guidance; numeric view sizes and composition ratios are local heuristics, not published industry standards.
 
 ---
+## 3. Palette and PBR Material Cues
 
-## 3. The 5-Tone Material Palette Standard
+There is no fixed five-tone count, coverage ratio, or universal metallic/smoothness value. Separate armor, machinery, rubber, optics, and warning accents through role-appropriate color and material response. Tune values for the unit, atlas, and gameplay lighting; consult the live generator and PBR preset registry for current names.
 
-Vehicles adhere to a disciplined 5-tone structural palette designed for maximum visual separation:
+| Material role | Visual cue |
+|---|---|
+| Armor | Faction color and broad readable panel groups |
+| Machinery | Dark alloy or exposed metal at joints, axles, actuators, and weapon housings |
+| Rubber / flexible parts | Low-metal response on tires, pads, seals, and gaiters |
+| Warning accents | Localized safety markings or unit identification |
+| Optics / energy | Small, controlled emissive regions |
 
-| Material Role | Proportion | Surface Description | Metallic | Smoothness | Emission |
-|---|---|---|---|---|---|
-| **Primary Armor** | 40–45% | Main hull plates, sponsons, lower chassis | 0.35–0.45 | 0.60–0.65 | None |
-| **Light Armor** | 20–25% | Turret cheeks, upper deck, hatch covers | 0.30–0.35 | 0.58–0.62 | None |
-| **Mechanical Gunmetal** | 15–20% | Cannon barrels, roll bars, suspension, axles | 0.74–0.80 | 0.68–0.75 | None |
-| **Tread / Rubber** | 10–15% | Track shoes, road wheels, tire rubber | 0.08–0.18 | 0.28–0.34 | None |
-| **Warning Accent** | 3–5% | High-contrast identification stripes, battery rails | 0.16–0.20 | 0.60–0.65 | None |
-| **Emissive Tech/Optics** | 1–3% | Sensor lenses, headlamps, arc discharge rings | 0.15–0.25 | 0.75–0.85 | **HDR ×1.5–2.5** |
-
-### Standard Faction Color Palettes
-- **Vanguard (Industrial Olive / Tan)**: Primary `#4A5340`, Light `#7D8471`, Accent `#D9822B`
-- **Siege (Heavy Crimson / Charcoal)**: Primary `#6B2D2D`, Light `#994D4D`, Accent `#E5A823`
-- **Arctic (Sub-Zero White / Steel Blue)**: Primary `#D6DEE5`, Light `#A3B5C4`, Accent `#2980B9`
-- **Syndicate (High-Tech Carbon / Gold)**: Primary `#2C3E50`, Light `#4A627A`, Accent `#F1C40F`
+Camouflage and procedural variation should reinforce the armor layout and unit identity. Do not allow noise, high-contrast markings, or emissive regions to erase the macro silhouette. Treat painted armor as a non-metal coating over a metal substrate: the intact paint region should not receive the same metallic response as exposed steel or alloy. Keep the project's exact MetallicGloss.R and MetallicGloss.A channel behavior.
 
 ---
-
 ## 4. Master Roster: The 24 Tactical Archetypes & 13 Weapons
 
 | Archetype | Native Template | Proportions (W × L × H) | Stance / Mobility | Default Weapon | Rig Architecture | Signature Visual Features |
@@ -313,12 +308,7 @@ Supports the mod rule that *every added unit requires a dedicated production bui
 - **Hardpoints (`--attachments`)**: `era` (Explosive Reactive Armor tiles), `aps` (Active Protection System radar/countermeasures), `sponson` (side autocannon pods), `fuel_drums` (jettisonable fuel cells). Detached FBX export (`--export-detached-attachments`) excludes meshes from primary atlas/LODs and outputs `<Name>_Attachment_<Type>.fbx`.
 - **Damaged Combat State (`--damaged-state`)**: Exports `<Name>_Damaged.fbx` with dented armor plates, jammed $5^\circ$ turret tilt, displaced wheels, and scorched materials.
 - **Tactical Icons (`--render-icons`)**: Headless Cycles/Eevee render of transparent alpha PNGs in Zenith (90°) and Isometric RTS (45° at `--icon-elevation 45.0`) at 64×64 and 128×128 resolutions.
-- **Subsystem Budget Breakdown**:
-  - Chassis & Hull: 35–40% of polygon budget.
-  - Mobility & Wheels: 25–30% of polygon budget.
-  - Turret & Cabin: 15–20% of polygon budget.
-  - Weapons: 10–15% of polygon budget.
-  - Optics & Greebles: 5–8% of polygon budget.
+- **Subsystem Budget Breakdown**: Use the counts as diagnostics, not fixed percentage quotas. Keep silhouette, mobility, weapon function, and readable construction intact; recover faces from exact duplicates, hidden internals, redundant bevel segments, or detail that disappears at the intended screen size. The LOD0 limit is a cap, not a target to fill.
 
 ---
 
@@ -591,7 +581,7 @@ dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
 - Six new mobile archetypes in `tools/generate_unit_model.py`: `mobile_sam_launcher`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `hexapod_assault`, `assault_hovercraft`. All are composed from existing RogueModelKit primitives and the faction palette (no new materials). Wreckage, gameplay-JSON template and rig metadata tables in `RogueModelKit.py` were extended.
 - Twelve new presets (6 archetype presets, 4 remixes: `urban_brawler`, `arctic_sentinel`, `night_stalker`, `armored_hauler`; 2 structures: `early_warning_array`, `fusion_silo`). Presets may now declare `camo`, `wear` and `attachments` defaults; explicit CLI options win. `--preset` choices derive from `PRESETS` keys.
 - Blender 4.5.14 headless: all 12 presets built with `Ground OK: True` (4.5k-8.5k tris before LOD); `arachnid_hexapod --rig --animate` built; `--batch-all-archetypes --dry-run` plans 30 archetypes. No in-game runtime evidence yet.
-- Boundary: the hexapod middle legs are static, body-bound geometry; only the four crawler legs are rigged.
+- Boundary: the generic `hexapod_assault` preset still uses a static body-bound middle pair; the active `ArachnidHexapod` rigged bridge now materializes `Bone_Thigh/Shin/Foot_ML/MR`, assigns rigid weights, and animates all six leg chains.
 
 ---
 
@@ -651,11 +641,11 @@ dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .
 
 ## 23. External Design Guidance Adapted to Rogue Command
 
-The local art direction now uses a source-backed, camera-first review sequence. These sources inform the workflow; Rogue Command's own style, face budget, shader, and export contracts remain authoritative.
+The local art direction now uses a source-backed, camera-first review sequence. These sources inform the workflow; Rogue Command's style, dynamically calibrated geometry budget, shader, and export contracts remain authoritative. The fixed caps described in this historical 2026-11-10 section were retired on 2026-11-11; use the current profile and calibration rules at the top of this document.
 
 - **RTS silhouette before surface detail**: PlaySide's *Age of Darkness* art director describes prioritizing silhouettes from the gameplay camera and removing micro-detail that adds noise. Blizzard's *StarCraft* retrospective describes testing tiny renders and selectively widening/thickening features that failed to read. Adaptation: test each unit as a black silhouette at the elevated game view; exaggerate only role-defining parts that disappear at the local 30–120 px review scale. [PlaySide interview](https://www.unrealengine.com/developer-interviews/age-of-darkness-is-an-rts-that-throws-thousands-of-undead-monsters-at-you), [Blizzard retrospective](https://news.blizzard.com/en-us/article/20719767/rock-and-roll-days-of-starcraft-a-development-retrospective).
-- **Reference-led hard-surface refinement**: Blender Studio's modeling guide and Blender's bevel documentation support a staged workflow that starts from references and blockout, then applies edge geometry selectively. Adaptation: treat RogueModelKit outputs as functional blockouts, shape the primary shells, and spend segments only on the silhouette or highlights that need them. Weighted normals improve shading but do not change the outline. [Blender Studio guide](https://studio.blender.org/tools/artist-guide/asset-creation/modeling), [Bevel Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/generate/bevel.html), [Weighted Normal Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/normals/weighted_normal.html).
-- **Shading and runtime budgets**: Unity 2021.3 supports importing authored normals and tangents, warns that a single smoothing angle can smooth some edges incorrectly, and describes LOD as reducing triangles for distant objects. The current 7,500-face profile target is a project-specific LOD0 budget, not an official Unity limit or a quota. Record Blender faces and Unity-exported triangles separately. [Unity FBX Model Importer](https://docs.unity3d.com/2021.3/Documentation/Manual/FBXImporter-Model.html), [Unity LOD](https://docs.unity3d.com/2021.3/Documentation/Manual/LevelOfDetail.html).
+- **Reference-led hard-surface refinement**: Blender Studio's modeling guide and Blender's bevel documentation support a staged workflow that starts from references and blockout, then applies edge geometry selectively. Adaptation: treat RogueModelKit outputs as functional blockouts, shape the primary shells, and spend segments only on the silhouette or highlights that need them. Weighted normals improve shading but do not change the outline. [Blender Studio guide](https://studio.blender.org/tools/pipeline-overview/asset-creation/modeling), [Bevel Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/generate/bevel.html), [Weighted Normal Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/normals/weighted_normal.html).
+- **Shading and runtime budgets**: Unity 2021.3 supports importing authored normals and tangents, warns that a single smoothing angle can smooth some edges incorrectly, and describes LOD as reducing triangles for distant objects. The Level 1 vehicle chassis uses a project-specific 6,500-face LOD0 cap; each Level 2 module has a separate 2,000-face cap; static structures retain their separate 10,000-face cap. These are not official Unity limits or quotas. Record Blender faces and Unity-exported triangles separately. [Unity FBX Model Importer](https://docs.unity3d.com/2021.3/Documentation/Manual/FBXImporter-Model.html), [Unity LOD](https://docs.unity3d.com/2021.3/Documentation/Manual/LevelOfDetail.html).
 - **Baked surface relief**: Blender's bake workflow and URP's Lit material documentation support transferring fine normal detail to a lower-detail mesh. Adaptation: bake into the existing Normal atlas only after UVs stabilize, and preserve MetallicGloss R/A, texture import settings, and mesh vertex-wear RGBA. [Blender Cycles baking](https://docs.blender.org/manual/en/4.5/render/cycles/baking.html), [URP 12.1 Lit](https://docs.unity3d.com/Packages/com.unity.render-pipelines.universal@12.1/manual/lit-shader.html).
 
 The local 50 px silhouette glance test, 30–120 px review range, and 65/25/10 visual hierarchy are authoring heuristics for this project. The cited sources support camera-first readability and staged refinement, but do not prescribe these numeric thresholds.
@@ -664,4 +654,358 @@ The local 50 px silhouette glance test, 30–120 px review range, and 65/25/10 v
 ## 23. Unity prefab scaffolding of muzzle VFX and 3D audio
 
 VehiclePrefabBuilder.EnsureCanonicalVfxAndAudioComponents adds (idempotently) FirePoint_0/FirePoint_1 under Socket_MuzzlePrimary/Socket_MuzzleSecondary with a ParticleSystem as child 0 (shared URP material Materials/VFX/VFX_MuzzleFlash_Additive.mat, max 25 particles), and 3D AudioSources (spatialBlend 1, logarithmic, 3-60 m, doppler 0) on Socket_WeaponAudio and Socket_EngineAudio (looping). Damage sockets stay clean for RuntimeVisualDirector. Evidence: static edit only; Unity compile and prefab build not yet run.
+---
 
+## 24. Wave 7 Tactical Archetypes, Procedural Weapons, and Support Hardware (local build/validation evidence)
+
+- **Six new mobile vehicle archetypes** (`tools/generate_unit_model.py` & `tools/RogueModelKit.py`), bringing total mobile archetypes to **42**:
+  1. `nanite_support_rover`: Agile 4x4 tactical medical/field repair rover with sloped glacis chassis, forward cab cowl, rear equipment bay, bilateral all-terrain wheel assemblies, and dual armored nanite repair dispenser pods.
+  2. `gravity_siege_breaker`: Heavy assault citadel breacher on 6-roadwheel continuous tracks with armored upper casemate, rear power core, heavy V-prow ram, and gyroscopic grav-dampener hub.
+  3. `tactical_relay_carrier`: Heavy 6x6 forward communications carrier with armored forward cab, rear electronics shelter, and high-gain telescopic comms & EW jamming mast.
+  4. `amphibious_assault_tank`: Tracked assault tank with raised water-deflecting bow prow, sloped glacis, continuous tracks with roadwheels, and dual stern propulsion waterjet thrusters with vectoring steering nozzles.
+  5. `plasma_mortar_strider`: Quadrupedal crawler siege strider (`rigType: QuadCrawler`) with cruciform center chassis, heavy turntable pedestal, articulated 2-bone crawler legs, and heavy rear ground recoil spade.
+  6. `stealth_recon_skimmer`: Low-observable hover reconnaissance skimmer with sharp faceted radar-evasion chines, sloped glacis, and flush stealth canopy.
+- **Two new procedural weapon assemblies** (`RogueModelKit.py` & `generate_unit_model.py`), bringing total weapon choices to **15**:
+  1. `nanite_projector` (`make_nanite_projector_assembly` / `.add_nanite_projector()`): Articulated nanite dispersal cannon with elevation cradle, bilateral chemical canisters with glowing level-indicator sight glasses, flexible armored feeder conduits, stepped magnetic focusing collars, and flared multi-aperture dispersal bell with glowing collimating lens ring.
+  2. `gravity_cannon` (`make_gravity_cannon_assembly` / `.add_gravity_cannon()`): Super-heavy gravitational singularity mass driver with sloped mantlet housing, dual heavy recoil damper cylinders, 4 stepped magnetic accelerator ring stages, glowing grav-core chamber, and longitudinal stabilization rails.
+- **Four new consolidated tactical hardware subsystems** (reusing canonical `FactionPalette` for **0 additional draw calls** after `batch_meshes_by_material()`):
+  1. **Armored Nanite Repair Dispensers (`make_nanite_repair_dispenser_assembly` / `--nanite-dispenser` / `.add_nanite_dispenser()`)**:
+     - Bilateral armored nanite repair canisters with glowing inspection sight glasses and omni-directional atomizer spray heads.
+  2. **Gyroscopic Grav-Dampener Hub (`make_grav_dampener_hub_assembly` / `--grav-dampener` / `.add_grav_dampener()`)**:
+     - Cylindrical gyroscopic gravitational anchor and inertial dampener hub with counter-rotating magnetic rotor rings, 4 radial structural bracing struts, and glowing spherical singularity core.
+  3. **Telescopic Comms & EW Jamming Mast (`make_comms_ew_mast_assembly` / `--comms-mast` / `.add_comms_mast()`)**:
+     - 3-stage telescopic communications and EW jamming mast with planar blade antenna fins, cross-dipole jamming horns, satcom teardrop radome, and apex beacon LEDs.
+  4. **Reinforced Kinetic Ram Prow (`make_reinforced_ram_prow_assembly` / `--ram-prow` / `.add_ram_prow()`)**:
+     - Heavy angled V-shaped kinetic battering ram cowcatcher bumper with diagonal hazard chevron accent plates, structural gusset reinforcement ribs, and forged towing shackles.
+- **Nine new presets** (bringing total presets to **56**):
+  - 6 archetype presets (`sentinel_relay`, `gravitas_breaker`, `command_relay`, `coastal_dreadnought`, `plasma_strider`, `phantom_skimmer`).
+  - 3 elite custom-palette remix presets (`emerald_warden`, `solar_colossus`, `void_spectre`) with custom primary/light/emissive color overrides and specialized VFX (muzzle star-spike, exhaust thruster plumes).
+- **Wreckage & Gameplay Metadata Integration**:
+  - `make_wreckage_variant`: Updated preservation filter to retain `"Nanite"`, `"Gravity"`, `"Prow"`, `"Dispenser"`, and `"Mast"` components across battle damage, and mapped new archetypes into respective chassis breakup categories.
+  - `export_gameplay_metadata`: Added kinematic vehicle template mappings for all 6 new mobile archetypes (`PCXBaseTank` and `GatlingWalker`).
+- **Parity Unit Test & Automated Validation**:
+  - Twin script byte-for-byte binary parity strictly maintained between `tools/` and `.agents/skills/rogue-command-3d-model-authoring/scripts/`.
+  - Added unit test suite `tests/python/authoring/test_model_kit_skill_copy.py` verifying file parity, archetype count (42), preset count (56), procedural assemblies, and builder chaining methods.
+---
+
+## 25. Hard-Surface Realism & Anti-Primitive Architectural Overhaul (local build/validation evidence)
+
+This is a historical implementation inventory. The listed helpers do not guarantee that each generated asset is realistic or finished; Section 26 and the current authoring skill define the active silhouette, form, motion, and surface acceptance rules.
+
+To address disconnected primitive stacks, the procedural modeling pipeline added or updated construction helpers across `RogueModelKit.py` and `generate_unit_model.py`:
+
+- **Compound Faceted Ballistic Turret Architecture (`make_faceted_turret_housing`)**:
+  - Replaces raw 3-box stacking with a 16-vertex monocoque kinetic turret shell:
+    - **Armored Turret Bearing Ring / Race Collar (`Turret_TurretRing`)**: Cylindrical/octagonal bearing race (r ≈ width × 0.44, h = 0.08m) that physically anchors the turret into the hull deck, eliminating floating boxes.
+    - **Kinetic Deflector Cheeks**: Forward wedge cheeks sloped at 32° for authentic projectile deflection.
+    - **Inward Tumblehome Flanks & Raked Brow**: Lateral armor angles inward toward the roof with a sloped front brow.
+    - **Undercut Rear Bustle**: Rear compartment underside angles upward at 28°, providing realistic clearance over the engine deck for 360° traverse without clipping.
+    - **Recessed Cast Gun Mantlet Cradle (`Turret_MantletHousing`)**: Cast mantlet collar with sloped cheek bevels.
+    - **Bilateral Composite Cheek Applique Plates (`Turret_CheekArmor_L/R`)**: Layered kinetic standoff armor panels flanking the mantlet.
+- **Hull Turret Well Coaming & Glacis Driver Cupola (`add_sloped_hull`)**:
+  - Integrated raised cylindrical turret coaming rim on the fighting compartment deck (`Armor_TurretCoaming`) to seat the turret race.
+  - Forward glacis faceted driver cupola (`Armor_DriverHood`) with emissive periscope vision slit (`Armor_DriverPeriscope`), breaking flat upper glacis monotony.
+- **Articulated Walker / Mech Torso & Cast Pelvis Architecture (`make_articulated_mech_torso`, `make_cast_pelvis_assembly`)**:
+  - Eliminates the previous pattern of 4 vertically stacked cubes (`Pelvis`, `Torso`, `Chest`, `PowerCell`):
+    - **Cast Pelvis Gimbal Assembly (`make_cast_pelvis_assembly` / `.add_cast_pelvis()`)**: Heavy central waist gimbal cylinder, bilateral forged hip clevis actuator brackets with cross-pin axle bosses, and lower groin chevron deflector plate.
+    - **Faceted Monocoque Mech Torso (`make_articulated_mech_torso` / `.add_mech_torso()`)**: Tapered ballistic torso pod with sloped chest glacis plate (20° forward slope), recessed panoramic sensor visor cowl, bilateral shoulder pauldron mounting hardpoints with cylindrical joint cuffs, and dorsal power reactor bay with twin angled cooling exhaust stacks.
+    - Applied across `walker`, `colossus_titan`, `heavy_crane_mech`, and `artillery_strider`.
+- **Sculpted Wheel Arch Fenders (`make_sculpted_wheel_fender_assembly` / `.add_wheel_fenders()`)**:
+  - Contoured 3-segment arched wheel well fenders hugging all-terrain tires, with forward mudflap deflectors, rear splash guards, and outer chamfered flare skirts.
+  - Deployed on `nanite_support_rover`, `tactical_relay_carrier`, `halftrack`, and wheeled variants.
+
+
+- **Transitional Mounting Coamings (`make_transitional_coaming_collar` / `.add_transitional_coaming()`)**:
+  - Beveled perimeter mounting flanges bridging cabins, cowls, superstructures, hoppers, and equipment bays to chassis decks, eliminating unnatural computer-generated 90-degree knife-edge intersections.
+  - Deployed across the full fleet: `super_heavy`, `siege_crawler`, `drone_carrier`, `combat_harvester`, `gravity_siege_breaker`, `mortar_carrier`, `mine_layer`, `recovery_crawler`, `bridge_layer`, `demolition_breacher`, `amphibious_assault_tank`, `ew_jammer`, `mobile_sam_launcher`, `command_hq_rig`, `buggy`, `bike`, `quad_mech`, `spider`, `hexapod_assault`, `plasma_mortar_strider`.
+- **Aerodynamic Compound Fuselages & Wing Root Fillets (`make_aerodynamic_fuselage_assembly` / `.add_aerodynamic_fuselage()`)**:
+  - Tapered aeronautical monocoques with multi-panel faceted cockpit canopies, upper shoulder tumblehome chamfers, bilateral jet/lift-fan intake scoops with splitter plates, ventral keel rails, and blended wing root fairings.
+  - Deployed on `vtol`, `heavy_dropship`, and `flying_wing_bomber`, eliminating primitive rectangular-block aircraft bodies.
+- **Segmented Plenum Skirt & Vectoring Louvers (`make_hover_skimmer_assembly`)**:
+  - Flexible rubber plenum skirt pleats at bow and stern (22° deflection), lateral thrust vectoring air louvers, and perimeter welt bumper collar across all hovercraft (`hover`, `hover_cruiser`, `assault_hovercraft`, `stealth_recon_skimmer`).
+- **Architectural Plinths & Buttress Pilasters (`make_factory_assembly`, `make_turret_bunker_assembly`)**:
+  - Angled foundation corner buttresses and sloped armor glacis plinth rings anchoring industrial production halls and defense bunkers firmly to Z=0.0m foundation slabs.
+
+
+### Wave 2 Hard-Surface Realism & Mechanical Fidelity Suite (local build/validation evidence)
+
+To elevate mechanical fidelity beyond basic blockout geometry, Wave 2 introduces authentic heavy hardware, suspension running gear, joint deflection shields, and field rigging across `RogueModelKit.py` and `generate_unit_model.py`:
+
+- **Heavy Forged Towing Clevis Shackles (`make_towing_shackle_assembly` / `.add_towing_shackles()`)**:
+  - Welded mounting bosses, transverse retaining clevis pins, and hanging 18° angled forged D-ring shackles mounted low on front lower glacis and rear hull plates.
+  - Deployed across 25 vehicles (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `bridge_layer`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `halftrack`, `shield_truck`, `ew_jammer`, `mobile_sam_launcher`, `command_hq_rig`, `tactical_relay_carrier`, `nanite_support_rover`).
+- **Crane Rigging & Field Hoist Eye Lugs (`make_crane_lifting_lugs` / `.add_lifting_lugs()`)**:
+  - 4-point forged circular eye lugs with reinforced weld pads mounted to upper hull, chassis deck corners, and turret roofs across 30 vehicles and mechs (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `siege_crawler`, `drone_carrier`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `bridge_layer`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `halftrack`, `shield_truck`, `ew_jammer`, `mobile_sam_launcher`, `command_hq_rig`, `tactical_relay_carrier`, `nanite_support_rover`, `colossus_titan`, `heavy_crane_mech`, `artillery_strider`, `walker`, `quad_mech`).
+- **Trailing-Arm Suspension Linkages with Torsion Bosses & Coil Springs (`with_suspension_arms=True`)**:
+  - Enabled by default on `add_continuous_tracks()`, connecting all roadwheels to the hull via mechanical swing arms, cylindrical torsion bosses, and coil shock dampers.
+- **Rear Flexible Rubber Mudflaps (`FenderRearMudflap_L/R`)**:
+  - Integrated into `make_continuous_track_assembly()`, angled at -32° to prevent realistic track debris throw.
+- **Ballistic Chevron Knee Deflector Shields & Ankle Hydraulic Dampers (`make_quad_crawler_leg`)**:
+  - Added angled chevron kneecap deflector armor (`KneeCapShield`) and parallel ankle hydraulic shock absorbers (`AnkleHydraulicShock`) to multi-leg spider, hexapod, and crawler archetypes.
+- **Rocket Backblast Deflector Cowl & Umbilical Conduit Bundle (`make_missile_launcher_pod`)**:
+  - Top overhanging blast deflector cowl (`BlastCowl`) and flexible umbilical firing cable conduit (`UmbilicalConduit`) routing rocket guidance controls into the launcher rack.
+- **Factory Electrical Substation & Cable Raceway (`make_factory_assembly`)**:
+  - Step-down electrical transformer housing (`SubstationTransformer`) and high-voltage cable raceway trunking (`CableRaceway`) running along industrial factory foundations.
+- **Fleet-Wide Commander's Crew Cupolas (`.add_crew_cupola()`)**:
+  - Armored commander cupolas with emissive periscope vision blocks deployed across 15 fighting vehicles.
+
+### Waves 3 & 4 Hard-Surface Realism: Anti-Floating Anchors, Structural Bridging & Interlocking Armor Gussets (local build/validation evidence)
+
+To resolve floating accessories and disconnected primitive joins ("figuras geométricas flotando o unidas sin anclaje"), Waves 3 & 4 deploy physical load-bearing mounts, drive axle housings, sponson bridges, and structural web gussets across `RogueModelKit.py` and `generate_unit_model.py`:
+
+- **Structural Deck Pylons & Anti-Floating Weapon/Sensor Mounts**:
+  - **Radar Turntable Pedestal Column (`Radar_DeckPylon`)**: Heavy cylindrical pedestal anchoring the radar turntable down into the turret/hull roof, eliminating floating rotodomes and dishes.
+  - **Missile Pod Trunnion Cradle & Axle (`MissilePod_TrunnionCradle`, `MissilePod_TrunnionAxle`)**: Cast elevation saddle and trunnion pin mounting rocket pods securely to the deck rather than hovering in empty air.
+  - **Pintle Mounting Saddles & Struts (`Gatling_PintleSaddle`, `Gatling_PintlePin`)**: Forged pintle brackets and transverse pins anchoring side-mounted rotary autocannons to vehicle hulls and mech shoulders.
+  - **Arc Emitter Insulator Mounting Collar (`Arc_PedestalCollar`)**: Flanged armored pedestal collar locking the electrical arc projector core directly into the turret face plate.
+  - **Cheek Smoke Rack Brackets (`Smoke_MountBracket_L/R`)**: Angled steel mounting brackets welding smoke grenade dispensers to turret armor cheeks.
+  - **Cantilever Sponson Bridge Beams (`Sponson_BridgeArm_L/R_Front/Rear`)**: Dual load-bearing cantilever beams physically bridging external sponsons to the primary hull.
+  - **Flanged Antenna Deck Sockets (`Sensor_AntennaDeckCollar`)**: Flared armored socket collars seating spring-loaded and whip antenna bases flush into decks.
+
+- **Wheeled Chassis Drive Axle Beams & Vertical Shock Struts (`add_all_terrain_wheels`)**:
+  - Heavy transverse drive axle beam housings (`Chassis_AxleBeam`) and center differential pumpkins (`Chassis_Differential`) spanning between left and right wheels across the chassis underside.
+  - Vertical suspension shock absorber struts (`Chassis_ShockStrut_L/R`) connecting each wheel hub to the chassis frame rail, eliminating disconnected floating wheels.
+
+- **Tracked Sponson Hull Floor Bridging (`add_continuous_tracks`)**:
+  - Armored sponson floor plates (`Armor_SponsonBridge_L/R`) closing the hollow void between the inner track face and the lower hull tub.
+
+- **Mech Hip Mounting Flanges, Calf Shields & Ankle Clevises (`make_bipedal_digitigrade_leg`)**:
+  - Flanged hip rotary actuator collars (`HipFlange_L/R`) locking the leg pivot into the pelvis.
+  - Rear armored calf deflector plates (`CalfArmor_L/R`) shielding the twin ankle hydraulic dampers.
+  - Ankle clevis yoke brackets (`AnkleClevis_L/R`) physically boxing the ankle pivot to the stabilizer foot base.
+
+- **Recessed Engine Deck Radiator Cavities (`add_engine_deck`)**:
+  - Deep dark intake cavity bed (`Engine_RadiatorCavity`) recessed beneath the angled louvers to simulate real engine compartment depth.
+
+- **Welded Triangular Interlocking Armor Gussets (`make_interlocking_armor_gusset` / `.add_interlocking_gussets()`)**:
+  - 3D triangular web gusset brackets welded into 90° hull/superstructure joints across heavy combat vehicles (`tank`, `artillery`, `super_heavy`, `siege_crawler`, `colossus_titan`, `heavy_crane_mech`, `command_hq_rig`, `combat_harvester`, `demolition_breacher`, `gravity_siege_breaker`).
+
+### Waves 5 & 6 Hard-Surface Realism: Ballistic Splash Protection, Bustle Stowage, CITV Sights, Recovery Winches, Fuel Drums & Thermal Deflectors (local build/validation evidence)
+
+To eliminate primitive boxiness and inject authentic battlefield functional architecture across `RogueModelKit.py` and `generate_unit_model.py`:
+- **V-Shaped Glacis Ballistic Splash Ribs (`make_glacis_splash_rib` / `.add_splash_rib()`)**:
+  - Chevron-angled kinetic splash breaker ribs welded to the forward glacis plate, deflecting shell fragments, ricochets, mud, and water away from driver periscopes and turret ring raceways.
+  - Deployed across 13 armored fighting vehicles (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `thermobaric_tank`, `amphibious_assault_tank`, `demolition_breacher`, `gravity_siege_breaker`, `bridge_layer`, `mine_layer`, `mortar_carrier`, `drone_carrier`).
+- **Welded Tubular Turret Bustle Stowage Baskets (`make_bustle_stowage_basket` / `.add_bustle_basket()`)**:
+  - Dual-tier welded tubular perimeter rail basket with perforated mesh floor and hull mounting standoffs cantilevered off the turret rear overhang, breaking the planar rear silhouette and providing authentic gear/camo net stowage.
+  - Deployed across 7 frontline combat turrets (`tank`, `artillery`, `super_heavy`, `arc_tank`, `flak_anti_air`, `thermobaric_tank`, `amphibious_assault_tank`).
+- **Commander's Independent Thermal Viewer (CITV) Panoramic Sights (`make_panoramic_commander_sight` / `.add_commander_sight()`)**:
+  - 360-degree rotating armored optic mast with lower turntable ring, dual sensor apertures (high-resolution FLIR thermal camera + laser rangefinder), and angled protective sunshade brow hood.
+  - Deployed across 10 combat units (`tank`, `artillery`, `super_heavy`, `flak_anti_air`, `thermobaric_tank`, `colossus_titan`, `quad_mech`, `gravity_siege_breaker`, `combat_harvester`, `drone_carrier`).
+- **Heavy Front Recovery Winch Assemblies (`make_recovery_winch_assembly` / `.add_recovery_winch()`)**:
+  - Front bumper-mounted recovery winch unit featuring armored drive housing, grooved steel cable spool drum, and dual-axis (horizontal + vertical) roller fairleads for field vehicle recovery and self-extraction.
+  - Deployed across 7 support, engineering, and heavy tracked/wheeled units (`recovery_crawler`, `halftrack`, `shield_truck`, `command_hq_rig`, `demolition_breacher`, `combat_harvester`, `bridge_layer`).
+- **Soviet-Style Auxiliary External Fuel Drums (`make_auxiliary_fuel_drum_assembly` / `.add_fuel_drums()`)**:
+  - Dual transverse cylindrical fuel/battery drums mounted to rear overhang via stamped steel cradle saddles, recessed end caps, double tension retention bands, and armored fuel transfer manifold line.
+  - Deployed across heavy tracked main battle tanks (`super_heavy`, `artillery`, `arc_tank`).
+- **Heavy Armored Exhaust Deflector Cowls (`make_exhaust_deflector_cowl` / `.add_exhaust_deflector()`)**:
+  - Angled protective exhaust hood with directional heat diffuser louvers, directing black engine smoke and thermal signature downward and backward away from optics and cooling intakes.
+  - Deployed on heavy utility and diesel engineering vehicles (`combat_harvester`, `bridge_layer`, `mine_layer`, `mortar_carrier`).
+- **Articulated Mech Torso Yaw Bearing Collar & Flexible Knee Joint Dust Gaiters**:
+  - `Torso_YawRace`: Heavy 14-vertex cast yaw bearing collar physically bridging the pelvis ring to the articulated upper torso in `add_mech_torso()`.
+  - `KneeGaiter`: Flexible accordion rubber knee joint dust boot shielding internal hydraulic pistons from grit and shrapnel in `make_bipedal_digitigrade_leg()`.
+### Wave 7 Hard-Surface Realism: Anti-Ring Weapon Overhaul, Tapered Cannon Barrels, Stator Rails & Two-Tier Shader Wear (local build/validation evidence)
+
+To resolve the artificial "toy-like" look caused by straight constant-radius pipes and stacked concentric/toroid rings ("demasiados anillos y tubos rectos pegados entre si"), Wave 7 replaces primitive cylinder stacks across `RogueModelKit.py` and `VehiclePBR_VertexWear.shader` with authentic military ballistic and electromagnetic engineering:
+
+- **Tapered Conical Frustum Primitive (`make_tapered_cylinder`)**:
+  - Leverages Blender's `bpy.ops.mesh.primitive_cone_add(radius1, radius2, depth)` with directional quaternion tracking to generate realistic conical frustums.
+  - Deployed across all cannon tubes, howitzer barrels, bore evacuators, and electrode prongs, providing authentic structural taper from thick reinforced breeches to narrower muzzles.
+- **Continuous Tapered Cannon & Howitzer Assemblies (`make_coaxial_cannon_assembly`, `make_heavy_howitzer_assembly`, `make_dual_cannon_assembly`)**:
+  - Heavy breech reinforce section tapering smoothly into barrel (1.25x to 0.92x caliber).
+  - Double-conical aerodynamic bore evacuators with forward and aft transition tapers, completely eliminating flat rectangular steps and floating warning rings.
+  - Multi-baffle muzzle brakes with real ventilated gas port cutouts.
+- **Electromagnetic Stator Rail Beams (`make_plasma_mortar_assembly`)**:
+  - Replaced stacked concentric floating rings/collars with four full-length longitudinal structural stator rail beams (`StatorRail_Top`, `_Bottom`, `_L`, `_R`) and recessed linear induction channels, transforming toy-like ring stacks into an authentic electromagnetic siege weapon.
+- **Faceted Shroud & Heat-Sink Collimator Rails (`make_collimated_beam_laser_assembly`)**:
+  - Replaced floating toroid donut rings with a faceted hexagonal jacket (`HexCollimationShroud`) and longitudinal heat-sink fin rails.
+- **Dielectric Ceramic Housing & Convergent Electrode Prongs (`make_arc_energy_emitter`)**:
+  - Replaced repetitive toroid coil loops with a faceted ceramic dielectric housing, heavy rear transformer insulator collar, and twin tapered convergent discharge prongs.
+- **Conical Accordion Pleat Mantlet Dust Boot (`make_mantlet_dust_boot`)**:
+  - Replaced disjoint floating toroid donuts with continuous conical accordion pleat pairs (`PleatConeA`, `PleatConeB`) producing an authentic flexible rubber/canvas protective bellows.
+- **Two-Tier Edge Wear & Carbon Soot Specular Extinction (`VehiclePBR_VertexWear.shader`)**:
+  - Two-tier wear transition curve: dark oxidized primer boundary outline (`#2c2724`, `wear 0.12-0.50`) transitioning into bare bright hardened alloy steel ridge (`#c7ccd6`, `wear > 0.42`), accurately simulating realistic paint chipping.
+  - Thermal soot specular extinction: carbon soot scaling suppresses specular smoothness (`smoothness *= (1.0 - soot * 0.65)`) and reduces metallic response (`metallic -= soot * 0.40`), ensuring burned muzzles and exhausts render as velvety carbon-matte instead of plastic or glossy metal.
+
+### Wave 8 Hard-Surface Realism: Procedural Scalloped Weld Seams, Weighted Normals, World-Space Mud & RNM Micro-Relief (local build/validation evidence)
+
+To elevate realism beyond clean primitive blockouts and eliminate knife-edge joins and uniform shading:
+- **Procedural Scalloped Weld Seam Chains (`make_weld_seam_bead` / `.add_weld_seams()`)**:
+  - Simulates industrial MIG/TIG weld seams along plate boundaries (glacis-to-hull joints, cheek armor) via alternating-tilt low-poly elliptical weld puddle cones with 45° angle-weighted auto-smoothing.
+  - Deployed on `tank`, `super_heavy`, and `artillery` sloped armor junctions.
+- **Automatic Weighted Normal Enforcement in FBX Export (`merge_meshes_by_material`)**:
+  - `merge_meshes_by_material` now systematically applies `shade_smooth_by_angle(38.0°)` and `apply_weighted_normals(weight=60, keep_sharp=True)` across all combined mesh batches.
+  - Keeps broad armor planes mathematically flat (no shading pinch) while 2-segment chamfers reflect sharp specular sun glints.
+- **World-Space Ground Mud & Road Dust Accumulation (`VehiclePBR_VertexWear.shader`)**:
+  - Computes vertical height falloff from `positionWS.y` and `_MudHeight` (default 0.55m).
+  - Procedurally blends albedo towards `_MudColor`, extinguishes metallic reflectivity (`metallic *= (1.0 - mudFactor)`), and dulls specularity to `_MudSmoothness` (0.20), grounding tracks, roadwheels, and lower hulls naturally onto terrain.
+- **Reoriented Normal Mapping (RNM) & Toksvig Anti-Shimmering**:
+  - Integrates `BlendNormalsRNM` for micro-armor grain (`_DetailBumpMap`) blending without flattening base normals.
+  - View-distance Toksvig damping softens specular highlights at high RTS camera elevations to eliminate pixel shimmering.
+- **Automated Open-Source Addon Installer (`tools/Setup-BlenderAuthoringAddons.ps1`)**:
+  - Automates installation and verification of `EdgeFlow` (edge-loop curvature), `DreamUV` (trim-sheet mapping), and `Ucupaint` (layered PBR texturing) directly in Blender 4.5.14 LTS.
+
+### Wave 9: Fleet-Wide Glacis Weld Seams & Shared Steel Micro-Detail Normal (local build/validation evidence)
+
+- **`add_glacis_weld_seams()`**: hull-scaled scalloped weld beads along both glacis-to-side-plate junctions; applied to every archetype that already carries `add_splash_rib()` (13 total with the Wave 8 hand-placed trio).
+- **`RCL_SteelMicroDetail_Normal.png`** (`tools/generate_steel_micro_detail_normal.py`): deterministic, seamlessly tileable (FFT-periodic) 256 px rolled-steel/cast-grain normal with anisotropic streaks and sparse pitting. `VehiclePrefabBuilder` binds it to `_DetailBumpMap` (scale 0.5) and the shader RNM-blends it independently of `_NORMALMAP`, fading out between 18 m and 58 m camera distance to prevent RTS shimmer.
+- Runtime/Steam evidence: **none** for this wave. Builds, importer settings, and Blender previews do not prove in-game rendering; the Unity AssetBundle rebuild and a Profile2 Steam acceptance run remain pending.
+
+### Wave 10: Deck-Edge Weld Seams on Every Sloped Hull (local build/validation evidence)
+
+- **`add_deck_edge_weld_seams()`**: scalloped weld beads along both upper deck-to-side-plate edges, scaled to the hull; emitted right after each single-line `builder.add_sloped_hull(...)` call (23 archetype branches). Combined with Wave 9 glacis seams, sloped-hull vehicles now show welded plate construction on both the front and top edges.
+- Evidence level: local Blender build only; no Unity bundle rebuild or Steam runtime run.
+
+
+### Wave 11: Turret Ring Guards, Driver Periscope Hoods, Exhaust Heat Shields & Thermal Tempering (local build/validation evidence)
+
+To banish floating boxes, disconnected primitive joins, and toy-like surfaces, Wave 11 deploys heavy load-bearing structural collars, crewed vision architecture, and metallurgical thermal tempering across `RogueModelKit.py`, `generate_unit_model.py`, and `VehiclePBR_VertexWear.shader`:
+
+- **Armored Turret Ring Guard & Shot-Trap Deflector Collar (`make_turret_ring_guard` / `.add_turret_ring_guard()`)**:
+  - Armored circular deflector ring / yaw-race coaming with upper kinetic bevel, stepped inner yaw bearing lip, and 8 radial hex bolt studs physically seating and boxing the turret into the hull deck.
+  - Deployed across 12 turreted combat archetypes (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `thermobaric_tank`, `combat_harvester`, `recovery_crawler`, `sniper_tankette`, `mortar_carrier`, `gravity_siege_breaker`, `amphibious_assault_tank`).
+- **Cast Armored Driver Periscope Hoods (`make_driver_periscope_hood` / `.add_driver_periscope_hood()`)**:
+  - Heavy cast steel hoods with sloped ballistic brows and recessed optical prisms (`Driver_PeriscopeGlass` with emissive sensor cyan) providing authentic crewed cockpit architecture.
+  - Deployed across 11 armored hull archetypes (`tank`, `artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `demolition_breacher`, `gravity_siege_breaker`, `amphibious_assault_tank`, `mortar_carrier`, `mine_layer`, `bridge_layer`).
+- **Perforated Exhaust Heat Shield Sleeves (`make_perforated_exhaust_heat_shield` / `.add_exhaust_heat_shield()`)**:
+  - Tubular heat shield sleeves with tension clamp bands at both ends surrounding exhaust ducts to prevent plumbing pipe appearances.
+  - Deployed on heavy utility and diesel engineering vehicles (`combat_harvester`, `bridge_layer`, `mine_layer`, `mortar_carrier`).
+- **Thermal Tempering Fringe & Crevice Micro-Dust Softening (`VehiclePBR_VertexWear.shader`)**:
+  - Metallurgical heat bluing: Simulates straw bronze (`#d4af37`) and iridescent blue/violet (`#435388`) temper oxide colors at the outer boundary of channel B (thermal soot, `soot 0.10 - 0.65`) before thick carbon soot takes over.
+  - Crevice micro-dust softening: Deep recesses (channel R, Cavity AO) lose specular gloss due to trapped dry micro-dust (`smoothness *= lerp(0.70, 1.0, ao)`).
+  - Zenith sun bleach: Upward-facing armor plates (`normalWS.y > 0.55`) receive subtle atmospheric sun-bleached oxidation.
+- **Surface Diagnostics & Telemetry Expansion (`RuntimeVisualSurfaceCensus.cs`, `AgentDiagnosticsFormatter.cs`)**:
+  - Exposes `temperFringeVertexCount` in `VisualSurfaceRow` and `visualSurfaceCensus` payloads.
+- Evidence level: local build/validation evidence only; no fresh Steam runtime proof.
+
+### Wave 12: Weapon Trunnion Brackets, Final Drive Planetary Housings & Armored Access Hatches (local build/validation evidence)
+
+To banish primitive "stuck-on/floating" geometry and establish realistic structural load paths between weapons, drivetrain sprockets, and armored hulls, Wave 12 introduces 3 procedural mechanical assemblies across `RogueModelKit.py` and integrates them into `generate_unit_model.py`:
+
+- **Weapon Elevation Trunnion Bracket Assemblies (`make_weapon_trunnion_bracket_assembly` / `.add_weapon_trunnions()`)**:
+  - Heavy cast/machined elevation trunnion bearing cheek brackets flanking the weapon mantlet or gun pivot center.
+  - Features left and right trunnion cheek housing blocks (`_CheekBlock_L/R`), heavy horizontal pivot pins (`_TrunnionPin_L/R`), flanged retention end caps / hub nuts (`_RetentionCap_L/R`), and flanged base mounting saddles (`_MountFlange_L/R`).
+  - Physically anchors elevating gun tubes and ballistic barrels to the turret or casemate carriage.
+  - Deployed across 10 weapon configurations and heavy artillery mounts (`railgun`, `gravity_cannon`, `laser_beam`, `quad_flak`, `plasma_mortar`, `howitzer`, `dual_cannon`, `sniper_tankette`, standard `cannon`, and `artillery` turret).
+- **Planetary Final-Drive Transmission Gearbox Housings (`make_final_drive_housing_assembly` / `.add_final_drive_housings()`)**:
+  - Stepped cylindrical cast planetary final-drive transmission gearbox housings connecting the lower hull sponson wall to drive sprockets.
+  - Features heavy stepped main housing cylinders (`_DriveHousing_L/R`), circular 8-bolt mounting flange rings (`_FlangeRing_L/R`), and protruding center bearing lubrication hub caps (`_HubCap_L/R`).
+  - Mechanically grounds the continuous track assemblies to the armored chassis, resolving the appearance of floating track belts.
+  - Deployed across all 16 tracked combat and engineering archetypes (`artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `bridge_layer`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `standard_tank`).
+- **Raised Armored Crew & Maintenance Access Hatches (`make_armored_access_hatch_assembly` / `.add_access_hatches()`)**:
+  - Raised armored crew ingress/egress and engine/battery inspection hatches.
+  - Features raised perimeter coaming weld rims (`_HatchCoaming`), beveled protective hatch cover plates (`_HatchCover`), heavy cylindrical transverse hinge knuckles (`_HatchHinge`), and rotating dogging-clamp locking latch handles (`_HatchLatch`).
+  - Supported on both vehicles (`RogueVehicleBuilder.add_access_hatches()`) and structures (`RogueStructureBuilder.add_access_hatches()`).
+  - Deployed across 14 combat, command, and engineering vehicle archetypes (`artillery`, `super_heavy`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `bridge_layer`, `command_hq_rig`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `standard_tank`).
+- Evidence level: local build/validation evidence only; no fresh Steam runtime proof.
+
+### Wave 13: Hydraulic Track Tensioners, Coaxial Gun Ports & Pioneer Entrenching Tool Racks (local build/validation evidence)
+
+To banish floating track idlers, plain featureless sponsons, and flat turret faces, Wave 13 introduces 3 procedural assemblies across `RogueModelKit.py` and `generate_unit_model.py`:
+
+- **Hydraulic Track Tensioners & Front Idler Wheel Yokes (`make_track_tensioner_idler_yoke_assembly` / `.add_track_tensioners()`)**:
+  - Mechanical front idler wheel mounting linking the front sponson wall to the track loop.
+  - Features longitudinal hydraulic tensioner cylinder barrels (`_TensionerCyl_L/R`), chrome-finished extension piston shafts (`_TensionerPiston_L/R`), heavy cast trailing yoke swing-arms (`_IdlerYokeArm_L/R`), idler spindle hub collars (`_IdlerSpindleHub_L/R`), and angled debris/mud scraper blades (`_TrackScraper_L/R`).
+  - Completes the mechanical suspension loop alongside Wave 12 rear final-drive housings: both ends of the track assembly are now structurally engineered into the chassis.
+  - Deployed across all 16 tracked combat and engineering archetypes (`artillery`, `arc_tank`, `super_heavy`, `flak_anti_air`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `sniper_tankette`, `bridge_layer`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `amphibious_assault_tank`, `standard_tank`).
+- **Turret Coaxial Weapon Ports & Blast Deflector Cowls (`make_coaxial_gun_port_assembly` / `.add_coaxial_weapon_ports()`)**:
+  - Armored secondary weapon port flanking main ordnance on the turret cheek or mantlet bezel.
+  - Features a cast armored port housing block (`_PortHousing`), sloped ballistic blast deflector brow cowl (`_BlastCowl`), recessed secondary barrel sleeve (`_CoaxSleeve`), and perforated flash hider tip (`_CoaxMuzzle`).
+  - Banishes empty, flat turret cheeks by establishing authentic secondary coaxial defense armament.
+  - Deployed across 10 turreted combat archetypes (`standard_tank`, `super_heavy`, `artillery`, `flak_anti_air`, `thermobaric_tank`, `sniper_tankette`, `gravity_siege_breaker`, `amphibious_assault_tank`, `arc_tank`, `combat_harvester`).
+- **Exterior Pioneer Entrenching Tool Racks & Sponson Stowage Cleats (`make_pioneer_tool_rack_assembly` / `.add_pioneer_tool_racks()`)**:
+  - Field pioneer entrenching gear and stowage racks mounted along vehicle flanks, sponsons, and facility exterior decks.
+  - Features dual stamped steel mounting C-cleats (`_MountCleat_0/1`) with dogging clamp clasps (`_ClampClasp_0/1`), an entrenching shovel (`_SpadeShaft`, `_SpadeBlade`), and an octagonal steel track-pin breaker pry bar with curved chisel claw tip (`_PryBar`, `_PryBarClaw`).
+  - Supported on both vehicles (`RogueVehicleBuilder.add_pioneer_tool_racks()`) and structures (`RogueStructureBuilder.add_pioneer_tool_racks()`).
+  - Deployed across 14 military combat and engineering vehicles (`standard_tank`, `super_heavy`, `combat_harvester`, `demolition_breacher`, `thermobaric_tank`, `recovery_crawler`, `mine_layer`, `bridge_layer`, `command_hq_rig`, `mortar_carrier`, `siege_drill_mole`, `gravity_siege_breaker`, `halftrack`, `shield_truck`).
+- Evidence level: local build/validation evidence only; no fresh Steam runtime proof.
+
+### Full Fleet & Active Unit Realism Rollout (Waves 11–13 Completed Integration)
+
+Wave 11–13 procedural assembly coverage now reaches **all 42 archetypes** in `generate_unit_model.py` and **all 18 active pack units** in `ActiveUnitVisualEnhancements.py`. These counts describe helper deployment only; they do not certify realistic silhouettes, model finish, or gameplay readability:
+
+- **Complete 42-Archetype Generator Coverage (`generate_unit_model.py` & skill twin)**:
+  - **Raised Access & Maintenance Hatches (`add_access_hatches`)**: 43 deployments across tanks, tracked crawlers, walkers, mechs, wheeled vehicles, and aircraft.
+  - **Turret Ring Deflector Guards (`add_turret_ring_guard`)**: 32 deployments across turreted combat vehicles and weapon stations.
+  - **Driver Periscope Ballistic Hoods (`add_driver_periscope_hood`)**: 31 deployments on enclosed glacis and cab roofs.
+  - **Pioneer Entrenching Tool Racks (`add_pioneer_tool_racks`)**: 29 deployments along sponsons, fenders, and side armor.
+  - **Coaxial Secondary Gun Ports (`add_coaxial_weapon_ports`)**: 21 deployments beside main guns on combat turrets.
+  - **Elevation Weapon Trunnions (`add_weapon_trunnions`)**: 20 deployments on elevating barrels and heavy weapon mounts.
+  - **Planetary Final-Drive Housings (`add_final_drive_housings`)**: 19 deployments on tracked chassis and heavy crawlers.
+  - **Hydraulic Track Tensioners & Front Idlers (`add_track_tensioners`)**: 19 deployments on front track sponsons.
+  - **Exhaust Heat Shields (`add_exhaust_heat_shield`)**: 13 deployments over engine manifolds and exhaust pipes.
+  - Every archetype has at least one assembly from these waves; this inventory is not a visual-quality score.
+- **Full Active Pack Unit Integration (`ActiveUnitVisualEnhancements.py`)**:
+  - Authoring profile map `ACTIVE_UNIT_REALISM_PROFILES` added for all 18 active units:
+    - Tracked: `SandlanceScout`, `ColossusSiegePlatform`, `SurgeArcTank`, `BulwarkSiegeTank`, `GravitasBreaker` (final drive, track tensioner, access hatch, pioneer rack, turret ring guard, coaxial port, driver periscope, weapon trunnions).
+    - Wheeled: `OverlordCommandHQ`, `FieldMedicRover`, `SentinelRelay`, `CommandRelay`, `SkyguardSAM`, `SalvageHauler` (access hatch, driver periscope, pioneer rack, turret ring guard).
+    - Mechs / Walkers: `IroncladWalker`, `AtlasCraneMech`, `BastionSiegeMech`, `ArachnidHexapod`, `ArcLanceWalker` (access hatch, weapon trunnions, turret ring guard where turreted).
+    - Hovercraft & Bike: `TidebreakerHovercraft` (access hatch, driver periscope, turret ring guard, coaxial port), `SkirmishStrikeBike` (access hatch, pioneer rack).
+  - Idempotent builder integration via `apply_realism_details()`, chained into `apply_wave34_details()`.
+- **Twin Script Parity & Quality Verification**:
+  - Byte-for-byte binary parity between `tools/generate_unit_model.py` and `.agents/skills/rogue-command-3d-model-authoring/scripts/generate_unit_model.py` verified via `fc.exe /b`.
+  - Comprehensive unit test `test_active_units_have_realism_profiles` and updated threshold assertions verified in `tests/python/authoring/test_model_kit_skill_copy.py`.
+  - Full Python test suite passed cleanly (131/131 tests).
+- Evidence level: local build/validation evidence only; no fresh Steam runtime proof.
+
+## 26. Stylized Realism Research and Three-Model Pilot (local Blender evidence)
+
+The current art direction is grounded stylized military science-fiction realism. This section and the linked authoring skill supersede any earlier implication that fixed detail ratios, a generator preset, or adding hardware by itself guarantees a realistic model.
+
+### Research translated into project rules
+
+- Blender Studio recommends collecting references, establishing a scaled blockout, testing movement, and refining the asset from several views; boolean-heavy refinements may need topology cleanup to restore smooth curvature. Rogue Command treats generator output as a functional blockout: refine the primary hull, torso, fairing, or facility shell before adding small parts, then inspect cut surfaces under moving highlights and retopologize pinched areas before UVs. [Blender Studio modeling guide](https://studio.blender.org/tools/pipeline-overview/asset-creation/modeling)
+- Blizzard's StarCraft: Remastered team retained recognizable unit silhouettes while increasing visible detail. For Rogue Command, preserve each unit role and recognition cues, while developing original stance, proportions, negative space, and construction. [Blizzard development interview](https://news.blizzard.com/en-us/article/20726732/behind-the-scenes-of-starcraft-remastered)
+- Turn that identity/readability balance into an explicit roster-divergence pass: compare each candidate against the closest native/mod counterpart, record the inherited default body plan and the role cues to retain, and sketch two structurally distinct blockouts if the first draft still follows the stock pattern. Choose a form whose visible support, clearance, movement, or thermal path explains its massing. The two-blockout exercise is a project heuristic, not a Blizzard rule. Novelty must come from form and function rather than surface noise or decorative attachments.
+- Blizzard's RTS art guidance prioritizes unit readability and warns that a team color can disappear against similarly colored terrain. Add a preview check against representative light, dark, and similar-hue backgrounds; treat this as an art-direction check rather than runtime faction-color evidence. [Blizzard mapmaking art and performance guidance](https://news.blizzard.com/en-gb/article/20097658/mapmaking-best-practices-in-art-and-performance)
+- Blender's bevel and baking references distinguish edge geometry and surface shading from transferred fine relief. Apply bevels by part construction, use flat shading for intentional armor facets and smooth shading for formed parts, and reserve tangent-space normal maps, cage setup, and UV padding for detail after geometry and UVs settle. [Bevel Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/generate/bevel.html), [Cycles baking](https://docs.blender.org/manual/en/4.5/render/cycles/baking.html)
+- Blender's Weighted Normal modifier changes custom shading normals based on face area, corner angle, or face strength. Use it to preserve broad designed planes after the shape is authored; it cannot replace silhouette and cross-section refinement. [Weighted Normal Modifier](https://docs.blender.org/manual/en/4.5/modeling/modifiers/normals/weighted_normal.html)
+- Unity's model importer and LOD workflow support authored normals/tangents and screen-relative simplification. Review shape at the actual camera scale, preserve authored shading, and simplify hidden or sub-pixel geometry first. The 6,500-face Level 1 chassis cap, 2,000-face per-module Level 2 cap, and separate 10,000-face static-structure cap are project profiles, not engine limits or targets. [Unity 2021.3 Model Importer](https://docs.unity3d.com/2021.3/Documentation/Manual/FBXImporter-Model.html), [Unity 2021.3 Level of Detail](https://docs.unity3d.com/2021.3/Documentation/Manual/LevelOfDetail.html)
+- PBR guidance separates metalness from roughness: roughness controls reflection sharpness. For Rogue Command, use that principle to choose material-specific values and localized wear while preserving the project's MetallicGloss packing and vertex-wear contract. [Adobe OpenPBR overview](https://experienceleague.adobe.com/en/docs/substance-3d/general-knowledge/openpbr/openpbr-overview)
+- Unity 2021.3's metallic workflow supports region-specific metallic and smoothness data: the Standard Shader reads metallic from R and smoothness from A. Use this to separate coating, bare metal, rubber, optics, and other materials rather than assigning one metallic value across the atlas; retain the actual mod shader/importer as the final contract. [Unity 2021.3 Metallic workflow](https://docs.unity3d.com/2021.3/Documentation/Manual/StandardShaderMaterialParameterMetallic.html), [Unity 2021.3 Smoothness](https://docs.unity3d.com/2021.3/Documentation/Manual/StandardShaderMaterialParameterSmoothness.html)
+
+### Pilot results
+
+- **Sandlance Scout:** refined the main hull, deck, side pods, turret, and gun nose with profiled shells. Local Blender builder result: 6,946 faces; bounds 2.17 × 2.70 × 1.57 m; ground contact passed.
+- **Skirmish Strike Bike:** refined the front fairing and side/body shells, reduced the battery volume, and added four insulator supports beneath the induction ring. Local Blender builder result: 3,910 faces; bounds 1.20 × 2.20 × 1.31 m; ground contact passed. Its separate rig/export builder validated rigid weights and in-place clips and regenerated the atlas FBX.
+- **Ironclad Walker:** refined torso, pelvis, shoulder, guard, and bracer shells. Faceted armor remains flat-shaded while formed housings and smaller joint-related covers use restrained smooth shading. Local Blender builder result: 4,396 faces; bounds 2.02 × 1.98 × 2.546 m; ground contact passed; rig, five action clips, and atlas export completed.
+
+These three historical primary-asset builds were measured against the former 7,500-face ceiling; all three results (6,946, 3,910, and 4,396 faces) were within the then-current Level 1 10,000-face maximum. Their preview renders are under `artifacts/previews/`; face counts refer to Blender source geometry, not Unity triangles. Material Maker 1.7 produced strict 2048×2048 four-map preview sets under `artifacts/model-realism-pilot/material-maker/` with the matching unit presets. These generated maps remain review intermediates and were not promoted over the current unit material atlases. The local Unity authoring build and live Steam appearance were not verified in this pass.
+
+- **Overlord Command HQ (ongoing, isolated candidate)**: a refined Blender build produced 6,696 faces and met the former 7,500-face ceiling; it also sat within the then-current 10,000-face Level 1 primary-asset maximum. The `neosteel_command_citadel` Material Maker set passed strict map/channel checks, but its broad blue edge emission and noisy normal detail failed visual review. An isolated graph with reduced microdetail and no emission passed the strict map gate, but the textured render still showed too much broad mottling. The `three_d` workflow also created and audited a UV-frozen, single-submesh paint proxy; its stock graph reproduced the same broad emission and dense surface pattern. Keep the geometry and map outputs as review candidates under `artifacts/pre-realism-fleet-step3-20261110/` and do not promote this texture set. The previews are local Blender authoring evidence, not Unity or in-game validation.
+- **Gravitas Breaker (isolated LOD0 candidate)**: targeted duplicate removal found 22 exact overlapping meshes in towing/lifting and gusset details; a protected 48-degree dissolve pass on parts up to 1.2 m produced 6,271 Blender faces / 16,346 triangles with ground contact at 0.0088 m. The source and FBX candidate are under `artifacts/pre-realism-fleet-step2-20261110/candidate-48deg/`. The four-view review still reads as a slab/tank body and the splinter pattern remains visually busy, so this is a geometry-budget experiment only and is not promoted. Production source/FBX, maps, and AssetBundle remain untouched; appearance evidence is local Blender only.
+
+### Acceptance rules for future fleet work
+
+1. Define role, movement, primary system, and two or three silhouette cues from several references. Compare against the closest native/mod counterpart, retain role cues, and depart from its generic body-plan pattern where function supports a new silhouette.
+2. If the first blockout follows the stock pattern, make two structurally distinct silhouette blockouts before detailed modeling. Record the selected design's role constraint, shape choice, and functional evidence.
+3. Test a rough articulation or movement envelope while the blockout is still cheap to change. Pass side-by-side black-silhouette and neutral-clay reviews at actual RTS size before tertiary detail. Review front, side, top, elevated gameplay view, and a representative movement pose.
+4. Refine large connected forms with changing profiles and purposeful transitions. After boolean or dense panel cuts, inspect curvature under grazing highlights and repair pinching or lumpy topology before UVs. Keep separate plates and joints where the mechanism requires them; reject both unmodified block stacks and oversized smooth blobs.
+5. Recheck support, load path, clearance, and motion for every prominent weapon, sensor, wheel, leg, hatch, or suspension part.
+6. Finalize geometry and UVs before baking. Keep the exact PBR map/channel/import contract, vertex Color RGBA, canonical sockets, rig/pivots, hierarchy, and LOD behavior.
+7. Keep the material pass subordinate to the form pass: tune response per material and place grime/wear where use or exposure explains it. Do not use full-surface noise or edge highlights to compensate for weak shape design.
+8. Distinguish intact coatings from exposed metal, flexible parts, glazing, and lights in the existing PBR channels. Keep emissions localized to functional elements and avoid outlining every panel.
+9. Give generated maps an independent visual gate on the target UV model at RTS scale. A strict file/channel report does not establish material quality; reject debug overlays, conspicuous tiling, high-frequency noise, and color shifts that damage readability before promotion.
+10. Select bevel and smoothing per part construction. Use weighted normals to preserve large authored faces, not as a blanket smoothing fix; inspect both clay and textured assets at the actual RTS view size. Preview intended color grouping against terrain colors that could compete with the faction tint.
+11. Report Blender faces, exported Unity triangles, local Unity validation, and runtime appearance as separate evidence levels.
+
+## 27. Quality-first 6,000-face reduction pass (2026-11-10, historical cap)
+
+Vehicle and structure `build_and_export` methods run `RogueModelKit.reduce_subpixel_details_to_budget` after optional details/refinement and before their strict LOD0 gates. Preset bevel refinements use the same authored-data guards. Direct-source builders call the pass before skinning and vertex-color baking; the common `batch_and_join_by_material` and `merge_meshes_by_material` paths enforce the final cap. It prioritizes small fasteners, welds, lugs, shackles, and hinges, then dissolves redundant splits on eligible fittings while respecting UV discontinuities. Meshes with authored Color data, weights, custom normals, multiple material assignments, or explicit sharp/seam edges are skipped so those attributes remain exact. Its conservative stage is limited to 0.60 m; a bounded fallback reaches 1.20 m and protects armor/shell parts and turret bases, rings, yaw races, mantlets, and all main functional systems. Each proposed dissolve is compared against the prior surface in both directions using vertex, edge-midpoint, and face-center samples. The accumulated sampled displacement per mesh is capped at 0.02 m across both preset and budget passes. If those safe reductions are insufficient, export remains blocked for a model-specific redesign rather than count-only decimation. Reports now include the per-build face-reduction diagnostics. Exporters bypassing the shared paths need their own measured call and strict gate.
+
+Re-auditing the earlier isolated candidates with the displacement guard shows which builds met the former 6,000-face cap. The r3 results below are historical candidates from before this check and should not be treated as current accepted outputs. The guarded r8 build of Sentinel Relay produced 5,993 Blender source faces and 12,864 Blender-profiled triangles with valid ground contact; its FBX and four neutral views are under `artifacts/face-reduction-6000-r8-20261110/SentinelRelay/`. Static Blender FBX reimport confirmed the same 5,993 faces / 12,864 triangles, UVs on all nine visible meshes, retained Color RGBA, armature and colliders, and 20 unique sockets with `FirePoint_0` parented under `Socket_MuzzlePrimary`. This is Blender export/reimport evidence, not Unity or in-game validation. Under the former 6,000-face cap, Command Relay remained at 6,480 faces, Overlord Command HQ at 6,269, and Gravitas Breaker at 8,893 after the guarded pass and therefore stopped before FBX export. No source-art blend, production FBX, atlas, Unity prefab, or bundle was promoted.
+
+- **Command Relay (isolated candidate)**: the current builder produced 8,539 faces after its model-specific refinement; the shared cleanup reduced this to 5,981 faces / 12,940 triangles across 230 source parts batched into 8 Unity meshes, with ground contact at 0.055 m. Four neutral Blender views and the FBX are under `artifacts/face-reduction-6000-r3-20261110/CommandRelay/`. The candidate keeps the hull, missile system, turret, wheels, and mast. No PBR atlas was baked or promoted.
+- **Sentinel Relay (isolated candidate)**: the current builder produced 7,195 faces after its model-specific refinement; cleanup reduced this to 5,968 faces / 12,870 triangles across 186 source parts batched into 9 Unity meshes, with ground contact at 0.0655 m. Four neutral Blender views and the FBX are under `artifacts/face-reduction-6000-r3-20261110/SentinelRelay/`. No production textures or assets were replaced.
+- **Overlord Command HQ (isolated candidate)**: the current builder produced 8,588 faces after its custom wheel/fender/bevel pass; the shared cleanup produced 5,996 faces / 13,724 triangles across 231 source parts batched into 8 Unity meshes, with ground contact at 0.0505 m. Its four neutral views and FBX are under `artifacts/face-reduction-6000-r3-20261110/OverlordCommandHQ/`. No PBR atlas was baked or promoted.
+- **Conservative in-memory source survey (under the former 6,000-face cap)**: after adding guards for authored colors, skinning, custom normals, material splits, and marked sharp/seam edges, six primary sources were flagged for model-specific work: Bulwark Siege Tank 9,320→7,143; Gravitas Breaker 12,400→12,400; Longshot Tankette 10,698→10,698; Minefield Sower 11,522→11,522; Salvage Hauler 7,979→6,274; Subterranean Mole 11,756→11,756. These are unsaved static Blender measurements on source `.blend` files before each unit's builder refinements. The refined Gravitas candidate at 8,428 faces was also blocked only by the former 6,000-face cap; it is numerically within the new cap but requires a fresh artifact-only build before acceptance. The three passing builds were isolated neutral candidates under the former cap only; no production `.blend`, FBX, atlas, or Unity prefab was overwritten or promoted.
+
+## 28. Historical Level 1 LOD0 maximum raised to 10,000 faces (2026-11-11; superseded by 6,500)
+
+At that historical revision, the 10,000 Blender source-face maximum applied to the Level 1 primary chassis. The generic CLI, direct model builders, procedural authoring helper, and Rogue Command 3D authoring skill use the Level 1 ceiling. Level 2 modules have their own 2,000-face maximum per module asset; module faces are not charged to the chassis or combined across modules. The quality gates remain unchanged: reductions are limited to eligible small-detail meshes, authored surface data and role-defining parts stay protected, and accumulated sampled surface displacement cannot exceed 0.02 m. The older 6,000-face reduction results remain historical. Under the 10,000-face cap in effect at that revision, Command Relay (6,480), Overlord Command HQ (6,269), and Gravitas Breaker (8,893) were numerically under budget; under the current 6,500-face cap, only Command Relay and Overlord are below the ceiling, while Gravitas needs another quality-preserving reduction. All still need fresh artifact-only builds before any candidate can be considered current. No model, source blend, production FBX, texture, Unity prefab, or AssetBundle was changed by the cap update.
+
+## 29. Independent Level 2 module budget and contact rules (2026-11-11)
+
+`RogueModelKit.LEVEL1_CHASSIS_FACE_BUDGET` is now 6,500 source faces for one Level 1 vehicle chassis. `LEVEL2_MODULE_FACE_BUDGET` is 2,000 source faces for each independently exported Level 2 module; the limit is checked before export and again during material batching, and module counts are not combined with the owning chassis or other modules. Static structures retain `STRUCTURE_FACE_BUDGET = 10000`; the generic CLI selects its default from the asset class. The 2,000 value gives headroom over the read-only profile of the 35 current module source assets, whose largest module contained 1,270 Blender faces. This profile only informed a geometry budget; it is not runtime or frame-time evidence.
+
+The modeling skill now treats visible interpenetration as a pre-export failure. Inspect exposed surfaces from front, side, top, elevated RTS, and representative motion views; permit penetration only within concealed mounts, sealed interfaces, or articulated joints. Keep circular forms where their cross-section serves a named mechanical function, and remove decorative concentric rings or repeated cylinder stacks from armor and housings. These are mandatory authoring review gates. This documentation and budget wiring did not rebuild or promote any model, FBX, texture, prefab, or bundle, and no whole-fleet intersection scan was performed.

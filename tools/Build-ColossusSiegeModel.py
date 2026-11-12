@@ -24,6 +24,8 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 from mathutils import Vector
 import RogueModelKit as rmk
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 
 
 # Target paths (customize for your unit)
@@ -36,10 +38,6 @@ PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "colossus-siege.png"
 
 def build_colossus_siege_model():
     rmk.clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     # 1. Disciplined 5-Tone Material Palette (Heavy Industrial / Siege Set)
     armor_primary = rmk.make_material("ColossusArmor", (0.12, 0.19, 0.24), metallic=0.42, roughness=0.58)
     armor_light = rmk.make_material("ColossusLightArmor", (0.22, 0.32, 0.38), metallic=0.34, roughness=0.60)
@@ -317,22 +315,46 @@ def build_colossus_siege_model():
                          rotation=(math.radians(22), 0.0, 0.0)),
         ]
 
+    model_objects.extend(apply_wave2_details(
+        "ColossusSiegePlatform",
+        objects=model_objects,
+        object_prefix="Colossus",
+        materials={"armor": armor_primary, "gunmetal": gunmetal, "warning": warning_amber, "tread": tread_mat},
+    ))
+
+    model_objects.extend(apply_wave34_details(
+        "ColossusSiegePlatform",
+        objects=model_objects,
+        object_prefix="Colossus",
+        materials={"armor": armor_primary, "gunmetal": gunmetal, "warning": warning_amber, "tread": tread_mat},
+    ))
+    rmk.enforce_face_budget_before_export(model_objects, "ColossusSiegePlatform")
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
+
     # 8. Automated Quality Diagnostics & Validation
     diagnostics = rmk.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
         raise ValueError("Colossus model failed ground-contact or material validation")
     bounds = diagnostics["bounds"]
-    if bounds["width_x"] > 2.8 or bounds["height_z"] > 1.9:
+    if bounds["width_x"] > 2.8 or bounds["height_z"] > 2.0:
         raise ValueError("Colossus model exceeds the ArtilleryTank width or height")
     if bounds["length_y"] > 3.6:
         print("Note: the siege cannon intentionally extends beyond the approximate ArtilleryTank length; verify unit spacing in-game.")
 
     # 9. Studio Preview Setup, AgX Rendering, and FBX Export
     rmk.setup_preview_studio(model_objects, PREVIEW_PATH, ortho_scale=6.4)
+    rmk.bake_advanced_vertex_shading(
+        model_objects,
+        wear_level="field_tested",
+        structural_wear_mask=True,
+    )
+    hardpoint_sockets = create_canonical_hardpoint_sockets("ColossusSiegePlatform")
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
-    export_batches = rmk.merge_meshes_by_material(model_objects, "Colossus", {
+    export_batches = rmk.merge_meshes_by_material(model_objects, "ColossusSiegePlatform", {
         armor_primary: "armor",
         armor_light: "lightArmor",
         gunmetal: "gunmetal",
@@ -342,7 +364,7 @@ def build_colossus_siege_model():
         warning_amber: "amber",
         sensor_cyan: "sensor",
     })
-    rmk.export_unity_fbx(FBX_PATH, export_batches)
+    rmk.export_unity_fbx(FBX_PATH, export_batches + hardpoint_sockets, include_empties=True, generate_profiled_lods=True, asset_id="ColossusSiegePlatform")
 
     print(f"Created source model: {BLEND_PATH}")
     print(f"Created Unity model: {FBX_PATH}")

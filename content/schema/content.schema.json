@@ -56,6 +56,22 @@
       "items": {
         "$ref": "#/$defs/relic"
       }
+    },
+    "buildings": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/building"
+      },
+      "description": "Optional standalone buildings (defensive turrets, support spires, walls, refineries) not bound to a produced unit."
+    },
+    "upgrades": {
+      "type": "array",
+      "maxItems": 128,
+      "items": {
+        "$ref": "#/$defs/upgrade"
+      },
+      "description": "Optional standalone card upgrades offered in runs, shops, and card drafts."
     }
   },
   "allOf": [
@@ -121,6 +137,26 @@
           ],
           "properties": {
             "relics": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "buildings"
+          ],
+          "properties": {
+            "buildings": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": [
+            "upgrades"
+          ],
+          "properties": {
+            "upgrades": {
               "minItems": 1
             }
           }
@@ -197,7 +233,11 @@
         "visualRootPath": {
           "type": "string",
           "minLength": 1,
-          "pattern": "\\S"
+          "pattern": "^(?!.*[\\r\\n])(?!\\s*$)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*(?:^|/)\\s*(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+          "description": "Relative Unity Transform path with non-empty, non-dot segments and forward slashes."
+        },
+        "nativeRigRetarget": {
+          "$ref": "#/$defs/nativeRigRetarget"
         },
         "nativeTemplateId": {
           "type": "string",
@@ -242,11 +282,169 @@
             "Stationary"
           ]
         },
+        "combatValue": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777216,
+          "description": "Structured integer copied to the native combatValue row field; gameplay semantics are not established here."
+        },
+        "gridSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Structured integer copied to the native gridSize row field; gameplay semantics are not established here."
+        },
+        "cardModelScalingFactor": {
+          "type": "number",
+          "exclusiveMinimum": 0.01000000024214387,
+          "maximum": 100.00000381469727,
+          "description": "Structured float copied to the native cardModelScalingFactor row field; gameplay/display effect is not established here."
+        },
+        "coinsAmount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16777216,
+          "description": "Structured integer copied to the native coinsAmount row field; gameplay semantics are not established here."
+        },
+        "firePointCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Structured integer copied to the native firePointCount row field; gameplay effect is not established here."
+        },
         "customBalance": {
           "type": "object",
-          "additionalProperties": {
-            "type": "number"
-          }
+          "description": "Per-unit balance overrides keyed by the 25 row-backed EntityBalancingStore.ChangeableValue members (ManaRechargePerSecond is global-only and excluded). Each key writes the exact EntityBalancingParameters row field read by the pinned native getter: integer-backed keys (Cost, MaxCapacity, MaxHealth, MaxShield, MaxMana, MaxRank, SightRadius, SkillRange) are read by GetOriginalIntValue and capped at 16777216; the other 17 are read by GetOriginalFloatValue. Non-obvious mappings: Attack1Cooldown writes attackCooldown, SpawnTtl writes duration2.",
+          "properties": {
+            "Cost": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "ProductionDuration": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "MaxCapacity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MaxHealth": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MaxShield": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MaxMana": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MaxRank": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "MoveSpeed": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "SightRadius": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "Damage1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "Damage2": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "WeaponRange": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "Attack1Cooldown": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38,
+              "description": "Writes EntityBalancingParameters.attackCooldown (no '1') via GetOriginalFloatValue."
+            },
+            "Attack2Cooldown": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "EffectRadius1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "EffectRadius2": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "SkillRange": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 16777216
+            },
+            "HealAmount1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "HealAmount2": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "GainCreditsAmount": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "SkillManaCost": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "Duration1": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "SpawnTtl": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38,
+              "description": "Writes EntityBalancingParameters.duration2 (no spawnTtl row field exists) via GetOriginalFloatValue."
+            },
+            "MaxArmor": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            },
+            "ArmorProtection": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 3.4028234663852886e+38
+            }
+          },
+          "additionalProperties": false
         },
         "abilities": {
           "type": "array",
@@ -274,32 +472,50 @@
         },
         "upgrades": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitUpgrade" }
+          "items": {
+            "$ref": "#/$defs/unitUpgrade"
+          }
         },
         "experience": {
           "$ref": "#/$defs/unitExperience"
         },
         "synergies": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitSynergy" }
+          "items": {
+            "$ref": "#/$defs/unitSynergy"
+          }
         },
         "visualVariants": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitVisualVariant" }
+          "items": {
+            "$ref": "#/$defs/unitVisualVariant"
+          }
+        },
+        "variants": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/unitVariant"
+          }
         },
         "spawn": {
           "$ref": "#/$defs/unitSpawn"
         },
         "statusEffects": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitStatusEffect" }
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/unitStatusEffect"
+          }
         },
         "productionQueue": {
           "$ref": "#/$defs/unitProductionQueue"
         },
         "resourceCosts": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitResourceCost" }
+          "items": {
+            "$ref": "#/$defs/unitResourceCost"
+          }
         },
         "movement": {
           "$ref": "#/$defs/unitMovement"
@@ -309,7 +525,9 @@
         },
         "weapons": {
           "type": "array",
-          "items": { "$ref": "#/$defs/unitWeapon" }
+          "items": {
+            "$ref": "#/$defs/unitWeapon"
+          }
         },
         "armor": {
           "$ref": "#/$defs/unitArmor"
@@ -334,6 +552,294 @@
         },
         "aiBehavior": {
           "$ref": "#/$defs/unitAiBehavior"
+        },
+        "shieldRegeneration": {
+          "$ref": "#/$defs/unitShieldRegen"
+        },
+        "vampiricLeech": {
+          "$ref": "#/$defs/unitVampiricLeech"
+        },
+        "tauntPulse": {
+          "$ref": "#/$defs/unitTauntPulse"
+        },
+        "shieldOverloadNova": {
+          "$ref": "#/$defs/unitShieldOverloadNova"
+        },
+        "damageReflect": {
+          "$ref": "#/$defs/unitDamageReflect"
+        },
+        "deathNova": {
+          "$ref": "#/$defs/unitDeathNova"
+        },
+        "copyUpgradesToEntityId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_:-]+$",
+          "description": "Identifier of the entity that receives card upgrades assigned to this entity."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native UnitRole bitmask flags classifying unit archetype (e.g. FrontalAttacker, Sniper, Tank, Mech)."
+        },
+        "attackType": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Single",
+            "AoE",
+            "Multi",
+            "MultiAoE",
+            "Beam",
+            "Artillery",
+            "MultiArtillery"
+          ],
+          "description": "Native weapon firing archetype governing projectile/beam presentation and upgrade eligibility."
+        },
+        "skillType": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Toggle",
+            "Location",
+            "LocationAoE",
+            "LocationMultiTargets",
+            "Self",
+            "SelfAoE",
+            "Target",
+            "TargetMultiTarget",
+            "TargetAoE",
+            "SelfMultiTarget"
+          ],
+          "description": "Native active skill targeting and HUD archetype."
+        },
+        "rarity": {
+          "type": "string",
+          "enum": [
+            "Common",
+            "Rare",
+            "UltraRare"
+          ],
+          "description": "Native card rarity governing visual frame styling and offer weighting."
+        },
+        "tech": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Colorless",
+            "Mech",
+            "Tank",
+            "Ancient",
+            "Specialist",
+            "All"
+          ],
+          "description": "Native faction technology classification."
+        },
+        "neededExperienceLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum player meta-progression experience level required to offer this blueprint."
+        },
+        "systemTags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Melee",
+              "Shield",
+              "Spawn",
+              "Armor",
+              "Mech",
+              "Robo",
+              "Heal",
+              "Turret",
+              "Fire",
+              "Bounty",
+              "Panic",
+              "Slow",
+              "Stun",
+              "Teleport",
+              "AoE",
+              "ManaUse",
+              "Rush",
+              "Turbo",
+              "Strength",
+              "Robust",
+              "SkillRangeUse",
+              "Bomb",
+              "Tank",
+              "Vehicle",
+              "EffectDuration",
+              "SpawnDuration",
+              "CriticalHits",
+              "Stealth",
+              "Zombo",
+              "Sniper",
+              "Regen",
+              "EconomySupport"
+            ]
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native SystemTags bitmask flags enabling meta-progression relic synergies."
+        },
+        "baselineStatusEffects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CombatBoost",
+              "Defender",
+              "SquadEffect",
+              "Turbo",
+              "SlowedDown",
+              "Stun",
+              "OnFire",
+              "Spikes",
+              "CriticallyHitting",
+              "Battered",
+              "Reaper",
+              "Regen",
+              "Rage",
+              "Attacker",
+              "Invincible",
+              "Leaking",
+              "Vampirism",
+              "Robust",
+              "Marked",
+              "Rush",
+              "Solo",
+              "Stealth",
+              "Taunt",
+              "Armored",
+              "AttackDeactivated",
+              "Panic",
+              "Overclocked"
+            ]
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native StatusEffect bitmask flags applied intrinsically to the unit."
+        },
+        "maxCapacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Maximum living units/buildings allowed simultaneously on the map."
+        },
+        "rotationDegreesPerSecond": {
+          "type": "number",
+          "minimum": 10.0,
+          "maximum": 720.0,
+          "description": "Entity angular rotation speed in degrees per second for steering and turret traverse."
+        },
+        "collisionRadius": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 50.0,
+          "description": "Collision and separation avoidance radius for flocking and placement."
+        },
+        "attackWarmUpTime": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 10.0,
+          "description": "Pre-attack warm-up / charging delay in seconds before projectile launch."
+        },
+        "canAttackWhileMoving": {
+          "type": "boolean",
+          "description": "Whether the entity can fire weapons while traversing or must stop to shoot."
+        },
+        "shootAutomaticallyOnEnemiesWithinRange": {
+          "type": "boolean",
+          "description": "Autonomous target acquisition against hostiles within detection / weapon range."
+        },
+        "defendPositionAggressivelyWhenIdle": {
+          "type": "boolean",
+          "description": "Aggressive guard behavior when idle, engaging encroaching enemies without player orders."
+        },
+        "rangeToChooseNewTargetAutomatically": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1000,
+          "description": "Automatic retargeting acquisition radius limit (-1 disables and uses sight radius)."
+        },
+        "minAttackRange": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 200.0,
+          "description": "Artillery dead-zone minimum attack range; weapons will not fire inside this distance."
+        },
+        "criticalHitChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Base critical hit chance bonus for precision/sniper units [0.0, 1.0]."
+        },
+        "onHitStatusEffects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/onHitStatusEffect"
+          },
+          "description": "List of dynamic status effects applied on attack impact."
+        },
+        "prespawnCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Target instance count pre-warmed in EntityFactory.PrespawnedEntities to prevent mid-combat hitching."
+        },
+        "selectionSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "engineSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "weaponSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "defaultTacticalStance": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "Aggressive",
+            "Defensive",
+            "HoldFire",
+            "Kiting"
+          ],
+          "description": "Default combat tactical stance applied to the unit on battlefield spawn."
+        },
+        "startingAffixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Swift",
+              "Bulwark",
+              "Juggernaut",
+              "Overcharged",
+              "Vampiric",
+              "Volatile"
+            ]
+          },
+          "uniqueItems": true,
+          "maxItems": 6,
+          "description": "List of elite affixes and traits active on the unit upon deployment."
+        },
+        "defaultLoadout": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Default combat loadout preset (Standard, AP, HE, Speed, Siege, Reinforced) or declared local variant ID applied to the unit on battlefield spawn."
+        },
+        "startingVeterancyRank": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Initial veterancy rank (0 to 5) applied to the unit upon deployment."
         }
       },
       "oneOf": [
@@ -483,8 +989,62 @@
               "visualAssetName"
             ]
           }
+        },
+        {
+          "if": {
+            "required": [
+              "nativeRigRetarget"
+            ]
+          },
+          "then": {
+            "required": [
+              "nativeTemplateId",
+              "assetBundleId",
+              "visualAssetName",
+              "visualRootPath"
+            ]
+          }
         }
       ]
+    },
+    "nativeRigRetarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mappings"
+      ],
+      "properties": {
+        "mappings": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/nativeRigRetargetMapping"
+          }
+        }
+      }
+    },
+    "nativeRigRetargetMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourcePath",
+        "targetPath"
+      ],
+      "properties": {
+        "sourcePath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[\\r\\n])(?!\\s*$)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*(?:^|/)\\s*(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+          "description": "Exact Transform path relative to the native unit prefab root."
+        },
+        "targetPath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[\\r\\n])(?!\\s*$)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*(?:^|/)\\s*(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+          "description": "Exact Transform path relative to the custom visual prefab root."
+        }
+      }
     },
     "unitLocalization": {
       "type": "object",
@@ -647,6 +1207,10 @@
             "All"
           ]
         },
+        "coinsAmount": {
+          "type": "integer",
+          "minimum": 0
+        },
         "neededExperienceLevel": {
           "type": "integer",
           "minimum": 0,
@@ -656,6 +1220,9 @@
           "type": "boolean"
         },
         "isForSpecialists": {
+          "type": "boolean"
+        },
+        "inactive": {
           "type": "boolean"
         },
         "localizations": {
@@ -734,13 +1301,39 @@
         "valueToChange",
         "operation",
         "value",
-        "side",
-        "multiplyValueWithCurrentHeatLevel",
-        "onlyForTheseEntityIds"
+        "side"
       ],
       "properties": {
         "valueToChange": {
-          "const": "Health"
+          "enum": [
+            "Health",
+            "Cost",
+            "ProductionDuration",
+            "MaxCapacity",
+            "MaxHealth",
+            "MaxShield",
+            "MaxMana",
+            "MaxRank",
+            "MoveSpeed",
+            "SightRadius",
+            "Damage1",
+            "Damage2",
+            "WeaponRange",
+            "Attack1Cooldown",
+            "Attack2Cooldown",
+            "EffectRadius1",
+            "EffectRadius2",
+            "SkillRange",
+            "HealAmount1",
+            "HealAmount2",
+            "GainCreditsAmount",
+            "SkillManaCost",
+            "Duration1",
+            "SpawnTtl",
+            "ManaRechargePerSecond",
+            "MaxArmor",
+            "ArmorProtection"
+          ]
         },
         "operation": {
           "enum": [
@@ -761,7 +1354,7 @@
           ]
         },
         "multiplyValueWithCurrentHeatLevel": {
-          "const": false
+          "type": "boolean"
         },
         "multiplyValueWithMetaProgressionMultiplier": {
           "type": "string",
@@ -770,12 +1363,54 @@
         },
         "onlyForTheseEntityIds": {
           "type": "array",
-          "minItems": 1,
           "maxItems": 128,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/namespacedId"
           }
+        },
+        "cardMustHaveAllOfTheseRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "cardMustHaveOneOfTheseRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "cardMustNotHaveOneOfTheseRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "cardMustNotHaveOneOfTheseTechs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "entityIdsNotAllowed": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/namespacedId"
+          }
+        },
+        "changeableValueHasToBeGreaterZero": {
+          "type": "boolean"
         }
       }
     },
@@ -816,6 +1451,10 @@
           "pattern": "\\S",
           "description": "Relative path to one native factory visual subtree."
         },
+        "isAllowedAsStartingBlueprint": {
+          "type": "boolean",
+          "description": "Allows this factory to enter the initial stage-0 blueprint offer."
+        },
         "balanceOverrides": {
           "type": "array",
           "maxItems": 64,
@@ -846,6 +1485,122 @@
               "name"
             ]
           }
+        },
+        "gridSize": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ],
+          "description": "Building footprint on the WorldGrid: 1 for 1x1, 2 for 2x2."
+        },
+        "maxCapacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Maximum simultaneous instances allowed on the map (native PlaceBuildings capacity cap)."
+        },
+        "cost": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "description": "Crystal cost to build or place."
+        },
+        "buildTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Drop and construction duration in seconds."
+        },
+        "combatValue": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Tactical combat threat value used by AI prioritization and threat balance."
+        },
+        "cardModelScalingFactor": {
+          "type": "number",
+          "exclusiveMinimum": 0.01000000024214387,
+          "maximum": 100.00000381469727,
+          "description": "Visual 3D model scale factor rendered inside card viewports."
+        },
+        "rarity": {
+          "type": "string",
+          "enum": [
+            "Common",
+            "Rare",
+            "UltraRare"
+          ],
+          "description": "Native card rarity governing visual frame styling and offer weighting."
+        },
+        "tech": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Colorless",
+            "Mech",
+            "Tank",
+            "Ancient",
+            "Specialist",
+            "All"
+          ],
+          "description": "Native faction technology classification."
+        },
+        "neededExperienceLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum player meta-progression experience level required to offer this blueprint."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native UnitRole bitmask flags classifying unit archetype (e.g. FrontalAttacker, Sniper, Tank, Mech)."
+        },
+        "systemTags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Melee",
+              "Shield",
+              "Spawn",
+              "Armor",
+              "Mech",
+              "Robo",
+              "Heal",
+              "Turret",
+              "Fire",
+              "Bounty",
+              "Panic",
+              "Slow",
+              "Stun",
+              "Teleport",
+              "AoE",
+              "ManaUse",
+              "Rush",
+              "Turbo",
+              "Strength",
+              "Robust",
+              "SkillRangeUse",
+              "Bomb",
+              "Tank",
+              "Vehicle",
+              "EffectDuration",
+              "SpawnDuration",
+              "CriticalHits",
+              "Stealth",
+              "Zombo",
+              "Sniper",
+              "Regen",
+              "EconomySupport"
+            ]
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native SystemTags bitmask flags enabling meta-progression relic synergies."
         }
       },
       "allOf": [
@@ -1126,7 +1881,7 @@
           "then": {
             "properties": {
               "value": {
-                "pattern": "^[0-9]+$"
+                "pattern": "^0*(?:[0-9]{1,7}|1[0-5][0-9]{6}|16[0-6][0-9]{5}|167[0-6][0-9]{4}|1677[0-6][0-9]{3}|16777[0-1][0-9]{2}|1677720[0-9]|1677721[0-6])$"
               }
             }
           }
@@ -1355,7 +2110,10 @@
     "stagePoolEntry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["poolId", "unitIds"],
+      "required": [
+        "poolId",
+        "unitIds"
+      ],
       "properties": {
         "poolId": {
           "type": "string",
@@ -1367,12 +2125,13 @@
           "type": "array",
           "minItems": 1,
           "maxItems": 64,
-          "items": { "$ref": "#/$defs/namespacedId" },
+          "items": {
+            "$ref": "#/$defs/namespacedId"
+          },
           "uniqueItems": true
         }
       }
     },
-
     "stageLandscape": {
       "type": "object",
       "additionalProperties": false,
@@ -1513,6 +2272,69 @@
           "items": {
             "$ref": "#/$defs/aiModule"
           }
+        },
+        "doctrine": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "Assault",
+            "Siege",
+            "Kiting",
+            "Fortify"
+          ],
+          "description": "Dynamic strategic AI doctrine dictating behavior pacing and wave intensity."
+        },
+        "aggressionMultiplier": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 5.0,
+          "description": "Scalar multiplier adjusting AI director decision tick cadence and assault wave tempo."
+        },
+        "defaultUnitStance": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "Aggressive",
+            "Defensive",
+            "HoldFire",
+            "Kiting"
+          ],
+          "description": "Default combat tactical stance applied automatically to AI units deployed under this profile."
+        },
+        "defaultUnitLoadout": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "AP",
+            "HE",
+            "Speed",
+            "Siege",
+            "Reinforced"
+          ],
+          "description": "Default combat loadout preset applied automatically to AI units deployed under this profile."
+        },
+        "startingUnitAffixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Swift",
+              "Bulwark",
+              "Juggernaut",
+              "Overcharged",
+              "Vampiric",
+              "Volatile"
+            ]
+          },
+          "uniqueItems": true,
+          "maxItems": 4,
+          "description": "Squad-wide elite affixes applied automatically to AI units deployed under this profile."
+        },
+        "startingUnitVeterancyRank": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "description": "Initial veterancy rank (0 to 5) applied automatically to AI units deployed under this profile."
         }
       },
       "oneOf": [
@@ -1720,6 +2542,59 @@
         }
       }
     },
+    "onHitStatusEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statusEffect",
+        "duration"
+      ],
+      "properties": {
+        "statusEffect": {
+          "type": "string",
+          "enum": [
+            "CombatBoost",
+            "Defender",
+            "SquadEffect",
+            "Turbo",
+            "SlowedDown",
+            "Stun",
+            "OnFire",
+            "Spikes",
+            "CriticallyHitting",
+            "Battered",
+            "Reaper",
+            "Regen",
+            "Rage",
+            "Attacker",
+            "Invincible",
+            "Leaking",
+            "Vampirism",
+            "Robust",
+            "Marked",
+            "Rush",
+            "Solo",
+            "Stealth",
+            "Taunt",
+            "Armored",
+            "AttackDeactivated",
+            "Panic",
+            "Overclocked"
+          ]
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 300.0
+        },
+        "chance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 1.0
+        }
+      }
+    },
     "activeSkill": {
       "type": "object",
       "additionalProperties": false,
@@ -1736,8 +2611,19 @@
           "enum": [
             "Position",
             "Target",
-            "Self"
+            "Self",
+            "Toggle",
+            "Location",
+            "LocationAoE",
+            "LocationMultiTargets",
+            "SelfAoE",
+            "TargetAoE"
           ]
+        },
+        "targetOrigin": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "cooldown": {
           "type": "number",
@@ -1751,6 +2637,27 @@
         },
         "effectValue": {
           "type": "number"
+        },
+        "range": {
+          "type": "number",
+          "minimum": 0
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "helpAiToActivate": {
+          "type": "boolean"
+        },
+        "aiActivationTrigger": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "aiSkillCooldown": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 300
         }
       }
     },
@@ -1786,197 +2693,1280 @@
     "unitUpgrade": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["targetUnitId"],
+      "required": [
+        "targetUnitId"
+      ],
       "properties": {
-        "targetUnitId": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "requiredExperienceLevel": { "type": "integer", "minimum": 0 },
-        "cost": { "type": "number", "minimum": 0 },
-        "description": { "type": "string" }
+        "targetUnitId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "requiredExperienceLevel": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "description": {
+          "type": "string"
+        }
       }
     },
     "unitExperience": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "experiencePerLevel": { "type": "integer", "minimum": 0 },
-        "maxLevel": { "type": "integer", "minimum": 0, "maximum": 100 },
-        "experienceGainMultiplier": { "type": "number", "minimum": 0, "maximum": 10 },
-        "levelUpBonus": { "type": "number", "minimum": 0 }
+        "experiencePerLevel": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "experienceGainMultiplier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "levelUpBonus": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitSynergy": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "statName"],
+      "required": [
+        "id",
+        "statName"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "statName": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "multiplier": { "type": "number", "minimum": 0, "maximum": 10 },
-        "radius": { "type": "number", "minimum": 0 },
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "statName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "multiplier": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0
+        },
         "targetUnitIds": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
         }
       }
     },
     "unitVisualVariant": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "visualAssetName": { "$ref": "#/$defs/assetName" },
-        "visualRootPath": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "colorTint": { "type": "string" },
-        "scale": { "type": "number", "minimum": 0, "maximum": 10 }
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "visualAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "visualRootPath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[\\r\\n])(?!\\s*$)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*(?:^|/)\\s*(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$"
+        },
+        "colorTint": {
+          "type": "string"
+        },
+        "scale": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "modules": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/unitVisualModule"
+          }
+        }
+      }
+    },
+    "unitVisualModule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slotId",
+        "assetName"
+      ],
+      "properties": {
+        "slotId": {
+          "type": "string",
+          "enum": [
+            "ERA",
+            "APS",
+            "Sponsons",
+            "FuelDrums"
+          ]
+        },
+        "assetName": {
+          "$ref": "#/$defs/assetName"
+        }
+      }
+    },
+    "unitVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(?!.*[\\n\\r\\u2028\\u2029])[a-z][a-z0-9._-]{0,63}$"
+        },
+        "loadout": {
+          "type": "string",
+          "enum": [
+            "AP",
+            "HE"
+          ]
+        },
+        "balanceOverrides": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/balanceOverride"
+          }
+        }
       }
     },
     "unitSpawn": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "spawnRate": { "type": "number", "minimum": 0 },
-        "maxSpawnCount": { "type": "integer", "minimum": 0 },
-        "spawnCooldown": { "type": "number", "minimum": 0 },
-        "spawnLocation": { "type": "string" }
+        "spawnRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxSpawnCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "spawnCooldown": {
+          "type": "number",
+          "minimum": 0
+        },
+        "spawnLocation": {
+          "type": "string"
+        }
       }
     },
     "unitStatusEffect": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "effectType"],
+      "required": [
+        "id",
+        "effectType"
+      ],
       "properties": {
-        "id": { "$ref": "#/$defs/namespacedId" },
-        "effectType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "duration": { "type": "number", "minimum": 0 },
-        "magnitude": { "type": "number" }
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "effectType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 300
+        },
+        "magnitude": {
+          "type": "number"
+        }
       }
     },
     "unitProductionQueue": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "buildTime": { "type": "number", "minimum": 0 },
-        "resourceCost": { "type": "number", "minimum": 0 },
-        "queueSize": { "type": "integer", "minimum": 0 },
-        "productionPriority": { "type": "integer", "minimum": 0 }
+        "buildTime": {
+          "type": "number",
+          "minimum": 0
+        },
+        "resourceCost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "queueSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "productionPriority": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "unitResourceCost": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["resourceType"],
+      "required": [
+        "resourceType"
+      ],
       "properties": {
-        "resourceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "amount": { "type": "number", "minimum": 0 }
+        "resourceType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitMovement": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "moveSpeed": { "type": "number", "minimum": 0 },
-        "turnRate": { "type": "number", "minimum": 0 },
-        "acceleration": { "type": "number", "minimum": 0 }
+        "moveSpeed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "turnRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "acceleration": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitDetection": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "detectionRange": { "type": "number", "minimum": 0 },
-        "sensorType": { "type": "string", "enum": ["Visual", "Radar", "Sonar", "Thermal"] },
-        "stealthDetection": { "type": "boolean" }
+        "detectionRange": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sensorType": {
+          "type": "string",
+          "enum": [
+            "Visual",
+            "Radar",
+            "Sonar",
+            "Thermal"
+          ]
+        },
+        "stealthDetection": {
+          "type": "boolean"
+        }
       }
     },
     "unitWeapon": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["weaponType"],
+      "required": [
+        "weaponType"
+      ],
       "properties": {
-        "weaponType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "damage": { "type": "number", "minimum": 0 },
-        "range": { "type": "number", "minimum": 0 },
-        "fireRate": { "type": "number", "minimum": 0 }
+        "weaponType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "damage": {
+          "type": "number",
+          "minimum": 0
+        },
+        "range": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fireRate": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitArmor": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "armorType": { "type": "string", "enum": ["Light", "Medium", "Heavy", "Energy"] },
-        "armorValue": { "type": "number", "minimum": 0 },
-        "shieldValue": { "type": "number", "minimum": 0 },
-        "damageReduction": { "type": "number", "minimum": 0, "maximum": 1 }
+        "armorType": {
+          "type": "string",
+          "enum": [
+            "Light",
+            "Medium",
+            "Heavy",
+            "Energy"
+          ]
+        },
+        "armorValue": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shieldValue": {
+          "type": "number",
+          "minimum": 0
+        },
+        "damageReduction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
     "unitHealing": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "healAmount": { "type": "number", "minimum": 0 },
-        "healRange": { "type": "number", "minimum": 0 },
-        "healRate": { "type": "number", "minimum": 0 },
-        "repairAmount": { "type": "number", "minimum": 0 }
+        "healAmount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "healRange": {
+          "type": "number",
+          "minimum": 0
+        },
+        "healRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "repairAmount": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitStealth": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "stealthLevel": { "type": "number", "minimum": 0, "maximum": 10 },
-        "cloakDuration": { "type": "number", "minimum": 0 },
-        "detectionReduction": { "type": "number", "minimum": 0, "maximum": 1 }
+        "stealthLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "cloakDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "detectionReduction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
     "unitCommand": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "commandRange": { "type": "number", "minimum": 0 },
-        "commandType": { "type": "string", "enum": ["Move", "Attack", "Defend", "Support"] },
-        "maxCommandChain": { "type": "integer", "minimum": 0 }
+        "commandRange": {
+          "type": "number",
+          "minimum": 0
+        },
+        "commandType": {
+          "type": "string",
+          "enum": [
+            "Move",
+            "Attack",
+            "Defend",
+            "Support"
+          ]
+        },
+        "maxCommandChain": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "unitExperienceReward": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "experienceAmount": { "type": "integer", "minimum": 0 },
-        "experienceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "bonusMultiplier": { "type": "number", "minimum": 0 }
+        "experienceAmount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "experienceType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "bonusMultiplier": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitAura": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "auraRadius": { "type": "number", "minimum": 0 },
-        "auraType": { "type": "string", "enum": ["Buff", "Debuff", "Heal", "Shield"] },
-        "buffAmount": { "type": "number", "minimum": 0 },
-        "affectsAllies": { "type": "boolean" },
-        "affectsEnemies": { "type": "boolean" }
+        "auraRadius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "auraType": {
+          "type": "string",
+          "enum": [
+            "Buff",
+            "Debuff",
+            "Heal",
+            "Shield"
+          ]
+        },
+        "buffAmount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "affectsAllies": {
+          "type": "boolean"
+        },
+        "affectsEnemies": {
+          "type": "boolean"
+        }
       }
     },
     "unitResourceGathering": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["resourceType"],
+      "required": [
+        "resourceType"
+      ],
       "properties": {
-        "resourceType": { "type": "string", "minLength": 1, "pattern": "\\S" },
-        "gatherRate": { "type": "number", "minimum": 0 },
-        "carryCapacity": { "type": "integer", "minimum": 0 },
-        "gatherRange": { "type": "number", "minimum": 0 }
+        "resourceType": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "gatherRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "carryCapacity": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gatherRange": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "unitAiBehavior": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "unitCap": { "type": "integer", "minimum": 0 },
-        "combatUnitCap": { "type": "integer", "minimum": 0 },
-        "skillActivationCheckInterval": { "type": "number", "minimum": 0 },
-        "aiTag": { "type": "string" }
+        "unitCap": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "combatUnitCap": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "skillActivationCheckInterval": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 60
+        },
+        "aiTag": {
+          "type": "string"
+        }
+      }
+    },
+    "unitShieldRegen": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rechargeDelay": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rechargeRate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "burstAmount": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "unitVampiricLeech": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "siphonRatio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "siphonToShield": {
+          "type": "boolean"
+        },
+        "maxSiphonPerHit": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "unitTauntPulse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pulseInterval": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tauntRadius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxTargets": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "unitShieldOverloadNova": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "novaRadius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "damage": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stunDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cooldown": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "unitDamageReflect": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reflectRatio": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxReflectPerHit": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "unitDeathNova": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "novaRadius": {
+          "type": "number",
+          "minimum": 0
+        },
+        "damage": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stunDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "slowDuration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxTargets": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "building": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "nativeTemplateId",
+        "localizations"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "nativeTemplateId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S",
+          "description": "Native entity template ID with Building role (e.g. MachineGunTurret, FlameTurret, HealingSpire, WallBlock)."
+        },
+        "assetBundleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "cardImageAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "visualAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "AssetBundle address for visual-only building GameObject prefab."
+        },
+        "visualRootPath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*[\\r\\n])(?!\\s*$)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*(?:^|/)\\s*(?:/|$))[^/\\\\]+(?:/[^/\\\\]+)*$",
+          "description": "Relative path to native building visual subtree."
+        },
+        "gridSize": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ],
+          "description": "Building footprint on the WorldGrid: 1 for 1x1, 2 for 2x2."
+        },
+        "maxCapacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Maximum simultaneous instances allowed on the map (native PlaceBuildings capacity cap)."
+        },
+        "cost": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000,
+          "description": "Crystal cost to build or place."
+        },
+        "buildTime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Drop and construction duration in seconds."
+        },
+        "combatValue": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Tactical combat threat value used by AI prioritization and threat balance."
+        },
+        "rarity": {
+          "type": "string",
+          "enum": [
+            "Common",
+            "Rare",
+            "UltraRare"
+          ],
+          "description": "Native card rarity governing visual frame styling and offer weighting."
+        },
+        "tech": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Colorless",
+            "Mech",
+            "Tank",
+            "Ancient",
+            "Specialist",
+            "All"
+          ],
+          "description": "Native faction technology classification."
+        },
+        "neededExperienceLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum player meta-progression experience level required to offer this blueprint."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native UnitRole bitmask flags classifying unit archetype (e.g. FrontalAttacker, Sniper, Tank, Mech)."
+        },
+        "systemTags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Melee",
+              "Shield",
+              "Spawn",
+              "Armor",
+              "Mech",
+              "Robo",
+              "Heal",
+              "Turret",
+              "Fire",
+              "Bounty",
+              "Panic",
+              "Slow",
+              "Stun",
+              "Teleport",
+              "AoE",
+              "ManaUse",
+              "Rush",
+              "Turbo",
+              "Strength",
+              "Robust",
+              "SkillRangeUse",
+              "Bomb",
+              "Tank",
+              "Vehicle",
+              "EffectDuration",
+              "SpawnDuration",
+              "CriticalHits",
+              "Stealth",
+              "Zombo",
+              "Sniper",
+              "Regen",
+              "EconomySupport"
+            ]
+          },
+          "maxItems": 16,
+          "uniqueItems": true,
+          "description": "Native SystemTags bitmask flags enabling meta-progression relic synergies."
+        },
+        "cardModelScalingFactor": {
+          "type": "number",
+          "exclusiveMinimum": 0.01000000024214387,
+          "maximum": 100.00000381469727,
+          "description": "Visual 3D model scale factor rendered inside card viewports."
+        },
+        "firePointCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Structured integer copied to the native firePointCount row field; gameplay effect is not established here."
+        },
+        "damage1": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary weapon attack damage."
+        },
+        "attackCooldown": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary weapon attack interval/cooldown in seconds."
+        },
+        "weaponRange": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary weapon targeting range in cells/meters."
+        },
+        "damage2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary weapon attack damage."
+        },
+        "attack2Cooldown": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary weapon attack interval/cooldown in seconds."
+        },
+        "attackType": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Single",
+            "AoE",
+            "Multi",
+            "MultiAoE",
+            "Beam",
+            "Artillery",
+            "MultiArtillery"
+          ],
+          "description": "Native weapon firing archetype governing projectile/beam presentation and upgrade eligibility."
+        },
+        "skillType": {
+          "type": "string",
+          "enum": [
+            "None",
+            "Toggle",
+            "Location",
+            "LocationAoE",
+            "LocationMultiTargets",
+            "Self",
+            "SelfAoE",
+            "Target",
+            "TargetMultiTarget",
+            "TargetAoE",
+            "SelfMultiTarget"
+          ],
+          "description": "Native active skill targeting and HUD archetype."
+        },
+        "skillRange": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Active skill effect / target acquisition range."
+        },
+        "skillManaCost": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Mana consumed per active skill trigger."
+        },
+        "healAmount1": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Healing or repair rate/amount for support spires."
+        },
+        "healAmount2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary healing amount."
+        },
+        "effectRadius1": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary effect radius for auras, blasts, or repair fields."
+        },
+        "effectRadius2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary effect radius."
+        },
+        "duration1": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Primary effect duration in seconds."
+        },
+        "duration2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Secondary effect duration in seconds."
+        },
+        "isAllowedAsBlueprint": {
+          "type": "boolean",
+          "description": "Whether this building is eligible as a blueprint reward card (defaults to true)."
+        },
+        "isAllowedAsStartingBlueprint": {
+          "type": "boolean",
+          "description": "Whether this building can appear in the initial starting draft."
+        },
+        "isAllowedForAi": {
+          "type": "boolean",
+          "description": "Whether AI bases can build this structure."
+        },
+        "isAllowedForDemo": {
+          "type": "boolean"
+        },
+        "isForSpecialists": {
+          "type": "boolean"
+        },
+        "balanceOverrides": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/balanceOverride"
+          }
+        },
+        "localizations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/unitLocalization"
+          },
+          "contains": {
+            "properties": {
+              "language": {
+                "const": "en-US"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "required": [
+              "language",
+              "name"
+            ]
+          }
+        },
+        "rotationDegreesPerSecond": {
+          "type": "number",
+          "minimum": 10.0,
+          "maximum": 720.0,
+          "description": "Entity angular rotation speed in degrees per second for steering and turret traverse."
+        },
+        "collisionRadius": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 50.0,
+          "description": "Collision and separation avoidance radius for flocking and placement."
+        },
+        "attackWarmUpTime": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 10.0,
+          "description": "Pre-attack warm-up / charging delay in seconds before projectile launch."
+        },
+        "canAttackWhileMoving": {
+          "type": "boolean",
+          "description": "Whether the entity can fire weapons while traversing or must stop to shoot."
+        },
+        "shootAutomaticallyOnEnemiesWithinRange": {
+          "type": "boolean",
+          "description": "Autonomous target acquisition against hostiles within detection / weapon range."
+        },
+        "defendPositionAggressivelyWhenIdle": {
+          "type": "boolean",
+          "description": "Aggressive guard behavior when idle, engaging encroaching enemies without player orders."
+        },
+        "rangeToChooseNewTargetAutomatically": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1000,
+          "description": "Automatic retargeting acquisition radius limit (-1 disables and uses sight radius)."
+        },
+        "minAttackRange": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 200.0,
+          "description": "Artillery dead-zone minimum attack range; weapons will not fire inside this distance."
+        },
+        "criticalHitChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Base critical hit chance bonus for precision/sniper units [0.0, 1.0]."
+        },
+        "onHitStatusEffects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/onHitStatusEffect"
+          },
+          "description": "List of dynamic status effects applied on attack impact."
+        },
+        "prespawnCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Target instance count pre-warmed in EntityFactory.PrespawnedEntities to prevent mid-combat hitching."
+        },
+        "selectionSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "engineSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        },
+        "weaponSoundAssetName": {
+          "$ref": "#/$defs/assetName"
+        }
+      }
+    },
+    "upgradeLocalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "language",
+        "name",
+        "description"
+      ],
+      "properties": {
+        "language": {
+          "enum": [
+            "en-US",
+            "de-DE",
+            "ja-JP",
+            "ko-KR",
+            "zh-CN",
+            "zh-TW",
+            "fr-FR",
+            "es-XL",
+            "pt-BR",
+            "ru-RU"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "upgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "assetBundleId",
+        "imageAssetName",
+        "rarity",
+        "tech",
+        "offeredSystemTags",
+        "neededSystemTags",
+        "neededExperienceLevel",
+        "isAllowedForDemo",
+        "isForSpecialists",
+        "localizations",
+        "cardChanges"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "assetBundleId": {
+          "$ref": "#/$defs/namespacedId"
+        },
+        "imageAssetName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "rarity": {
+          "enum": [
+            "Common",
+            "Rare",
+            "UltraRare"
+          ]
+        },
+        "tech": {
+          "enum": [
+            "None",
+            "Colorless",
+            "Mech",
+            "Tank",
+            "Ancient",
+            "Specialist",
+            "All"
+          ]
+        },
+        "offeredSystemTags": {
+          "enum": [
+            "None",
+            "Melee",
+            "Shield",
+            "Spawn",
+            "Armor",
+            "Mech",
+            "Robo",
+            "Heal",
+            "Turret",
+            "Fire",
+            "Bounty",
+            "Panic",
+            "Slow",
+            "Stun",
+            "Teleport",
+            "AoE",
+            "ManaUse",
+            "Rush",
+            "Turbo",
+            "Strength",
+            "Robust",
+            "SkillRangeUse",
+            "Bomb",
+            "Tank",
+            "Vehicle",
+            "EffectDuration",
+            "SpawnDuration",
+            "CriticalHits",
+            "Stealth",
+            "Zombo",
+            "Sniper",
+            "Regen",
+            "EconomySupport",
+            "All"
+          ]
+        },
+        "neededSystemTags": {
+          "enum": [
+            "None",
+            "Melee",
+            "Shield",
+            "Spawn",
+            "Armor",
+            "Mech",
+            "Robo",
+            "Heal",
+            "Turret",
+            "Fire",
+            "Bounty",
+            "Panic",
+            "Slow",
+            "Stun",
+            "Teleport",
+            "AoE",
+            "ManaUse",
+            "Rush",
+            "Turbo",
+            "Strength",
+            "Robust",
+            "SkillRangeUse",
+            "Bomb",
+            "Tank",
+            "Vehicle",
+            "EffectDuration",
+            "SpawnDuration",
+            "CriticalHits",
+            "Stealth",
+            "Zombo",
+            "Sniper",
+            "Regen",
+            "EconomySupport",
+            "All"
+          ]
+        },
+        "coinsAmount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "neededExperienceLevel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "isAllowedForDemo": {
+          "type": "boolean"
+        },
+        "isForSpecialists": {
+          "type": "boolean"
+        },
+        "inactive": {
+          "type": "boolean"
+        },
+        "applyToFactoryWhereApplicable": {
+          "type": "boolean"
+        },
+        "entityMustHaveOneOfTheseRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entityMustNotHaveOneOfTheseRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "attackTypeFilterHandling": {
+          "enum": [
+            "AllAllowed",
+            "OnlyIfEntityHasType",
+            "OnlyIfEntityHasNotType"
+          ]
+        },
+        "attackTypeFilter": {
+          "enum": [
+            "None",
+            "Single",
+            "AoE",
+            "Multi",
+            "MultiAoE",
+            "Beam",
+            "Artillery",
+            "MultiArtillery"
+          ]
+        },
+        "skillTypeFilterHandling": {
+          "enum": [
+            "AllAllowed",
+            "OnlyIfEntityHasType",
+            "OnlyIfEntityHasNotType"
+          ]
+        },
+        "skillTypeFilter": {
+          "enum": [
+            "None",
+            "Toggle",
+            "Location",
+            "LocationAoE",
+            "LocationMultiTargets",
+            "Self",
+            "SelfAoE",
+            "Target",
+            "TargetMultiTarget",
+            "TargetAoE",
+            "SelfMultiTarget"
+          ]
+        },
+        "mustNotHaveOneOfTheseEntityIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "localizations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/upgradeLocalization"
+          },
+          "contains": {
+            "properties": {
+              "language": {
+                "const": "en-US"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "required": [
+              "language",
+              "name"
+            ]
+          }
+        },
+        "cardChanges": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "$ref": "#/$defs/cardChange"
+          }
+        }
       }
     }
   }

@@ -15,6 +15,8 @@ FBX_PATH = (REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" /
 PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "sandlance-scout.png"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import RogueModelKit as modelkit
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 
 
 def clear_scene():
@@ -94,28 +96,23 @@ def make_rod(name, start, end, radius, material, vertices=8):
 
 
 def make_hull(material):
-    vertices = [
-        (-0.66, -1.30, 0.20), (0.66, -1.30, 0.20),
-        (0.66, 0.76, 0.20), (-0.66, 0.76, 0.20),
-        (-0.56, -1.16, 0.72), (0.56, -1.16, 0.72),
-        (0.54, 1.18, 0.72), (-0.54, 1.18, 0.72),
-    ]
-    faces = [
-        (3, 2, 1, 0), (4, 5, 6, 7), (0, 4, 7, 3),
-        (1, 2, 6, 5), (0, 1, 5, 4), (3, 7, 6, 2),
-    ]
-    mesh = bpy.data.meshes.new("Sandlance sloped chassis")
-    mesh.from_pydata(vertices, [], faces)
-    mesh.update()
-    obj = bpy.data.objects.new("ScoutArmor_Hull", mesh)
-    bpy.context.collection.objects.link(obj)
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.mesh.normals_make_consistent(inside=False)
-    bpy.ops.object.mode_set(mode="OBJECT")
-    return finish_mesh(obj, material, 0.045)
+    """Create a continuous tapered hull with a rounded shoulder and sloped bow."""
+    return modelkit.make_lofted_superellipse_shell(
+        "ScoutArmor_Hull",
+        [
+            (-1.30, 0.0, 0.45, 0.50, 0.25),
+            (-1.18, 0.0, 0.48, 0.62, 0.29),
+            (-0.82, 0.0, 0.48, 0.66, 0.30),
+            (0.52, 0.0, 0.48, 0.64, 0.29),
+            (0.92, 0.0, 0.46, 0.58, 0.27),
+            (1.16, 0.0, 0.40, 0.44, 0.19),
+            (1.28, 0.0, 0.36, 0.09, 0.07),
+        ],
+        material,
+        axis="Y",
+        segments=28,
+        exponent=0.78,
+    )
 
 
 def add_preview_stage(model_objects):
@@ -165,10 +162,6 @@ def add_preview_stage(model_objects):
 
 def main():
     clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     armor = make_material("Sandlance Armor", (0.105, 0.185, 0.225), 0.42, 0.37)
     armor_light = make_material("Sandlance Light Armor", (0.24, 0.34, 0.36), 0.32, 0.4)
     tread = make_material("Sandlance Tread", (0.045, 0.055, 0.06), 0.18, 0.74)
@@ -181,11 +174,21 @@ def main():
 
     model_objects = [make_hull(armor)]
     model_objects += [
-        make_box("ScoutArmor_Deck", (1.14, 1.47, 0.28), (0.0, -0.06, 0.76), armor_light, 0.09),
-        make_box("ScoutArmor_SidePod_L", (0.16, 1.18, 0.30), (-0.72, -0.02, 0.56), armor, 0.055,
-                 (math.radians(-7), 0.0, 0.0)),
-        make_box("ScoutArmor_SidePod_R", (0.16, 1.18, 0.30), (0.72, -0.02, 0.56), armor, 0.055,
-                 (math.radians(-7), 0.0, 0.0)),
+        modelkit.make_lofted_superellipse_shell(
+            "ScoutArmor_Deck",
+            [(-0.78, 0.0, 0.82, 0.32, 0.07), (-0.62, 0.0, 0.83, 0.48, 0.11),
+             (0.22, 0.0, 0.83, 0.46, 0.11), (0.43, 0.0, 0.79, 0.24, 0.07)],
+            armor_light, axis="Y", segments=24, exponent=0.78),
+        *[
+            modelkit.make_lofted_superellipse_shell(
+                "ScoutArmor_SidePod_{0}".format(side_name),
+                [(-0.64, side * 0.71, 0.56, 0.07, 0.11),
+                 (-0.50, side * 0.72, 0.56, 0.09, 0.15),
+                 (0.48, side * 0.72, 0.56, 0.09, 0.15),
+                 (0.62, side * 0.70, 0.54, 0.06, 0.12)],
+                armor, axis="Y", segments=16, exponent=0.72)
+            for side, side_name in ((-1, "L"), (1, "R"))
+        ],
     ]
 
     for side in (-1, 1):
@@ -207,10 +210,17 @@ def main():
             (0.045, 0.88, 0.075), (side * 0.817, -0.02, 0.63), amber, 0.018))
 
     model_objects += [
-        make_cylinder("ScoutArmor_LowTurret", 0.53, 0.30, (0.0, -0.18, 0.97), armor_light,
-                      (0.0, 0.0, 0.0), 8),
-        make_box("ScoutArmor_TurretNose", (0.76, 0.38, 0.23), (0.0, 0.30, 0.98), armor, 0.07,
-                 (math.radians(-4), 0.0, 0.0)),
+        modelkit.make_lofted_superellipse_shell(
+            "ScoutArmor_LowTurret",
+            [(-0.72, 0.0, 0.94, 0.34, 0.10), (-0.58, 0.0, 0.97, 0.46, 0.15),
+             (-0.18, 0.0, 0.97, 0.49, 0.16), (0.20, 0.0, 0.95, 0.41, 0.14),
+             (0.34, 0.0, 0.92, 0.24, 0.10)],
+            armor_light, axis="Y", segments=24, exponent=0.78),
+        modelkit.make_lofted_superellipse_shell(
+            "ScoutArmor_TurretNose",
+            [(0.12, 0.0, 0.98, 0.27, 0.10), (0.28, 0.0, 0.98, 0.34, 0.12),
+             (0.49, 0.0, 0.97, 0.28, 0.10)],
+            armor, axis="Y", segments=20, exponent=0.76),
         make_cylinder("ScoutGun_Barrel_L", 0.055, 0.90, (-0.14, 0.78, 1.01), gunmetal,
                       (math.radians(90), 0.0, 0.0), 10),
         make_cylinder("ScoutGun_Barrel_R", 0.055, 0.90, (0.14, 0.78, 1.01), gunmetal,
@@ -269,6 +279,24 @@ def main():
             "ScoutAccent_RearMarker_{0}".format(side_name),
             (0.12, 0.16, 0.035), (side * 0.45, -0.56, 0.92), amber, 0.012))
 
+    model_objects.extend(apply_wave2_details(
+        "SandlanceScout",
+        objects=model_objects,
+        object_prefix="Scout",
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": amber, "tread": tread},
+    ))
+
+    model_objects.extend(apply_wave34_details(
+        "SandlanceScout",
+        objects=model_objects,
+        object_prefix="Scout",
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": amber, "tread": tread},
+    ))
+    modelkit.enforce_face_budget_before_export(model_objects, "SandlanceScout")
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
+
     diagnostics = modelkit.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
         raise ValueError("Scout model failed ground-contact or material validation")
@@ -277,14 +305,20 @@ def main():
         raise ValueError("Scout model exceeds the PCXBaseTank native footprint")
 
     add_preview_stage(model_objects)
+    modelkit.bake_advanced_vertex_shading(
+        model_objects,
+        wear_level="field_tested",
+        structural_wear_mask=True,
+    )
+    hardpoint_sockets = create_canonical_hardpoint_sockets("SandlanceScout")
     bpy.ops.wm.save_as_mainfile(filepath=str(BLEND_PATH))
     bpy.ops.render.render(write_still=True)
 
-    batched_objects = modelkit.merge_meshes_by_material(model_objects, "Scout", {
+    batched_objects = modelkit.merge_meshes_by_material(model_objects, "SandlanceScout", {
         armor: "armor", armor_light: "lightArmor", tread: "tread", wheel: "wheel",
         gunmetal: "gunmetal", amber: "amber", sensor: "sensor"
     })
-    modelkit.export_unity_fbx(FBX_PATH, batched_objects)
+    modelkit.export_unity_fbx(FBX_PATH, batched_objects + hardpoint_sockets, include_empties=True, generate_profiled_lods=True, asset_id="SandlanceScout")
     print("Created source model: {0}".format(BLEND_PATH))
     print("Created Unity model: {0}".format(FBX_PATH))
     print("Created preview: {0}".format(PREVIEW_PATH))

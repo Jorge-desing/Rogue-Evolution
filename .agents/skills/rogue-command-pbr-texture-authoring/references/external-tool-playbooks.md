@@ -6,8 +6,8 @@ Use this reference when an atlas uses ArmorPaint, Material Maker, or an adapted 
 
 - Keep the finalized `.blend`, source FBX, UV layout, canonical sockets, hierarchy, and RGBA mesh `Color` attribute unchanged.
 - Work from a disposable texture-tool copy under `artifacts/texture-work/<Name>/<tool>/`. Never save a tool-exported mesh over the Blender source or Unity model.
-- Blender 4.5.14 `--bake-atlas` remains the first reproducible output. External work is an optional art pass, not a replacement for the generator or a build dependency.
-- Stage optional applications with `tools/Setup-TextureAuthoringTools.ps1`. The script verifies Material Maker 1.7 against the pinned release SHA-256. ArmorPaint can only be staged from an official archive the user already has access to; its distributed desktop binary is offered through purchase access.
+- Blender 4.5.14 `--bake-atlas` remains the first reproducible geometry/UV output. Material Maker is the required image-authoring pass, not a replacement for the generator or a build dependency.
+- Material Maker 1.7 is the required local texture application; stage it with `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker` and use `tools/Run-MaterialMakerBake.ps1` for the automated export. ArmorPaint can only be staged from an official archive the user already has access to; its distributed desktop binary is offered through purchase access.
 - Copy only the four final PNGs into the task-owned Unity texture folder. Do not import a tool-created `.mat`; `VehiclePrefabBuilder` and the project shader define material wiring.
 
 ## ArmorPaint

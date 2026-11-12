@@ -9,8 +9,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
-import bpy
 import RogueModelKit as rmk
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 from mathutils import Vector
 
 
@@ -30,8 +30,6 @@ FBX_PATH = (
 def build_ironclad_walker_model() -> None:
     """Create a reinforced dual-Gatling biped within the native walker envelope."""
     rmk.clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     builder = rmk.RogueVehicleBuilder(UNIT_NAME, faction="vanguard")
     builder.add_bipedal_legs(hip_height=1.45, hip_spacing_x=0.88)
@@ -42,37 +40,47 @@ def build_ironclad_walker_model() -> None:
     warning = builder.palette.warning
     sensor = builder.palette.emissive
 
-    # Reinforced waist, torso, and chest plate define a heavier silhouette than the native frame.
+    # Shape the main armor as integrated shells. Keep the waist, torso, chest
+    # shield, and rear power cell distinct where their functions meet, but avoid
+    # the stacked rectangular-block silhouette of the earlier generator pass.
     builder.objects.extend(
         [
-            rmk.make_box(
+            rmk.make_lofted_superellipse_shell(
                 f"{UNIT_NAME}Armor_Pelvis",
-                (0.96, 0.62, 0.42),
-                (0.0, -0.02, 1.40),
+                [(1.17, 0.0, -0.01, 0.34, 0.21),
+                 (1.26, 0.0, -0.01, 0.46, 0.29),
+                 (1.48, 0.0, -0.01, 0.48, 0.30),
+                 (1.61, 0.0, -0.01, 0.38, 0.25)],
                 gunmetal,
-                bevel=0.065,
+                axis="Z", segments=20, exponent=0.70, smooth=False,
             ),
-            rmk.make_box(
+            rmk.make_lofted_superellipse_shell(
                 f"{UNIT_NAME}Armor_Torso",
-                (1.18, 0.74, 0.78),
-                (0.0, 0.02, 1.98),
+                [(1.58, 0.0, 0.00, 0.43, 0.27),
+                 (1.72, 0.0, 0.01, 0.55, 0.34),
+                 (2.12, 0.0, 0.00, 0.59, 0.36),
+                 (2.29, 0.0, -0.02, 0.49, 0.32),
+                 (2.39, 0.0, -0.03, 0.34, 0.25)],
                 armor,
-                bevel=0.085,
+                axis="Z", segments=20, exponent=0.70, smooth=False,
             ),
-            rmk.make_box(
+            rmk.make_lofted_superellipse_shell(
                 f"{UNIT_NAME}Armor_ChestPlate",
-                (1.03, 0.20, 0.42),
-                (0.0, 0.43, 2.08),
+                [(1.84, 0.0, 0.39, 0.34, 0.08),
+                 (1.94, 0.0, 0.42, 0.45, 0.10),
+                 (2.13, 0.0, 0.42, 0.44, 0.10),
+                 (2.23, 0.0, 0.38, 0.34, 0.08)],
                 light_armor,
-                bevel=0.045,
-                rotation=(-math.radians(8), 0.0, 0.0),
+                axis="Z", segments=16, exponent=0.62, smooth=False,
             ),
-            rmk.make_box(
+            rmk.make_lofted_superellipse_shell(
                 f"{UNIT_NAME}Armor_RearPowerCell",
-                (0.72, 0.34, 0.56),
-                (0.0, -0.51, 2.01),
+                [(1.72, 0.0, -0.48, 0.24, 0.13),
+                 (1.81, 0.0, -0.51, 0.33, 0.17),
+                 (2.15, 0.0, -0.51, 0.34, 0.17),
+                 (2.24, 0.0, -0.49, 0.27, 0.13)],
                 gunmetal,
-                bevel=0.055,
+                axis="Z", segments=16, exponent=0.76, smooth=True,
             ),
         ]
     )
@@ -81,33 +89,41 @@ def build_ironclad_walker_model() -> None:
         side_tag = "L" if side < 0 else "R"
         builder.objects.extend(
             [
-                rmk.make_box(
+                rmk.make_lofted_superellipse_shell(
                     f"{UNIT_NAME}Armor_ShoulderGuard_{side_tag}",
-                    (0.48, 0.70, 0.40),
-                    (side * 0.67, 0.02, 2.25),
+                    [(2.00, side * 0.64, 0.02, 0.22, 0.22),
+                     (2.11, side * 0.67, 0.02, 0.31, 0.33),
+                     (2.31, side * 0.67, 0.02, 0.34, 0.35),
+                     (2.42, side * 0.64, 0.02, 0.24, 0.29)],
                     armor,
-                    bevel=0.055,
+                    axis="Z", segments=16, exponent=0.70, smooth=False,
                 ),
-                rmk.make_box(
+                rmk.make_lofted_superellipse_shell(
                     f"{UNIT_NAME}Armor_ShoulderInset_{side_tag}",
-                    (0.28, 0.14, 0.24),
-                    (side * 0.67, 0.40, 2.23),
+                    [(2.12, side * 0.67, 0.36, 0.11, 0.05),
+                     (2.20, side * 0.67, 0.40, 0.18, 0.07),
+                     (2.31, side * 0.67, 0.39, 0.16, 0.06),
+                     (2.36, side * 0.67, 0.35, 0.10, 0.04)],
                     light_armor,
-                    bevel=0.025,
+                    axis="Z", segments=12, exponent=0.62, smooth=False,
                 ),
-                rmk.make_box(
+                rmk.make_lofted_superellipse_shell(
                     f"{UNIT_NAME}Armor_HipGuard_{side_tag}",
-                    (0.34, 0.18, 0.34),
-                    (side * 0.47, 0.17, 1.40),
+                    [(1.25, side * 0.46, 0.16, 0.13, 0.07),
+                     (1.32, side * 0.47, 0.17, 0.21, 0.10),
+                     (1.50, side * 0.47, 0.17, 0.21, 0.10),
+                     (1.57, side * 0.46, 0.15, 0.14, 0.07)],
                     armor,
-                    bevel=0.028,
+                    axis="Z", segments=16, exponent=0.76, smooth=True,
                 ),
-                rmk.make_box(
+                rmk.make_lofted_superellipse_shell(
                     f"{UNIT_NAME}Armor_GatlingBracer_{side_tag}",
-                    (0.36, 0.48, 0.30),
-                    (side * 0.72, 0.20, 1.59),
+                    [(1.42, side * 0.72, 0.17, 0.14, 0.18),
+                     (1.50, side * 0.72, 0.20, 0.18, 0.24),
+                     (1.68, side * 0.72, 0.20, 0.18, 0.24),
+                     (1.76, side * 0.72, 0.19, 0.14, 0.18)],
                     light_armor,
-                    bevel=0.035,
+                    axis="Z", segments=16, exponent=0.76, smooth=True,
                 ),
                 rmk.make_box(
                     f"{UNIT_NAME}Warning_ShoulderMark_{side_tag}",
@@ -164,6 +180,18 @@ def build_ironclad_walker_model() -> None:
             )
         )
 
+    builder.objects.extend(apply_wave2_details(
+        UNIT_NAME,
+        objects=builder.objects,
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": warning},
+    ))
+
+    builder.objects.extend(apply_wave34_details(
+        UNIT_NAME,
+        objects=builder.objects,
+        materials={"armor": armor, "gunmetal": gunmetal, "warning": warning},
+    ))
+
     diagnostics = rmk.validate_model_mesh_quality(builder.objects)
     bounds = diagnostics["bounds"]
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
@@ -173,8 +201,10 @@ def build_ironclad_walker_model() -> None:
             "Ironclad Walker exceeds the approximate GatlingWalker envelope "
             f"(2.2 x 2.7 x 2.2 m): {bounds}"
         )
-    if diagnostics["total_polygons"] > 5000:
-        raise ValueError("Ironclad Walker exceeds the 5,000-face low-poly authoring budget")
+    if diagnostics["total_polygons"] > rmk.DEFAULT_FACE_BUDGET:
+        raise ValueError(
+            f"Ironclad Walker exceeds the {rmk.DEFAULT_FACE_BUDGET:,}-face LOD0 profiling ceiling"
+        )
 
     result = builder.build_and_export(
         fbx_path=FBX_PATH,
@@ -185,10 +215,13 @@ def build_ironclad_walker_model() -> None:
         include_ik=True,
         include_animations=True,
         wear_level="factory_new",
-        target_budget=4000,
+        target_budget=rmk.DEFAULT_FACE_BUDGET,
         profile_budget=True,
         structural_wear_mask=True,
         unity_batch_names=True,
+        bake_atlas=True,
+        atlas_resolution=2048,
+        single_material_atlas=True,
     )
     if not result.get("ground_contact_valid"):
         raise ValueError("Rigged Ironclad Walker failed the export ground-contact check")

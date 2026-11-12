@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using RogueCommandExpansionLoader.Content;
+using RogueCommandExpansionLoader.Runtime.Ai;
 
 namespace RogueCommandExpansionLoader.Contracts
 {
@@ -34,5 +36,18 @@ namespace RogueCommandExpansionLoader.Contracts
         void OnInitialized();
         void Tick();
         void OnDestroyed();
+    }
+
+    /// <summary>
+    /// Optional HUB-D extension interface for AI runtime behaviours that consume a shared
+    /// <see cref="AiBattlefieldSnapshot"/> and emit utility-scored <see cref="AiIntentProposal"/>
+    /// intents to be arbitrated once per tick by <see cref="Modules.CompositeAiRuntimeBehaviour"/>.
+    /// </summary>
+    public interface ICoordinatedAiRuntimeBehaviour : IRogueCommandAiRuntimeBehaviour
+    {
+        void CollectProposals(
+            AiBattlefieldSnapshot snapshot,
+            AiDoctrineWeights doctrineWeights,
+            IList<AiIntentProposal> proposals);
     }
 }

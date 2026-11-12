@@ -89,6 +89,28 @@ def collect_references(pack: dict[str, Any]) -> list[tuple[str, str, str, str]]:
         add(owner, "prefabAssetName", unit.get("assetBundleId"), unit.get("prefabAssetName"), "GameObject prefab")
         add(owner, "cardImageAssetName", unit.get("assetBundleId"), unit.get("cardImageAssetName"), "Sprite card image")
         add(owner, "visualAssetName", unit.get("assetBundleId"), unit.get("visualAssetName"), "GameObject prefab")
+        for index, variant in enumerate(unit.get("visualVariants") or []):
+            if not isinstance(variant, dict):
+                continue
+            for module_index, module in enumerate(variant.get("modules") or []):
+                if not isinstance(module, dict):
+                    continue
+                add(
+                    owner,
+                    f"visualVariants[{index}].modules[{module_index}].assetName",
+                    unit.get("assetBundleId"),
+                    module.get("assetName"),
+                    "GameObject prefab",
+                )
+
+        factory = unit.get("productionBuilding")
+        if isinstance(factory, dict):
+            factory_owner = f"productionBuilding:{factory.get('id', '<missing-id>')}"
+            factory_bundle_id = factory.get("assetBundleId") or ""
+            add(factory_owner, "cardImageAssetName", factory_bundle_id,
+                factory.get("cardImageAssetName"), "Sprite card image")
+            add(factory_owner, "visualAssetName", factory_bundle_id,
+                factory.get("visualAssetName"), "GameObject prefab")
 
     for stage in pack.get("stages") or []:
         if not stage.get("nativeTemplateId"):
@@ -110,6 +132,45 @@ def collect_references(pack: dict[str, Any]) -> list[tuple[str, str, str, str]]:
                 "GameObject prefab",
             )
     return references
+
+
+def validate_references(
+    references: list[tuple[str, str, str, str]],
+    bundle_entries: dict[str, list[tuple[str, str]]],
+) -> tuple[list[str], int]:
+    diagnostics: list[str] = []
+    failures = 0
+    for location, bundle_id, asset_name, expected_label in references:
+        if bundle_id not in bundle_entries:
+            diagnostics.append(f"ERROR {location}: AssetBundle ID {bundle_id!r} is not declared")
+            failures += 1
+            continue
+
+        matches = resolve_asset(bundle_entries[bundle_id], asset_name)
+        if not matches:
+            diagnostics.append(
+                f"ERROR {location}: {asset_name!r} does not match a serialized AssetBundle entry"
+            )
+            failures += 1
+            continue
+        if len(matches) != 1:
+            candidates = ", ".join(f"{path} ({kind})" for path, kind in matches)
+            diagnostics.append(f"ERROR {location}: {asset_name!r} is ambiguous: {candidates}")
+            failures += 1
+            continue
+
+        path, object_type = matches[0]
+        expected_types = EXPECTED_TYPES[expected_label]
+        if object_type not in expected_types:
+            diagnostics.append(
+                f"ERROR {location}: {path} is {object_type}, expected {expected_label} "
+                f"({', '.join(sorted(expected_types))})"
+            )
+            failures += 1
+            continue
+        diagnostics.append(f"OK {location}: {path} ({object_type})")
+
+    return diagnostics, failures
 
 
 def main() -> int:
@@ -136,34 +197,9 @@ def main() -> int:
         print(f"Could not inspect pack bundles: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
 
-    failures = 0
-    for location, bundle_id, asset_name, expected_label in references:
-        if bundle_id not in bundle_entries:
-            print(f"ERROR {location}: AssetBundle ID {bundle_id!r} is not declared")
-            failures += 1
-            continue
-
-        matches = resolve_asset(bundle_entries[bundle_id], asset_name)
-        if not matches:
-            print(f"ERROR {location}: {asset_name!r} does not match a serialized AssetBundle entry")
-            failures += 1
-            continue
-        if len(matches) != 1:
-            candidates = ", ".join(f"{path} ({kind})" for path, kind in matches)
-            print(f"ERROR {location}: {asset_name!r} is ambiguous: {candidates}")
-            failures += 1
-            continue
-
-        path, object_type = matches[0]
-        expected_types = EXPECTED_TYPES[expected_label]
-        if object_type not in expected_types:
-            print(
-                f"ERROR {location}: {path} is {object_type}, expected {expected_label} "
-                f"({', '.join(sorted(expected_types))})"
-            )
-            failures += 1
-            continue
-        print(f"OK {location}: {path} ({object_type})")
+    diagnostics, failures = validate_references(references, bundle_entries)
+    for diagnostic in diagnostics:
+        print(diagnostic)
 
     print(f"Checked {len(references)} AssetBundle reference(s); {failures} error(s).")
     return 1 if failures else 0

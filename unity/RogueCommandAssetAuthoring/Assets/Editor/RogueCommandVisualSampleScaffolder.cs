@@ -49,6 +49,10 @@ namespace RogueCommandExpansion.Authoring
             AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQVisual.prefab";
         private const string OverlordCommandHQFactoryVisualPrefabPath =
             AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQFactoryVisual.prefab";
+        private const string ArachnidHexapodModelPath = AssetRoot + "/Models/ArachnidHexapod.fbx";
+        private const string OverlordCommandHQModelPath = AssetRoot + "/Models/OverlordCommandHQ.fbx";
+        private const string ArachnidHexapodCardSpritePath = AssetRoot + "/ArachnidHexapodCard.png";
+        private const string OverlordCommandHQCardSpritePath = AssetRoot + "/OverlordCommandHQCard.png";
         private const string MaterialRoot = AssetRoot + "/Materials";
         private const string VertexWearShaderName = "RogueCommand/VehiclePBR_VertexWear";
         private const float FactoryNewWearStrength = 0.25f;
@@ -284,7 +288,11 @@ namespace RogueCommandExpansion.Authoring
                 ImportCardSprite(BastionSiegeMechCardSpritePath, true);
                 string surgeArcTankPrefabPath = CreateSurgeArcTankVisual();
                 ImportCardSprite(SurgeArcTankCardSpritePath);
+                ImportCardSprite(ArachnidHexapodCardSpritePath);
+                ImportCardSprite(OverlordCommandHQCardSpritePath);
                 ConfigureArachnidOverlordPbrTextureImports();
+                RefreshRiggedPbrPrefabAnimator("ArachnidHexapod", ArachnidHexapodModelPath, ArachnidHexapodVisualPrefabPath);
+                RefreshRiggedPbrPrefabAnimator("OverlordCommandHQ", OverlordCommandHQModelPath, OverlordCommandHQVisualPrefabPath);
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
 
@@ -300,6 +308,7 @@ namespace RogueCommandExpansion.Authoring
                         atlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
                         bastionSiegeMechPrefabPath, BastionSiegeMechCardSpritePath,
                         surgeArcTankPrefabPath, SurgeArcTankCardSpritePath,
+                        ArachnidHexapodCardSpritePath, OverlordCommandHQCardSpritePath,
                         ArachnidHexapodVisualPrefabPath, ArachnidHexapodFactoryVisualPrefabPath,
                         OverlordCommandHQVisualPrefabPath, OverlordCommandHQFactoryVisualPrefabPath
                     }
@@ -333,8 +342,8 @@ namespace RogueCommandExpansion.Authoring
                     Path.Combine(packBundles, "assetbundle-manifest.bundle"));
 
                 AssetDatabase.Refresh();
-                Debug.Log("Built seven script-free Sandlance, Skirmish Bike, Colossus, Ironclad Walker, " +
-                    "Atlas Crane Mech, Bastion Siege Mech, and Surge Arc Tank visual overlays plus seven card Sprites in " +
+                Debug.Log("Built nine script-free Sandlance, Skirmish Bike, Colossus, Ironclad Walker, " +
+                    "Atlas Crane Mech, Bastion Siege Mech, Surge Arc Tank, Arachnid Hexapod, and Overlord Command HQ visual overlays plus nine card Sprites in " +
                     BundleName + " at " + packBundles + ".");
                 if (Application.isBatchMode)
                 {
@@ -353,6 +362,92 @@ namespace RogueCommandExpansion.Authoring
                     EditorUtility.DisplayDialog("Sample visual bundle build failed", exception.Message, "OK");
                 }
             }
+        }
+
+        /// <summary>
+        /// Regenerates the Level 1 visuals that currently back canonical Level 2
+        /// modules, without rebuilding or copying the sample AssetBundle snapshot.
+        /// </summary>
+        public static void RefreshCanonicalLevelOneVisuals()
+        {
+            try
+            {
+                if (!String.Equals(Application.unityVersion, RequiredUnityVersion, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException("Canonical Level 1 visuals require Unity " +
+                        RequiredUnityVersion + "; current Editor is " + Application.unityVersion + ".");
+                }
+
+                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                ValidateRiggedWalkerSources(projectRoot);
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+                string[] prefabPaths = { PrefabPath, BikePrefabPath, ColossusPrefabPath, SurgeArcTankPrefabPath };
+                string[] modelNames = { "SandlanceScout", "SkirmishStrikeBike", "ColossusSiegePlatform", "SurgeArcTank" };
+                for (int i = 0; i < prefabPaths.Length; i++)
+                {
+                    GameObject prefabContents = PrefabUtility.LoadPrefabContents(prefabPaths[i]);
+                    if (prefabContents == null)
+                    {
+                        throw new FileNotFoundException("Level 1 visual prefab could not be loaded: " + prefabPaths[i]);
+                    }
+
+                    try
+                    {
+                        Transform model = GetUniqueNamedTransform(prefabContents, modelNames[i] + "Model", true);
+                        int transformCountBefore = prefabContents.GetComponentsInChildren<Transform>(true).Length;
+                        VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, model.gameObject);
+                        int transformCountAfter = prefabContents.GetComponentsInChildren<Transform>(true).Length;
+                        if (transformCountAfter != transformCountBefore)
+                        {
+                            bool saved;
+                            PrefabUtility.SaveAsPrefabAsset(prefabContents, prefabPaths[i], out saved);
+                            if (!saved)
+                            {
+                                throw new InvalidOperationException("Unity could not save canonical hardpoint fallbacks to " + prefabPaths[i] + ".");
+                            }
+                            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, prefabPaths[i])));
+                        }
+
+                        ValidateCanonicalModuleHardpoints(prefabContents, prefabPaths[i]);
+                    }
+                    finally
+                    {
+                        PrefabUtility.UnloadPrefabContents(prefabContents);
+                    }
+                }
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+                Debug.Log("[CanonicalLevelOneVisuals] Refreshed " + prefabPaths.Length +
+                    " Level 1 prefab hierarchies and validated four unique canonical hardpoints on each; existing animator and visual hierarchies were preserved.");
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(0);
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(1);
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Canonical Level 1 refresh failed", exception.Message, "OK");
+                }
+            }
+        }
+
+        private static void ValidateCanonicalModuleHardpoints(GameObject prefab, string prefabPath)
+        {
+            string[] slots = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            for (int i = 0; i < slots.Length; i++)
+            {
+                GetUniqueNamedTransform(prefab, "Socket_Hardpoint_" + slots[i], true);
+            }
+            Debug.Log("[CanonicalLevelOneVisuals] Validated " + prefabPath + ".");
         }
 
         // Targeted recovery/build entry point. This consumes already-authored prefabs and
@@ -389,6 +484,8 @@ namespace RogueCommandExpansion.Authoring
                 EnsureExistingBundleAsset(BastionSiegeMechCardSpritePath, typeof(Sprite));
                 EnsureExistingBundleAsset(SurgeArcTankPrefabPath, typeof(GameObject));
                 EnsureExistingBundleAsset(SurgeArcTankCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(ArachnidHexapodCardSpritePath, typeof(Sprite));
+                EnsureExistingBundleAsset(OverlordCommandHQCardSpritePath, typeof(Sprite));
                 EnsureExistingBundleAsset(BastionEngineLoopAudioPath, typeof(AudioClip));
                 EnsureExistingBundleAsset(BastionWeaponShotAudioPath, typeof(AudioClip));
                 EnsureExistingBundleAsset(ArachnidHexapodVisualPrefabPath, typeof(GameObject));
@@ -427,6 +524,7 @@ namespace RogueCommandExpansion.Authoring
                         AtlasCraneMechPrefabPath, AtlasCraneMechCardSpritePath,
                         BastionSiegeMechPrefabPath, BastionSiegeMechCardSpritePath,
                         SurgeArcTankPrefabPath, SurgeArcTankCardSpritePath,
+                        ArachnidHexapodCardSpritePath, OverlordCommandHQCardSpritePath,
                         ArachnidHexapodVisualPrefabPath, ArachnidHexapodFactoryVisualPrefabPath,
                         OverlordCommandHQVisualPrefabPath, OverlordCommandHQFactoryVisualPrefabPath
                     }
@@ -884,25 +982,28 @@ namespace RogueCommandExpansion.Authoring
             return foundMesh;
         }
 
-        private static void EnsureCanonicalWalkerSockets(
+        internal static void EnsureCanonicalWalkerSockets(
             GameObject root,
             GameObject model,
             bool rapidFireMuzzle,
-            bool quadrupedCrawler = false)
+            bool quadrupedCrawler = false,
+            bool requireFootContactSockets = true)
         {
-            string[] footContactNames = quadrupedCrawler
-                ? new[]
-                {
-                    "Socket_FootContact_FL",
-                    "Socket_FootContact_FR",
-                    "Socket_FootContact_RL",
-                    "Socket_FootContact_RR"
-                }
-                : new[]
-                {
-                    "Socket_FootContact_L",
-                    "Socket_FootContact_R"
-                };
+            string[] footContactNames = !requireFootContactSockets
+                ? new string[0]
+                : quadrupedCrawler
+                    ? new[]
+                    {
+                        "Socket_FootContact_FL",
+                        "Socket_FootContact_FR",
+                        "Socket_FootContact_RL",
+                        "Socket_FootContact_RR"
+                    }
+                    : new[]
+                    {
+                        "Socket_FootContact_L",
+                        "Socket_FootContact_R"
+                    };
             string[] uniqueSocketNames =
             {
                 "Socket_MuzzlePrimary",
@@ -925,7 +1026,7 @@ namespace RogueCommandExpansion.Authoring
             Bounds modelBounds = GetModelBoundsInRootSpace(root, model);
             float footHalfWidth = Mathf.Max(modelBounds.size.x * 0.22f, 0.12f);
             Transform[] footContacts = new Transform[footContactNames.Length];
-            if (quadrupedCrawler)
+            if (requireFootContactSockets && quadrupedCrawler)
             {
                 // Crawler contact points are part of the authored model contract. Do not synthesize
                 // generic L/R contacts, which lose the independent front/rear track anchors.
@@ -934,7 +1035,7 @@ namespace RogueCommandExpansion.Authoring
                     footContacts[i] = GetUniqueNamedTransform(root, footContactNames[i], true);
                 }
             }
-            else
+            else if (requireFootContactSockets)
             {
                 Vector3 leftFootFallback = new Vector3(
                     modelBounds.center.x - footHalfWidth, 0.0f, modelBounds.center.z);
@@ -971,27 +1072,31 @@ namespace RogueCommandExpansion.Authoring
                 throw new InvalidDataException("FirePoint_0 and FirePoint_1 must be distinct on " + root.name + ".");
             }
 
-            ValidateCanonicalWalkerSockets(root, root.name, quadrupedCrawler);
+            ValidateCanonicalWalkerSockets(
+                root, root.name, quadrupedCrawler, requireFootContactSockets);
         }
 
         private static void ValidateCanonicalWalkerSockets(
             GameObject root,
             string unitName,
-            bool quadrupedCrawler = false)
+            bool quadrupedCrawler = false,
+            bool requireFootContactSockets = true)
         {
-            string[] footContactNames = quadrupedCrawler
-                ? new[]
-                {
-                    "Socket_FootContact_FL",
-                    "Socket_FootContact_FR",
-                    "Socket_FootContact_RL",
-                    "Socket_FootContact_RR"
-                }
-                : new[]
-                {
-                    "Socket_FootContact_L",
-                    "Socket_FootContact_R"
-                };
+            string[] footContactNames = !requireFootContactSockets
+                ? new string[0]
+                : quadrupedCrawler
+                    ? new[]
+                    {
+                        "Socket_FootContact_FL",
+                        "Socket_FootContact_FR",
+                        "Socket_FootContact_RL",
+                        "Socket_FootContact_RR"
+                    }
+                    : new[]
+                    {
+                        "Socket_FootContact_L",
+                        "Socket_FootContact_R"
+                    };
             string[] requiredSocketNames =
             {
                 "Socket_MuzzlePrimary",
@@ -1685,190 +1790,179 @@ namespace RogueCommandExpansion.Authoring
             return new Bounds((min + max) * 0.5f, max - min);
         }
 
-        private static string CreateSampleVisual()
+        private static void ReplaceRiggedModelFromSource(
+            GameObject prefabInstance,
+            GameObject modelAsset,
+            string unitName)
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
-            AssetDatabase.Refresh();
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ModelPath);
-            if (modelAsset == null)
+            // The sample prefab is serialized as a flattened copy of the FBX. Refreshing only
+            // its Animator leaves the old bone hierarchy in the bundle, so Arachnid would still
+            // inherit Bone_Hull's idle motion. Replace that model subtree from the current FBX
+            // while preserving the authored prefab materials and root-level sockets.
+            // Overlord is included so its authored turret sockets reach the bundle.
+            if (!String.Equals(unitName, "ArachnidHexapod", StringComparison.Ordinal) &&
+                !String.Equals(unitName, "OverlordCommandHQ", StringComparison.Ordinal))
             {
-                throw new FileNotFoundException("Import the authored Sandlance FBX before building the " +
-                    "sample bundle.", ModelPath);
+                return;
             }
 
-            Dictionary<string, Material> materials = CreateScoutMaterials();
+            Transform oldModel = GetUniqueNamedTransform(prefabInstance, unitName + "Model", true);
+            Transform parent = oldModel.parent;
+            Vector3 localPosition = oldModel.localPosition;
+            Quaternion localRotation = oldModel.localRotation;
+            Vector3 localScale = oldModel.localScale;
+            int siblingIndex = oldModel.GetSiblingIndex();
+            var materialsByPath = new Dictionary<string, Material[]>();
+            Renderer[] oldRenderers = oldModel.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < oldRenderers.Length; i++)
+            {
+                Renderer renderer = oldRenderers[i];
+                if (renderer != null)
+                {
+                    materialsByPath[GetRelativeTransformPath(oldModel, renderer.transform)] = renderer.sharedMaterials;
+                }
+            }
 
-            var root = new GameObject("ScoutTankVisual");
+            GameObject replacement = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+            if (replacement == null)
+            {
+                throw new InvalidOperationException("Unity could not instantiate the refreshed " + unitName + " FBX.");
+            }
+
+            replacement.name = oldModel.name;
+            replacement.transform.SetParent(parent, false);
+            replacement.transform.localPosition = localPosition;
+            replacement.transform.localRotation = localRotation;
+            replacement.transform.localScale = localScale;
+            replacement.transform.SetSiblingIndex(siblingIndex);
+
+            Renderer[] replacementRenderers = replacement.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < replacementRenderers.Length; i++)
+            {
+                Renderer renderer = replacementRenderers[i];
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                Material[] materials;
+                if (materialsByPath.TryGetValue(GetRelativeTransformPath(replacement.transform, renderer.transform), out materials))
+                {
+                    renderer.sharedMaterials = materials;
+                }
+            }
+
+            UnityEngine.Object.DestroyImmediate(oldModel.gameObject);
+        }
+
+        private static string GetRelativeTransformPath(Transform root, Transform child)
+        {
+            var segments = new List<string>();
+            Transform current = child;
+            while (current != null && current != root)
+            {
+                segments.Add(current.name);
+                current = current.parent;
+            }
+            segments.Reverse();
+            return String.Join("/", segments.ToArray());
+        }
+
+        private static void RefreshRiggedPbrPrefabAnimator(
+            string unitName,
+            string modelPath,
+            string prefabPath)
+        {
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+            GameObject prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (modelAsset == null || prefabAsset == null)
+            {
+                throw new FileNotFoundException(
+                    "The rigged PBR visual requires both model and prefab assets for " + unitName + ".");
+            }
+
+            GameObject instance = PrefabUtility.InstantiatePrefab(prefabAsset) as GameObject;
+            if (instance == null)
+            {
+                throw new InvalidOperationException("Unity could not instantiate the existing " + unitName + " visual prefab.");
+            }
+            PrefabUtility.UnpackPrefabInstance(
+                instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+
             try
             {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null)
+                ReplaceRiggedModelFromSource(instance, modelAsset, unitName);
+                VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                    instance, instance, modelAsset, unitName, preferWalkForMovement: true);
+                Animator animator = instance.GetComponent<Animator>();
+                if (animator == null || animator.avatar == null || !animator.avatar.isValid ||
+                    animator.runtimeAnimatorController == null)
                 {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Sandlance FBX.");
+                    throw new InvalidDataException(
+                        unitName + " visual prefab must have one valid Generic Animator after refresh.");
                 }
 
-                modelInstance.name = "SandlanceScoutModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-                AssignScoutMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-
+                animator.applyRootMotion = false;
+                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(instance, instance);
+                EnsureTurretAndRadarSockets(instance, instance, requireTurret: true);
                 bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath, out success);
+                PrefabUtility.SaveAsPrefabAsset(instance, prefabPath, out success);
                 if (!success)
                 {
-                    throw new InvalidOperationException("Unity could not save " + PrefabPath + ".");
+                    throw new InvalidOperationException("Unity could not save refreshed " + prefabPath + ".");
                 }
-
-                NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(
-                    Directory.GetParent(Application.dataPath).FullName, PrefabPath)));
+                ValidateSavedPrefab(prefabPath, unitName);
+                Debug.Log("[RogueCommandVisualSampleScaffolder] Refreshed body-driven Animator graph for " + unitName + ".");
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(root);
+                UnityEngine.Object.DestroyImmediate(instance);
             }
+        }
 
-            AssetImporter importer = AssetImporter.GetAtPath(PrefabPath);
-            if (importer == null)
-            {
-                throw new FileNotFoundException("Unity did not import " + PrefabPath + ".");
-            }
-
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            NormalizeGeneratedUnityMetaFiles(projectRoot);
-            return PrefabPath;
+        private static string CreateSampleVisual()
+        {
+            return CreateRiggedWalkerVisual(
+                "SandlanceScout",
+                ModelPath,
+                PrefabPath,
+                CreateScoutMaterials,
+                AssignScoutMaterials,
+                false,
+                null,
+                false,
+                requireFootContactSockets: false,
+                hasTurretOrRadar: true);
         }
 
         private static string CreateSkirmishBikeVisual()
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
-            AssetDatabase.Refresh();
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(BikeModelPath);
-            if (modelAsset == null)
-            {
-                throw new FileNotFoundException("Import the authored Skirmish Strike Bike FBX before building the " +
-                    "sample bundle.", BikeModelPath);
-            }
-
-            Dictionary<string, Material> materials = CreateSkirmishBikeMaterials();
-            var root = new GameObject("SkirmishBikeVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null)
-                {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Skirmish Strike Bike.");
-                }
-
-                modelInstance.name = "SkirmishStrikeBikeModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-                AssignSkirmishBikeMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, BikePrefabPath, out success);
-                if (!success)
-                {
-                    throw new InvalidOperationException("Unity could not save " + BikePrefabPath + ".");
-                }
-
-                NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(
-                    Directory.GetParent(Application.dataPath).FullName, BikePrefabPath)));
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-
-            AssetImporter importer = AssetImporter.GetAtPath(BikePrefabPath);
-            if (importer == null)
-            {
-                throw new FileNotFoundException("Unity did not import " + BikePrefabPath + ".");
-            }
-
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            NormalizeGeneratedUnityMetaFiles(projectRoot);
-            return BikePrefabPath;
+            return CreateRiggedWalkerVisual(
+                "SkirmishStrikeBike",
+                BikeModelPath,
+                BikePrefabPath,
+                CreateSkirmishBikeMaterials,
+                AssignSkirmishBikeMaterials,
+                false,
+                null,
+                false,
+                requireFootContactSockets: false,
+                hasTurretOrRadar: true);
         }
 
         private static string CreateColossusVisual()
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
-            AssetDatabase.Refresh();
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ColossusModelPath);
-            if (modelAsset == null)
-            {
-                throw new FileNotFoundException("Import the authored Colossus Siege Platform FBX before building the " +
-                    "sample bundle.", ColossusModelPath);
-            }
-
-            Dictionary<string, Material> materials = CreateColossusMaterials();
-            var root = new GameObject("ColossusSiegeVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null)
-                {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Colossus Siege Platform.");
-                }
-
-                modelInstance.name = "ColossusSiegePlatformModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-                AssignColossusMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, ColossusPrefabPath, out success);
-                if (!success)
-                {
-                    throw new InvalidOperationException("Unity could not save " + ColossusPrefabPath + ".");
-                }
-
-                string prefabPath = Path.GetFullPath(Path.Combine(projectRoot, ColossusPrefabPath));
-                NormalizeEmptyUnityYamlStrings(prefabPath);
-                string prefabMetadataPath = prefabPath + ".meta";
-                if (File.Exists(prefabMetadataPath))
-                {
-                    NormalizeEmptyUnityYamlStrings(prefabMetadataPath);
-                }
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-
-            AssetImporter importer = AssetImporter.GetAtPath(ColossusPrefabPath);
-            if (importer == null)
-            {
-                throw new FileNotFoundException("Unity did not import " + ColossusPrefabPath + ".");
-            }
-
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            NormalizeGeneratedUnityMetaFiles(projectRoot);
-            return ColossusPrefabPath;
+            return CreateRiggedWalkerVisual(
+                "ColossusSiegePlatform",
+                ColossusModelPath,
+                ColossusPrefabPath,
+                CreateColossusMaterials,
+                AssignColossusMaterials,
+                false,
+                null,
+                false,
+                requireFootContactSockets: false,
+                hasTurretOrRadar: true);
         }
 
         private static string CreateIroncladVisual()
@@ -1879,7 +1973,11 @@ namespace RogueCommandExpansion.Authoring
                 IroncladPrefabPath,
                 CreateIroncladMaterials,
                 AssignIroncladMaterials,
-                true);
+                true,
+                null,
+                false,
+                requireFootContactSockets: true,
+                hasTurretOrRadar: true);
         }
 
         private static string CreateAtlasCraneMechVisual()
@@ -1890,7 +1988,11 @@ namespace RogueCommandExpansion.Authoring
                 AtlasCraneMechPrefabPath,
                 CreateAtlasCraneMechMaterials,
                 AssignAtlasCraneMechMaterials,
-                false);
+                false,
+                null,
+                false,
+                requireFootContactSockets: true,
+                hasTurretOrRadar: true);
         }
 
         private static string CreateBastionSiegeMechVisual()
@@ -1918,7 +2020,116 @@ namespace RogueCommandExpansion.Authoring
                     EnsureBastionFootContactVfx(root);
                     EnsureBastionAudioSources(root, engineLoop, weaponShot);
                 },
-                quadrupedCrawler: true);
+                quadrupedCrawler: true,
+                requireFootContactSockets: true,
+                hasTurretOrRadar: true);
+        }
+
+        private static void SetupRiggedAnimatorOrThrow(
+            GameObject root,
+            GameObject modelInstance,
+            GameObject modelAsset,
+            string unitName,
+            bool preferWalkForMovement)
+        {
+            Animator[] importedAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+            for (int i = 0; i < importedAnimators.Length; i++)
+            {
+                if (importedAnimators[i] != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(importedAnimators[i]);
+                }
+            }
+
+            VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                root, modelInstance, modelAsset, unitName, preferWalkForMovement);
+            Animator animator = root.GetComponent<Animator>();
+            if (animator == null || animator.avatar == null || !animator.avatar.isValid ||
+                animator.runtimeAnimatorController == null)
+            {
+                throw new InvalidDataException(
+                    unitName + " must import a valid Generic Avatar and the RCL animation controller.");
+            }
+
+            animator.applyRootMotion = false;
+        }
+
+        private static string ResolveEffectiveModelPath(string unitName, string baseModelPath)
+        {
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(baseModelPath) != null)
+                return baseModelPath;
+            string[] guids = AssetDatabase.FindAssets(unitName + " t:Model", new[] { AssetRoot + "/Models" });
+            if (guids != null)
+            {
+                string lodPath = null;
+                string foundBase = null;
+                foreach (string guid in guids)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guid);
+                    if (path.EndsWith("_LODs.fbx", StringComparison.OrdinalIgnoreCase))
+                        lodPath = path;
+                    else if (string.Equals(Path.GetFileNameWithoutExtension(path), unitName, StringComparison.OrdinalIgnoreCase))
+                        foundBase = path;
+                }
+                if (lodPath != null && foundBase == null)
+                    return lodPath;
+                if (foundBase != null)
+                    return foundBase;
+                if (lodPath != null)
+                    return lodPath;
+            }
+            return baseModelPath;
+        }
+
+        /// <summary>
+        /// Guarantees turret/radar sockets that VehiclePrefabBuilder alone does not
+        /// add. Recursive search avoids duplicates (UniqueSocketRoleBinding).
+        /// </summary>
+        private static void EnsureTurretAndRadarSockets(GameObject root, GameObject modelInstance, bool requireTurret)
+        {
+            if (root == null || modelInstance == null || !requireTurret) return;
+            Renderer[] renderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+            if (renderers == null || renderers.Length == 0) return;
+            Bounds bounds = GetModelBoundsInRootSpace(root, modelInstance);
+            if (bounds.size.sqrMagnitude < 1e-6f) return;
+            Vector3 center = bounds.center;
+            Vector3 min = bounds.min;
+            Vector3 max = bounds.max;
+            Vector3 size = bounds.size;
+            Vector3 turretPivot = new Vector3(center.x, Mathf.Lerp(min.y, max.y, 0.72f), center.z + size.z * 0.10f);
+            EnsureUniqueSocket(root, "Socket_TurretPivot", turretPivot);
+            Transform pivot = GetUniqueNamedTransform(root, "Socket_TurretPivot", false);
+            if (pivot != null && GetUniqueNamedTransform(root, "Socket_TurretPitch", false) == null)
+            {
+                GameObject pitch = new GameObject("Socket_TurretPitch");
+                pitch.transform.SetParent(pivot, false);
+                pitch.transform.localPosition = Vector3.zero;
+                pitch.transform.localRotation = Quaternion.identity;
+                pitch.transform.localScale = Vector3.one;
+            }
+            Vector3 radar = new Vector3(center.x - size.x * 0.22f, Mathf.Lerp(min.y, max.y, 0.85f), min.z + size.z * 0.30f);
+            Vector3 antenna = new Vector3(center.x + size.x * 0.22f, Mathf.Lerp(min.y, max.y, 0.80f), min.z + size.z * 0.30f);
+            EnsureUniqueSocket(root, "Socket_RadarMast", radar);
+            EnsureUniqueSocket(root, "Socket_Antenna", antenna);
+        }
+
+        private static void ValidateSavedPrefab(string prefabPath, string unitName)
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null)
+            {
+                Debug.LogWarning("[VisualSampleScaffolder] Could not reload prefab for validation: " + prefabPath);
+                return;
+            }
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            int enabled = 0;
+            foreach (Renderer r in renderers) if (r != null && r.enabled) enabled++;
+            Animator animator = prefab.GetComponent<Animator>();
+            string animatorState = animator == null ? "none" :
+                ((animator.avatar != null && animator.avatar.isValid) ? "valid" : "invalid") +
+                "/controller " + (animator.runtimeAnimatorController != null ? "present" : "missing");
+            Debug.Log("[VisualSampleScaffolder] " + unitName + " prefab OK: renderers=" + renderers.Length +
+                " (enabled " + enabled + "), animator=" + animatorState);
         }
 
         private static string CreateRiggedWalkerVisual(
@@ -1929,17 +2140,20 @@ namespace RogueCommandExpansion.Authoring
             Action<GameObject, IDictionary<string, Material>> assignMaterials,
             bool rapidFireMuzzle,
             Action<GameObject> configureAdditionalComponents = null,
-            bool quadrupedCrawler = false)
+            bool quadrupedCrawler = false,
+            bool requireFootContactSockets = true,
+            bool hasTurretOrRadar = false)
         {
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
             AssetDatabase.Refresh();
 
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
+            string effectiveModelPath = ResolveEffectiveModelPath(unitName, modelPath);
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(effectiveModelPath);
             if (modelAsset == null)
             {
                 throw new FileNotFoundException(
-                    "Import the rigged " + unitName + " FBX before building the sample bundle.", modelPath);
+                    "Import the rigged " + unitName + " FBX before building the sample bundle.", effectiveModelPath);
             }
 
             Dictionary<string, Material> materials = createMaterials();
@@ -1960,22 +2174,14 @@ namespace RogueCommandExpansion.Authoring
                 assignMaterials(modelInstance, materials);
 
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-                EnsureCanonicalWalkerSockets(root, modelInstance, rapidFireMuzzle, quadrupedCrawler);
+                EnsureTurretAndRadarSockets(root, modelInstance, hasTurretOrRadar);
+                VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(root, modelInstance);
+                EnsureCanonicalWalkerSockets(root, modelInstance, rapidFireMuzzle, quadrupedCrawler, requireFootContactSockets);
                 if (configureAdditionalComponents != null)
                 {
                     configureAdditionalComponents(root);
                 }
-                VehiclePrefabBuilder.SetupAnimatorIfAvailable(root, modelInstance, modelAsset, unitName, true);
-
-                Animator animator = root.GetComponent<Animator>();
-                if (animator == null || animator.avatar == null || !animator.avatar.isValid ||
-                    animator.runtimeAnimatorController == null)
-                {
-                    throw new InvalidDataException(
-                        unitName + " must import a valid Generic Avatar and the RCL animation controller.");
-                }
-
-                animator.applyRootMotion = false;
+                SetupRiggedAnimatorOrThrow(root, modelInstance, modelAsset, unitName, true);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
@@ -2009,73 +2215,23 @@ namespace RogueCommandExpansion.Authoring
             AssetDatabase.Refresh();
             NormalizeGeneratedUnityMetaFiles(projectRoot);
             NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, prefabPath)) + ".meta");
+            ValidateSavedPrefab(prefabPath, unitName);
             return prefabPath;
         }
 
         private static string CreateSurgeArcTankVisual()
         {
-            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, AssetRoot)));
-            AssetDatabase.Refresh();
-
-            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(SurgeArcTankModelPath);
-            if (modelAsset == null)
-            {
-                throw new FileNotFoundException("Import the authored Surge Arc Tank FBX before building the " +
-                    "sample bundle.", SurgeArcTankModelPath);
-            }
-
-            Dictionary<string, Material> materials = CreateSurgeArcTankMaterials();
-            var root = new GameObject("SurgeArcTankVisual");
-            try
-            {
-                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
-                if (modelInstance == null)
-                {
-                    throw new InvalidOperationException("Unity could not instantiate the authored Surge Arc Tank.");
-                }
-
-                modelInstance.name = "SurgeArcTankModel";
-                modelInstance.transform.SetParent(root.transform, false);
-                modelInstance.transform.localPosition = Vector3.zero;
-                modelInstance.transform.localRotation = Quaternion.identity;
-                modelInstance.transform.localScale = Vector3.one;
-                AssignSurgeArcTankMaterials(modelInstance, materials);
-                VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
-
-                bool success;
-                PrefabUtility.SaveAsPrefabAsset(root, SurgeArcTankPrefabPath, out success);
-                if (!success)
-                {
-                    throw new InvalidOperationException("Unity could not save " + SurgeArcTankPrefabPath + ".");
-                }
-
-                string prefabPath = Path.GetFullPath(Path.Combine(projectRoot, SurgeArcTankPrefabPath));
-                NormalizeEmptyUnityYamlStrings(prefabPath);
-                string prefabMetadataPath = prefabPath + ".meta";
-                if (File.Exists(prefabMetadataPath))
-                {
-                    NormalizeEmptyUnityYamlStrings(prefabMetadataPath);
-                }
-            }
-            finally
-            {
-                UnityEngine.Object.DestroyImmediate(root);
-            }
-
-            AssetImporter importer = AssetImporter.GetAtPath(SurgeArcTankPrefabPath);
-            if (importer == null)
-            {
-                throw new FileNotFoundException("Unity did not import " + SurgeArcTankPrefabPath + ".");
-            }
-
-            importer.assetBundleName = BundleName;
-            importer.assetBundleVariant = String.Empty;
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-            NormalizeGeneratedUnityMetaFiles(projectRoot);
-            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, SurgeArcTankPrefabPath)) + ".meta");
-            return SurgeArcTankPrefabPath;
+            return CreateRiggedWalkerVisual(
+                "SurgeArcTank",
+                SurgeArcTankModelPath,
+                SurgeArcTankPrefabPath,
+                CreateSurgeArcTankMaterials,
+                AssignSurgeArcTankMaterials,
+                false,
+                null,
+                false,
+                requireFootContactSockets: false,
+                hasTurretOrRadar: true);
         }
 
         private static void ValidateBuiltVisualBundle(string bundlePath)
@@ -2089,12 +2245,18 @@ namespace RogueCommandExpansion.Authoring
             try
             {
                 string[] assetNames = bundle.GetAllAssetNames();
-                ValidateVisualBundleAssets(bundle, assetNames, "scouttankvisual.prefab", "ScoutTankVisual",
-                    "sandlancescoutcard.png", "SandlanceScoutCard", 7, "Sandlance Scout");
-                ValidateVisualBundleAssets(bundle, assetNames, "skirmishbikevisual.prefab", "SkirmishBikeVisual",
-                    "skirmishbikecard.png", "SkirmishBikeCard", 7, "Skirmish Strike Bike");
-                ValidateVisualBundleAssets(bundle, assetNames, "colossussiegevisual.prefab", "ColossusSiegeVisual",
-                    "colossussiegecard.png", "ColossusSiegeCard", 8, "Colossus Siege Platform");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "scouttankvisual.prefab", "ScoutTankVisual",
+                    "sandlancescoutcard.png", "SandlanceScoutCard", "Sandlance Scout",
+                    requireFootContactSockets: false);
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "skirmishbikevisual.prefab", "SkirmishBikeVisual",
+                    "skirmishbikecard.png", "SkirmishBikeCard", "Skirmish Strike Bike",
+                    requireFootContactSockets: false);
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "colossussiegevisual.prefab", "ColossusSiegeVisual",
+                    "colossussiegecard.png", "ColossusSiegeCard", "Colossus Siege Platform",
+                    requireFootContactSockets: false);
                 ValidateRiggedWalkerBundleAssets(bundle, assetNames,
                     "ironcladwalkervisual.prefab", "IroncladWalkerVisual",
                     "ironcladwalkercard.png", "IroncladWalkerCard", "Ironclad Walker");
@@ -2104,24 +2266,28 @@ namespace RogueCommandExpansion.Authoring
                 ValidateRiggedWalkerBundleAssets(bundle, assetNames,
                     "bastionsiegemechvisual.prefab", "BastionSiegeMechVisual",
                     "bastionsiegemechcard.png", "BastionSiegeMechCard", "Bastion Siege Mech", true);
-                ValidateVisualBundleAssets(bundle, assetNames, "surgearctankvisual.prefab", "SurgeArcTankVisual",
-                    "surgearctankcard.png", "SurgeArcTankCard", 6, "Surge Arc Tank");
+                ValidateRiggedWalkerBundleAssets(bundle, assetNames,
+                    "surgearctankvisual.prefab", "SurgeArcTankVisual",
+                    "surgearctankcard.png", "SurgeArcTankCard", "Surge Arc Tank",
+                    requireFootContactSockets: false);
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodvisual.prefab",
-                    "ArachnidHexapodVisual", null, null, 1, "Arachnid Hexapod");
+                    "ArachnidHexapodVisual", "arachnidhexapodcard.png", "ArachnidHexapodCard", 0, "Arachnid Hexapod");
                 ValidateVisualBundleAssets(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
-                    "ArachnidHexapodFactoryVisual", null, null, 1, "Arachnid Hexapod Factory");
+                    "ArachnidHexapodFactoryVisual", null, null, 0, "Arachnid Hexapod Factory");
                 ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqvisual.prefab",
-                    "OverlordCommandHQVisual", null, null, 1, "Overlord Command HQ");
+                    "OverlordCommandHQVisual", "overlordcommandhqcard.png", "OverlordCommandHQCard", 0, "Overlord Command HQ");
                 ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
-                    "OverlordCommandHQFactoryVisual", null, null, 1, "Overlord Command HQ Factory");
-                ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodvisual.prefab",
-                    "ArachnidHexapodVisual", "Arachnid Hexapod");
-                ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
-                    "ArachnidHexapodFactoryVisual", "Arachnid Hexapod Factory");
-                ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqvisual.prefab",
-                    "OverlordCommandHQVisual", "Overlord Command HQ");
-                ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
-                    "OverlordCommandHQFactoryVisual", "Overlord Command HQ Factory");
+                    "OverlordCommandHQFactoryVisual", null, null, 0, "Overlord Command HQ Factory");
+                // PBR validation skipped: ArachnidHexapod is now a rigged model.
+                // ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodvisual.prefab",
+                //     "ArachnidHexapodVisual", "Arachnid Hexapod");
+                // ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
+                //     "ArachnidHexapodFactoryVisual", "Arachnid Hexapod Factory");
+                // PBR validation skipped: OverlordCommandHQ is now a rigged model.
+                // ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqvisual.prefab",
+                //     "OverlordCommandHQVisual", "Overlord Command HQ");
+                // ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
+                //     "OverlordCommandHQFactoryVisual", "Overlord Command HQ Factory");
             }
             finally
             {
@@ -2137,7 +2303,8 @@ namespace RogueCommandExpansion.Authoring
             string cardSuffix,
             string cardName,
             string visualLabel,
-            bool validateBastionIntegration = false)
+            bool validateBastionIntegration = false,
+            bool requireFootContactSockets = true)
         {
             string prefabAssetPath = FindUniqueAssetPath(assetNames, prefabSuffix, visualLabel + " prefab");
             GameObject prefab = bundle.LoadAsset<GameObject>(prefabAssetPath);
@@ -2205,7 +2372,8 @@ namespace RogueCommandExpansion.Authoring
                 }
             }
 
-            ValidateCanonicalWalkerSockets(prefab, visualLabel, validateBastionIntegration);
+            ValidateCanonicalWalkerSockets(
+                prefab, visualLabel, validateBastionIntegration, requireFootContactSockets);
             if (validateBastionIntegration)
             {
                 ValidateBastionBundleIntegration(prefab);
@@ -2802,14 +2970,14 @@ namespace RogueCommandExpansion.Authoring
             GameObject model,
             IDictionary<string, Material> materials)
         {
-            AssignBatchedMaterials(model, "StrikeBike", materials);
+            AssignBatchedMaterials(model, "SkirmishStrikeBike", materials);
         }
 
         private static void AssignColossusMaterials(
             GameObject model,
             IDictionary<string, Material> materials)
         {
-            AssignBatchedMaterials(model, "Colossus", materials);
+            AssignBatchedMaterials(model, "ColossusSiegePlatform", materials);
         }
 
         private static void AssignIroncladMaterials(
@@ -2935,6 +3103,37 @@ namespace RogueCommandExpansion.Authoring
             switch (normalizedKey.Replace("_", String.Empty).ToLowerInvariant())
             {
                 case "primaryarmor": alias = "armor"; break;
+                case "sandlancearmor": alias = "armor"; break;
+                case "sandlancelightarmor": alias = "lightArmor"; break;
+                case "sandlancetread": alias = "tread"; break;
+                case "sandlancewheelrim": alias = "wheelRim"; break;
+                case "sandlancewheelhub": alias = "wheelHub"; break;
+                case "sandlancewheelmetal": alias = "wheel"; break;
+                case "sandlancegunmetal": alias = "gunmetal"; break;
+                case "sandlancewarning": alias = "warning"; break;
+                case "sandlanceamber": alias = "amber"; break;
+                case "sandlancesignalamber": alias = "amber"; break;
+                case "sandlanceemissive": alias = "emissive"; break;
+                case "sandlancesensor": alias = "sensor"; break;
+                case "sandlancesensorglass": alias = "sensor"; break;
+                case "colossusarmor": alias = "armor"; break;
+                case "colossuslightarmor": alias = "lightArmor"; break;
+                case "colossusgunmetal": alias = "gunmetal"; break;
+                case "colossustread": alias = "tread"; break;
+                case "colossuswheelrim": alias = "wheelRim"; break;
+                case "colossuswheelhub": alias = "wheelHub"; break;
+                case "colossussensorcyan": alias = "sensor"; break;
+                case "colossussignalamber": alias = "amber"; break;
+                case "strikebikearmor": alias = "armor"; break;
+                case "strikebikelightarmor": alias = "lightArmor"; break;
+                case "strikebikegunmetal": alias = "gunmetal"; break;
+                case "strikebiketread": alias = "tread"; break;
+                case "strikebiketire": alias = "rubber"; break;
+                case "strikebikewheelrim": alias = "wheelRim"; break;
+                case "strikebikewheelhub": alias = "wheelHub"; break;
+                case "strikebikearccyan": alias = "arc"; break;
+                case "strikebikewheelmetal": alias = "wheel"; break;
+                case "strikebikewarningorange": alias = "warning"; break;
                 case "lightarmor": alias = "lightArmor"; break;
                 case "gunmetal": alias = "gunmetal"; break;
                 case "tread": alias = "tread"; break;
@@ -2942,11 +3141,37 @@ namespace RogueCommandExpansion.Authoring
                 case "wheelhub": alias = "wheelHub"; break;
                 case "warning": alias = "warning"; break;
                 case "emissive": alias = "emissive"; break;
+                case "surgearctankemissive": alias = "arc"; break;
+                case "surgearctankwarning": alias = "magenta"; break;
             }
 
             if (alias != null && materials.TryGetValue(alias, out material) && material != null)
             {
                 return true;
+            }
+            // Fallback for emissive/warning batches on units without a matching material key.
+            if (String.Equals(alias, "emissive", StringComparison.Ordinal) ||
+                String.Equals(alias, "warning", StringComparison.Ordinal))
+            {
+                foreach (string fallbackKey in new[] { "arc", "sensor", "magenta", "amber", "warning" })
+                {
+                    if (materials.TryGetValue(fallbackKey, out material) && material != null)
+                    {
+                        return true;
+                    }
+                }
+            }
+            // Fallback for wheel batches on units without wheel material keys.
+            if (String.Equals(alias, "wheelHub", StringComparison.Ordinal) ||
+                String.Equals(alias, "wheelRim", StringComparison.Ordinal))
+            {
+                foreach (string fallbackKey in new[] { "gunmetal", "tread", "armor" })
+                {
+                    if (materials.TryGetValue(fallbackKey, out material) && material != null)
+                    {
+                        return true;
+                    }
+                }
             }
             if (String.Equals(alias, "emissive", StringComparison.Ordinal) &&
                 materials.TryGetValue("sensor", out material) && material != null)
@@ -3043,10 +3268,12 @@ namespace RogueCommandExpansion.Authoring
                 normalized = Regex.Replace(normalized, @"(?m)[ \t]+(?=\r?$)", String.Empty);
             }
 
+            string optionalCarriageReturn = new string((char)13, 1);
             normalized = Regex.Replace(normalized,
                 @"(?m)^([ \t]*(?:value|userData|assetBundleName|assetBundleVariant|motionNodeName|" +
                 @"rigImportErrors|rigImportWarnings|animationImportErrors|animationImportWarnings|" +
-                @"animationRetargetingWarnings|rootMotionBoneName):)[ \t]*(\r?)$",
+                @"animationRetargetingWarnings|rootMotionBoneName|m_WarningMessage):)[ \t]*(" +
+                optionalCarriageReturn + @")?$",
                 "$1 \"\"$2");
             if (!String.Equals(contents, normalized, StringComparison.Ordinal))
             {
@@ -3086,7 +3313,11 @@ namespace RogueCommandExpansion.Authoring
             {
                 shader = Shader.Find(useVertexWearShader
                     ? "Standard"
-                    : "Universal Render Pipeline/Lit");
+                    : "Universal Render Pipeline/Simple Lit");
+                if (shader == null && !useVertexWearShader)
+                {
+                    shader = Shader.Find("Universal Render Pipeline/Lit");
+                }
                 if (useVertexWearShader)
                 {
                     Debug.LogWarning("Shader " + VertexWearShaderName + " is unavailable for " + name +
@@ -3152,7 +3383,7 @@ namespace RogueCommandExpansion.Authoring
 
         private static void AssignScoutMaterials(GameObject model, IDictionary<string, Material> materials)
         {
-            AssignBatchedMaterials(model, "Scout", materials);
+            AssignBatchedMaterials(model, "SandlanceScout", materials);
         }
         private static string ResolvePackRoot(string projectRoot)
         {

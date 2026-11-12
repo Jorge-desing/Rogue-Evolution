@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "bepinex_mcp": {
+      "command": "python",
+      "args": [
+        "${workspaceFolder}/tools/bepinex_mcp_server.py"
+      ],
+      "env": {
+        "BEPINEX_MCP_URL": "http://127.0.0.1:8080/mcp/"
+      }
+    }
+  }
+}

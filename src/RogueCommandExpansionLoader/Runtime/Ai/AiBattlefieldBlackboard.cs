@@ -1,0 +1,394 @@
+using System;
+using System.Collections.Generic;
+
+namespace RogueCommandExpansionLoader.Runtime.Ai
+{
+    /// <summary>
+    /// Immutable battlefield perception frame shared across coordinated AI modules in a single tick.
+    /// Omission counters are placed strictly first to respect bounded trace formatting rules.
+    /// </summary>
+    public sealed class AiBattlefieldSnapshot
+    {
+        public int OmittedAiUnitCount { get; }
+        public int OmittedHostileUnitCount { get; }
+        public int OmittedHazardZoneCount { get; }
+        public float Timestamp { get; }
+        public int BaseIndex { get; }
+        public int CurrentWaveNumber { get; }
+        public int TotalAiCombatUnits { get; }
+        public int TotalAiHarvesters { get; }
+        public int TotalAiBuildings { get; }
+        public int TotalHostileCombatUnits { get; }
+        public int TotalHarmfulHazardZones { get; }
+        public float TotalAiCombatPower { get; }
+        public float TotalHostileCombatPower { get; }
+        public float HostileCentroidX { get; }
+        public float HostileCentroidZ { get; }
+        public float AiCentroidX { get; }
+        public float AiCentroidZ { get; }
+        public float EngagementDistance { get; }
+        public float AlliedDispersionRadius { get; }
+        public float FlankLeftX { get; }
+        public float FlankLeftZ { get; }
+        public float FlankRightX { get; }
+        public float FlankRightZ { get; }
+        public bool UnderHarvesterOrBasePressure { get; }
+        public IReadOnlyList<AiUnitSnapshot> AiUnits { get; }
+        public IReadOnlyList<AiUnitSnapshot> HostileUnits { get; }
+        public IReadOnlyList<AiHazardZoneSnapshot> HazardZones { get; }
+
+        public AiBattlefieldSnapshot(
+            float timestamp,
+            int baseIndex,
+            int currentWaveNumber,
+            int omittedAiUnitCount,
+            int omittedHostileUnitCount,
+            int totalAiCombatUnits,
+            int totalAiHarvesters,
+            int totalAiBuildings,
+            int totalHostileCombatUnits,
+            float totalAiCombatPower,
+            float totalHostileCombatPower,
+            float hostileCentroidX,
+            float hostileCentroidZ,
+            bool underHarvesterOrBasePressure,
+            IReadOnlyList<AiUnitSnapshot> aiUnits,
+            IReadOnlyList<AiUnitSnapshot> hostileUnits,
+            int omittedHazardZoneCount = 0,
+            int totalHarmfulHazardZones = 0,
+            IReadOnlyList<AiHazardZoneSnapshot> hazardZones = null,
+            float aiCentroidX = 0f,
+            float aiCentroidZ = 0f,
+            float engagementDistance = 0f,
+            float flankLeftX = 0f,
+            float flankLeftZ = 0f,
+            float flankRightX = 0f,
+            float flankRightZ = 0f,
+            float alliedDispersionRadius = 0f)
+        {
+            OmittedAiUnitCount = Math.Max(0, omittedAiUnitCount);
+            OmittedHostileUnitCount = Math.Max(0, omittedHostileUnitCount);
+            OmittedHazardZoneCount = Math.Max(0, omittedHazardZoneCount);
+            Timestamp = float.IsNaN(timestamp) || float.IsInfinity(timestamp) ? 0f : timestamp;
+            BaseIndex = baseIndex;
+            CurrentWaveNumber = Math.Max(0, currentWaveNumber);
+            TotalAiCombatUnits = Math.Max(0, totalAiCombatUnits);
+            TotalAiHarvesters = Math.Max(0, totalAiHarvesters);
+            TotalAiBuildings = Math.Max(0, totalAiBuildings);
+            TotalHostileCombatUnits = Math.Max(0, totalHostileCombatUnits);
+            TotalHarmfulHazardZones = Math.Max(0, totalHarmfulHazardZones);
+            TotalAiCombatPower = Math.Max(0f, totalAiCombatPower);
+            TotalHostileCombatPower = Math.Max(0f, totalHostileCombatPower);
+            HostileCentroidX = float.IsNaN(hostileCentroidX) || float.IsInfinity(hostileCentroidX) ? 0f : hostileCentroidX;
+            HostileCentroidZ = float.IsNaN(hostileCentroidZ) || float.IsInfinity(hostileCentroidZ) ? 0f : hostileCentroidZ;
+            AiCentroidX = float.IsNaN(aiCentroidX) || float.IsInfinity(aiCentroidX) ? 0f : aiCentroidX;
+            AiCentroidZ = float.IsNaN(aiCentroidZ) || float.IsInfinity(aiCentroidZ) ? 0f : aiCentroidZ;
+            EngagementDistance = float.IsNaN(engagementDistance) || float.IsInfinity(engagementDistance) ? 0f : Math.Max(0f, engagementDistance);
+            AlliedDispersionRadius = float.IsNaN(alliedDispersionRadius) || float.IsInfinity(alliedDispersionRadius) ? 0f : Math.Max(0f, alliedDispersionRadius);
+            FlankLeftX = float.IsNaN(flankLeftX) || float.IsInfinity(flankLeftX) ? 0f : flankLeftX;
+            FlankLeftZ = float.IsNaN(flankLeftZ) || float.IsInfinity(flankLeftZ) ? 0f : flankLeftZ;
+            FlankRightX = float.IsNaN(flankRightX) || float.IsInfinity(flankRightX) ? 0f : flankRightX;
+            FlankRightZ = float.IsNaN(flankRightZ) || float.IsInfinity(flankRightZ) ? 0f : flankRightZ;
+            UnderHarvesterOrBasePressure = underHarvesterOrBasePressure;
+            AiUnits = aiUnits ?? Array.Empty<AiUnitSnapshot>();
+            HostileUnits = hostileUnits ?? Array.Empty<AiUnitSnapshot>();
+            HazardZones = hazardZones ?? Array.Empty<AiHazardZoneSnapshot>();
+        }
+
+        public static AiBattlefieldSnapshot Empty { get; } = new AiBattlefieldSnapshot(
+            timestamp: 0f,
+            baseIndex: -1,
+            currentWaveNumber: 0,
+            omittedAiUnitCount: 0,
+            omittedHostileUnitCount: 0,
+            totalAiCombatUnits: 0,
+            totalAiHarvesters: 0,
+            totalAiBuildings: 0,
+            totalHostileCombatUnits: 0,
+            totalAiCombatPower: 0f,
+            totalHostileCombatPower: 0f,
+            hostileCentroidX: 0f,
+            hostileCentroidZ: 0f,
+            underHarvesterOrBasePressure: false,
+            aiUnits: Array.Empty<AiUnitSnapshot>(),
+            hostileUnits: Array.Empty<AiUnitSnapshot>(),
+            omittedHazardZoneCount: 0,
+            totalHarmfulHazardZones: 0,
+            hazardZones: Array.Empty<AiHazardZoneSnapshot>(),
+            aiCentroidX: 0f,
+            aiCentroidZ: 0f,
+            engagementDistance: 0f,
+            flankLeftX: 0f,
+            flankLeftZ: 0f,
+            flankRightX: 0f,
+            flankRightZ: 0f,
+            alliedDispersionRadius: 0f);
+    }
+
+    /// <summary>
+    /// Pure builder that aggregates pre-filtered AI, hostile, and hazard snapshots into a single
+    /// <see cref="AiBattlefieldSnapshot"/> with bounded list caps and threat vector metrics.
+    /// </summary>
+    public static class AiBattlefieldBlackboardBuilder
+    {
+        public const int DefaultMaxTrackedUnitsPerSide = 64;
+        public const int DefaultMaxTrackedHazardZones = 16;
+        public const float DefaultPressureRadiusSquared = 18f * 18f;
+
+        public static AiBattlefieldSnapshot BuildSnapshot(
+            float timestamp,
+            int baseIndex,
+            int currentWaveNumber,
+            IReadOnlyList<AiUnitSnapshot> aiUnits,
+            IReadOnlyList<AiUnitSnapshot> hostileUnits,
+            int maxTrackedUnitsPerSide = DefaultMaxTrackedUnitsPerSide)
+        {
+            return BuildSnapshot(
+                timestamp: timestamp,
+                baseIndex: baseIndex,
+                currentWaveNumber: currentWaveNumber,
+                aiUnits: aiUnits,
+                hostileUnits: hostileUnits,
+                hazardZones: null,
+                maxTrackedUnitsPerSide: maxTrackedUnitsPerSide,
+                maxTrackedHazardZones: DefaultMaxTrackedHazardZones);
+        }
+
+        public static AiBattlefieldSnapshot BuildSnapshot(
+            float timestamp,
+            int baseIndex,
+            int currentWaveNumber,
+            IReadOnlyList<AiUnitSnapshot> aiUnits,
+            IReadOnlyList<AiUnitSnapshot> hostileUnits,
+            IReadOnlyList<AiHazardZoneSnapshot> hazardZones,
+            int maxTrackedUnitsPerSide = DefaultMaxTrackedUnitsPerSide,
+            int maxTrackedHazardZones = DefaultMaxTrackedHazardZones)
+        {
+            int cap = Math.Max(1, maxTrackedUnitsPerSide);
+            int hazardCap = Math.Max(1, maxTrackedHazardZones);
+
+            var boundedAi = new List<AiUnitSnapshot>();
+            var boundedHostiles = new List<AiUnitSnapshot>();
+            var boundedHazards = new List<AiHazardZoneSnapshot>();
+            var protectedIds = new HashSet<int>();
+            var protectedPositions = new List<(float X, float Z)>();
+
+            int omittedAi = 0;
+            int totalAiCombat = 0;
+            int totalAiHarvesters = 0;
+            int totalAiBuildings = 0;
+            float totalAiPower = 0f;
+            float sumAiCombatX = 0f;
+            float sumAiCombatZ = 0f;
+            int aiCombatCentroidCount = 0;
+
+            if (aiUnits != null)
+            {
+                for (int i = 0; i < aiUnits.Count; i++)
+                {
+                    AiUnitSnapshot unit = aiUnits[i];
+                    if (baseIndex >= 0 && unit.BaseIndex >= 0 && unit.BaseIndex != baseIndex)
+                    {
+                        continue;
+                    }
+
+                    if (unit.IsCombatUnit)
+                    {
+                        totalAiCombat++;
+                        totalAiPower += unit.CombinedCombatPower;
+                        sumAiCombatX += unit.PosX;
+                        sumAiCombatZ += unit.PosZ;
+                        aiCombatCentroidCount++;
+                    }
+
+                    if (unit.IsHarvester)
+                    {
+                        totalAiHarvesters++;
+                        protectedIds.Add(unit.UniqueEntityId);
+                        protectedPositions.Add((unit.PosX, unit.PosZ));
+                    }
+
+                    if (unit.IsBuilding)
+                    {
+                        totalAiBuildings++;
+                        protectedIds.Add(unit.UniqueEntityId);
+                        protectedPositions.Add((unit.PosX, unit.PosZ));
+                    }
+
+                    if (boundedAi.Count < cap)
+                    {
+                        boundedAi.Add(unit);
+                    }
+                    else
+                    {
+                        omittedAi++;
+                    }
+                }
+            }
+
+            int omittedHostiles = 0;
+            int totalHostileCombat = 0;
+            float totalHostilePower = 0f;
+            float sumHostileX = 0f;
+            float sumHostileZ = 0f;
+            int centroidCount = 0;
+            bool underPressure = false;
+
+            if (hostileUnits != null)
+            {
+                for (int i = 0; i < hostileUnits.Count; i++)
+                {
+                    AiUnitSnapshot hostile = hostileUnits[i];
+                    if (hostile.IsCombatUnit)
+                    {
+                        totalHostileCombat++;
+                        totalHostilePower += hostile.CombinedCombatPower;
+                    }
+
+                    sumHostileX += hostile.PosX;
+                    sumHostileZ += hostile.PosZ;
+                    centroidCount++;
+
+                    if (!underPressure)
+                    {
+                        if (hostile.CurrentTargetId >= 0 && protectedIds.Contains(hostile.CurrentTargetId))
+                        {
+                            underPressure = true;
+                        }
+                        else
+                        {
+                            for (int p = 0; p < protectedPositions.Count; p++)
+                            {
+                                float dx = hostile.PosX - protectedPositions[p].X;
+                                float dz = hostile.PosZ - protectedPositions[p].Z;
+                                if (dx * dx + dz * dz <= DefaultPressureRadiusSquared)
+                                {
+                                    underPressure = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (boundedHostiles.Count < cap)
+                    {
+                        boundedHostiles.Add(hostile);
+                    }
+                    else
+                    {
+                        omittedHostiles++;
+                    }
+                }
+            }
+
+            int omittedHazards = 0;
+            int totalHarmfulHazards = 0;
+            if (hazardZones != null)
+            {
+                for (int i = 0; i < hazardZones.Count; i++)
+                {
+                    AiHazardZoneSnapshot hz = hazardZones[i];
+                    if (!hz.IsBeneficialToAi)
+                    {
+                        totalHarmfulHazards++;
+                    }
+
+                    if (boundedHazards.Count < hazardCap)
+                    {
+                        boundedHazards.Add(hz);
+                    }
+                    else
+                    {
+                        omittedHazards++;
+                    }
+                }
+            }
+
+            float centroidX = centroidCount > 0 ? sumHostileX / centroidCount : 0f;
+            float centroidZ = centroidCount > 0 ? sumHostileZ / centroidCount : 0f;
+            float aiCentroidX = aiCombatCentroidCount > 0 ? sumAiCombatX / aiCombatCentroidCount : 0f;
+            float aiCentroidZ = aiCombatCentroidCount > 0 ? sumAiCombatZ / aiCombatCentroidCount : 0f;
+
+            float alliedDispersion = 0f;
+            if (aiCombatCentroidCount > 0)
+            {
+                float sumDispersion = 0f;
+                for (int i = 0; i < boundedAi.Count; i++)
+                {
+                    AiUnitSnapshot u = boundedAi[i];
+                    if (u.IsCombatUnit && (baseIndex < 0 || u.BaseIndex < 0 || u.BaseIndex == baseIndex))
+                    {
+                        float ddx = u.PosX - aiCentroidX;
+                        float ddz = u.PosZ - aiCentroidZ;
+                        sumDispersion += (float)Math.Sqrt(Math.Max(0f, ddx * ddx + ddz * ddz));
+                    }
+                }
+                alliedDispersion = sumDispersion / aiCombatCentroidCount;
+            }
+
+            float engagementDist = 0f;
+            float flankLeftX = 0f;
+            float flankLeftZ = 0f;
+            float flankRightX = 0f;
+            float flankRightZ = 0f;
+
+            if (aiCombatCentroidCount > 0 && centroidCount > 0)
+            {
+                float dx = centroidX - aiCentroidX;
+                float dz = centroidZ - aiCentroidZ;
+                float distSq = dx * dx + dz * dz;
+                engagementDist = (float)Math.Sqrt(Math.Max(0f, distSq));
+
+                if (engagementDist > 0.01f)
+                {
+                    float dirX = dx / engagementDist;
+                    float dirZ = dz / engagementDist;
+
+                    float flankOffset = Math.Max(8.0f, Math.Min(28.0f, engagementDist * 0.45f));
+
+                    flankLeftX = centroidX + (-dirZ * flankOffset);
+                    flankLeftZ = centroidZ + (dirX * flankOffset);
+
+                    flankRightX = centroidX + (dirZ * flankOffset);
+                    flankRightZ = centroidZ + (-dirX * flankOffset);
+                }
+                else
+                {
+                    flankLeftX = centroidX - 10.0f;
+                    flankLeftZ = centroidZ;
+                    flankRightX = centroidX + 10.0f;
+                    flankRightZ = centroidZ;
+                }
+            }
+
+            return new AiBattlefieldSnapshot(
+                timestamp: timestamp,
+                baseIndex: baseIndex,
+                currentWaveNumber: currentWaveNumber,
+                omittedAiUnitCount: omittedAi,
+                omittedHostileUnitCount: omittedHostiles,
+                totalAiCombatUnits: totalAiCombat,
+                totalAiHarvesters: totalAiHarvesters,
+                totalAiBuildings: totalAiBuildings,
+                totalHostileCombatUnits: totalHostileCombat,
+                totalAiCombatPower: totalAiPower,
+                totalHostileCombatPower: totalHostilePower,
+                hostileCentroidX: centroidX,
+                hostileCentroidZ: centroidZ,
+                underHarvesterOrBasePressure: underPressure,
+                aiUnits: boundedAi.AsReadOnly(),
+                hostileUnits: boundedHostiles.AsReadOnly(),
+                omittedHazardZoneCount: omittedHazards,
+                totalHarmfulHazardZones: totalHarmfulHazards,
+                hazardZones: boundedHazards.AsReadOnly(),
+                aiCentroidX: aiCentroidX,
+                aiCentroidZ: aiCentroidZ,
+                engagementDistance: engagementDist,
+                flankLeftX: flankLeftX,
+                flankLeftZ: flankLeftZ,
+                flankRightX: flankRightX,
+                flankRightZ: flankRightZ,
+                alliedDispersionRadius: alliedDispersion);
+        }
+    }
+}

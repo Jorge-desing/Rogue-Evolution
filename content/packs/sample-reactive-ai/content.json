@@ -29,6 +29,14 @@
       "id": "sample-reactive-ai:base-defense",
       "nativeTemplateId": "_01_Enemy - Melee Poker PCXPoker Variant",
       "scopeToReferencedStages": true,
+      "doctrine": "Fortify",
+      "aggressionMultiplier": 1.15,
+      "defaultUnitStance": "Defensive",
+      "defaultUnitLoadout": "Reinforced",
+      "startingUnitAffixes": [
+        "Bulwark"
+      ],
+      "startingUnitVeterancyRank": 1,
       "unitEntries": [
         {
           "unitId": "sample-native:skirmish-bike",
@@ -65,6 +73,17 @@
             { "name": "cooldownSeconds", "value": "1" },
             { "name": "defenseRadiusCells", "value": "12" },
             { "name": "maxResponders", "value": "2" }
+          ]
+        },
+        {
+          "moduleId": "sample:threat-prioritization",
+          "parameters": []
+        },
+        {
+          "moduleId": "sample:adaptive-commander",
+          "parameters": [
+            { "name": "scanIntervalSeconds", "value": "5" },
+            { "name": "baseIndex", "value": "0" }
           ]
         }
       ]
