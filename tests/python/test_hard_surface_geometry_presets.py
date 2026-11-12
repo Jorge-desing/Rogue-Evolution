@@ -454,6 +454,26 @@ class TestHardSurfacePresetConfigs(unittest.TestCase):
         with self.assertRaises(ValueError):
             OptronicReconSensorMastConfig(mast_height=-0.1)
 
+    def test_service_hatch_config_valid_and_invalid(self) -> None:
+        cfg = ServiceHatchConfig(center_xy=(0.0, 0.0), outer_size=(0.40, 0.30), support_top_z=0.50)
+        self.assertEqual(cfg.recess_depth, 0.025)
+        self.assertEqual(cfg.frame_width, 0.015)
+        with self.assertRaises(ValueError):
+            ServiceHatchConfig(center_xy=(0.0, 0.0), outer_size=(-0.40, 0.30), support_top_z=0.50)
+        with self.assertRaises(ValueError):
+            ServiceHatchConfig(center_xy=(0.0, 0.0), outer_size=(0.40, 0.30), support_top_z=0.50, hinge_axis="Z")
+        with self.assertRaises(ValueError):
+            ServiceHatchConfig(center_xy=(0.0, 0.0), outer_size=(0.40, 0.30), support_top_z=0.50, hinge_side="INVALID")
+
+    def test_era_brick_config_valid_and_invalid(self) -> None:
+        cfg = EraBrickConfig(center=(0.0, 0.0, 0.0), normal=(0.0, 0.0, 1.0))
+        self.assertEqual(cfg.size, (0.22, 0.13, 0.055))
+        self.assertEqual(cfg.backing_overhang, 0.010)
+        with self.assertRaises(ValueError):
+            EraBrickConfig(center=(0.0, 0.0, 0.0), normal=(0.0, 0.0, 0.0))
+        with self.assertRaises(ValueError):
+            EraBrickConfig(center=(0.0, 0.0, 0.0), normal=(0.0, 0.0, 1.0), size=(-0.2, 0.1, 0.05))
+
 
 class TestHardSurfacePresetRegistry(unittest.TestCase):
     """Test registry completeness and style/slot coverage."""
@@ -536,6 +556,10 @@ class TestHardSurfacePresetBlenderGeneration(unittest.TestCase):
             "armor = rmk.make_material('TestArmor', (0.3, 0.35, 0.4), metallic=0.7)\n"
             "gunmetal = rmk.make_material('TestGunmetal', (0.15, 0.15, 0.15), metallic=0.9)\n"
             "accent = rmk.make_material('TestAccent', (0.2, 0.7, 0.9), metallic=0.5)\n"
+            "armor.use_fake_user = True\n"
+            "gunmetal.use_fake_user = True\n"
+            "accent.use_fake_user = True\n"
+            "\n"
             "misaligned_panel = rmk.make_box('MisalignedServicePanel', (0.46, 0.08, 0.26), (0.0, 4.005, 0.0), gunmetal, bevel=0.0)\n"
             "try:\n"
             "    hsg.create_coaxial_service_connector_preset(prefix='MisalignedConnector', config=hsg.CoaxialServiceConnectorConfig(center=(0.0, 4.0, 0.0)), armor_material=armor, hardware_material=gunmetal, backing_panel=misaligned_panel)\n"
@@ -543,6 +567,11 @@ class TestHardSurfacePresetBlenderGeneration(unittest.TestCase):
             "    assert 'center' in str(exc), f'unexpected misalignment rejection: {exc}'\n"
             "else:\n"
             "    raise AssertionError('off-center service connector was accepted')\n"
+            "finally:\n"
+            "    p_data = misaligned_panel.data if misaligned_panel and misaligned_panel.type == 'MESH' else None\n"
+            "    bpy.data.objects.remove(misaligned_panel, do_unlink=True)\n"
+            "    if p_data and p_data.users == 0:\n"
+            "        bpy.data.meshes.remove(p_data)\n"
             "\n"
             "results = {}\n"
             "presets_to_test = [\n"
@@ -579,6 +608,8 @@ class TestHardSurfacePresetBlenderGeneration(unittest.TestCase):
             "    (hsg.MAGNETIC_TRACTOR_DOCKING_CLAMP_PRESET_ID, hsg.MagneticTractorDockingClampConfig(center=(7.5, 10.0, 0.0))),\n"
             "    (hsg.GRAVITON_RECOIL_ANCHOR_PRESET_ID, hsg.GravitonRecoilAnchorConfig(center=(9.0, 10.0, 0.0))),\n"
             "    (hsg.OPTRONIC_RECON_SENSOR_MAST_PRESET_ID, hsg.OptronicReconSensorMastConfig(center=(10.5, 10.0, 0.0))),\n"
+            "    (hsg.SERVICE_HATCH_PRESET_ID, hsg.ServiceHatchConfig(center_xy=(0.0, 0.0), outer_size=(0.4, 0.3), support_top_z=0.5)),\n"
+            "    (hsg.ERA_BRICK_PRESET_ID, hsg.EraBrickConfig(center=(0.0, 0.0, 0.0), normal=(0.0, 0.0, 1.0))),\n"
             "]\n"
             "for preset_id, config in presets_to_test:\n"
             "    creator = hsg.GEOMETRY_PRESETS[preset_id]\n"
@@ -606,6 +637,19 @@ class TestHardSurfacePresetBlenderGeneration(unittest.TestCase):
             "        'all_tagged': all_tagged,\n"
             "        'panel_anchor_bolt_count': len([o for o in objs if o.get('rcl_service_connector_component') == 'panel_anchor_bolt']),\n"
             "    }\n"
+            "    for o in objs:\n"
+            "        o_type = o.type\n"
+            "        d = o.data\n"
+            "        bpy.data.objects.remove(o, do_unlink=True)\n"
+            "        if d and d.users == 0:\n"
+            "            if o_type == 'MESH':\n"
+            "                bpy.data.meshes.remove(d)\n"
+            "            elif o_type == 'CURVE':\n"
+            "                bpy.data.curves.remove(d)\n"
+            "    for block in (bpy.data.meshes, bpy.data.curves):\n"
+            "        for item in list(block):\n"
+            "            if item.users == 0:\n"
+            "                block.remove(item)\n"
             "print('__JSON_START__' + json.dumps(results) + '__JSON_END__')\n"
         )
         proc = subprocess.run(
@@ -622,6 +666,8 @@ class TestHardSurfacePresetBlenderGeneration(unittest.TestCase):
         )
         json_str = proc.stdout.split("__JSON_START__")[1].split("__JSON_END__")[0]
         data = json.loads(json_str)
+
+        self.assertEqual(set(data.keys()), set(GEOMETRY_PRESETS.keys()))
 
         for preset_id, info in data.items():
             with self.subTest(preset=preset_id):
