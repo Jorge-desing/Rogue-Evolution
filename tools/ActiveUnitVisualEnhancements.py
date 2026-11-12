@@ -202,10 +202,9 @@ ACTIVE_UNIT_WAVE34_PROFILES = {
         "gusset_locations": [(-0.58, -0.52, 1.18), (0.58, -0.52, 1.18)],
     },
     "SentinelRelay": {
-        "features": {"drive_axles", "antenna_collar", "gussets"},
+        "features": {"drive_axles", "antenna_collar"},
         "axle_locations": [("Rear", -1.05, 0.47, 0.88), ("Front", 1.05, 0.47, 0.88)],
         "antenna_location": (0.0, -0.72, 1.72),
-        "gusset_locations": [(-0.62, -0.55, 1.20), (0.62, -0.55, 1.20)],
     },
     "GravitasBreaker": {
         "features": {"sponson_bridges", "engine_cavity", "gussets"},
@@ -213,11 +212,9 @@ ACTIVE_UNIT_WAVE34_PROFILES = {
         "gusset_locations": [(-0.82, -0.48, 1.24), (0.82, -0.48, 1.24)],
     },
     "CommandRelay": {
-        "features": {"drive_axles", "radar_mount", "antenna_collar", "gussets"},
+        "features": {"drive_axles", "antenna_collar"},
         "axle_locations": [("Rear", -1.45, 0.475, 0.92), ("Mid", -0.15, 0.475, 0.92), ("Front", 1.45, 0.475, 0.92)],
-        "radar_location": (0.0, -0.42, 2.05),
-        "antenna_location": (0.0, -1.25, 2.12),
-        "gusset_locations": [(-0.68, -0.62, 1.34), (0.68, -0.62, 1.34)],
+        "antenna_location": (-0.35, -1.25, 1.72),
     },
 }
 
@@ -342,11 +339,10 @@ ACTIVE_UNIT_REALISM_PROFILES = {
         "turret_ring_location": (0.0, 0.20, 1.45), "turret_ring_radius": 0.52,
     },
     "SentinelRelay": {
-        "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},
+        "features": {"access_hatches", "driver_periscope", "turret_ring_guard"},
         "hull_width": 2.20, "hull_length": 2.80, "deck_z": 1.30, "ground_clearance": 0.06,
         "hatch_location": (0.42, -0.38, 1.35),
         "periscope_location": (0.0, 1.15, 1.28),
-        "tool_rack_location": (-0.92, -0.18, 1.30),
         "turret_ring_location": (0.0, 0.25, 1.32), "turret_ring_radius": 0.55,
     },
     "GravitasBreaker": {
@@ -362,11 +358,10 @@ ACTIVE_UNIT_REALISM_PROFILES = {
         "idler_center": (0.0, 1.30, 0.36),
     },
     "CommandRelay": {
-        "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},
+        "features": {"access_hatches", "driver_periscope", "turret_ring_guard"},
         "hull_width": 2.20, "hull_length": 2.90, "deck_z": 1.30, "ground_clearance": 0.06,
         "hatch_location": (0.42, -0.42, 1.35),
         "periscope_location": (0.0, 1.20, 1.28),
-        "tool_rack_location": (-0.92, -0.22, 1.30),
         "turret_ring_location": (0.0, 0.28, 1.32), "turret_ring_radius": 0.55,
     },
 }
