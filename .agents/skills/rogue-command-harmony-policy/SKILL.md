@@ -7,7 +7,7 @@ author: Hermes Agent
 metadata:
   hermes:
     tags: [Rogue Command, Unity, Mono, BepInEx, Harmony, IL2CPP, patching, SHA256, MVID, assembly verification]
-    related_skills: [rogue-command-clean-room-diagnostics, rogue-command-reverse-engineering, rogue-command-game-research, rogue-command-steam-runtime-validation, rogue-command-pack-validation, rogue-command-unit-authoring]
+    related_skills: [rogue-command-bepinex-mcp, rogue-command-clean-room-diagnostics, rogue-command-reverse-engineering, rogue-command-game-research, rogue-command-steam-runtime-validation, rogue-command-pack-validation, rogue-command-unit-authoring]
 ---
 
 # Rogue Command Harmony Policy
@@ -144,6 +144,12 @@ The loader registers 65 verified hooks across core game simulation systems, incl
 | **Static Inspection** | Repo files, decompiled IL, assets | Method signatures, tokens, structure | Runtime behavior or registration |
 | **Local Build / Validation** | `dotnet build`, test harness, Python | Compile correctness, hook list | In-game execution or match flow |
 | **In-Game Steam Evidence** | Live Steam process (AppID `1461910`) | Active hook execution, live AI/commands | Universal cross-version behavior |
+
+## Live Runtime Handoff
+
+- Use [Rogue Command BepInEx MCP](../rogue-command-bepinex-mcp/SKILL.md) for screenshot-free runtime control, compatibility preflight, exact overload resolution, temporary Harmony patch lifecycle, and cleanup.
+- Treat the version, `Assembly-CSharp.dll` SHA-256, and MVID as one identity. The pinned values above are a baseline; re-read current installation and runtime capabilities before reflected calls or Harmony patches.
+- The project-local `bepinex_mcp` MCP server is configured in `.codex/config.toml` under the same key as the global upstream integration. The local entry owns runtime tool usage in this repository.
 
 For live AI evidence, separate module registration from stage activation: a 23-module registry census alone proves availability only. Confirm the current stage's AI profile and observe its director/roster plus module-specific effects or counters in `Game`. An intermission boss-node read proves route telemetry only, not AI execution.
 

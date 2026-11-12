@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rogue Command BepInEx MCP"
+  short_description: "Controla el runtime sin capturas y aplica Harmony compatible."
+  default_prompt: "Usa el puente BepInEx MCP del proyecto para inspeccionar y controlar el runtime de Rogue Command sin capturas ni Computer Use. Verifica la identidad del juego y sigue la política Harmony."
