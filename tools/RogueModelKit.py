@@ -8501,6 +8501,18 @@ def merge_meshes_by_material(
     return exported_objects
 
 
+def _validate_export_budget_token(
+    asset_budget: Dict[str, Any] | None,
+    expected_asset_id: str | None,
+) -> None:
+    from model_budget_policy import ModelBudgetError, validate_prevalidated_export_budget
+
+    try:
+        validate_prevalidated_export_budget(asset_budget, expected_asset_id=expected_asset_id)
+    except ModelBudgetError as exc:
+        raise ValueError(str(exc)) from exc
+
+
 def export_unity_fbx(
     fbx_path: Path,
     model_objects: Sequence[bpy.types.Object],
@@ -8511,14 +8523,17 @@ def export_unity_fbx(
     asset_id: str | None = None,
     profile_path: Path | None = None,
     scene_id: str | None = None,
+    prevalidated_budget: Dict[str, Any] | None = None,
 ) -> None:
-    """Exports model objects to FBX with optimal scale and axis mappings for Unity."""
+    """Exports model objects to FBX after a calibrated budget has been resolved."""
     asset_budget = None
     mesh_objects: list[bpy.types.Object] = []
     ratios: list[Tuple[str, float]] = []
     if generate_profiled_lods:
         if not asset_id:
             raise ValueError("profile-driven LOD export requires an explicit asset_id")
+        if prevalidated_budget is not None:
+            raise ValueError("profile-driven LOD export resolves its own budget; do not pass prevalidated_budget")
         # Resolve and validate the profile before touching the FBX destination.
         # A missing or infeasible calibration must not partially export LOD0.
         asset_budget = resolve_geometry_budget(asset_id, profile_path, scene_id)
@@ -8533,6 +8548,18 @@ def export_unity_fbx(
                 f"{asset_id} has {source_triangles} LOD0 triangles above its calibrated {lod0_target}-triangle allocation"
             )
         ratios = lod_ratios_from_budget(asset_budget, source_triangles)
+    else:
+        if prevalidated_budget is None:
+            raise ValueError(
+                "FBX export requires generate_profiled_lods=True or a prevalidated calibrated geometry budget"
+            )
+        asset_budget = prevalidated_budget
+
+    if asset_id is None and isinstance(asset_budget, dict):
+        asset_id = str(asset_budget.get("assetId", "")) or None
+    _validate_export_budget_token(asset_budget, expected_asset_id=asset_id)
+    if not model_objects:
+        raise ValueError("FBX export requires at least one object")
 
     fbx_path.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
@@ -8579,6 +8606,8 @@ def export_unity_fbx(
             include_empties=False,
             include_armature=include_armature,
             bake_anim=False,
+            asset_id=asset_id,
+            prevalidated_budget=asset_budget,
         )
         print(f"[model-budget] {asset_id}: {report_path}")
 
@@ -8707,8 +8736,10 @@ def make_wreckage_variant(
     ),
     smooth_by_angle: bool = True,
     smooth_angle_deg: float = 38.0,
+    prevalidated_budget: Dict[str, Any] | None = None,
 ) -> list[bpy.types.Object]:
     """Generates an archetype-aware battle-destroyed / burned wreckage model variant with severity scaling."""
+    _validate_export_budget_token(prevalidated_budget, expected_asset_id=prefix)
     # Material tuning by severity
     if severity == "light":
         charred_armor = make_material(f"{prefix}_Wreck_Charred", (0.16, 0.16, 0.18), metallic=0.15, roughness=0.72)
@@ -8845,7 +8876,13 @@ def make_wreckage_variant(
         output_blend_path.parent.mkdir(parents=True, exist_ok=True)
         bpy.ops.wm.save_as_mainfile(filepath=str(output_blend_path))
 
-    export_unity_fbx(output_fbx_path, batched_wreckage, include_empties=False)
+    export_unity_fbx(
+        output_fbx_path,
+        batched_wreckage,
+        include_empties=False,
+        asset_id=prefix,
+        prevalidated_budget=prevalidated_budget,
+    )
     return batched_wreckage
 
 
@@ -12682,8 +12719,10 @@ def create_single_material_atlas_model(
     prefix: str,
     texture_maps: dict[str, Path],
     output_fbx_path: Path,
+    prevalidated_budget: Dict[str, Any] | None = None,
 ) -> bpy.types.Object:
     """Combines source meshes into one object with one PBR atlas material slot."""
+    _validate_export_budget_token(prevalidated_budget, expected_asset_id=prefix)
     valid_mesh_objs = [o for o in source_objects if o.type == "MESH" and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))]
     if not valid_mesh_objs:
         raise ValueError("No mesh objects available for single-material atlas creation")
@@ -12767,7 +12806,13 @@ def create_single_material_atlas_model(
             unified_obj.modifiers.remove(modifier)
 
     output_fbx_path.parent.mkdir(parents=True, exist_ok=True)
-    export_unity_fbx(output_fbx_path, [unified_obj], include_empties=False)
+    export_unity_fbx(
+        output_fbx_path,
+        [unified_obj],
+        include_empties=False,
+        asset_id=prefix,
+        prevalidated_budget=prevalidated_budget,
+    )
     return unified_obj
 
 
@@ -12778,8 +12823,10 @@ def make_damaged_state(
     output_blend_path: Path | None = None,
     smooth_by_angle: bool = True,
     smooth_angle_deg: float = 35.0,
+    prevalidated_budget: Dict[str, Any] | None = None,
 ) -> list[bpy.types.Object]:
     """Generates an active combat-damaged variant (<Name>_Damaged.fbx) with distorted armor plates and scorch marks."""
+    _validate_export_budget_token(prevalidated_budget, expected_asset_id=prefix)
     mesh_objs = [o for o in source_objects if o.type == "MESH" and not o.name.endswith(("_COLLIDER", "_ShieldBubble"))]
     if not mesh_objs:
         return []
@@ -12845,7 +12892,13 @@ def make_damaged_state(
     )
 
     output_fbx_path.parent.mkdir(parents=True, exist_ok=True)
-    export_unity_fbx(output_fbx_path, batched, include_empties=False)
+    export_unity_fbx(
+        output_fbx_path,
+        batched,
+        include_empties=False,
+        asset_id=prefix,
+        prevalidated_budget=prevalidated_budget,
+    )
 
     if output_blend_path is not None:
         output_blend_path.parent.mkdir(parents=True, exist_ok=True)
@@ -16481,7 +16534,13 @@ class RogueVehicleBuilder:
                 if not exportable_objects:
                     continue
                 att_fbx = fbx_path.parent / f"{self.name}_Attachment_{att_type}.fbx"
-                export_unity_fbx(att_fbx, exportable_objects, include_empties=False)
+                export_unity_fbx(
+                    att_fbx,
+                    exportable_objects,
+                    include_empties=False,
+                    asset_id=self.name,
+                    prevalidated_budget=asset_budget,
+                )
                 detached_attachment_object_ptrs.update(obj.as_pointer() for obj in exportable_objects)
                 detached_paths[att_type] = str(att_fbx)
             diagnostics["detached_attachments"] = detached_paths
@@ -16552,7 +16611,13 @@ class RogueVehicleBuilder:
             diagnostics["texture_maps"] = {k: str(v) for k, v in tex_maps.items()}
             if single_material_atlas:
                 atlas_fbx_path = fbx_path.parent / f"{fbx_path.stem}_Atlas.fbx"
-                create_single_material_atlas_model(batched_objects, self.name, tex_maps, atlas_fbx_path)
+                create_single_material_atlas_model(
+                    batched_objects,
+                    self.name,
+                    tex_maps,
+                    atlas_fbx_path,
+                    prevalidated_budget=asset_budget,
+                )
                 diagnostics["atlas_fbx_path"] = str(atlas_fbx_path)
 
         # 11. Multi-Level LOD Chain generation
@@ -16598,6 +16663,8 @@ class RogueVehicleBuilder:
             include_empties=include_locators,
             include_armature=include_rig,
             bake_anim=include_animations,
+            asset_id=self.name,
+            prevalidated_budget=asset_budget,
         )
 
         # 13. Export Dedicated LOD FBX if requested
@@ -16615,6 +16682,8 @@ class RogueVehicleBuilder:
                 all_lod_objs,
                 include_empties=include_locators,
                 include_armature=include_rig,
+                asset_id=self.name,
+                prevalidated_budget=asset_budget,
             )
             diagnostics["lod_fbx_path"] = str(lod_fbx_path)
 
@@ -16647,6 +16716,7 @@ class RogueVehicleBuilder:
                 severity=eff_severity,
                 smooth_by_angle=smooth_by_angle,
                 smooth_angle_deg=smooth_angle_deg,
+                prevalidated_budget=asset_budget,
             )
             diagnostics["wreckage_fbx_path"] = str(wreckage_fbx_path)
 
@@ -16662,6 +16732,7 @@ class RogueVehicleBuilder:
                 output_blend_path=damaged_blend,
                 smooth_by_angle=smooth_by_angle,
                 smooth_angle_deg=smooth_angle_deg,
+                prevalidated_budget=asset_budget,
             )
             diagnostics["damaged_fbx_path"] = str(damaged_fbx_path)
 
@@ -17561,7 +17632,13 @@ class RogueStructureBuilder:
             diagnostics["texture_maps"] = {key: str(path) for key, path in texture_maps.items()}
             if single_material_atlas:
                 atlas_fbx_path = fbx_path.parent / f"{fbx_path.stem}_Atlas.fbx"
-                create_single_material_atlas_model(batched_objects, self.name, texture_maps, atlas_fbx_path)
+                create_single_material_atlas_model(
+                    batched_objects,
+                    self.name,
+                    texture_maps,
+                    atlas_fbx_path,
+                    prevalidated_budget=asset_budget,
+                )
                 diagnostics["atlas_fbx_path"] = str(atlas_fbx_path)
 
         export_objects = list(batched_objects)
@@ -17569,7 +17646,13 @@ class RogueStructureBuilder:
         if generate_colliders and self.collider_objects:
             export_objects.extend(self.collider_objects)
 
-        export_unity_fbx(fbx_path, export_objects, include_empties=True)
+        export_unity_fbx(
+            fbx_path,
+            export_objects,
+            include_empties=True,
+            asset_id=self.name,
+            prevalidated_budget=asset_budget,
+        )
 
         lod_dict: Dict[str, list[bpy.types.Object]] | None = None
         if generate_lods:
@@ -17593,7 +17676,13 @@ class RogueStructureBuilder:
             for lod_objs in lod_dict.values():
                 all_lod_objs.extend(lod_objs)
             all_lod_objs.extend(self.locator_sockets)
-            export_unity_fbx(lod_fbx_path, all_lod_objs, include_empties=True)
+            export_unity_fbx(
+                lod_fbx_path,
+                all_lod_objs,
+                include_empties=True,
+                asset_id=self.name,
+                prevalidated_budget=asset_budget,
+            )
             diagnostics["lod_fbx_path"] = str(lod_fbx_path)
 
         if gameplay_meta_path is not None:

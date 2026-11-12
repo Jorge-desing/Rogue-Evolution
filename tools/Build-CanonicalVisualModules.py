@@ -625,14 +625,30 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
     for entry, objects, lod_dict, asset_budget in module_rows:
         fbx_path = ROOT / entry["fbxFilePath"]
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
-        rmk.export_unity_fbx(fbx_path, objects, include_empties=False, include_armature=False, bake_anim=False)
+        rmk.export_unity_fbx(
+            fbx_path,
+            objects,
+            include_empties=False,
+            include_armature=False,
+            bake_anim=False,
+            asset_id=entry["moduleName"],
+            prevalidated_budget=asset_budget,
+        )
         if not fbx_path.is_file() or fbx_path.stat().st_size <= 0:
             raise RuntimeError(f"Blender did not export a non-empty FBX: {fbx_path}")
         lod_fbx_path = ROOT / entry["lodFbxFilePath"]
         all_lod_objects = [
             obj for lod_name in ("LOD1", "LOD2") for obj in lod_dict[lod_name]
         ]
-        rmk.export_unity_fbx(lod_fbx_path, all_lod_objects, include_empties=False, include_armature=False, bake_anim=False)
+        rmk.export_unity_fbx(
+            lod_fbx_path,
+            all_lod_objects,
+            include_empties=False,
+            include_armature=False,
+            bake_anim=False,
+            asset_id=entry["moduleName"],
+            prevalidated_budget=asset_budget,
+        )
         if not lod_fbx_path.is_file() or lod_fbx_path.stat().st_size <= 0:
             raise RuntimeError(f"Blender did not export a non-empty LOD FBX: {lod_fbx_path}")
 

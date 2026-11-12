@@ -502,6 +502,79 @@ def resolve_asset_budget(
     }
 
 
+def validate_prevalidated_export_budget(
+    budget: Mapping[str, Any] | None,
+    expected_asset_id: str | None = None,
+) -> None:
+    """Fail closed unless an FBX export carries a real resolved allocation.
+
+    This boundary is intentionally structural: builders obtain the value from
+    :func:`resolve_asset_budget` before they create output paths, then pass it
+    to the low-level exporter. It prevents accidental unbudgeted exports and
+    cross-asset token reuse without adding a fixed geometry ceiling.
+    """
+    if not isinstance(budget, Mapping):
+        raise ModelBudgetError("a resolved calibrated geometry budget is required for FBX export")
+
+    asset_id = str(budget.get("assetId", "")).strip()
+    if not asset_id:
+        raise ModelBudgetError("FBX export budget must declare assetId")
+    if expected_asset_id is not None and asset_id != expected_asset_id:
+        raise ModelBudgetError(
+            f"FBX export budget assetId {asset_id!r} does not match requested asset {expected_asset_id!r}"
+        )
+    if not str(budget.get("sceneId", "")).strip():
+        raise ModelBudgetError(f"{asset_id}: FBX export budget must declare sceneId")
+    if budget.get("budgetVerdict") != "CALIBRATED_FOR_RECORDED_PC_AND_SCENE":
+        raise ModelBudgetError(f"{asset_id}: FBX export requires a calibrated profile verdict")
+    if budget.get("sceneBudgetPassed") is not True:
+        raise ModelBudgetError(f"{asset_id}: FBX export scene budget has not passed")
+    if budget.get("assetVerdict") != "PASS":
+        raise ModelBudgetError(f"{asset_id}: FBX export asset allocation has not passed")
+
+    try:
+        target_fps = float(budget["targetFps"])
+        capacity = int(budget["sceneTriangleCapacity"])
+        allocation = int(budget["sceneAllocationTriangles"])
+        max_instances = int(budget["maxVisibleInstances"])
+        resolution = budget["resolution"]
+        width = int(resolution["width"])
+        height = int(resolution["height"])
+        lods = budget["lods"]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ModelBudgetError(f"{asset_id}: FBX export budget is incomplete") from exc
+
+    if not math.isfinite(target_fps) or abs(target_fps - DEFAULT_TARGET_FPS) > 0.1:
+        raise ModelBudgetError(f"{asset_id}: FBX export budget must target {DEFAULT_TARGET_FPS:g} FPS")
+    if capacity <= 0 or allocation <= 0 or allocation > capacity:
+        raise ModelBudgetError(f"{asset_id}: FBX export budget has an invalid scene allocation")
+    if max_instances <= 0 or width <= 0 or height <= 0:
+        raise ModelBudgetError(f"{asset_id}: FBX export budget has invalid visibility or resolution metadata")
+    if not isinstance(lods, list) or len(lods) != len(LOD_NAMES):
+        raise ModelBudgetError(f"{asset_id}: FBX export budget must contain exactly three LOD allocations")
+
+    transitions: list[float] = []
+    for name, row in zip(LOD_NAMES, lods):
+        if not isinstance(row, Mapping) or row.get("lod") != name:
+            raise ModelBudgetError(f"{asset_id}: FBX export LOD allocation order is invalid")
+        try:
+            transition = float(row["screenRelativeTransitionHeight"])
+            target_faces = int(row["targetFacesPerInstance"])
+            target_triangles = int(row["targetTrianglesPerInstance"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ModelBudgetError(f"{asset_id}: {name} export allocation is incomplete") from exc
+        if (
+            not math.isfinite(transition)
+            or not 0.0 < transition <= 1.0
+            or target_faces <= 0
+            or target_triangles <= 0
+        ):
+            raise ModelBudgetError(f"{asset_id}: {name} export allocation is invalid")
+        transitions.append(transition)
+    if not (transitions[0] > transitions[1] > transitions[2]):
+        raise ModelBudgetError(f"{asset_id}: FBX export LOD screen thresholds must descend")
+
+
 def calibrate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
     """Fit the profile samples and return an explicit calibrated or uncalibrated state."""
     result = dict(profile)

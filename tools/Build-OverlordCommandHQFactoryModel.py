@@ -115,7 +115,13 @@ def main() -> None:
         candidate_dir = ROOT / "artifacts" / "overlord-hq-factory-build" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         candidate_dir.mkdir(parents=True, exist_ok=False)
         candidate_base = candidate_dir / f"{ASSET_ID}.fbx"
-        rmk.export_unity_fbx(candidate_base, lod_objects, include_empties=False)
+        rmk.export_unity_fbx(
+            candidate_base,
+            lod_objects,
+            include_empties=False,
+            asset_id=ASSET_ID,
+            prevalidated_budget=asset_budget,
+        )
         candidate_lods = candidate_dir / f"{ASSET_ID}_LODs.fbx"
         if not candidate_lods.is_file():
             raise IOError(f"{ASSET_ID}: profile LOD exporter did not create {candidate_lods}")

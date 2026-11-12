@@ -14,13 +14,53 @@ from tools.model_budget_policy import (
     calibrate_profile,
     fit_triangle_capacity,
     resolve_asset_budget,
+    validate_prevalidated_export_budget,
 )
 from tools.profile_model_budgets import _read_samples
 
 TEST_LOD_HEIGHTS = (0.54, 0.23, 0.07)
 
 
+def _valid_export_budget() -> dict[str, object]:
+    return {
+        "assetId": "Tank",
+        "sceneId": "DenseRTS",
+        "targetFps": 60.0,
+        "resolution": {"width": 1920, "height": 1080},
+        "sceneTriangleCapacity": 250_000,
+        "sceneAllocationTriangles": 100_000,
+        "maxVisibleInstances": 4,
+        "sceneBudgetPassed": True,
+        "assetVerdict": "PASS",
+        "budgetVerdict": "CALIBRATED_FOR_RECORDED_PC_AND_SCENE",
+        "lods": [
+            {"lod": "LOD0", "screenRelativeTransitionHeight": 0.54, "targetFacesPerInstance": 20_000, "targetTrianglesPerInstance": 30_000},
+            {"lod": "LOD1", "screenRelativeTransitionHeight": 0.23, "targetFacesPerInstance": 10_000, "targetTrianglesPerInstance": 15_000},
+            {"lod": "LOD2", "screenRelativeTransitionHeight": 0.07, "targetFacesPerInstance": 5_000, "targetTrianglesPerInstance": 8_000},
+        ],
+    }
+
+
 class ModelBudgetPolicyTests(unittest.TestCase):
+    def test_prevalidated_export_budget_requires_a_passing_matching_asset_allocation(self):
+        validate_prevalidated_export_budget(_valid_export_budget(), expected_asset_id="Tank")
+
+        with self.assertRaisesRegex(ModelBudgetError, "resolved calibrated geometry budget"):
+            validate_prevalidated_export_budget(None)
+        with self.assertRaisesRegex(ModelBudgetError, "does not match"):
+            validate_prevalidated_export_budget(_valid_export_budget(), expected_asset_id="OtherTank")
+
+        failed = _valid_export_budget()
+        failed["assetVerdict"] = "LOD0_REDUCTION_REQUIRED"
+        with self.assertRaisesRegex(ModelBudgetError, "allocation has not passed"):
+            validate_prevalidated_export_budget(failed)
+
+    def test_prevalidated_export_budget_rejects_invalid_lod_transitions(self):
+        budget = _valid_export_budget()
+        budget["lods"][2]["screenRelativeTransitionHeight"] = 0.23
+        with self.assertRaisesRegex(ModelBudgetError, "thresholds must descend"):
+            validate_prevalidated_export_budget(budget)
+
     def test_capacity_is_derived_from_measured_frame_time(self):
         result = fit_triangle_capacity(
             [

@@ -80,6 +80,43 @@ def _build_function(module: ast.Module, path: Path) -> ast.FunctionDef:
 
 
 class ModelBuilderBudgetGateOrderTests(unittest.TestCase):
+    def test_every_fbx_export_requires_a_profile_or_prevalidated_budget(self) -> None:
+        for path in sorted((REPO_ROOT / "tools").glob("*.py")):
+            module = ast.parse(path.read_text(encoding="utf-8"))
+            for call in _calls(module):
+                if not _dotted_name(call.func).endswith("export_unity_fbx"):
+                    continue
+                with self.subTest(path=path.name, line=call.lineno):
+                    keywords = {keyword.arg: keyword.value for keyword in call.keywords}
+                    profiled = isinstance(keywords.get("generate_profiled_lods"), ast.Constant) and keywords["generate_profiled_lods"].value is True
+                    prevalidated = "prevalidated_budget" in keywords
+                    self.assertTrue(
+                        profiled or prevalidated,
+                        f"{path.name}:{call.lineno}: FBX export has no calibrated budget path",
+                    )
+                    if prevalidated:
+                        self.assertIn("asset_id", keywords, f"{path.name}:{call.lineno}: budget token needs an expected asset id")
+
+    def test_low_level_export_validates_budget_before_touching_destination(self) -> None:
+        path = REPO_ROOT / "tools" / "RogueModelKit.py"
+        module = ast.parse(path.read_text(encoding="utf-8"))
+        exporter = next(
+            node for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "export_unity_fbx"
+        )
+        calls = _calls(exporter)
+        validate_lines = [
+            call.lineno for call in calls
+            if _dotted_name(call.func).endswith("_validate_export_budget_token")
+        ]
+        destination_lines = [
+            call.lineno for call in calls
+            if _dotted_name(call.func).endswith(("mkdir", "bpy.ops.export_scene.fbx"))
+        ]
+        self.assertTrue(validate_lines, "export_unity_fbx must validate its budget token")
+        self.assertTrue(destination_lines, "export_unity_fbx must create or write the FBX destination")
+        self.assertLess(max(validate_lines), min(destination_lines))
+
     def test_direct_builder_outputs_follow_geometry_gate(self) -> None:
         for filename in DIRECT_BUILDERS:
             with self.subTest(builder=filename):
