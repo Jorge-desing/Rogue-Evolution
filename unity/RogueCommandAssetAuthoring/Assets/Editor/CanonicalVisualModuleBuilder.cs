@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using UnityEditor;
 using UnityEngine;
 
@@ -16,11 +17,8 @@ namespace RogueCommandExpansion.Authoring
         private const string ModuleAssetRoot = "Assets/RogueCommandExpansionSample/VisualModules";
         private const string TextureFolder = ModuleAssetRoot + "/Textures";
         private const string MaterialFolder = ModuleAssetRoot + "/Materials";
-        private const string ServiceHatchGeometryPresetId = "service_hatch_recessed_v1";
-        private const string EraBrickGeometryPresetId = "era_brick_cassette_v1";
-        private const string CoaxialServiceConnectorGeometryPresetId = "coaxial_service_connector_recessed_v1";
-        private const string BulwarkEraGeometryLayoutId = "bulwark_side_skirt_array_v1";
         private const string ManifestRelativePath = "content/source-art/canonical-visual-modules.json";
+        private const string GeometryPresetRegistryRelativePath = "content/source-art/canonical-visual-module-roles.json";
         private const float FactoryNewWearStrength = 0.55f;
         private const int ExpectedTextureResolution = 2048;
 
@@ -28,7 +26,36 @@ namespace RogueCommandExpansion.Authoring
         private sealed class ModuleManifest
         {
             public int schemaVersion;
+            public string geometryPresetRegistrySha256;
             public ModuleEntry[] modules;
+        }
+
+        [Serializable]
+        private sealed class GeometryPresetRegistry
+        {
+            public int schemaVersion;
+            public GeometryPresetBinding[] geometryPresetBindings;
+            public GeometryLayoutBinding[] geometryLayouts;
+        }
+
+        [Serializable]
+        private sealed class GeometryPresetBinding
+        {
+            public string geometryPresetId;
+            public string slotId;
+            public string geometryEngineeringRole;
+            public string[] visualEngineeringRoles;
+            public string[] allowedVariantIds;
+        }
+
+        [Serializable]
+        private sealed class GeometryLayoutBinding
+        {
+            public string geometryLayoutId;
+            public string variantId;
+            public string slotId;
+            public string visualEngineeringRole;
+            public string requiredGeometryPresetId;
         }
 
         [Serializable]
@@ -151,6 +178,19 @@ namespace RogueCommandExpansion.Authoring
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
             ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
+            string geometryPresetRegistryPath = Path.Combine(repositoryRoot,
+                GeometryPresetRegistryRelativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(geometryPresetRegistryPath))
+            {
+                throw new FileNotFoundException("Canonical geometry preset registry is missing.", geometryPresetRegistryPath);
+            }
+            GeometryPresetRegistry geometryPresetRegistry = JsonUtility.FromJson<GeometryPresetRegistry>(
+                File.ReadAllText(geometryPresetRegistryPath));
+            if (!IsGeometryPresetRegistryValid(geometryPresetRegistry))
+            {
+                throw new InvalidDataException("Canonical geometry preset registry must use schema version 2 and contain unique preset/layout bindings.");
+            }
+
             string manifestPath = Path.Combine(repositoryRoot, ManifestRelativePath.Replace('/', Path.DirectorySeparatorChar));
             if (!File.Exists(manifestPath))
             {
@@ -158,9 +198,20 @@ namespace RogueCommandExpansion.Authoring
             }
 
             ModuleManifest manifest = JsonUtility.FromJson<ModuleManifest>(File.ReadAllText(manifestPath));
-            if (manifest == null || manifest.schemaVersion != 2 || manifest.modules == null || manifest.modules.Length == 0)
+            if (manifest == null || manifest.schemaVersion != 3 || manifest.modules == null || manifest.modules.Length == 0)
             {
-                throw new InvalidDataException("Canonical visual module manifest must use schema version 2 and contain modules.");
+                throw new InvalidDataException("Canonical visual module manifest must use schema version 3 and contain modules.");
+            }
+            if (!String.Equals(manifest.geometryPresetRegistrySha256, ComputeSha256(geometryPresetRegistryPath),
+                StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("Canonical visual module manifest is stale relative to its geometry preset registry.");
+            }
+
+            var seenPrefabPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < manifest.modules.Length; i++)
+            {
+                ValidateEntry(manifest.modules[i], seenPrefabPaths, geometryPresetRegistry);
             }
 
             Shader shader = Shader.Find(ShaderName);
@@ -180,12 +231,10 @@ namespace RogueCommandExpansion.Authoring
             validatedHardpointBindings += ValidatePackModuleBindingsAndLevelOneHardpoints(
                 "tactical-operations", repositoryRoot, manifest.modules);
 
-            var seenPrefabPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var materialSets = new Dictionary<string, ModuleMaterials>(StringComparer.Ordinal);
             for (int i = 0; i < manifest.modules.Length; i++)
             {
                 ModuleEntry entry = manifest.modules[i];
-                ValidateEntry(entry, seenPrefabPaths);
                 ModuleMaterials materials;
                 if (!materialSets.TryGetValue(entry.preset, out materials))
                 {
@@ -601,7 +650,10 @@ namespace RogueCommandExpansion.Authoring
             assignments[unityAssetPath] = bundleName;
         }
 
-        private static void ValidateEntry(ModuleEntry entry, HashSet<string> seenPrefabPaths)
+        private static void ValidateEntry(
+            ModuleEntry entry,
+            HashSet<string> seenPrefabPaths,
+            GeometryPresetRegistry geometryPresetRegistry)
         {
             if (entry == null || String.IsNullOrWhiteSpace(entry.moduleName) ||
                 String.IsNullOrWhiteSpace(entry.packName) || String.IsNullOrWhiteSpace(entry.variantId) ||
@@ -612,8 +664,7 @@ namespace RogueCommandExpansion.Authoring
                 String.IsNullOrWhiteSpace(entry.preset) ||
                 String.IsNullOrWhiteSpace(entry.visualEngineeringRole) ||
                 !IsCanonicalHardpointSlot(entry.slotId) ||
-                !IsVisualEngineeringRoleAllowedForSlot(entry.visualEngineeringRole, entry.slotId) ||
-                !IsGeometryPresetValid(entry))
+                !IsGeometryPresetValid(entry, geometryPresetRegistry))
             {
                 throw new InvalidDataException("Canonical module manifest contains an incomplete or incompatible visual engineering role entry.");
             }
@@ -646,60 +697,125 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
-        private static bool IsGeometryPresetValid(ModuleEntry entry)
+        private static bool IsGeometryPresetRegistryValid(GeometryPresetRegistry registry)
         {
-            if (String.Equals(entry.visualEngineeringRole, "power_containment", StringComparison.Ordinal))
+            if (registry == null || registry.schemaVersion != 2 ||
+                registry.geometryPresetBindings == null || registry.geometryPresetBindings.Length == 0 ||
+                registry.geometryLayouts == null)
             {
-                bool isGravitasPowerVariant = String.Equals(entry.variantId,
-                    "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy", StringComparison.Ordinal) &&
-                    String.Equals(entry.slotId, "Sponsons", StringComparison.Ordinal);
-                return isGravitasPowerVariant
-                    ? String.Equals(entry.geometryPreset, CoaxialServiceConnectorGeometryPresetId, StringComparison.Ordinal) &&
-                        String.IsNullOrEmpty(entry.geometryLayout)
-                    : String.IsNullOrEmpty(entry.geometryPreset) && String.IsNullOrEmpty(entry.geometryLayout);
+                return false;
             }
-            if (String.Equals(entry.visualEngineeringRole, "utility_sponson", StringComparison.Ordinal))
+
+            var presetIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < registry.geometryPresetBindings.Length; i++)
             {
-                return String.Equals(entry.geometryPreset, ServiceHatchGeometryPresetId, StringComparison.Ordinal) &&
-                    String.IsNullOrEmpty(entry.geometryLayout);
-            }
-            if (String.Equals(entry.visualEngineeringRole, "armor_cassette", StringComparison.Ordinal))
-            {
-                if (!String.Equals(entry.geometryPreset, EraBrickGeometryPresetId, StringComparison.Ordinal))
+                GeometryPresetBinding binding = registry.geometryPresetBindings[i];
+                if (binding == null || String.IsNullOrWhiteSpace(binding.geometryPresetId) ||
+                    !IsCanonicalHardpointSlot(binding.slotId) ||
+                    String.IsNullOrWhiteSpace(binding.geometryEngineeringRole) ||
+                    binding.visualEngineeringRoles == null || binding.visualEngineeringRoles.Length == 0 ||
+                    !presetIds.Add(binding.geometryPresetId))
                 {
                     return false;
                 }
-                bool isBulwarkEraVariant = String.Equals(entry.variantId,
-                    "tactical-operations:bulwark-siege-tank-battleship-tungsten", StringComparison.Ordinal);
-                return isBulwarkEraVariant
-                    ? String.Equals(entry.geometryLayout, BulwarkEraGeometryLayoutId, StringComparison.Ordinal)
-                    : String.IsNullOrEmpty(entry.geometryLayout);
             }
-            return String.IsNullOrEmpty(entry.geometryPreset) && String.IsNullOrEmpty(entry.geometryLayout);
+
+            var layoutIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < registry.geometryLayouts.Length; i++)
+            {
+                GeometryLayoutBinding layout = registry.geometryLayouts[i];
+                if (layout == null || String.IsNullOrWhiteSpace(layout.geometryLayoutId) ||
+                    String.IsNullOrWhiteSpace(layout.variantId) || !IsCanonicalHardpointSlot(layout.slotId) ||
+                    String.IsNullOrWhiteSpace(layout.visualEngineeringRole) ||
+                    String.IsNullOrWhiteSpace(layout.requiredGeometryPresetId) ||
+                    !presetIds.Contains(layout.requiredGeometryPresetId) || !layoutIds.Add(layout.geometryLayoutId))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
-        private static bool IsVisualEngineeringRoleAllowedForSlot(string role, string slot)
+        private static bool IsGeometryPresetValid(ModuleEntry entry, GeometryPresetRegistry registry)
         {
-            switch (role)
+            GeometryPresetBinding binding = null;
+            for (int i = 0; i < registry.geometryPresetBindings.Length; i++)
             {
-                case "armor_cassette":
-                    return String.Equals(slot, "ERA", StringComparison.Ordinal);
-                case "aps_sensor_suite":
-                case "aps_magnetic_shield":
-                    return String.Equals(slot, "APS", StringComparison.Ordinal);
-                case "fuel_drum_pair":
-                case "ordnance_carrier":
-                    return String.Equals(slot, "FuelDrums", StringComparison.Ordinal);
-                case "excavation_drill":
-                case "thermal_radiator":
-                case "heavy_flak_battery":
-                case "repair_dispenser":
-                case "power_containment":
-                case "docking_clamp":
-                case "utility_sponson":
-                    return String.Equals(slot, "Sponsons", StringComparison.Ordinal);
-                default:
-                    return false;
+                if (String.Equals(registry.geometryPresetBindings[i].geometryPresetId,
+                    entry.geometryPreset, StringComparison.Ordinal))
+                {
+                    binding = registry.geometryPresetBindings[i];
+                    break;
+                }
+            }
+            if (binding == null || !String.Equals(binding.slotId, entry.slotId, StringComparison.Ordinal)) return false;
+
+            bool roleAllowed = false;
+            for (int i = 0; i < binding.visualEngineeringRoles.Length; i++)
+            {
+                if (String.Equals(binding.visualEngineeringRoles[i], entry.visualEngineeringRole, StringComparison.Ordinal))
+                {
+                    roleAllowed = true;
+                    break;
+                }
+            }
+            if (!roleAllowed) return false;
+
+            if (binding.allowedVariantIds != null && binding.allowedVariantIds.Length > 0)
+            {
+                bool variantAllowed = false;
+                for (int i = 0; i < binding.allowedVariantIds.Length; i++)
+                {
+                    if (String.Equals(binding.allowedVariantIds[i], entry.variantId, StringComparison.Ordinal))
+                    {
+                        variantAllowed = true;
+                        break;
+                    }
+                }
+                if (!variantAllowed) return false;
+            }
+
+            GeometryLayoutBinding requiredLayout = null;
+            for (int i = 0; i < registry.geometryLayouts.Length; i++)
+            {
+                GeometryLayoutBinding layout = registry.geometryLayouts[i];
+                if (String.Equals(layout.variantId, entry.variantId, StringComparison.Ordinal) &&
+                    String.Equals(layout.slotId, entry.slotId, StringComparison.Ordinal))
+                {
+                    if (requiredLayout != null) return false;
+                    requiredLayout = layout;
+                }
+            }
+
+            if (String.IsNullOrEmpty(entry.geometryLayout)) return requiredLayout == null;
+            if (requiredLayout != null)
+            {
+                return String.Equals(requiredLayout.geometryLayoutId, entry.geometryLayout, StringComparison.Ordinal) &&
+                    String.Equals(requiredLayout.visualEngineeringRole, entry.visualEngineeringRole, StringComparison.Ordinal) &&
+                    String.Equals(requiredLayout.requiredGeometryPresetId, entry.geometryPreset, StringComparison.Ordinal);
+            }
+            for (int i = 0; i < registry.geometryLayouts.Length; i++)
+            {
+                GeometryLayoutBinding layout = registry.geometryLayouts[i];
+                if (String.Equals(layout.geometryLayoutId, entry.geometryLayout, StringComparison.Ordinal) &&
+                    String.Equals(layout.variantId, entry.variantId, StringComparison.Ordinal) &&
+                    String.Equals(layout.slotId, entry.slotId, StringComparison.Ordinal) &&
+                    String.Equals(layout.visualEngineeringRole, entry.visualEngineeringRole, StringComparison.Ordinal) &&
+                    String.Equals(layout.requiredGeometryPresetId, entry.geometryPreset, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string ComputeSha256(string path)
+        {
+            using (SHA256 sha256 = SHA256.Create())
+            using (FileStream stream = File.OpenRead(path))
+            {
+                byte[] digest = sha256.ComputeHash(stream);
+                return BitConverter.ToString(digest).Replace("-", String.Empty).ToLowerInvariant();
             }
         }
 

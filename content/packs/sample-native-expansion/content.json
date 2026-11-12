@@ -273,7 +273,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_gunmetal_chassis.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_gunmetal_chassis_era.prefab"
+            },
+            {
+              "slotId": "FuelDrums",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_gunmetal_chassis_fueldrums.prefab"
             }
           ]
         },
@@ -284,7 +288,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_desert_camo.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_desert_camo_era.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_desert_camo_sponsons.prefab"
             }
           ]
         },
@@ -294,8 +302,12 @@
           "scale": 1.0,
           "modules": [
             {
+              "slotId": "ERA",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_longshot_sniper_camo_era.prefab"
+            },
+            {
               "slotId": "APS",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_longshot_sniper_camo.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_longshot_sniper_camo_aps.prefab"
             }
           ]
         }
@@ -565,7 +577,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_martian_iron_rust.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_martian_iron_rust_era.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_martian_iron_rust_sponsons.prefab"
             }
           ]
         },
@@ -576,7 +592,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_battleship_tungsten.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_battleship_tungsten_era.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_battleship_tungsten_sponsons.prefab"
             }
           ]
         }
@@ -859,7 +879,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_plasma_cinder_ablative.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_plasma_cinder_ablative_era.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_plasma_cinder_ablative_sponsons.prefab"
             }
           ]
         },
@@ -870,7 +894,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_orbital_drop_pod_cermet.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_orbital_drop_pod_cermet_era.prefab"
+            },
+            {
+              "slotId": "APS",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_orbital_drop_pod_cermet_aps.prefab"
             }
           ]
         }
@@ -1363,7 +1391,11 @@
           "modules": [
             {
               "slotId": "APS",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_stealth_radar_absorbent_ferrite.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_stealth_radar_absorbent_ferrite_aps.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_stealth_radar_absorbent_ferrite_sponsons.prefab"
             }
           ]
         },
@@ -1374,7 +1406,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_cryo_glacier_camo.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_cryo_glacier_camo_era.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_cryo_glacier_camo_sponsons.prefab"
             }
           ]
         }
@@ -1628,7 +1664,11 @@
           "modules": [
             {
               "slotId": "APS",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_pulsar_magnetic_shield.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_pulsar_magnetic_shield_aps.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_pulsar_magnetic_shield_sponsons.prefab"
             }
           ]
         },
@@ -1639,7 +1679,11 @@
           "modules": [
             {
               "slotId": "APS",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_stealth_void_composite.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_stealth_void_composite_aps.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_stealth_void_composite_sponsons.prefab"
             }
           ]
         }
@@ -2409,7 +2453,11 @@
           "modules": [
             {
               "slotId": "Sponsons",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_surge_tank_ion_thruster_titanium_grate.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_surge_tank_ion_thruster_titanium_grate_sponsons.prefab"
+            },
+            {
+              "slotId": "FuelDrums",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_surge_tank_ion_thruster_titanium_grate_fueldrums.prefab"
             }
           ]
         },

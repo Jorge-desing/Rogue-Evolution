@@ -1,11 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "scope": "Authoring-only visual engineering roles. These descriptions define visible mechanical form, not gameplay behavior.",
   "roleDefinitions": {
     "armor_cassette": {
       "allowedSlots": ["ERA"],
-      "visibleAssembly": "Removable, cross-seamed ERA cassettes with contacted backing plates, side keepers, and retained corner fasteners.",
-      "geometryPreset": "era_brick_cassette_v1"
+      "visibleAssembly": "Removable armor modules, including cross-seamed ERA cassettes, slat screens, and hex reactive tiles; mount geometry must match the declared preset."
     },
     "aps_sensor_suite": {
       "allowedSlots": ["APS"],
@@ -15,6 +14,14 @@
       "allowedSlots": ["APS"],
       "visibleAssembly": "A protected sensor head, gimbal, hard-kill pod, and paired field-array facets."
     },
+    "aps_phase_shield": {
+      "allowedSlots": ["APS"],
+      "visibleAssembly": "A protected phase-field emitter with supported faceted housing and emitter hardware."
+    },
+    "aps_countermeasure_suite": {
+      "allowedSlots": ["APS"],
+      "visibleAssembly": "A serviceable active countermeasure or multispectral obscurant assembly with retained launch or sensor hardware."
+    },
     "fuel_drum_pair": {
       "allowedSlots": ["FuelDrums"],
       "visibleAssembly": "A strapped auxiliary-fluid drum pair carried on a supported rear frame with thermal shrouds."
@@ -22,6 +29,10 @@
     "ordnance_carrier": {
       "allowedSlots": ["FuelDrums"],
       "visibleAssembly": "Sealed ordnance canisters on a supported carrier with a paired release manifold."
+    },
+    "fuel_jerrycan_carrier": {
+      "allowedSlots": ["FuelDrums"],
+      "visibleAssembly": "Stamped auxiliary fuel cans held in a supported skid basket with straps and serviceable retainers."
     },
     "excavation_drill": {
       "allowedSlots": ["Sponsons"],
@@ -43,51 +54,140 @@
       "allowedSlots": ["Sponsons"],
       "visibleAssembly": "An armored power-cell case with service panel, induction coils, coolant feeds, and containment braces."
     },
+    "plasma_containment": {
+      "allowedSlots": ["Sponsons"],
+      "visibleAssembly": "An armored plasma confinement assembly with supported field coils, service panels, and coolant routing."
+    },
+    "auxiliary_power_generator": {
+      "allowedSlots": ["Sponsons"],
+      "visibleAssembly": "A serviceable auxiliary generator with protected turbine housing, mounts, and exhaust connections."
+    },
+    "field_engineering_crane": {
+      "allowedSlots": ["Sponsons"],
+      "visibleAssembly": "A braced service crane and winch with retained pivot, cable drum, and load-bearing supports."
+    },
+    "recoil_anchor": {
+      "allowedSlots": ["Sponsons"],
+      "visibleAssembly": "A supported recoil and graviton anchor assembly with paired thrust surfaces and retained structural mounts."
+    },
     "docking_clamp": {
       "allowedSlots": ["Sponsons"],
       "visibleAssembly": "A structural clamp root with paired actuators, capture jaws, and latch pins."
     },
     "utility_sponson": {
       "allowedSlots": ["Sponsons"],
-      "visibleAssembly": "A supported side equipment pod with a recessed, hinged service hatch and paired mounting struts.",
-      "geometryPreset": "service_hatch_recessed_v1"
+      "visibleAssembly": "A supported side equipment pod with a recessed, hinged service hatch and paired mounting struts."
     }
   },
+  "geometryPresetBindings": [
+    {"geometryPresetId": "service_hatch_recessed_v1", "slotId": "Sponsons", "geometryEngineeringRole": "utility_sponson", "visualEngineeringRoles": ["utility_sponson"]},
+    {"geometryPresetId": "era_brick_cassette_v1", "slotId": "ERA", "geometryEngineeringRole": "armor_cassette", "visualEngineeringRoles": ["armor_cassette"]},
+    {"geometryPresetId": "coaxial_service_connector_recessed_v1", "slotId": "Sponsons", "geometryEngineeringRole": "power_containment", "visualEngineeringRoles": ["power_containment"], "allowedVariantIds": ["tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy"]},
+    {"geometryPresetId": "aps_hardkill_radar_v1", "slotId": "APS", "geometryEngineeringRole": "aps_hardkill_radar", "visualEngineeringRoles": ["aps_sensor_suite"]},
+    {"geometryPresetId": "fuel_aux_jerrycan_rack_v1", "slotId": "FuelDrums", "geometryEngineeringRole": "fuel_jerrycan_carrier", "visualEngineeringRoles": ["fuel_jerrycan_carrier"]},
+    {"geometryPresetId": "slat_armor_screen_v1", "slotId": "ERA", "geometryEngineeringRole": "slat_armor_screen", "visualEngineeringRoles": ["armor_cassette"]},
+    {"geometryPresetId": "ordnance_mine_dispenser_rack_v1", "slotId": "FuelDrums", "geometryEngineeringRole": "ordnance_carrier", "visualEngineeringRoles": ["ordnance_carrier"]},
+    {"geometryPresetId": "thermal_armored_radiator_pack_v1", "slotId": "Sponsons", "geometryEngineeringRole": "thermal_radiator", "visualEngineeringRoles": ["thermal_radiator"]},
+    {"geometryPresetId": "autocannon_remote_sponson_pod_v1", "slotId": "Sponsons", "geometryEngineeringRole": "heavy_flak_battery", "visualEngineeringRoles": ["heavy_flak_battery"]},
+    {"geometryPresetId": "aps_phase_shield_emitter_v1", "slotId": "APS", "geometryEngineeringRole": "aps_phase_shield", "visualEngineeringRoles": ["aps_phase_shield"]},
+    {"geometryPresetId": "plasma_containment_cell_v1", "slotId": "Sponsons", "geometryEngineeringRole": "plasma_containment_cell", "visualEngineeringRoles": ["plasma_containment"]},
+    {"geometryPresetId": "stealth_hex_reactive_tile_v1", "slotId": "ERA", "geometryEngineeringRole": "stealth_hex_reactive_tile", "visualEngineeringRoles": ["armor_cassette"]},
+    {"geometryPresetId": "plasma_torpedo_magazine_rack_v1", "slotId": "FuelDrums", "geometryEngineeringRole": "ordnance_carrier", "visualEngineeringRoles": ["ordnance_carrier"]},
+    {"geometryPresetId": "tachyonic_radiator_array_v1", "slotId": "Sponsons", "geometryEngineeringRole": "thermal_radiator", "visualEngineeringRoles": ["thermal_radiator"]},
+    {"geometryPresetId": "nanite_repair_dispenser_pod_v1", "slotId": "Sponsons", "geometryEngineeringRole": "repair_dispenser", "visualEngineeringRoles": ["repair_dispenser"]},
+    {"geometryPresetId": "aps_hardkill_radar_v2", "slotId": "APS", "geometryEngineeringRole": "aps_hardkill_radar", "visualEngineeringRoles": ["aps_sensor_suite"]},
+    {"geometryPresetId": "fuel_aux_jerrycan_rack_v2", "slotId": "FuelDrums", "geometryEngineeringRole": "fuel_jerrycan_carrier", "visualEngineeringRoles": ["fuel_jerrycan_carrier"]},
+    {"geometryPresetId": "slat_armor_screen_v2", "slotId": "ERA", "geometryEngineeringRole": "slat_armor_screen", "visualEngineeringRoles": ["armor_cassette"]},
+    {"geometryPresetId": "ordnance_mine_dispenser_rack_v2", "slotId": "FuelDrums", "geometryEngineeringRole": "ordnance_carrier", "visualEngineeringRoles": ["ordnance_carrier"]},
+    {"geometryPresetId": "thermal_armored_radiator_pack_v2", "slotId": "Sponsons", "geometryEngineeringRole": "thermal_radiator", "visualEngineeringRoles": ["thermal_radiator"]},
+    {"geometryPresetId": "autocannon_remote_sponson_pod_v2", "slotId": "Sponsons", "geometryEngineeringRole": "heavy_flak_battery", "visualEngineeringRoles": ["heavy_flak_battery"]},
+    {"geometryPresetId": "aps_phase_shield_emitter_v2", "slotId": "APS", "geometryEngineeringRole": "aps_phase_shield", "visualEngineeringRoles": ["aps_phase_shield"]},
+    {"geometryPresetId": "plasma_containment_cell_v2", "slotId": "Sponsons", "geometryEngineeringRole": "plasma_containment_cell", "visualEngineeringRoles": ["plasma_containment"]},
+    {"geometryPresetId": "stealth_hex_reactive_tile_v2", "slotId": "ERA", "geometryEngineeringRole": "stealth_hex_reactive_tile", "visualEngineeringRoles": ["armor_cassette"]},
+    {"geometryPresetId": "plasma_torpedo_magazine_rack_v2", "slotId": "FuelDrums", "geometryEngineeringRole": "ordnance_carrier", "visualEngineeringRoles": ["ordnance_carrier"]},
+    {"geometryPresetId": "tachyonic_radiator_array_v2", "slotId": "Sponsons", "geometryEngineeringRole": "thermal_radiator", "visualEngineeringRoles": ["thermal_radiator"]},
+    {"geometryPresetId": "nanite_repair_dispenser_pod_v2", "slotId": "Sponsons", "geometryEngineeringRole": "repair_dispenser", "visualEngineeringRoles": ["repair_dispenser"]},
+    {"geometryPresetId": "excavation_drill_carbide_borer_v1", "slotId": "Sponsons", "geometryEngineeringRole": "excavation_drill", "visualEngineeringRoles": ["excavation_drill"]},
+    {"geometryPresetId": "docking_clamp_hydraulic_arm_v1", "slotId": "Sponsons", "geometryEngineeringRole": "docking_clamp", "visualEngineeringRoles": ["docking_clamp"]},
+    {"geometryPresetId": "apu_turbogenerator_sponson_v1", "slotId": "Sponsons", "geometryEngineeringRole": "auxiliary_power_generator", "visualEngineeringRoles": ["auxiliary_power_generator"]},
+    {"geometryPresetId": "smoke_grenade_salvo_discharger_v1", "slotId": "APS", "geometryEngineeringRole": "aps_countermeasure_suite", "visualEngineeringRoles": ["aps_countermeasure_suite"]},
+    {"geometryPresetId": "plasma_excavation_torch_v1", "slotId": "Sponsons", "geometryEngineeringRole": "excavation_drill", "visualEngineeringRoles": ["excavation_drill"]},
+    {"geometryPresetId": "magnetic_tractor_docking_clamp_v1", "slotId": "Sponsons", "geometryEngineeringRole": "docking_clamp", "visualEngineeringRoles": ["docking_clamp"]},
+    {"geometryPresetId": "graviton_recoil_anchor_v1", "slotId": "Sponsons", "geometryEngineeringRole": "recoil_anchor", "visualEngineeringRoles": ["recoil_anchor"]},
+    {"geometryPresetId": "optronic_recon_sensor_mast_v1", "slotId": "APS", "geometryEngineeringRole": "aps_sensor_suite", "visualEngineeringRoles": ["aps_sensor_suite"]},
+    {"geometryPresetId": "ciws_rotary_point_defense_sponson_v1", "slotId": "Sponsons", "geometryEngineeringRole": "heavy_flak_battery", "visualEngineeringRoles": ["heavy_flak_battery"]},
+    {"geometryPresetId": "reinforced_fuel_drum_drop_rack_v1", "slotId": "FuelDrums", "geometryEngineeringRole": "fuel_drum_pair", "visualEngineeringRoles": ["fuel_drum_pair"]},
+    {"geometryPresetId": "field_engineering_crane_winch_sponson_v1", "slotId": "Sponsons", "geometryEngineeringRole": "field_engineering_crane", "visualEngineeringRoles": ["field_engineering_crane"]},
+    {"geometryPresetId": "multispectral_countermeasure_jammer_v1", "slotId": "APS", "geometryEngineeringRole": "aps_countermeasure_suite", "visualEngineeringRoles": ["aps_countermeasure_suite"]},
+    {"geometryPresetId": "quad_pulse_laser_ciws_sponson_v1", "slotId": "Sponsons", "geometryEngineeringRole": "heavy_flak_battery", "visualEngineeringRoles": ["heavy_flak_battery"]},
+    {"geometryPresetId": "cryo_fusion_cell_containment_rack_v1", "slotId": "FuelDrums", "geometryEngineeringRole": "fuel_drum_pair", "visualEngineeringRoles": ["fuel_drum_pair"]},
+    {"geometryPresetId": "nanofabrication_repair_projector_sponson_v1", "slotId": "Sponsons", "geometryEngineeringRole": "repair_dispenser", "visualEngineeringRoles": ["repair_dispenser"]},
+    {"geometryPresetId": "flux_deflection_shield_projector_v1", "slotId": "APS", "geometryEngineeringRole": "aps_magnetic_shield", "visualEngineeringRoles": ["aps_magnetic_shield"]},
+    {"geometryPresetId": "armor_access_panel_bolt_circle_v1", "slotId": "Sponsons", "geometryEngineeringRole": "utility_sponson", "visualEngineeringRoles": ["utility_sponson"]},
+    {"geometryPresetId": "engine_deck_louver_grille_v1", "slotId": "Sponsons", "geometryEngineeringRole": "thermal_radiator", "visualEngineeringRoles": ["thermal_radiator"]},
+    {"geometryPresetId": "composite_hex_vent_panel_v1", "slotId": "Sponsons", "geometryEngineeringRole": "thermal_radiator", "visualEngineeringRoles": ["thermal_radiator"]},
+    {"geometryPresetId": "cable_conduit_junction_manifold_v1", "slotId": "Sponsons", "geometryEngineeringRole": "power_containment", "visualEngineeringRoles": ["power_containment"]}
+  ],
+  "geometryLayouts": [
+    {"geometryLayoutId": "bulwark_side_skirt_array_v1", "variantId": "tactical-operations:bulwark-siege-tank-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "requiredGeometryPresetId": "era_brick_cassette_v1"}
+  ],
   "variantRoles": [
-    {"variantId": "sample-native-expansion:scout-tank-gunmetal-chassis", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "sample-native-expansion:scout-tank-desert-camo", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "sample-native-expansion:scout-tank-longshot-sniper-camo", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
-    {"variantId": "sample-native-expansion:heavy-artillery-tungsten-heavy-flak-plating", "slotId": "Sponsons", "visualEngineeringRole": "heavy_flak_battery"},
-    {"variantId": "sample-native-expansion:heavy-artillery-subterranean-mole-borer", "slotId": "Sponsons", "visualEngineeringRole": "excavation_drill"},
-    {"variantId": "sample-native-expansion:heavy-artillery-martian-iron-rust", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "sample-native-expansion:heavy-artillery-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "sample-native-expansion:assault-walker-plasma-cinder-ablative", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "sample-native-expansion:assault-walker-orbital-drop-pod-cermet", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "sample-native-expansion:atlas-crane-mech-zero-g-docking-alloy", "slotId": "Sponsons", "visualEngineeringRole": "docking_clamp"},
-    {"variantId": "sample-native-expansion:bastion-siege-mech-stealth-radar-absorbent-ferrite", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
-    {"variantId": "sample-native-expansion:bastion-siege-mech-cryo-glacier-camo", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "sample-native-expansion:arachnid-hexapod-pulsar-magnetic-shield", "slotId": "APS", "visualEngineeringRole": "aps_magnetic_shield"},
-    {"variantId": "sample-native-expansion:arachnid-hexapod-stealth-void-composite", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
-    {"variantId": "sample-native-expansion:overlord-command-hq-solar-gold-radiator", "slotId": "Sponsons", "visualEngineeringRole": "thermal_radiator"},
-    {"variantId": "sample-native-expansion:skirmish-bike-cyber-nanoweave", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
-    {"variantId": "sample-native-expansion:skirmish-bike-cerberus-white-ceramic", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "sample-native-expansion:surge-tank-ion-thruster-titanium-grate", "slotId": "Sponsons", "visualEngineeringRole": "thermal_radiator"},
-    {"variantId": "sample-native-expansion:surge-tank-antimatter-containment-lattice", "slotId": "Sponsons", "visualEngineeringRole": "power_containment"},
-    {"variantId": "tactical-operations:tidebreaker-skirmisher-tachyon-warp-radiator", "slotId": "Sponsons", "visualEngineeringRole": "thermal_radiator"},
-    {"variantId": "tactical-operations:tidebreaker-skirmisher-cryo-glacier-camo", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "tactical-operations:salvage-hauler-hazard-industrial", "slotId": "Sponsons", "visualEngineeringRole": "utility_sponson"},
-    {"variantId": "tactical-operations:salvage-hauler-minefield-ordnance-carrier", "slotId": "FuelDrums", "visualEngineeringRole": "ordnance_carrier"},
-    {"variantId": "tactical-operations:skyguard-sam-solar-flare-radiation-shield", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
-    {"variantId": "tactical-operations:skyguard-sam-longshot-sniper-camo", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
+    {"variantId": "sample-native-expansion:scout-tank-gunmetal-chassis", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1"},
+    {"variantId": "sample-native-expansion:scout-tank-desert-camo", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1"},
+    {"variantId": "sample-native-expansion:scout-tank-longshot-sniper-camo", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite", "geometryPreset": "aps_hardkill_radar_v2"},
+    {"variantId": "sample-native-expansion:heavy-artillery-tungsten-heavy-flak-plating", "slotId": "Sponsons", "visualEngineeringRole": "heavy_flak_battery", "geometryPreset": "autocannon_remote_sponson_pod_v2"},
+    {"variantId": "sample-native-expansion:heavy-artillery-subterranean-mole-borer", "slotId": "Sponsons", "visualEngineeringRole": "excavation_drill", "geometryPreset": "excavation_drill_carbide_borer_v1"},
+    {"variantId": "sample-native-expansion:heavy-artillery-martian-iron-rust", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "slat_armor_screen_v2"},
+    {"variantId": "sample-native-expansion:heavy-artillery-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1"},
+    {"variantId": "sample-native-expansion:assault-walker-plasma-cinder-ablative", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "stealth_hex_reactive_tile_v2"},
+    {"variantId": "sample-native-expansion:assault-walker-orbital-drop-pod-cermet", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "slat_armor_screen_v2"},
+    {"variantId": "sample-native-expansion:atlas-crane-mech-zero-g-docking-alloy", "slotId": "Sponsons", "visualEngineeringRole": "docking_clamp", "geometryPreset": "magnetic_tractor_docking_clamp_v1"},
+    {"variantId": "sample-native-expansion:bastion-siege-mech-stealth-radar-absorbent-ferrite", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite", "geometryPreset": "aps_hardkill_radar_v1"},
+    {"variantId": "sample-native-expansion:bastion-siege-mech-cryo-glacier-camo", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "stealth_hex_reactive_tile_v2"},
+    {"variantId": "sample-native-expansion:arachnid-hexapod-pulsar-magnetic-shield", "slotId": "APS", "visualEngineeringRole": "aps_magnetic_shield", "geometryPreset": "flux_deflection_shield_projector_v1"},
+    {"variantId": "sample-native-expansion:arachnid-hexapod-stealth-void-composite", "slotId": "APS", "visualEngineeringRole": "aps_countermeasure_suite", "geometryPreset": "multispectral_countermeasure_jammer_v1"},
+    {"variantId": "sample-native-expansion:overlord-command-hq-solar-gold-radiator", "slotId": "Sponsons", "visualEngineeringRole": "thermal_radiator", "geometryPreset": "thermal_armored_radiator_pack_v1"},
+    {"variantId": "sample-native-expansion:skirmish-bike-cyber-nanoweave", "slotId": "APS", "visualEngineeringRole": "aps_countermeasure_suite", "geometryPreset": "smoke_grenade_salvo_discharger_v1"},
+    {"variantId": "sample-native-expansion:skirmish-bike-cerberus-white-ceramic", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1"},
+    {"variantId": "sample-native-expansion:surge-tank-ion-thruster-titanium-grate", "slotId": "Sponsons", "visualEngineeringRole": "thermal_radiator", "geometryPreset": "tachyonic_radiator_array_v2"},
+    {"variantId": "sample-native-expansion:surge-tank-antimatter-containment-lattice", "slotId": "Sponsons", "visualEngineeringRole": "plasma_containment", "geometryPreset": "plasma_containment_cell_v2"},
+    {"variantId": "tactical-operations:tidebreaker-skirmisher-tachyon-warp-radiator", "slotId": "Sponsons", "visualEngineeringRole": "thermal_radiator", "geometryPreset": "tachyonic_radiator_array_v1"},
+    {"variantId": "tactical-operations:tidebreaker-skirmisher-cryo-glacier-camo", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "stealth_hex_reactive_tile_v1"},
+    {"variantId": "tactical-operations:salvage-hauler-hazard-industrial", "slotId": "Sponsons", "visualEngineeringRole": "utility_sponson", "geometryPreset": "service_hatch_recessed_v1"},
+    {"variantId": "tactical-operations:salvage-hauler-minefield-ordnance-carrier", "slotId": "FuelDrums", "visualEngineeringRole": "ordnance_carrier", "geometryPreset": "ordnance_mine_dispenser_rack_v1"},
+    {"variantId": "tactical-operations:skyguard-sam-solar-flare-radiation-shield", "slotId": "APS", "visualEngineeringRole": "aps_phase_shield", "geometryPreset": "aps_phase_shield_emitter_v2"},
+    {"variantId": "tactical-operations:skyguard-sam-longshot-sniper-camo", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite", "geometryPreset": "aps_hardkill_radar_v2"},
     {"variantId": "tactical-operations:bulwark-siege-tank-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1", "geometryLayout": "bulwark_side_skirt_array_v1"},
-    {"variantId": "tactical-operations:bulwark-siege-tank-minefield-ordnance-carrier", "slotId": "FuelDrums", "visualEngineeringRole": "ordnance_carrier"},
-    {"variantId": "tactical-operations:arc-lance-walker-plasma-arc-containment", "slotId": "Sponsons", "visualEngineeringRole": "power_containment"},
-    {"variantId": "tactical-operations:field-medic-rover-nanite-repair-chitin", "slotId": "Sponsons", "visualEngineeringRole": "repair_dispenser"},
-    {"variantId": "tactical-operations:sentinel-relay-stealth-void-composite", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"},
-    {"variantId": "tactical-operations:sentinel-relay-beryllium-mirror-hull", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
+    {"variantId": "tactical-operations:bulwark-siege-tank-minefield-ordnance-carrier", "slotId": "FuelDrums", "visualEngineeringRole": "ordnance_carrier", "geometryPreset": "ordnance_mine_dispenser_rack_v2"},
+    {"variantId": "tactical-operations:arc-lance-walker-plasma-arc-containment", "slotId": "Sponsons", "visualEngineeringRole": "plasma_containment", "geometryPreset": "plasma_containment_cell_v1"},
+    {"variantId": "tactical-operations:field-medic-rover-nanite-repair-chitin", "slotId": "Sponsons", "visualEngineeringRole": "repair_dispenser", "geometryPreset": "nanofabrication_repair_projector_sponson_v1"},
+    {"variantId": "tactical-operations:sentinel-relay-stealth-void-composite", "slotId": "APS", "visualEngineeringRole": "aps_countermeasure_suite", "geometryPreset": "multispectral_countermeasure_jammer_v1"},
+    {"variantId": "tactical-operations:sentinel-relay-beryllium-mirror-hull", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1"},
     {"variantId": "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy", "slotId": "Sponsons", "visualEngineeringRole": "power_containment", "geometryPreset": "coaxial_service_connector_recessed_v1"},
-    {"variantId": "tactical-operations:gravitas-breaker-cryogenic-fuel-shroud", "slotId": "FuelDrums", "visualEngineeringRole": "fuel_drum_pair"},
-    {"variantId": "tactical-operations:command-relay-beryllium-mirror-hull", "slotId": "ERA", "visualEngineeringRole": "armor_cassette"},
-    {"variantId": "tactical-operations:command-relay-cyber-nanoweave", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite"}
+    {"variantId": "tactical-operations:gravitas-breaker-cryogenic-fuel-shroud", "slotId": "FuelDrums", "visualEngineeringRole": "fuel_drum_pair", "geometryPreset": "cryo_fusion_cell_containment_rack_v1"},
+    {"variantId": "tactical-operations:command-relay-beryllium-mirror-hull", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1"},
+    {"variantId": "tactical-operations:command-relay-cyber-nanoweave", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite", "geometryPreset": "optronic_recon_sensor_mast_v1"},
+    {"variantId":"sample-native-expansion:assault-walker-orbital-drop-pod-cermet","slotId":"APS","visualEngineeringRole":"aps_phase_shield","geometryPreset":"aps_phase_shield_emitter_v1"},
+    {"variantId":"sample-native-expansion:scout-tank-desert-camo","slotId":"Sponsons","visualEngineeringRole":"auxiliary_power_generator","geometryPreset":"apu_turbogenerator_sponson_v1"},
+    {"variantId":"tactical-operations:sentinel-relay-beryllium-mirror-hull","slotId":"Sponsons","visualEngineeringRole":"utility_sponson","geometryPreset":"armor_access_panel_bolt_circle_v1"},
+    {"variantId":"sample-native-expansion:heavy-artillery-battleship-tungsten","slotId":"Sponsons","visualEngineeringRole":"heavy_flak_battery","geometryPreset":"autocannon_remote_sponson_pod_v1"},
+    {"variantId":"tactical-operations:command-relay-beryllium-mirror-hull","slotId":"Sponsons","visualEngineeringRole":"power_containment","geometryPreset":"cable_conduit_junction_manifold_v1"},
+    {"variantId":"tactical-operations:skyguard-sam-longshot-sniper-camo","slotId":"Sponsons","visualEngineeringRole":"heavy_flak_battery","geometryPreset":"ciws_rotary_point_defense_sponson_v1"},
+    {"variantId":"sample-native-expansion:bastion-siege-mech-cryo-glacier-camo","slotId":"Sponsons","visualEngineeringRole":"thermal_radiator","geometryPreset":"composite_hex_vent_panel_v1"},
+    {"variantId":"tactical-operations:tidebreaker-skirmisher-cryo-glacier-camo","slotId":"Sponsons","visualEngineeringRole":"docking_clamp","geometryPreset":"docking_clamp_hydraulic_arm_v1"},
+    {"variantId":"sample-native-expansion:bastion-siege-mech-stealth-radar-absorbent-ferrite","slotId":"Sponsons","visualEngineeringRole":"thermal_radiator","geometryPreset":"engine_deck_louver_grille_v1"},
+    {"variantId":"tactical-operations:salvage-hauler-minefield-ordnance-carrier","slotId":"Sponsons","visualEngineeringRole":"field_engineering_crane","geometryPreset":"field_engineering_crane_winch_sponson_v1"},
+    {"variantId":"tactical-operations:salvage-hauler-hazard-industrial","slotId":"FuelDrums","visualEngineeringRole":"fuel_jerrycan_carrier","geometryPreset":"fuel_aux_jerrycan_rack_v1"},
+    {"variantId":"sample-native-expansion:scout-tank-gunmetal-chassis","slotId":"FuelDrums","visualEngineeringRole":"fuel_jerrycan_carrier","geometryPreset":"fuel_aux_jerrycan_rack_v2"},
+    {"variantId":"sample-native-expansion:heavy-artillery-martian-iron-rust","slotId":"Sponsons","visualEngineeringRole":"recoil_anchor","geometryPreset":"graviton_recoil_anchor_v1"},
+    {"variantId":"sample-native-expansion:arachnid-hexapod-pulsar-magnetic-shield","slotId":"Sponsons","visualEngineeringRole":"repair_dispenser","geometryPreset":"nanite_repair_dispenser_pod_v1"},
+    {"variantId":"sample-native-expansion:arachnid-hexapod-stealth-void-composite","slotId":"Sponsons","visualEngineeringRole":"repair_dispenser","geometryPreset":"nanite_repair_dispenser_pod_v2"},
+    {"variantId":"sample-native-expansion:assault-walker-plasma-cinder-ablative","slotId":"Sponsons","visualEngineeringRole":"excavation_drill","geometryPreset":"plasma_excavation_torch_v1"},
+    {"variantId":"tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy","slotId":"FuelDrums","visualEngineeringRole":"ordnance_carrier","geometryPreset":"plasma_torpedo_magazine_rack_v1"},
+    {"variantId":"tactical-operations:tidebreaker-skirmisher-cryo-glacier-camo","slotId":"FuelDrums","visualEngineeringRole":"ordnance_carrier","geometryPreset":"plasma_torpedo_magazine_rack_v2"},
+    {"variantId":"tactical-operations:skyguard-sam-solar-flare-radiation-shield","slotId":"Sponsons","visualEngineeringRole":"heavy_flak_battery","geometryPreset":"quad_pulse_laser_ciws_sponson_v1"},
+    {"variantId":"sample-native-expansion:surge-tank-ion-thruster-titanium-grate","slotId":"FuelDrums","visualEngineeringRole":"fuel_drum_pair","geometryPreset":"reinforced_fuel_drum_drop_rack_v1"},
+    {"variantId":"sample-native-expansion:scout-tank-longshot-sniper-camo","slotId":"ERA","visualEngineeringRole":"armor_cassette","geometryPreset":"slat_armor_screen_v1"},
+    {"variantId":"tactical-operations:command-relay-cyber-nanoweave","slotId":"Sponsons","visualEngineeringRole":"thermal_radiator","geometryPreset":"thermal_armored_radiator_pack_v2"}
   ]
 }

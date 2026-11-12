@@ -11,11 +11,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.util
+import inspect
 import json
 import math
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, get_type_hints
 
 import bpy
 from mathutils import Euler, Vector
@@ -29,6 +30,7 @@ from hard_surface_geometry_presets import (  # noqa: E402
     COAXIAL_SERVICE_CONNECTOR_PRESET_ID,
     ERA_BRICK_PRESET_ID,
     GEOMETRY_PRESETS,
+    PRESET_METADATA,
     SERVICE_HATCH_PRESET_ID,
     EraBrickConfig,
     CoaxialServiceConnectorConfig,
@@ -79,12 +81,65 @@ def resolve_preset(variant_id: str, unit_profile: Any) -> str:
     raise ValueError(f"No registered Material Maker preset matches Level 2 variant {variant_id!r}")
 
 
-def load_visual_engineering_roles() -> tuple[dict[str, dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+def load_visual_engineering_roles() -> tuple[
+    dict[str, dict[str, Any]],
+    dict[tuple[str, str], dict[str, Any]],
+    dict[str, dict[str, Any]],
+    dict[str, dict[str, Any]],
+    dict[str, Any],
+]:
     registry = json.loads(ROLE_REGISTRY_PATH.read_text(encoding="utf-8"))
     definitions = registry.get("roleDefinitions")
     rows = registry.get("variantRoles")
-    if not isinstance(definitions, dict) or not isinstance(rows, list):
+    preset_rows = registry.get("geometryPresetBindings")
+    layout_rows = registry.get("geometryLayouts")
+    if (registry.get("schemaVersion") != 2 or not isinstance(definitions, dict) or
+            not isinstance(rows, list) or not isinstance(preset_rows, list) or not isinstance(layout_rows, list)):
         raise ValueError(f"Visual engineering role registry is incomplete: {ROLE_REGISTRY_PATH}")
+
+    preset_bindings: dict[str, dict[str, Any]] = {}
+    for binding in preset_rows:
+        preset_id = binding.get("geometryPresetId")
+        slot_id = binding.get("slotId")
+        engineering_role = binding.get("geometryEngineeringRole")
+        visual_roles = binding.get("visualEngineeringRoles")
+        metadata = PRESET_METADATA.get(preset_id)
+        if (not preset_id or preset_id in preset_bindings or preset_id not in GEOMETRY_PRESETS or
+                not metadata or slot_id != metadata.get("slot") or
+                engineering_role != metadata.get("engineeringRole") or
+                not isinstance(visual_roles, list) or not visual_roles):
+            raise ValueError(f"Invalid or stale hard-surface geometry preset binding: {binding}")
+        allowed_variants = binding.get("allowedVariantIds", [])
+        if not isinstance(allowed_variants, list) or any(not isinstance(value, str) or not value for value in allowed_variants):
+            raise ValueError(f"Invalid allowedVariantIds for geometry preset {preset_id!r}")
+        for visual_role in visual_roles:
+            definition = definitions.get(visual_role)
+            if (definition is None or slot_id not in (definition.get("allowedSlots") or [])):
+                raise ValueError(
+                    f"Geometry preset {preset_id!r} cannot be assigned to role {visual_role!r} at {slot_id!r}"
+                )
+        preset_bindings[preset_id] = binding
+    missing_presets = sorted(set(GEOMETRY_PRESETS) - set(preset_bindings))
+    unknown_presets = sorted(set(preset_bindings) - set(GEOMETRY_PRESETS))
+    if missing_presets or unknown_presets:
+        raise ValueError(
+            "Geometry preset contract must cover the complete factory catalog; "
+            f"missing={missing_presets}, unknown={unknown_presets}"
+        )
+
+    layout_bindings: dict[str, dict[str, Any]] = {}
+    for layout in layout_rows:
+        layout_id = layout.get("geometryLayoutId")
+        required_preset = layout.get("requiredGeometryPresetId")
+        role = layout.get("visualEngineeringRole")
+        slot = layout.get("slotId")
+        if (not layout_id or layout_id in layout_bindings or required_preset not in preset_bindings or
+                role not in definitions or slot not in definitions[role].get("allowedSlots", [])):
+            raise ValueError(f"Invalid canonical geometry layout binding: {layout}")
+        preset_binding = preset_bindings[required_preset]
+        if slot != preset_binding["slotId"] or role not in preset_binding["visualEngineeringRoles"]:
+            raise ValueError(f"Geometry layout {layout_id!r} is incompatible with {required_preset!r}")
+        layout_bindings[layout_id] = layout
 
     roles_by_variant_slot: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
@@ -99,15 +154,27 @@ def load_visual_engineering_roles() -> tuple[dict[str, dict[str, Any]], dict[tup
         allowed_slots = definitions[role].get("allowedSlots") or []
         if slot_id not in allowed_slots:
             raise ValueError(f"Role {role!r} cannot mount at {slot_id!r}: {variant_id}")
+        preset_id = row.get("geometryPreset")
+        binding = preset_bindings.get(preset_id)
+        if (binding is None or slot_id != binding["slotId"] or role not in binding["visualEngineeringRoles"]):
+            raise ValueError(f"Level 2 module has no compatible reusable geometry preset: {variant_id} at {slot_id}")
+        allowed_variants = binding.get("allowedVariantIds") or []
+        if allowed_variants and variant_id not in allowed_variants:
+            raise ValueError(f"Geometry preset {preset_id!r} is not authorized for {variant_id}")
         layout = row.get("geometryLayout", "")
-        if layout not in {"", "bulwark_side_skirt_array_v1"}:
-            raise ValueError(f"Unknown canonical geometry layout {layout!r} for {variant_id} at {slot_id}")
-        if layout and (variant_id != "tactical-operations:bulwark-siege-tank-battleship-tungsten" or
-                       slot_id != "ERA" or role != "armor_cassette"):
-            raise ValueError(f"Geometry layout {layout!r} is reserved for the Bulwark ERA module")
+        layout_binding = layout_bindings.get(layout) if layout else None
+        if layout and (layout_binding is None or layout_binding.get("variantId") != variant_id or
+                       layout_binding.get("slotId") != slot_id or
+                       layout_binding.get("visualEngineeringRole") != role or
+                       layout_binding.get("requiredGeometryPresetId") != preset_id):
+            raise ValueError(f"Geometry layout {layout!r} is not compatible with {variant_id} at {slot_id}")
+        expected_layout = next((item for item in layout_rows
+                                if item.get("variantId") == variant_id and item.get("slotId") == slot_id), None)
+        if expected_layout and layout != expected_layout.get("geometryLayoutId"):
+            raise ValueError(f"Variant {variant_id} at {slot_id} must use layout {expected_layout['geometryLayoutId']!r}")
         roles_by_variant_slot[key] = row
 
-    return definitions, roles_by_variant_slot
+    return definitions, roles_by_variant_slot, preset_bindings, layout_bindings, registry
 
 
 def parse_args() -> argparse.Namespace:
@@ -118,7 +185,7 @@ def parse_args() -> argparse.Namespace:
 
 def read_module_entries() -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
-    role_definitions, roles_by_variant_slot = load_visual_engineering_roles()
+    role_definitions, roles_by_variant_slot, _, _, _ = load_visual_engineering_roles()
     seen_roles: set[tuple[str, str]] = set()
     for pack_name in ACTIVE_PACKS:
         pack_path = ROOT / "content" / "packs" / pack_name / "content.json"
@@ -156,32 +223,8 @@ def read_module_entries() -> list[dict[str, Any]]:
                         raise ValueError(f"No explicit visual engineering role for {variant['id']} at {slot_id}")
                     visual_role = role_row["visualEngineeringRole"]
                     seen_roles.add(role_key)
-                    geometry_preset = role_row.get(
-                        "geometryPreset", role_definitions[visual_role].get("geometryPreset", ""))
+                    geometry_preset = role_row["geometryPreset"]
                     geometry_layout = role_row.get("geometryLayout", "")
-                    if geometry_preset and geometry_preset not in GEOMETRY_PRESETS:
-                        raise ValueError(
-                            f"Unknown hard-surface geometry preset {geometry_preset!r} "
-                            f"for {variant['id']} at {slot_id}"
-                        )
-                    if (visual_role == "armor_cassette") != (geometry_preset == ERA_BRICK_PRESET_ID):
-                        raise ValueError(f"ERA cassette roles must use {ERA_BRICK_PRESET_ID}: {variant['id']} at {slot_id}")
-                    if (visual_role == "utility_sponson") != (geometry_preset == SERVICE_HATCH_PRESET_ID):
-                        raise ValueError(f"Utility sponson roles must use {SERVICE_HATCH_PRESET_ID}: {variant['id']} at {slot_id}")
-                    is_gravitas_power_cell = (
-                        variant["id"] == "tactical-operations:gravitas-breaker-quantum-hyperdrive-alloy" and
-                        slot_id == "Sponsons" and visual_role == "power_containment"
-                    )
-                    if geometry_preset == COAXIAL_SERVICE_CONNECTOR_PRESET_ID and not is_gravitas_power_cell:
-                        raise ValueError(
-                            f"{COAXIAL_SERVICE_CONNECTOR_PRESET_ID} is reserved for the Gravitas Breaker "
-                            f"power-containment sponson: {variant['id']} at {slot_id}"
-                        )
-                    if is_gravitas_power_cell and geometry_preset != COAXIAL_SERVICE_CONNECTOR_PRESET_ID:
-                        raise ValueError(
-                            f"Gravitas Breaker power-containment sponson requires "
-                            f"{COAXIAL_SERVICE_CONNECTOR_PRESET_ID}"
-                        )
 
                     unit_slug = unit_id.split(":", 1)[1].replace("-", "_")
                     module_suffix = f"_{slot_id.lower()}" if len(module_declarations) > 1 else ""
@@ -299,6 +342,49 @@ def build_armor_module(
             hardflow_boolean_apply=hardflow_boolean_apply,
             hardflow_bevel=hardflow_bevel,
         ))
+    return objects
+
+
+def build_generic_geometry_preset(
+    entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any,
+    *, hardflow_boolean_apply: HardflowBoolean | None = None,
+    hardflow_bevel: HardflowBevel | None = None,
+) -> list[bpy.types.Object]:
+    """Dispatch a catalogued preset through its own config dataclass and factory."""
+    preset_id = entry["geometryPreset"]
+    creator = GEOMETRY_PRESETS.get(preset_id)
+    if creator is None:
+        raise ValueError(f"No hard-surface factory is registered for {preset_id!r}")
+    config_type = get_type_hints(creator).get("config")
+    if config_type is None:
+        raise TypeError(f"Hard-surface factory {creator.__name__} has no typed config contract")
+    try:
+        config = config_type()
+    except TypeError as exc:
+        raise TypeError(
+            f"Hard-surface preset {preset_id!r} needs an explicit mount recipe before it can be assigned"
+        ) from exc
+
+    parameters = inspect.signature(creator).parameters
+    kwargs: dict[str, Any] = {
+        "prefix": entry["moduleName"],
+        "config": config,
+        "armor_material": armor,
+        "hardware_material": gunmetal,
+    }
+    optional_values = {
+        "accent_material": accent,
+        "hardflow_boolean_apply": hardflow_boolean_apply,
+        "hardflow_bevel": hardflow_bevel,
+    }
+    kwargs.update({key: value for key, value in optional_values.items() if key in parameters})
+    objects = creator(**kwargs)
+    if not objects:
+        raise RuntimeError(f"Hard-surface preset {preset_id!r} produced no geometry")
+    for obj in objects:
+        obj["rcl_hard_surface_geometry_preset"] = preset_id
+        obj["rcl_canonical_visual_engineering_role"] = entry["visualEngineeringRole"]
+        obj["rcl_canonical_hardpoint_slot"] = entry["slotId"]
     return objects
 
 
@@ -446,7 +532,11 @@ def build_engineering_sponson_module(
     return objects
 
 
-def build_utility_sponson_module(entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int) -> list[bpy.types.Object]:
+def build_utility_sponson_module(
+    entry: dict[str, Any], armor: Any, gunmetal: Any, accent: Any, seed: int,
+    *, hardflow_boolean_apply: HardflowBoolean | None = None,
+    hardflow_bevel: HardflowBevel | None = None,
+) -> list[bpy.types.Object]:
     prefix = entry["moduleName"]
     role = entry["visualEngineeringRole"]
     if role == "docking_clamp":
@@ -505,12 +595,33 @@ def build_module_geometry(
 ) -> tuple[list[bpy.types.Object], list[bpy.types.Material]]:
     armor, gunmetal, accent = make_materials(entry)
     role = entry["visualEngineeringRole"]
-    if role == "armor_cassette":
+    geometry_preset = entry.get("geometryPreset", "")
+    if geometry_preset == ERA_BRICK_PRESET_ID:
         objects = build_armor_module(
             entry, armor, gunmetal, accent, seed,
             hardflow_boolean_apply=hardflow_boolean_apply,
             hardflow_bevel=hardflow_bevel,
         )
+    elif geometry_preset == SERVICE_HATCH_PRESET_ID:
+        objects = build_utility_sponson_module(
+            entry, armor, gunmetal, accent, seed,
+            hardflow_boolean_apply=hardflow_boolean_apply,
+            hardflow_bevel=hardflow_bevel,
+        )
+    elif geometry_preset == COAXIAL_SERVICE_CONNECTOR_PRESET_ID:
+        objects = build_engineering_sponson_module(
+            entry, armor, gunmetal, accent, seed,
+            hardflow_boolean_apply=hardflow_boolean_apply,
+            hardflow_bevel=hardflow_bevel,
+        )
+    elif geometry_preset:
+        objects = build_generic_geometry_preset(
+            entry, armor, gunmetal, accent,
+            hardflow_boolean_apply=hardflow_boolean_apply,
+            hardflow_bevel=hardflow_bevel,
+        )
+    elif role == "armor_cassette":
+        raise ValueError(f"Armor geometry preset is required for {entry['variantId']}")
     elif role in ("aps_sensor_suite", "aps_magnetic_shield"):
         objects = build_aps_module(entry, armor, gunmetal, accent, seed)
     elif role in ("fuel_drum_pair", "ordnance_carrier"):
@@ -524,7 +635,11 @@ def build_module_geometry(
             hardflow_bevel=hardflow_bevel,
         )
     elif role in ("docking_clamp", "utility_sponson"):
-        objects = build_utility_sponson_module(entry, armor, gunmetal, accent, seed)
+        objects = build_utility_sponson_module(
+            entry, armor, gunmetal, accent, seed,
+            hardflow_boolean_apply=hardflow_boolean_apply,
+            hardflow_bevel=hardflow_bevel,
+        )
     else:
         raise ValueError(f"No geometry builder registered for visual engineering role {role!r}")
 
@@ -654,14 +769,15 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
 
     role_registry = json.loads(ROLE_REGISTRY_PATH.read_text(encoding="utf-8"))
     manifest = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "sourceBlend": SOURCE_BLEND.relative_to(ROOT).as_posix(),
         "level1Authority": "Existing unit chassis geometry, functional hierarchy, rig, pivots, canonical sockets, LOD and PBR atlas.",
         "geometryBudgetPolicy": "scene-calibrated-per-asset-lod",
         "geometryBudgetProfile": "content/source-art/model-budget-profile.json",
         "level2Contract": "Each listed GameObject is visual-only geometry attached to exactly one canonical hardpoint group; no gameplay components or balance changes.",
         "visualEngineeringRoleContract": role_registry.get("scope", ""),
-        "geometryPresetPolicy": "Optional geometry recipes are named separately from Material Maker PBR presets.",
+        "geometryPresetRegistrySha256": hashlib.sha256(ROLE_REGISTRY_PATH.read_bytes()).hexdigest(),
+        "geometryPresetPolicy": "Every Level 2 module resolves one validated hard-surface factory from the complete preset catalog; geometry presets remain separate from Material Maker PBR presets.",
         "modules": entries,
     }
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)

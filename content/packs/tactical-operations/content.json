@@ -211,7 +211,15 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_cryo_glacier_camo.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_cryo_glacier_camo_era.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_cryo_glacier_camo_sponsons.prefab"
+            },
+            {
+              "slotId": "FuelDrums",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_cryo_glacier_camo_fueldrums.prefab"
             }
           ]
         }
@@ -411,7 +419,11 @@
           "modules": [
             {
               "slotId": "Sponsons",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_hazard_industrial.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_hazard_industrial_sponsons.prefab"
+            },
+            {
+              "slotId": "FuelDrums",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_hazard_industrial_fueldrums.prefab"
             }
           ]
         },
@@ -421,8 +433,12 @@
           "scale": 1.0,
           "modules": [
             {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_minefield_ordnance_carrier_sponsons.prefab"
+            },
+            {
               "slotId": "FuelDrums",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_minefield_ordnance_carrier.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_minefield_ordnance_carrier_fueldrums.prefab"
             }
           ]
         }
@@ -610,7 +626,11 @@
           "modules": [
             {
               "slotId": "APS",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_solar_flare_radiation_shield.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_solar_flare_radiation_shield_aps.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_solar_flare_radiation_shield_sponsons.prefab"
             }
           ]
         },
@@ -621,7 +641,11 @@
           "modules": [
             {
               "slotId": "APS",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_longshot_sniper_camo.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_longshot_sniper_camo_aps.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_longshot_sniper_camo_sponsons.prefab"
             }
           ]
         }
@@ -1501,7 +1525,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_sentinel_relay_beryllium_mirror_hull.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_sentinel_relay_beryllium_mirror_hull_era.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_sentinel_relay_beryllium_mirror_hull_sponsons.prefab"
             }
           ]
         }
@@ -1763,7 +1791,11 @@
           "modules": [
             {
               "slotId": "Sponsons",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_gravitas_breaker_quantum_hyperdrive_alloy.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_gravitas_breaker_quantum_hyperdrive_alloy_sponsons.prefab"
+            },
+            {
+              "slotId": "FuelDrums",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_gravitas_breaker_quantum_hyperdrive_alloy_fueldrums.prefab"
             }
           ]
         },
@@ -2031,7 +2063,11 @@
           "modules": [
             {
               "slotId": "ERA",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_beryllium_mirror_hull.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_beryllium_mirror_hull_era.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_beryllium_mirror_hull_sponsons.prefab"
             }
           ]
         },
@@ -2042,7 +2078,11 @@
           "modules": [
             {
               "slotId": "APS",
-              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_cyber_nanoweave.prefab"
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_cyber_nanoweave_aps.prefab"
+            },
+            {
+              "slotId": "Sponsons",
+              "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_cyber_nanoweave_sponsons.prefab"
             }
           ]
         }

@@ -69,6 +69,14 @@ from hard_surface_geometry_presets import (
     REINFORCED_FUEL_DRUM_DROP_RACK_PRESET_ID,
     SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID,
     ApuTurbogeneratorSponsonConfig,
+    ARMOR_ACCESS_PANEL_PRESET_ID,
+    ENGINE_DECK_LOUVER_GRILLE_PRESET_ID,
+    COMPOSITE_HEX_VENT_PANEL_PRESET_ID,
+    CABLE_CONDUIT_JUNCTION_PRESET_ID,
+    ArmorAccessPanelConfig,
+    EngineDeckLouverGrilleConfig,
+    CompositeHexVentPanelConfig,
+    CableConduitJunctionConfig,
     CiwsRotaryPointDefenseConfig,
     CryoFusionCellContainmentRackConfig,
     DockingClampHydraulicArmConfig,
@@ -557,6 +565,21 @@ class TestHardSurfacePresetConfigs(unittest.TestCase):
         with self.assertRaises(ValueError):
             FluxDeflectionShieldProjectorConfig(base_radius=0.0)
 
+    def test_detailing_configs_valid_and_invalid(self) -> None:
+        cfg = ArmorAccessPanelConfig(bolt_circle_count=8)
+        self.assertEqual(cfg.bolt_circle_count, 8)
+        self.assertEqual(cfg.to_dict()['bolt_circle_count'], 8)
+        with self.assertRaises(ValueError):
+            ArmorAccessPanelConfig(bolt_circle_count=2)
+        with self.assertRaises(ValueError):
+            ArmorAccessPanelConfig(panel_size=(0.0, 0.2, 0.03))
+        with self.assertRaises(ValueError):
+            EngineDeckLouverGrilleConfig(slot_count=1)
+        with self.assertRaises(ValueError):
+            CompositeHexVentPanelConfig(normal=(0.0, 0.0, 0.0))
+        with self.assertRaises(ValueError):
+            CableConduitJunctionConfig(fastener_radius=-0.01)
+
 
 class TestHardSurfacePresetRegistry(unittest.TestCase):
     """Test registry completeness and style/slot coverage."""
@@ -608,6 +631,11 @@ class TestHardSurfacePresetRegistry(unittest.TestCase):
             CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID,
             NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID,
             FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID,
+            # Detailing presets
+            ARMOR_ACCESS_PANEL_PRESET_ID,
+            ENGINE_DECK_LOUVER_GRILLE_PRESET_ID,
+            COMPOSITE_HEX_VENT_PANEL_PRESET_ID,
+            CABLE_CONDUIT_JUNCTION_PRESET_ID,
         }
         self.assertEqual(set(GEOMETRY_PRESETS.keys()), expected)
         self.assertEqual(set(PRESET_METADATA.keys()), expected)
@@ -679,6 +707,10 @@ class TestHardSurfacePresetBlenderGeneration(unittest.TestCase):
             (CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID, "CryoFusionCellContainmentRackConfig(center=(7.5, 12.0, 0.0))"),
             (NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID, "NanofabricationRepairProjectorConfig(center=(9.0, 12.0, 0.0))"),
             (FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID, "FluxDeflectionShieldProjectorConfig(center=(10.5, 12.0, 0.0))"),
+            (ARMOR_ACCESS_PANEL_PRESET_ID, "ArmorAccessPanelConfig(center=(0.0, 14.0, 0.0))"),
+            (ENGINE_DECK_LOUVER_GRILLE_PRESET_ID, "EngineDeckLouverGrilleConfig(center=(1.5, 14.0, 0.0))"),
+            (COMPOSITE_HEX_VENT_PANEL_PRESET_ID, "CompositeHexVentPanelConfig(center=(3.0, 14.0, 0.0))"),
+            (CABLE_CONDUIT_JUNCTION_PRESET_ID, "CableConduitJunctionConfig(center=(4.5, 14.0, 0.0))"),
         ]
 
         def run_worker_chunk(worker_idx: int, chunk: list[tuple[str, str]]) -> dict[str, Any]:

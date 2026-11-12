@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [switch]$UseHardflow,
-    [switch]$RenderPreviews
+    [switch]$FastPreview,
+    [switch]$RenderPreviews,
+    [string[]]$Group = @()
 )
 
 Set-StrictMode -Version Latest
@@ -28,12 +30,19 @@ try {
         [Environment]::SetEnvironmentVariable('BLENDER_USER_EXTENSIONS', $extensionsRoot, 'Process')
     }
 
-    $arguments = @('--background', '--python', $pilotScript, '--')
+    $arguments = @('--background', '--python-exit-code', '1', '--python', $pilotScript, '--')
     if ($UseHardflow) {
         $arguments += '--use-hardflow'
     }
+    if ($FastPreview) {
+        $arguments += '--fast-preview'
+    }
     if ($RenderPreviews) {
         $arguments += '--render-previews'
+    }
+    foreach ($groupName in $Group) {
+        $arguments += '--group'
+        $arguments += $groupName
     }
 
     Write-Host "Running Canonical Level 2 Hardflow Pilot in Blender 4.5.14..."

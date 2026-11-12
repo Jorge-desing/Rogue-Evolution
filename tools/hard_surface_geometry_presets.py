@@ -82,6 +82,11 @@ CRYO_FUSION_CELL_CONTAINMENT_RACK_PRESET_ID = "cryo_fusion_cell_containment_rack
 NANOFABRICATION_REPAIR_PROJECTOR_PRESET_ID = "nanofabrication_repair_projector_sponson_v1"
 FLUX_DEFLECTION_SHIELD_PROJECTOR_PRESET_ID = "flux_deflection_shield_projector_v1"
 
+ARMOR_ACCESS_PANEL_PRESET_ID = "armor_access_panel_bolt_circle_v1"
+ENGINE_DECK_LOUVER_GRILLE_PRESET_ID = "engine_deck_louver_grille_v1"
+COMPOSITE_HEX_VENT_PANEL_PRESET_ID = "composite_hex_vent_panel_v1"
+CABLE_CONDUIT_JUNCTION_PRESET_ID = "cable_conduit_junction_manifold_v1"
+
 
 @dataclass(frozen=True)
 class ServiceHatchConfig:
@@ -4281,13 +4286,13 @@ PRESET_METADATA: dict[str, dict[str, str]] = {
         "style": "contemporary_military",
         "slot": "Sponsons",
         "displayName": "Tactical APU Turbogenerator Sponson v1",
-        "engineeringRole": "power_containment",
+        "engineeringRole": "auxiliary_power_generator",
     },
     SMOKE_GRENADE_SALVO_DISCHARGER_PRESET_ID: {
         "style": "contemporary_military",
         "slot": "APS",
         "displayName": "Multispectral Smoke Salvo Discharger Bank v1",
-        "engineeringRole": "aps_sensor_suite",
+        "engineeringRole": "aps_countermeasure_suite",
     },
     PLASMA_EXCAVATION_TORCH_PRESET_ID: {
         "style": "futuristic_military",
@@ -4305,7 +4310,7 @@ PRESET_METADATA: dict[str, dict[str, str]] = {
         "style": "futuristic_military",
         "slot": "Sponsons",
         "displayName": "Kinetic & Graviton Recoil Anchor Pod v1",
-        "engineeringRole": "utility_sponson",
+        "engineeringRole": "recoil_anchor",
     },
     OPTRONIC_RECON_SENSOR_MAST_PRESET_ID: {
         "style": "futuristic_military",
@@ -4329,13 +4334,13 @@ PRESET_METADATA: dict[str, dict[str, str]] = {
         "style": "contemporary_military",
         "slot": "Sponsons",
         "displayName": "Combat Engineering Crane & Winch Sponson v1",
-        "engineeringRole": "repair_dispenser",
+        "engineeringRole": "field_engineering_crane",
     },
     MULTISPECTRAL_COUNTERMEASURE_JAMMER_PRESET_ID: {
         "style": "contemporary_military",
         "slot": "APS",
         "displayName": "Multispectral Active Jammer & MAWS Mast v1",
-        "engineeringRole": "aps_magnetic_shield",
+        "engineeringRole": "aps_countermeasure_suite",
     },
     QUAD_PULSE_LASER_CIWS_PRESET_ID: {
         "style": "futuristic_military",
@@ -4363,5 +4368,25 @@ PRESET_METADATA: dict[str, dict[str, str]] = {
     },
 }
 
+from hard_surface_geometry_presets_detailing import (  # noqa: E402
+    ARMOR_ACCESS_PANEL_PRESET_ID,
+    ENGINE_DECK_LOUVER_GRILLE_PRESET_ID,
+    COMPOSITE_HEX_VENT_PANEL_PRESET_ID,
+    CABLE_CONDUIT_JUNCTION_PRESET_ID,
+    ArmorAccessPanelConfig,
+    CableConduitJunctionConfig,
+    CompositeHexVentPanelConfig,
+    DetailingConfig,
+    EngineDeckLouverGrilleConfig,
+    create_armor_access_panel_preset,
+    create_engine_deck_louver_grille_preset,
+    create_composite_hex_vent_panel_preset,
+    create_cable_conduit_junction_preset,
+    DETAILING_METADATA,
+    DETAILING_PRESETS,
+)
+
+GEOMETRY_PRESETS.update(DETAILING_PRESETS)
+PRESET_METADATA.update(DETAILING_METADATA)
 PRESET_STYLES: dict[str, str] = {k: v["style"] for k, v in PRESET_METADATA.items()}
 PRESET_SLOTS: dict[str, str] = {k: v["slot"] for k, v in PRESET_METADATA.items()}
