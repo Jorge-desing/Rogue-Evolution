@@ -11727,6 +11727,13 @@ def assign_rigid_mesh_weights(
                     "L_F": "FL", "R_F": "FR", "L_R": "RL", "R_R": "RR",
                 }.get(raw_tag)
             if tag_found is None:
+                # The newly authored middle-knee names use a side suffix
+                # (``_L``/``_R``), but ``MidKnee`` disambiguates them from the
+                # front/rear leg tags and maps them to ML/MR.
+                mid_knee_match = re.search(r"(?:^|_)MidKnee(?:Axle)?_([LR])(?:_|$)", clean_name)
+                if mid_knee_match:
+                    tag_found = f"M{mid_knee_match.group(1)}"
+            if tag_found is None:
                 if "_ML" in clean_name or clean_name.endswith("ML"):
                     tag_found = "ML"
                 elif "_MR" in clean_name or clean_name.endswith("MR"):
@@ -11763,11 +11770,19 @@ def assign_rigid_mesh_weights(
                 target_bone = "Bone_Pelvis"
 
         if target_bone is None:
-            if any(k in clean_name for k in ("Barrel", "Muzzle", "Bore", "Recoil", "Nozzle")):
+            if "TurretRingGuard" in clean_name:
+                # The ring guard is seated on the fixed hull deck around the
+                # turret bearing; its name describes what it protects, not its rig parent.
+                target_bone = "Bone_Hull"
+            elif "CoaxialPort" in clean_name:
+                # Coaxial weapons are fixed to the turret's azimuth assembly;
+                # do not send their muzzle to the main cannon recoil bone.
+                target_bone = "Bone_TurretYaw"
+            elif any(k in clean_name for k in ("Barrel", "Muzzle", "Bore", "Recoil", "Nozzle")):
                 target_bone = "Bone_BarrelRecoil"
-            elif any(k in clean_name for k in ("Mantlet", "Cradle", "Howitzer", "Rail", "Flak", "Mortar", "Gatling", "Pod", "Emitter", "Flamer", "EMP", "TurretPitch")):
+            elif any(k in clean_name for k in ("Mantlet", "Cradle", "Breech", "Howitzer", "Rail", "Flak", "Mortar", "Gatling", "Pod", "Emitter", "Flamer", "EMP", "TurretPitch")):
                 target_bone = "Bone_TurretPitch"
-            elif any(k in clean_name for k in ("Turret", "Bustle", "Visor", "Radar", "Rotodome", "TurretPivot")):
+            elif any(k in clean_name for k in ("Turret", "Bustle", "Visor", "Radar", "Rotodome", "TurretPivot", "Trunnion")):
                 target_bone = "Bone_TurretYaw"
             elif leg_type == "biped":
                 target_bone = "Bone_Pelvis"

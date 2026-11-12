@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import unittest
 from pathlib import Path
+import sys
 
 import bpy
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT / "tools"))
+import RogueModelKit as rmk  # noqa: E402
+
 SOURCE_BLEND = REPO_ROOT / "content/source-art/arachnidhexapod-rigged.blend"
 LEG_TAGS = ("FL", "FR", "ML", "MR", "RL", "RR")
 
@@ -84,6 +88,46 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
                 armature_modifiers = [modifier for modifier in mesh.modifiers if modifier.type == "ARMATURE"]
                 self.assertEqual(1, len(armature_modifiers), f"{mesh_name} needs exactly one armature modifier")
                 self.assertIs(self.armature, armature_modifiers[0].object)
+
+    def test_new_middle_knee_and_axle_names_bind_to_middle_shins(self) -> None:
+        expected = {
+            "ArachnidHexapodJoint_MidKnee_L": "Bone_Shin_ML",
+            "ArachnidHexapodJoint_MidKneeAxle_L": "Bone_Shin_ML",
+            "ArachnidHexapodJoint_MidKnee_R": "Bone_Shin_MR",
+            "ArachnidHexapodJoint_MidKneeAxle_R": "Bone_Shin_MR",
+        }
+        temporary_objects = []
+        try:
+            for name in expected:
+                mesh = bpy.data.meshes.new(name + "_Mesh")
+                mesh.from_pydata(
+                    ((0.0, 0.0, 0.0), (0.05, 0.0, 0.0), (0.0, 0.05, 0.0)),
+                    (),
+                    ((0, 1, 2),),
+                )
+                obj = bpy.data.objects.new(name, mesh)
+                bpy.context.scene.collection.objects.link(obj)
+                temporary_objects.append(obj)
+
+            rmk.assign_rigid_mesh_weights(
+                temporary_objects,
+                "ArachnidHexapod",
+                self.armature,
+                leg_type="quad",
+            )
+
+            for obj in temporary_objects:
+                with self.subTest(mesh=obj.name):
+                    self.assertEqual([expected[obj.name]], [group.name for group in obj.vertex_groups])
+                    modifiers = [modifier for modifier in obj.modifiers if modifier.type == "ARMATURE"]
+                    self.assertEqual(1, len(modifiers))
+                    self.assertIs(self.armature, modifiers[0].object)
+        finally:
+            for obj in temporary_objects:
+                mesh = obj.data
+                bpy.data.objects.remove(obj, do_unlink=True)
+                if mesh.users == 0:
+                    bpy.data.meshes.remove(mesh)
 
     def test_leg_attachments_do_not_bind_to_idle_hull(self) -> None:
         """Leg hardware must not inherit the hull's stationary breathing curve."""

@@ -8,12 +8,17 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 from ActiveUnitVisualEnhancements import apply_wave34_details
-from gravitas_breaker_hardflow_recipe import apply_gravitas_breaker_details
+from gravitas_breaker_hardflow_recipe import (
+    apply_gravitas_breaker_details,
+    apply_gravitas_breech_feed_details,
+    apply_gravitas_trunnion_retainer_details,
+)
 import RogueModelKit as rmk
 from VisualModelAuthoringSupport import (
     add_box,
@@ -115,12 +120,51 @@ def refine(builder) -> None:
             0.042,
             p.warning,
         )
+    hardflow_breech_feed = apply_gravitas_breech_feed_details(
+        builder.objects,
+        mechanical_material=p.gunmetal,
+        warning_material=p.warning,
+    )
+    print(
+        "Gravitas Hardflow breech feed geometry replay: "
+        + json.dumps(hardflow_breech_feed, sort_keys=True)
+    )
+    hardflow_trunnion_retainers = apply_gravitas_trunnion_retainer_details(
+        builder.objects,
+        mechanical_material=p.gunmetal,
+    )
+    print(
+        "Gravitas Hardflow trunnion retainer geometry replay: "
+        + json.dumps(hardflow_trunnion_retainers, sort_keys=True)
+    )
     builder.damage_smoke_loc = builder.damage_smoke_loc or builder.center_of_mass_loc
     builder.damage_fire_loc = builder.damage_fire_loc or builder.turret_center
     builder.engine_audio_loc = builder.engine_audio_loc or builder.center_of_mass_loc
     builder.weapon_audio_loc = builder.weapon_audio_loc or builder.gun_pivot
     simplify_low_value_bevel_details(
         builder, max_dimension_m=1.2, angle_degrees=48.0
+    )
+    wheel_hardware = [
+        obj for obj in builder.objects
+        if obj.type == "MESH" and (
+            obj.name.endswith(("_Dish", "_AxleCap"))
+            or "_TorsionBoss_" in obj.name
+            or "_ShockDamper_" in obj.name
+            or "_Cleat_" in obj.name
+            or "_SwingArm_" in obj.name
+        )
+    ]
+    wheel_detail_reduction = simplify_low_value_bevel_details(
+        SimpleNamespace(objects=wheel_hardware),
+        max_dimension_m=0.60,
+        angle_degrees=45.0,
+        max_surface_deviation_m=0.02,
+        protected_name_tokens=(),
+    )
+    print(
+        "Gravitas wheel hardware refinement: "
+        f"simplified {len(wheel_hardware)} parts and removed "
+        f"{wheel_detail_reduction['faces_removed']} redundant bevel faces."
     )
 
 
