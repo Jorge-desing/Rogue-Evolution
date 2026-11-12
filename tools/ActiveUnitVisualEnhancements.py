@@ -260,10 +260,10 @@ ACTIVE_UNIT_REALISM_PROFILES = {
         "weapon_trunnion_center": (0.0, 0.65, 2.48), "trunnion_spacing": 0.68,
     },
     "ArachnidHexapod": {
-        "features": {"access_hatches", "weapon_trunnions", "turret_ring_guard"},
+        # The launcher is fixed to the carapace; this unit has no turret ring
+        # or articulated cannon trunnions. Keep only its service hatch.
+        "features": {"access_hatches"},
         "hatch_location": (0.0, -0.45, 1.62),
-        "turret_ring_location": (0.0, 0.10, 1.58), "turret_ring_radius": 0.68,
-        "weapon_trunnion_center": (0.0, 0.55, 1.62), "trunnion_spacing": 0.60,
     },
     "OverlordCommandHQ": {
         "features": {"access_hatches", "driver_periscope", "pioneer_racks", "turret_ring_guard"},

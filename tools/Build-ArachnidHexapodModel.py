@@ -6,10 +6,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from mathutils import Vector
-
 from VisualModelAuthoringSupport import (
-    add_box, add_link, add_loft_shell, add_y_axis_tube, hex_color,
-    remove_objects, replace_link_mesh, run_preset_build, set_material_color,
+    add_box, add_link, add_loft_shell, add_uv_ellipsoid, add_y_axis_tube, hex_color,
+    remove_objects, replace_link_mesh, run_preset_build,
+    set_material_color, simplify_low_value_bevel_details,
 )
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
@@ -20,9 +20,14 @@ def refine(builder):
     remove_objects(builder, lambda n: any(token in n for token in (
         "Armor_Hull", "Armor_UpperDeck", "Armor_ThoraxCore", "Turret_", "MissilePod_",
         "Sensor_Visor_", "Sensor_Antenna", "Hull_Greeble", "APS_",
+        "DeckEdgeWeld_", "TurretRingGuard_", "Armor_TurretRingGuard_",
     )))
+    # The preset-era hatch sits inside the replacement carapace; Wave 3/4 adds
+    # the correctly seated top hatch later in this refinement.
+    remove_objects(builder, lambda name: name.startswith("ArachnidHexapodAccessHatch_"))
 
-    # A single broad, tapered carapace replaces the three stacked box shells.
+    # The carapace uses more profile samples for a cleaner outline while its
+    # broad facets remain visible as fabricated armor planes.
     add_loft_shell(builder, "ArachnidHexapodArmor_ArmoredCarapace", [
         (0.64, 0.98, 1.54, -1.56),
         (0.79, 1.22, 1.72, -1.62),
@@ -30,7 +35,8 @@ def refine(builder):
         (1.30, 1.18, 1.59, -1.28),
         (1.52, 0.95, 1.26, -1.00),
         (1.62, 0.74, 0.92, -0.72),
-    ], p.primary_armor, exponent=0.62, smooth=False)
+    ], p.primary_armor, exponent=0.74, smooth=True, segments=32,
+       smooth_caps=False, smooth_side_ends=True)
 
     # Hip armor overlaps the torso and actuator roots so each limb appears mounted.
     for side, tag in ((-1, "L"), (1, "R")):
@@ -39,7 +45,8 @@ def refine(builder):
             (0.91, 0.34, 1.04, -1.00),
             (1.15, 0.29, 0.90, -0.88),
             (1.27, 0.21, 0.76, -0.74),
-        ], p.light_armor, center_x=side * 0.98, exponent=0.58, smooth=False)
+        ], p.light_armor, center_x=side * 0.98, exponent=0.70, smooth=True,
+           segments=20, smooth_caps=False, smooth_side_ends=True)
 
     # Raised, tapered flank plates sit proud of the carapace and catch light at
     # their edges, while the dark shell beneath remains a single continuous part.
@@ -53,11 +60,12 @@ def refine(builder):
 
     # Integrated forward sensor brow and recessed lens band.
     add_loft_shell(builder, "ArachnidHexapodArmor_OpticCrown", [
-        (1.40, 0.52, 1.43, 0.30),
-        (1.54, 0.63, 1.52, 0.22),
-        (1.73, 0.52, 1.37, 0.34),
-        (1.79, 0.38, 1.19, 0.49),
-    ], p.light_armor, exponent=0.52, smooth=False)
+        (1.43, 0.40, 1.53, 0.80),
+        (1.50, 0.50, 1.59, 0.68),
+        (1.62, 0.42, 1.51, 0.80),
+        (1.70, 0.30, 1.38, 0.90),
+    ], p.light_armor, exponent=0.74, smooth=True, segments=20,
+       smooth_caps=False, smooth_side_ends=True)
     add_box(builder, "ArachnidHexapodSensor_OpticGlazing",
             (0.0, 1.50, 1.59), (0.86, 0.055, 0.15), p.gunmetal)
     for index, x in enumerate((-0.28, -0.09, 0.09, 0.28), start=1):
@@ -109,29 +117,44 @@ def refine(builder):
             is_front = "_F_" in name
             sx, fy = (-1.0 if is_left else 1.0), (1.0 if is_front else -1.0)
             replace_link_mesh(obj, (sx * 1.10, fy * 1.20, 0.74),
-                              (sx * 1.92, fy * 1.83, 1.05), 0.22, 0.16, p.light_armor)
+                              (sx * 1.92, fy * 1.83, 1.05), 0.29, 0.21,
+                              p.light_armor, ring_segments=10, exponent=0.82)
         elif "CrawlerLeg_" in name and name.endswith("_TibiaStrut"):
             is_left = "_L_" in name
             is_front = "_F_" in name
             sx, fy = (-1.0 if is_left else 1.0), (1.0 if is_front else -1.0)
             replace_link_mesh(obj, (sx * 1.92, fy * 1.83, 1.05),
-                              (sx * 2.35, fy * 2.25, 0.18), 0.17, 0.13, p.primary_armor)
+                              (sx * 2.35, fy * 2.25, 0.18), 0.23, 0.17,
+                              p.primary_armor, ring_segments=10, exponent=0.82)
         elif "Armor_MidThigh_" in name:
             is_left = name.endswith("_ML")
             sx = -1.0 if is_left else 1.0
             replace_link_mesh(obj, (sx * 1.15, 0.0, 0.95),
-                              (sx * 1.60, 0.0, 1.12), 0.19, 0.15, p.light_armor)
+                              (sx * 1.62, 0.0, 0.72), 0.23, 0.17,
+                              p.light_armor, ring_segments=10, exponent=0.82)
         elif "Armor_MidShin_" in name:
             is_left = name.endswith("_ML")
             sx = -1.0 if is_left else 1.0
-            replace_link_mesh(obj, (sx * 1.60, 0.0, 1.12),
-                              (sx * 2.23, 0.0, 0.17), 0.145, 0.12, p.primary_armor)
+            replace_link_mesh(obj, (sx * 1.62, 0.0, 0.72),
+                              (sx * 2.23, 0.0, 0.17), 0.18, 0.14,
+                              p.primary_armor, ring_segments=10, exponent=0.82)
+        elif "KneeKnuckle" in name:
+            obj.scale = tuple(float(value) * 1.12 for value in obj.scale)
         elif "FootPad" in name:
             obj.data.materials.clear()
             obj.data.materials.append(p.wheel_rim)
         elif "FootTread" in name or "MidFootPad" in name:
             obj.data.materials.clear()
             obj.data.materials.append(p.tread)
+
+    # The lateral middle pair now has a visible knee joint and a two-link bend
+    # instead of a single straight support under the thorax.
+    for side, tag in ((-1, "L"), (1, "R")):
+        knee = (side * 1.62, 0.0, 0.72)
+        add_uv_ellipsoid(builder, f"ArachnidHexapodJoint_MidKnee_{tag}", knee,
+                         (0.22, 0.20, 0.19), p.gunmetal, segments=12, rings=6)
+        add_y_axis_tube(builder, f"ArachnidHexapodJoint_MidKneeAxle_{tag}",
+                        knee, 0.085, 0.42, p.wheel_rim, segments=12)
 
     # The antenna stays low and attached to the rear deck rather than floating
     # through the old turret stack.
@@ -175,6 +198,16 @@ def refine(builder):
         objects=builder.objects,
         materials={"armor": p.primary_armor, "gunmetal": p.gunmetal, "warning": p.warning, "tread": p.tread},
     ))
+
+    # Keep later shared detail waves from reintroducing hardware that has no
+    # host or motion system on this fixed-launcher chassis.
+    remove_objects(builder, lambda name: any(token in name for token in (
+        "ArachnidHexapodAccessHatch_",
+        "ArachnidHexapodArmor_TurretRingGuard_",
+        "ArachnidHexapodArmor_TrunnionBracket_",
+    )))
+
+    simplify_low_value_bevel_details(builder, max_dimension_m=0.60, angle_degrees=29.0)
 
     # Create canonical sockets now so the two mission-specific anchors can be
     # moved without duplicating the generator's authoritative hierarchy.
