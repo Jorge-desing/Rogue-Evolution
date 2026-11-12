@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -20,19 +21,70 @@ def _read_samples(path: Path) -> list[dict[str, object]]:
         value = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ModelBudgetError(f"cannot read calibration sample file: {path}") from exc
-    if isinstance(value, dict) and value.get("schema") == "rogue-command/runtime-geometry-sample/v3":
-        reports = [value]
+    evidence_context: dict[str, object] | None = None
+    if isinstance(value, dict) and value.get("schema") == "rogue-command/runtime-geometry-evidence/v1":
+        context = value.get("context")
+        references = value.get("reports")
+        if not isinstance(context, dict) or not isinstance(references, list) or not references:
+            raise ModelBudgetError(f"{path}: runtime evidence bundle needs context and report references")
+        scene_reference = context.get("sceneReference")
+        camera_reference = context.get("cameraReference")
+        if (not isinstance(scene_reference, dict) or not scene_reference.get("sceneId") or
+                scene_reference.get("unitySceneName") != "Game" or
+                not isinstance(camera_reference, dict) or not context.get("sceneMix")):
+            raise ModelBudgetError(f"{path}: evidence context must bind to a named Game scene, camera, and scene mix")
+        evidence_context = context
+        reports = []
+        bundle_root = path.parent.resolve()
+        for index, reference in enumerate(references):
+            if not isinstance(reference, dict):
+                raise ModelBudgetError(f"{path}: reports[{index}] must be an evidence reference object")
+            report_name = str(reference.get("reportPath", ""))
+            report_path = Path(report_name)
+            if not report_name or report_path.is_absolute() or ".." in report_path.parts:
+                raise ModelBudgetError(f"{path}: reports[{index}].reportPath must be a safe path relative to the bundle")
+            resolved = (bundle_root / report_path).resolve()
+            if resolved.parent != bundle_root:
+                raise ModelBudgetError(f"{path}: reports[{index}].reportPath must stay beside the evidence bundle")
+            try:
+                raw_bytes = resolved.read_bytes()
+                expected_sha = str(reference["sha256"]).lower()
+                actual_sha = hashlib.sha256(raw_bytes).hexdigest()
+                if expected_sha != actual_sha:
+                    raise ModelBudgetError(f"{path}: SHA-256 mismatch for {report_name}")
+                report = json.loads(raw_bytes.decode("utf-8-sig"))
+            except ModelBudgetError:
+                raise
+            except (OSError, KeyError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ModelBudgetError(f"{path}: cannot verify referenced runtime report {report_name}") from exc
+            if not isinstance(report, dict):
+                raise ModelBudgetError(f"{path}: referenced runtime report {report_name} must be an object")
+            reports.append((report, reference, report_name, actual_sha))
+    elif isinstance(value, dict) and value.get("schema") == "rogue-command/runtime-geometry-sample/v3":
+        reports = [(value, None, "", "")]
     elif isinstance(value, dict) and "reports" in value:
-        reports = value.get("reports")
-        if not isinstance(reports, list):
+        input_reports = value.get("reports")
+        if not isinstance(input_reports, list):
             raise ModelBudgetError("runtime capture input 'reports' must be an array")
+        reports = [(report, None, "", "") for report in input_reports]
     elif isinstance(value, list):
-        reports = value
+        reports = [(report, None, "", "") for report in value]
     else:
-        raise ModelBudgetError("calibration input must be a schema-v3 runtime report or a {reports: [...]} object")
-    if not reports or not all(isinstance(report, dict) for report in reports):
+        raise ModelBudgetError("calibration input must be a schema-v3 runtime report, {reports:[...]}, or a runtime evidence bundle")
+    if not reports or not all(isinstance(report, dict) for report, _, _, _ in reports):
         raise ModelBudgetError("runtime capture reports must be a nonempty array of objects")
-    rows = [_sample_from_runtime_capture(report, path) for report in reports]
+    rows: list[dict[str, object]] = []
+    for report, reference, report_name, report_sha in reports:
+        row = _sample_from_runtime_capture(report, path, evidence_context)
+        if reference is not None and evidence_context is not None:
+            row["measurementContext"] = evidence_context
+            row["evidenceReportPath"] = report_name
+            row["evidenceReportSha256"] = report_sha
+            row["captureGroup"] = str(reference.get("captureGroup", ""))
+            if isinstance(reference.get("entityCensus"), dict):
+                row["entityCensus"] = reference["entityCensus"]
+            row["evidenceNote"] = str(reference.get("evidenceNote", ""))
+        rows.append(row)
     capture_keys = {
         (
             row["scene"], row["camera"], row["pixelWidth"], row["pixelHeight"],
@@ -45,7 +97,11 @@ def _read_samples(path: Path) -> list[dict[str, object]]:
     return rows
 
 
-def _sample_from_runtime_capture(report: object, path: Path) -> dict[str, object]:
+def _sample_from_runtime_capture(
+    report: object,
+    path: Path,
+    evidence_context: dict[str, object] | None = None,
+) -> dict[str, object]:
     """Validate one complete, unpaused runtime capture and extract its fit row."""
     if not isinstance(report, dict) or report.get("schema") != "rogue-command/runtime-geometry-sample/v3":
         raise ModelBudgetError(f"{path}: runtime report schema must be rogue-command/runtime-geometry-sample/v3")
@@ -56,6 +112,8 @@ def _sample_from_runtime_capture(report: object, path: Path) -> dict[str, object
         raise ModelBudgetError(f"{path}: runtime report is missing capture, camera, or fitSample metadata")
     if report.get("status") != "complete" or sample.get("calibrationReady") is not True:
         raise ModelBudgetError(f"{path}: runtime capture is incomplete or not eligible for calibration")
+    if report.get("scene") != "Game":
+        raise ModelBudgetError(f"{path}: runtime captures from menus, intermissions, or other scenes cannot calibrate gameplay geometry")
     if not report.get("captureStartedUtc") or not report.get("unityVersion"):
         raise ModelBudgetError(f"{path}: runtime report must identify capture time and Unity version")
     if capture.get("frameIntervalMetric") != "UnityEngine.Time.unscaledDeltaTime" or capture.get("frameIntervalUnit") != "ms":
@@ -132,6 +190,45 @@ def _sample_from_runtime_capture(report: object, path: Path) -> dict[str, object
         raise ModelBudgetError(f"{path}: runtime geometry census must count at least one mesh renderer")
     if not isinstance(camera.get("orthographic"), bool):
         raise ModelBudgetError(f"{path}: camera projection mode is invalid")
+    if evidence_context is not None:
+        scene_reference = evidence_context.get("sceneReference")
+        camera_reference = evidence_context.get("cameraReference")
+        if not isinstance(scene_reference, dict) or scene_reference.get("unitySceneName") != report.get("scene"):
+            raise ModelBudgetError(f"{path}: runtime scene does not match the evidence bundle's sceneReference")
+        if not isinstance(camera_reference, dict):
+            raise ModelBudgetError(f"{path}: runtime evidence bundle has no cameraReference")
+        checks = {
+            "name": camera.get("name"),
+            "pixelWidth": pixel_width,
+            "pixelHeight": pixel_height,
+            "fieldOfView": field_of_view,
+            "orthographic": bool(camera["orthographic"]),
+            "orthographicSize": orthographic_size,
+            "aspect": camera_aspect,
+            "cullingMask": camera_culling_mask,
+            "position": list(camera_position),
+            "rotationEuler": list(camera_rotation),
+        }
+        for field, observed in checks.items():
+            expected = camera_reference.get(field)
+            if isinstance(observed, float):
+                try:
+                    matches = math.isclose(float(expected), observed, rel_tol=1e-7, abs_tol=1e-5)
+                except (TypeError, ValueError):
+                    matches = False
+            elif isinstance(observed, list):
+                try:
+                    values = [float(value) for value in expected]
+                    matches = len(values) == len(observed) and all(
+                        math.isclose(actual, target, rel_tol=1e-7, abs_tol=1e-5)
+                        for actual, target in zip(values, observed)
+                    )
+                except (TypeError, ValueError):
+                    matches = False
+            else:
+                matches = expected == observed
+            if not matches:
+                raise ModelBudgetError(f"{path}: runtime camera {field} does not match the evidence bundle reference")
     camera_settings = (
         field_of_view,
         bool(camera.get("orthographic")),
@@ -177,6 +274,18 @@ def compile_profile(profile_path: Path, samples_path: Path | None = None) -> dic
             description = str(calibration.get(field, "")).strip()
             if not description or description.lower().startswith(("pending", "unknown", "unverified")):
                 raise ModelBudgetError(f"profile calibration.{field} must be authored before runtime reports can be ingested")
+        contexts = [sample.get("measurementContext") for sample in samples]
+        if not all(isinstance(context, dict) for context in contexts):
+            raise ModelBudgetError("profile calibration requires a hashed runtime evidence bundle with an explicit scene and camera binding")
+        context = contexts[0]
+        if any(item != context for item in contexts[1:]):
+            raise ModelBudgetError("runtime reports must share one evidence context")
+        authored_scene = calibration.get("sceneReference")
+        measured_scene = context.get("sceneReference") if isinstance(context, dict) else None
+        if authored_scene is not None and authored_scene != measured_scene:
+            raise ModelBudgetError("runtime evidence sceneReference does not match the profile")
+        calibration["sceneReference"] = measured_scene
+        calibration["measurementContext"] = context
         calibration["samples"] = samples
     compiled = calibrate_profile(profile)
     return compiled
@@ -185,7 +294,7 @@ def compile_profile(profile_path: Path, samples_path: Path | None = None) -> dic
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, default=Path("content/source-art/model-budget-profile.json"))
-    parser.add_argument("--samples", type=Path, help="Complete schema-v3 runtime report or JSON object {reports:[report,...]}")
+    parser.add_argument("--samples", type=Path, help="Hashed runtime evidence bundle, schema-v3 report, or JSON object {reports:[report,...]}")
     parser.add_argument("--output", type=Path, required=True, help="Compiled profile JSON output path")
     args = parser.parse_args(argv)
     try:

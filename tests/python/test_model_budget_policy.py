@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -39,6 +40,30 @@ class ModelBudgetPolicyTests(unittest.TestCase):
             fit_triangle_capacity(
                 [FrameSample(0, 18), FrameSample(100, 19), FrameSample(200, 20)],
                 target_fps=60,
+            )
+
+    def test_measured_envelope_uses_a_reserved_observed_range_without_extrapolation(self):
+        result = fit_triangle_capacity(
+            [FrameSample(110_175, 12.093465), FrameSample(401_462, 12.1293), FrameSample(401_462, 12.1604)],
+            capacity_model={
+                "method": "conservative-measured-incremental-envelope-v1",
+                "reserveFraction": 0.25,
+            },
+        )
+        self.assertEqual(result["sceneTriangleCapacity"], 218_465)
+        self.assertEqual(result["capacityScope"], "incremental-asset-geometry-above-lowest-observed-load")
+        self.assertEqual(result["observedTriangleRange"], 291_287)
+        self.assertEqual(result["reservedTriangleHeadroom"], 72_822)
+        self.assertFalse(result["extrapolationUsed"])
+        self.assertEqual(result["fitMethod"], "conservative-measured-incremental-envelope-v1")
+
+        with self.assertRaisesRegex(ModelBudgetError, "exceed the 16.667 ms target"):
+            fit_triangle_capacity(
+                [FrameSample(100, 16.8), FrameSample(200, 16.7), FrameSample(300, 16.6)],
+                capacity_model={
+                    "method": "conservative-measured-incremental-envelope-v1",
+                    "reserveFraction": 0.25,
+                },
             )
 
     def test_runtime_capture_is_normalized_for_profile_calibration(self):
@@ -89,6 +114,51 @@ class ModelBudgetPolicyTests(unittest.TestCase):
         self.assertEqual(rows[0]["p95UnscaledFrameIntervalMs"], 13.5)
         self.assertEqual(rows[0]["measurementSource"], "runtime-model-budget-probe-v3")
         self.assertEqual(rows[0]["unityVersion"], "2021.3.45f2")
+
+        intermission = json.loads(json.dumps(report))
+        intermission["scene"] = "IntermissionScreen"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "intermission.json"
+            path.write_text(json.dumps(intermission), encoding="utf-8")
+            with self.assertRaisesRegex(ModelBudgetError, "menus, intermissions"):
+                _read_samples(path)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            bundle_dir = Path(temp_dir)
+            raw_path = bundle_dir / "capture.json"
+            raw_bytes = json.dumps(report).encode("utf-8")
+            raw_path.write_bytes(raw_bytes)
+            camera = report["camera"]
+            bundle = {
+                "schema": "rogue-command/runtime-geometry-evidence/v1",
+                "context": {
+                    "sceneReference": {
+                        "sceneId": "dense-gameplay", "unitySceneName": "Game", "level": 4,
+                    },
+                    "cameraReference": {
+                        "name": camera["name"], "pixelWidth": camera["pixelWidth"],
+                        "pixelHeight": camera["pixelHeight"], "fieldOfView": camera["fieldOfView"],
+                        "orthographic": camera["orthographic"], "orthographicSize": camera["orthographicSize"],
+                        "aspect": camera["aspect"], "cullingMask": camera["cullingMask"],
+                        "position": camera["position"], "rotationEuler": camera["rotationEuler"],
+                    },
+                    "sceneMix": "fixed gameplay scene with the measured vehicle mix",
+                    "capacityEligible": True,
+                },
+                "reports": [{
+                    "reportPath": "capture.json",
+                    "sha256": hashlib.sha256(raw_bytes).hexdigest(),
+                    "captureGroup": "fixed-mix",
+                }],
+            }
+            bundle_path = bundle_dir / "evidence.json"
+            bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
+            bundle_rows = _read_samples(bundle_path)
+            self.assertEqual(bundle_rows[0]["evidenceReportSha256"], hashlib.sha256(raw_bytes).hexdigest())
+            self.assertEqual(bundle_rows[0]["measurementContext"]["sceneReference"]["sceneId"], "dense-gameplay")
+            raw_path.write_bytes(raw_bytes + b" ")
+            with self.assertRaisesRegex(ModelBudgetError, "SHA-256 mismatch"):
+                _read_samples(bundle_path)
 
         different_view = json.loads(json.dumps(report))
         different_view["camera"]["position"][0] += 1.0
@@ -204,6 +274,41 @@ class ModelBudgetPolicyTests(unittest.TestCase):
         self.assertEqual(result["calibrationStatus"], "uncalibrated")
         self.assertIn("cameraReference and sceneMix are required", result["calibrationFailureReason"])
 
+    def test_uncontrolled_measured_envelope_is_retained_as_evidence_but_not_calibrated(self):
+        result = calibrate_profile({
+            "schemaVersion": 1,
+            "targetFps": 60,
+            "calibration": {
+                "resolutionWidth": 1920,
+                "resolutionHeight": 1080,
+                "cameraReference": "Main Camera21 / fixed 1920x1080 pose",
+                "sceneMix": "Level 4 boss scene with four measured vehicle types",
+                "maximumVisibleInstances": 12,
+                "capacityModel": {
+                    "method": "conservative-measured-incremental-envelope-v1",
+                    "reserveFraction": 0.25,
+                },
+                "measurementContext": {
+                    "capacityEligible": False,
+                    "capacityIneligibilityReason": "scene population changed between low and high loads",
+                },
+                "samples": [
+                    {"triangles": 110_175, "p95UnscaledFrameIntervalMs": 12.093465},
+                    {"triangles": 401_462, "p95UnscaledFrameIntervalMs": 12.1293},
+                    {"triangles": 401_462, "p95UnscaledFrameIntervalMs": 12.1604},
+                ],
+            },
+        })
+        self.assertEqual(result["calibrationStatus"], "uncalibrated")
+        self.assertEqual(result["calibrationFailureReason"], "scene population changed between low and high loads")
+        self.assertEqual(result["measurementCapacityEstimate"]["sceneTriangleCapacity"], 218_465)
+        self.assertNotIn("calibrationFit", result)
+        forced_calibrated = dict(result)
+        forced_calibrated["calibrationStatus"] = "calibrated"
+        from tools.model_budget_policy import build_budget_report
+        with self.assertRaisesRegex(ModelBudgetError, "evidence-only until their load pair is controlled"):
+            build_budget_report(forced_calibrated)
+
     def test_scene_allocation_obeys_aggregate_capacity_and_lod_order(self):
         report = allocate_scene_budgets(
             120_000,
@@ -299,6 +404,66 @@ class ModelBudgetPolicyTests(unittest.TestCase):
         }
         from tools.model_budget_policy import build_budget_report
         with self.assertRaisesRegex(ModelBudgetError, "rolePriority is required"):
+            build_budget_report(profile)
+
+    def test_scene_demands_cannot_exceed_the_profiled_visible_instance_total(self):
+        profile = {
+            "schemaVersion": 1,
+            "calibrationStatus": "calibrated",
+            "targetFps": 60,
+            "calibration": {
+                "resolutionWidth": 1920, "resolutionHeight": 1080,
+                "cameraReference": "dense RTS camera", "sceneMix": "mixed vehicles",
+                "maximumVisibleInstances": 1,
+                "samples": [
+                    {"triangles": 0, "p95UnscaledFrameIntervalMs": 8},
+                    {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 12},
+                    {"triangles": 200_000, "p95UnscaledFrameIntervalMs": 16},
+                ],
+            },
+            "scenes": [{"sceneId": "dense", "assets": [
+                {"assetId": "one", "sourceFaces": 100, "sourceTriangles": 200,
+                 "maxVisibleInstances": 1, "screenHeightFraction": 0.5,
+                 "rolePriority": 1.0, "lodScreenHeights": list(TEST_LOD_HEIGHTS)},
+                {"assetId": "two", "sourceFaces": 100, "sourceTriangles": 200,
+                 "maxVisibleInstances": 1, "screenHeightFraction": 0.5,
+                 "rolePriority": 1.0, "lodScreenHeights": list(TEST_LOD_HEIGHTS)},
+            ]}],
+        }
+        from tools.model_budget_policy import build_budget_report
+        with self.assertRaisesRegex(ModelBudgetError, "above calibration.maximumVisibleInstances"):
+            build_budget_report(profile)
+
+    def test_profile_demands_must_match_inventory_source_hash_and_geometry(self):
+        from tools.model_budget_policy import build_budget_report
+        profile = {
+            "schemaVersion": 1,
+            "calibrationStatus": "calibrated",
+            "targetFps": 60,
+            "calibration": {
+                "resolutionWidth": 1920, "resolutionHeight": 1080,
+                "cameraReference": "dense RTS camera", "sceneMix": "mixed vehicles",
+                "maximumVisibleInstances": 1,
+                "samples": [
+                    {"triangles": 0, "p95UnscaledFrameIntervalMs": 8},
+                    {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 12},
+                    {"triangles": 200_000, "p95UnscaledFrameIntervalMs": 16},
+                ],
+            },
+            "assetInventory": {"assets": [{
+                "assetId": "tank", "sourceFaces": 100, "sourceTriangles": 200,
+                "sha256": "a" * 64,
+            }]},
+            "scenes": [{"sceneId": "dense", "assets": [{
+                "assetId": "tank", "sourceFaces": 100, "sourceTriangles": 200,
+                "sourceSha256": "a" * 64,
+                "maxVisibleInstances": 1, "screenHeightFraction": 0.5,
+                "rolePriority": 1.0, "lodScreenHeights": list(TEST_LOD_HEIGHTS),
+            }]}],
+        }
+        self.assertTrue(build_budget_report(profile)["scenes"][0]["sceneBudgetPassed"])
+        profile["scenes"][0]["assets"][0]["sourceSha256"] = "b" * 64
+        with self.assertRaisesRegex(ModelBudgetError, "sourceSha256 does not match assetInventory"):
             build_budget_report(profile)
 
     def test_weighting_accounts_for_instance_count_screen_area_and_role(self):

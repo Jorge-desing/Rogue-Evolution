@@ -58,16 +58,57 @@ def _frame_samples(values: Iterable[Mapping[str, Any]]) -> list[FrameSample]:
 def fit_triangle_capacity(
     samples: Sequence[FrameSample],
     target_fps: float = DEFAULT_TARGET_FPS,
+    capacity_model: Mapping[str, Any] | None = None,
 ) -> dict[str, float | int]:
     """Fit p95 unscaled frame interval to triangle count and find scene capacity.
 
     At least three measurements with two distinct geometry loads are required.
-    A negative or flat slope is rejected rather than inventing a safe cap.
+    The default model fits a positive linear slope. An explicit measured-envelope
+    model instead bounds the incremental asset budget to a reserved fraction of
+    the observed load range and never extrapolates beyond measured triangles.
     """
     if not math.isfinite(target_fps) or target_fps <= 0.0:
         raise ModelBudgetError("targetFps must be finite and greater than zero")
     if len(samples) < 3 or len({sample.triangles for sample in samples}) < 2:
         raise ModelBudgetError("calibration needs at least three samples at two or more triangle loads")
+
+    if capacity_model is not None:
+        method = str(capacity_model.get("method", ""))
+        if method != "conservative-measured-incremental-envelope-v1":
+            raise ModelBudgetError(f"unsupported capacity model: {method or '<missing>'}")
+        try:
+            reserve_fraction = float(capacity_model["reserveFraction"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ModelBudgetError("measured-envelope capacity model needs reserveFraction") from exc
+        if not math.isfinite(reserve_fraction) or not 0.0 < reserve_fraction < 0.5:
+            raise ModelBudgetError("measured-envelope reserveFraction must be greater than 0 and less than 0.5")
+        target_frame_time_ms = 1000.0 / target_fps
+        if any(sample.p95_unscaled_frame_interval_ms > target_frame_time_ms for sample in samples):
+            raise ModelBudgetError(
+                f"measured samples exceed the {target_frame_time_ms:.3f} ms target; "
+                "a passing 60-FPS geometry envelope cannot be derived"
+            )
+        baseline_triangles = min(sample.triangles for sample in samples)
+        maximum_triangles = max(sample.triangles for sample in samples)
+        observed_increment = maximum_triangles - baseline_triangles
+        capacity = math.floor(observed_increment * (1.0 - reserve_fraction))
+        if baseline_triangles <= 0 or observed_increment <= 0 or capacity <= 0:
+            raise ModelBudgetError("measured-envelope samples need a positive baseline and load range")
+        return {
+            "targetFps": float(target_fps),
+            "targetFrameTimeMs": target_frame_time_ms,
+            "fitMethod": method,
+            "capacityScope": "incremental-asset-geometry-above-lowest-observed-load",
+            "observedBaselineTriangles": int(baseline_triangles),
+            "observedMaximumTriangles": int(maximum_triangles),
+            "observedTriangleRange": int(observed_increment),
+            "sceneTriangleCapacity": int(capacity),
+            "reservedTriangleHeadroom": int(observed_increment - capacity),
+            "safetyReserveFraction": reserve_fraction,
+            "maxMeasuredP95FrameIntervalMs": max(sample.p95_unscaled_frame_interval_ms for sample in samples),
+            "extrapolationUsed": False,
+            "estimateStatus": "measured-envelope-candidate",
+        }
 
     x_mean = sum(sample.triangles for sample in samples) / len(samples)
     y_mean = sum(sample.p95_unscaled_frame_interval_ms for sample in samples) / len(samples)
@@ -268,7 +309,7 @@ def build_budget_report(profile: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(calibration, Mapping):
         raise ModelBudgetError("calibration object is required")
     samples = _frame_samples(calibration.get("samples", []))
-    fit = fit_triangle_capacity(samples, target_fps)
+    fit = fit_triangle_capacity(samples, target_fps, calibration.get("capacityModel"))
     if int(calibration.get("resolutionWidth", 0)) <= 0 or int(calibration.get("resolutionHeight", 0)) <= 0:
         raise ModelBudgetError("calibration resolution must be positive")
     camera_reference = str(calibration.get("cameraReference", "")).strip()
@@ -279,6 +320,24 @@ def build_budget_report(profile: Mapping[str, Any]) -> dict[str, Any]:
         raise ModelBudgetError("calibration.sceneMix must describe the benchmark scene")
     if int(calibration.get("maximumVisibleInstances", 0)) <= 0:
         raise ModelBudgetError("calibration.maximumVisibleInstances must be positive")
+    capacity_model = calibration.get("capacityModel")
+    measurement_context = calibration.get("measurementContext")
+    if (isinstance(capacity_model, Mapping) and
+            capacity_model.get("method") == "conservative-measured-incremental-envelope-v1" and
+            (not isinstance(measurement_context, Mapping) or measurement_context.get("capacityEligible") is not True)):
+        raise ModelBudgetError("measured-envelope samples are evidence-only until their load pair is controlled")
+    if isinstance(capacity_model, Mapping) and capacity_model.get("method") == "conservative-measured-incremental-envelope-v1":
+        scene_reference = calibration.get("sceneReference")
+        if (not isinstance(scene_reference, Mapping) or scene_reference.get("unitySceneName") != "Game" or
+                measurement_context.get("sceneReference") != scene_reference):
+            raise ModelBudgetError("calibration.sceneReference must match the bound runtime evidence context")
+        for index, sample in enumerate(calibration.get("samples", [])):
+            if not isinstance(sample, Mapping) or sample.get("measurementContext") != measurement_context:
+                raise ModelBudgetError(f"calibration.samples[{index}] is not bound to the profile measurement context")
+            if (sample.get("scene") != "Game" or
+                    int(sample.get("pixelWidth", 0)) != int(calibration.get("resolutionWidth", 0)) or
+                    int(sample.get("pixelHeight", 0)) != int(calibration.get("resolutionHeight", 0))):
+                raise ModelBudgetError(f"calibration.samples[{index}] scene or resolution differs from the profile")
     scenes = profile.get("scenes")
     if not isinstance(scenes, Sequence) or isinstance(scenes, (str, bytes)) or not scenes:
         raise ModelBudgetError("profile must contain at least one scene")
@@ -287,6 +346,14 @@ def build_budget_report(profile: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(scene, Mapping) or not scene.get("sceneId"):
             raise ModelBudgetError("each scene requires sceneId")
         demands: list[AssetDemand] = []
+        demand_instance_total = 0
+        inventory = profile.get("assetInventory")
+        inventory_rows = inventory.get("assets") if isinstance(inventory, Mapping) else None
+        inventory_by_id = (
+            {str(row.get("assetId")): row for row in inventory_rows if isinstance(row, Mapping)}
+            if isinstance(inventory_rows, Sequence) and not isinstance(inventory_rows, (str, bytes))
+            else None
+        )
         for item in scene.get("assets", []):
             if not isinstance(item, Mapping):
                 raise ModelBudgetError(f"{scene['sceneId']}: asset entries must be objects")
@@ -297,8 +364,21 @@ def build_budget_report(profile: Mapping[str, Any]) -> dict[str, Any]:
             thresholds = item.get("lodScreenHeights")
             if not isinstance(thresholds, Sequence) or isinstance(thresholds, (str, bytes)):
                 raise ModelBudgetError(f"{scene['sceneId']}/{item.get('assetId', '<unknown>')}: lodScreenHeights are required")
+            asset_id = str(item.get("assetId", ""))
+            if inventory_by_id is not None:
+                source = inventory_by_id.get(asset_id)
+                if source is None:
+                    raise ModelBudgetError(f"{scene['sceneId']}/{asset_id}: asset demand is absent from assetInventory")
+                for demand_key in ("sourceFaces", "sourceTriangles"):
+                    if int(item.get(demand_key, 0)) != int(source.get(demand_key, 0)):
+                        raise ModelBudgetError(f"{scene['sceneId']}/{asset_id}: {demand_key} does not match assetInventory")
+                expected_sha = str(source.get("sha256", "")).lower()
+                demanded_sha = str(item.get("sourceSha256", "")).lower()
+                if not expected_sha or demanded_sha != expected_sha:
+                    raise ModelBudgetError(f"{scene['sceneId']}/{asset_id}: sourceSha256 does not match assetInventory")
+            demand_instance_total += int(item.get("maxVisibleInstances", 0))
             demands.append(AssetDemand(
-                asset_id=str(item.get("assetId", "")),
+                asset_id=asset_id,
                 source_faces=int(item.get("sourceFaces", 0)),
                 source_triangles=int(item.get("sourceTriangles", 0)),
                 max_visible_instances=int(item.get("maxVisibleInstances", 0)),
@@ -306,6 +386,11 @@ def build_budget_report(profile: Mapping[str, Any]) -> dict[str, Any]:
                 role_priority=float(item["rolePriority"]),
                 lod_screen_heights=tuple(float(value) for value in thresholds),
             ))
+        if demand_instance_total > int(calibration.get("maximumVisibleInstances", 0)):
+            raise ModelBudgetError(
+                f"{scene['sceneId']}: asset demands total {demand_instance_total} visible instances, "
+                "above calibration.maximumVisibleInstances"
+            )
         scene_report = allocate_scene_budgets(int(fit["sceneTriangleCapacity"]), demands)
         scene_report["sceneId"] = str(scene["sceneId"])
         reports.append(scene_report)
@@ -420,6 +505,8 @@ def resolve_asset_budget(
 def calibrate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
     """Fit the profile samples and return an explicit calibrated or uncalibrated state."""
     result = dict(profile)
+    result.pop("calibrationFit", None)
+    result.pop("measurementCapacityEstimate", None)
     try:
         result["targetFps"] = float(profile.get("targetFps", DEFAULT_TARGET_FPS))
     except (TypeError, ValueError):
@@ -441,7 +528,12 @@ def calibrate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
         result.pop("calibrationFit", None)
         return result
     try:
-        fit = fit_triangle_capacity(_frame_samples(calibration.get("samples", [])), result["targetFps"])
+        fit = fit_triangle_capacity(
+            _frame_samples(calibration.get("samples", [])),
+            result["targetFps"],
+            calibration.get("capacityModel"),
+        )
+        result["measurementCapacityEstimate"] = fit
         if int(calibration.get("resolutionWidth", 0)) <= 0 or int(calibration.get("resolutionHeight", 0)) <= 0:
             raise ModelBudgetError("calibration resolution must be positive")
         camera_reference = str(calibration.get("cameraReference", "")).strip()
@@ -452,10 +544,22 @@ def calibrate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
             raise ModelBudgetError("cameraReference and sceneMix are required")
         if int(calibration.get("maximumVisibleInstances", 0)) <= 0:
             raise ModelBudgetError("maximumVisibleInstances must be positive")
+        capacity_model = calibration.get("capacityModel")
+        if (isinstance(capacity_model, Mapping) and
+                capacity_model.get("method") == "conservative-measured-incremental-envelope-v1"):
+            context = calibration.get("measurementContext")
+            if not isinstance(context, Mapping):
+                raise ModelBudgetError("measured-envelope capacity requires a runtime measurementContext")
+            if context.get("capacityEligible") is not True:
+                result["calibrationStatus"] = "uncalibrated"
+                result["calibrationFailureReason"] = str(
+                    context.get("capacityIneligibilityReason")
+                    or "measured-envelope samples are evidence-only until their load pair is controlled"
+                )
+                return result
     except (ModelBudgetError, TypeError, ValueError) as exc:
         result["calibrationStatus"] = "uncalibrated"
         result["calibrationFailureReason"] = str(exc)
-        result.pop("calibrationFit", None)
         return result
     result["calibrationStatus"] = "calibrated"
     result.pop("calibrationFailureReason", None)

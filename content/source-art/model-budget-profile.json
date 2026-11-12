@@ -2,7 +2,6 @@
   "schemaVersion": 1,
   "profileId": "rogue-command-local-pc-dense-rts-60fps",
   "calibrationStatus": "uncalibrated",
-  "calibrationFailureReason": "No complete unpaused schema-v2 runtime captures or authored dense-scene demands are available. The paused probe verification is not eligible for calibration.",
   "targetFps": 60.0,
   "targetFrameTimeMs": 16.666666666666668,
   "hardware": {
@@ -12,17 +11,387 @@
   "calibration": {
     "resolutionWidth": 1920,
     "resolutionHeight": 1080,
-    "cameraReference": "pending: paused in-game RTS camera and zoom must be measured",
-    "sceneMix": "pending: dense mixed vehicle, heavy unit, module, and structure scene",
-    "maximumVisibleInstances": 0,
-    "samples": [],
+    "cameraReference": "Main Camera21, 1920x1080, display-backed perspective Game camera; position (-180.495209,147.800003,234.495285), rotation (48.000004,135,0), FOV 26.231289.",
+    "sceneMix": "Level 4 boss gameplay, Default mode, stage 0 (StageParameters_Pools_Level4), plus 12 temporary diagnostic units across Bulwark, Gravitas Breaker, Arachnid Hexapod, and Command Relay; see hashed runtime evidence context for changing AI population.",
+    "maximumVisibleInstances": 12,
+    "samples": [
+      {
+        "triangles": 110175,
+        "p95UnscaledFrameIntervalMs": 12.093465,
+        "captureStartedUtc": "2026-11-12T03:17:55.4469807Z",
+        "scene": "Game",
+        "camera": "Main Camera21",
+        "cameraSettings": [
+          26.231289,
+          false,
+          42.0,
+          1.777778,
+          6025015,
+          "Game",
+          false,
+          [
+            -180.495209,
+            147.800003,
+            234.495285
+          ],
+          [
+            48.000004,
+            135.0,
+            0.0
+          ]
+        ],
+        "pixelWidth": 1920,
+        "pixelHeight": 1080,
+        "unityVersion": "2021.3.45f2",
+        "timeScaleAtStart": 1.0,
+        "sampleCount": 120,
+        "measurementSource": "runtime-model-budget-probe-v3",
+        "measurementContext": {
+          "sceneReference": {
+            "sceneId": "level4-boss-default-1920x1080",
+            "unitySceneName": "Game",
+            "level": 4,
+            "stageIndex": 0,
+            "stageParametersId": "StageParameters_Pools_Level4",
+            "mode": "Default"
+          },
+          "cameraReference": {
+            "name": "Main Camera21",
+            "pixelWidth": 1920,
+            "pixelHeight": 1080,
+            "fieldOfView": 26.231289,
+            "orthographic": false,
+            "orthographicSize": 42,
+            "aspect": 1.777778,
+            "cullingMask": 6025015,
+            "position": [
+              -180.495209,
+              147.800003,
+              234.495285
+            ],
+            "rotationEuler": [
+              48.000004,
+              135,
+              0
+            ]
+          },
+          "sceneMix": "Level 4 boss gameplay in Default mode; observed existing battlefield plus 12 temporary diagnostic units (3 each Bulwark, Gravitas Breaker, Arachnid Hexapod, Command Relay), native AI units and AI buildings; camera 1920x1080.",
+          "maximumVisibleInstances": 12,
+          "capacityEligible": false,
+          "capacityIneligibilityReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+          "capturePairing": {
+            "status": "uncontrolled-population-change",
+            "lowLoadEntityCensus": {
+              "total": 15,
+              "player": 1,
+              "aiUnits": 5,
+              "aiBuildings": 9
+            },
+            "highLoadEntityCensus": {
+              "total": 35,
+              "player": 13,
+              "aiUnits": 12,
+              "aiBuildings": 10,
+              "diagnosticPlayerUnits": 12
+            },
+            "diagnosticUnitMix": {
+              "tactical-operations:bulwark-siege-tank": 3,
+              "tactical-operations:gravitas-breaker": 3,
+              "sample-native:arachnid-hexapod": 3,
+              "tactical-operations:command-relay": 3
+            }
+          },
+          "limitation": "Frame intervals are realized Unity pacing. Frustum triangles exclude occlusion, particles, terrain-specific paths, shadows and GPU-instanced draws; no CPU/GPU timing is collected."
+        },
+        "evidenceReportPath": "level4-stable-low-01.json",
+        "evidenceReportSha256": "a6712f8accca9b52ad17f98a7fbf8318eedfc1da36366f65253940e3e44b8d2f",
+        "captureGroup": "low-load",
+        "entityCensus": {
+          "total": 15,
+          "player": 1,
+          "aiUnits": 5,
+          "aiBuildings": 9
+        },
+        "evidenceNote": "Original schema-v3 report verified by SHA-256; context recorded independently from runtime census."
+      },
+      {
+        "triangles": 401462,
+        "p95UnscaledFrameIntervalMs": 12.1293,
+        "captureStartedUtc": "2026-11-12T03:23:59.7374260Z",
+        "scene": "Game",
+        "camera": "Main Camera21",
+        "cameraSettings": [
+          26.231289,
+          false,
+          42.0,
+          1.777778,
+          6025015,
+          "Game",
+          false,
+          [
+            -180.495209,
+            147.800003,
+            234.495285
+          ],
+          [
+            48.000004,
+            135.0,
+            0.0
+          ]
+        ],
+        "pixelWidth": 1920,
+        "pixelHeight": 1080,
+        "unityVersion": "2021.3.45f2",
+        "timeScaleAtStart": 1.0,
+        "sampleCount": 120,
+        "measurementSource": "runtime-model-budget-probe-v3",
+        "measurementContext": {
+          "sceneReference": {
+            "sceneId": "level4-boss-default-1920x1080",
+            "unitySceneName": "Game",
+            "level": 4,
+            "stageIndex": 0,
+            "stageParametersId": "StageParameters_Pools_Level4",
+            "mode": "Default"
+          },
+          "cameraReference": {
+            "name": "Main Camera21",
+            "pixelWidth": 1920,
+            "pixelHeight": 1080,
+            "fieldOfView": 26.231289,
+            "orthographic": false,
+            "orthographicSize": 42,
+            "aspect": 1.777778,
+            "cullingMask": 6025015,
+            "position": [
+              -180.495209,
+              147.800003,
+              234.495285
+            ],
+            "rotationEuler": [
+              48.000004,
+              135,
+              0
+            ]
+          },
+          "sceneMix": "Level 4 boss gameplay in Default mode; observed existing battlefield plus 12 temporary diagnostic units (3 each Bulwark, Gravitas Breaker, Arachnid Hexapod, Command Relay), native AI units and AI buildings; camera 1920x1080.",
+          "maximumVisibleInstances": 12,
+          "capacityEligible": false,
+          "capacityIneligibilityReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+          "capturePairing": {
+            "status": "uncontrolled-population-change",
+            "lowLoadEntityCensus": {
+              "total": 15,
+              "player": 1,
+              "aiUnits": 5,
+              "aiBuildings": 9
+            },
+            "highLoadEntityCensus": {
+              "total": 35,
+              "player": 13,
+              "aiUnits": 12,
+              "aiBuildings": 10,
+              "diagnosticPlayerUnits": 12
+            },
+            "diagnosticUnitMix": {
+              "tactical-operations:bulwark-siege-tank": 3,
+              "tactical-operations:gravitas-breaker": 3,
+              "sample-native:arachnid-hexapod": 3,
+              "tactical-operations:command-relay": 3
+            }
+          },
+          "limitation": "Frame intervals are realized Unity pacing. Frustum triangles exclude occlusion, particles, terrain-specific paths, shadows and GPU-instanced draws; no CPU/GPU timing is collected."
+        },
+        "evidenceReportPath": "level4-stable-high-01.json",
+        "evidenceReportSha256": "615a70455c7b055e1fde4971a954bd39b3ab3ae1d33e76f3410f8b031060ae2a",
+        "captureGroup": "high-load-repeat",
+        "entityCensus": {
+          "total": 35,
+          "player": 13,
+          "aiUnits": 12,
+          "aiBuildings": 10,
+          "diagnosticPlayerUnits": 12
+        },
+        "evidenceNote": "Original schema-v3 report verified by SHA-256; context recorded independently from runtime census."
+      },
+      {
+        "triangles": 401462,
+        "p95UnscaledFrameIntervalMs": 12.1604,
+        "captureStartedUtc": "2026-11-12T03:25:06.0549713Z",
+        "scene": "Game",
+        "camera": "Main Camera21",
+        "cameraSettings": [
+          26.231289,
+          false,
+          42.0,
+          1.777778,
+          6025015,
+          "Game",
+          false,
+          [
+            -180.495209,
+            147.800003,
+            234.495285
+          ],
+          [
+            48.000004,
+            135.0,
+            0.0
+          ]
+        ],
+        "pixelWidth": 1920,
+        "pixelHeight": 1080,
+        "unityVersion": "2021.3.45f2",
+        "timeScaleAtStart": 1.0,
+        "sampleCount": 120,
+        "measurementSource": "runtime-model-budget-probe-v3",
+        "measurementContext": {
+          "sceneReference": {
+            "sceneId": "level4-boss-default-1920x1080",
+            "unitySceneName": "Game",
+            "level": 4,
+            "stageIndex": 0,
+            "stageParametersId": "StageParameters_Pools_Level4",
+            "mode": "Default"
+          },
+          "cameraReference": {
+            "name": "Main Camera21",
+            "pixelWidth": 1920,
+            "pixelHeight": 1080,
+            "fieldOfView": 26.231289,
+            "orthographic": false,
+            "orthographicSize": 42,
+            "aspect": 1.777778,
+            "cullingMask": 6025015,
+            "position": [
+              -180.495209,
+              147.800003,
+              234.495285
+            ],
+            "rotationEuler": [
+              48.000004,
+              135,
+              0
+            ]
+          },
+          "sceneMix": "Level 4 boss gameplay in Default mode; observed existing battlefield plus 12 temporary diagnostic units (3 each Bulwark, Gravitas Breaker, Arachnid Hexapod, Command Relay), native AI units and AI buildings; camera 1920x1080.",
+          "maximumVisibleInstances": 12,
+          "capacityEligible": false,
+          "capacityIneligibilityReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+          "capturePairing": {
+            "status": "uncontrolled-population-change",
+            "lowLoadEntityCensus": {
+              "total": 15,
+              "player": 1,
+              "aiUnits": 5,
+              "aiBuildings": 9
+            },
+            "highLoadEntityCensus": {
+              "total": 35,
+              "player": 13,
+              "aiUnits": 12,
+              "aiBuildings": 10,
+              "diagnosticPlayerUnits": 12
+            },
+            "diagnosticUnitMix": {
+              "tactical-operations:bulwark-siege-tank": 3,
+              "tactical-operations:gravitas-breaker": 3,
+              "sample-native:arachnid-hexapod": 3,
+              "tactical-operations:command-relay": 3
+            }
+          },
+          "limitation": "Frame intervals are realized Unity pacing. Frustum triangles exclude occlusion, particles, terrain-specific paths, shadows and GPU-instanced draws; no CPU/GPU timing is collected."
+        },
+        "evidenceReportPath": "level4-stable-high-02.json",
+        "evidenceReportSha256": "f99800359fed9ee8019c1521128366c41d47c8cc1dbba4c9f05ac68cc71255bc",
+        "captureGroup": "high-load-repeat",
+        "entityCensus": {
+          "total": 35,
+          "player": 13,
+          "aiUnits": 12,
+          "aiBuildings": 10,
+          "diagnosticPlayerUnits": 12
+        },
+        "evidenceNote": "Original schema-v3 report verified by SHA-256; context recorded independently from runtime census."
+      }
+    ],
     "minimumSamples": 3,
     "sampleMetric": "p95 UnityEngine.Time.unscaledDeltaTime interval in ms, paired with a one-time camera-frustum mesh triangle count; realized frame pacing, not a CPU/GPU breakdown",
-    "geometryMetric": "enabled MeshRenderer and SkinnedMeshRenderer sharedMesh triangles intersecting the reference camera frustum; excludes occlusion, particles, terrain-specific paths, shadows, and GPU-instanced draws"
+    "geometryMetric": "enabled MeshRenderer and SkinnedMeshRenderer sharedMesh triangles intersecting the reference camera frustum; excludes occlusion, particles, terrain-specific paths, shadows, and GPU-instanced draws",
+    "sceneReference": {
+      "sceneId": "level4-boss-default-1920x1080",
+      "unitySceneName": "Game",
+      "level": 4,
+      "stageIndex": 0,
+      "stageParametersId": "StageParameters_Pools_Level4",
+      "mode": "Default"
+    },
+    "measurementContext": {
+      "sceneReference": {
+        "sceneId": "level4-boss-default-1920x1080",
+        "unitySceneName": "Game",
+        "level": 4,
+        "stageIndex": 0,
+        "stageParametersId": "StageParameters_Pools_Level4",
+        "mode": "Default"
+      },
+      "cameraReference": {
+        "name": "Main Camera21",
+        "pixelWidth": 1920,
+        "pixelHeight": 1080,
+        "fieldOfView": 26.231289,
+        "orthographic": false,
+        "orthographicSize": 42,
+        "aspect": 1.777778,
+        "cullingMask": 6025015,
+        "position": [
+          -180.495209,
+          147.800003,
+          234.495285
+        ],
+        "rotationEuler": [
+          48.000004,
+          135,
+          0
+        ]
+      },
+      "sceneMix": "Level 4 boss gameplay in Default mode; observed existing battlefield plus 12 temporary diagnostic units (3 each Bulwark, Gravitas Breaker, Arachnid Hexapod, Command Relay), native AI units and AI buildings; camera 1920x1080.",
+      "maximumVisibleInstances": 12,
+      "capacityEligible": false,
+      "capacityIneligibilityReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+      "capturePairing": {
+        "status": "uncontrolled-population-change",
+        "lowLoadEntityCensus": {
+          "total": 15,
+          "player": 1,
+          "aiUnits": 5,
+          "aiBuildings": 9
+        },
+        "highLoadEntityCensus": {
+          "total": 35,
+          "player": 13,
+          "aiUnits": 12,
+          "aiBuildings": 10,
+          "diagnosticPlayerUnits": 12
+        },
+        "diagnosticUnitMix": {
+          "tactical-operations:bulwark-siege-tank": 3,
+          "tactical-operations:gravitas-breaker": 3,
+          "sample-native:arachnid-hexapod": 3,
+          "tactical-operations:command-relay": 3
+        }
+      },
+      "limitation": "Frame intervals are realized Unity pacing. Frustum triangles exclude occlusion, particles, terrain-specific paths, shadows and GPU-instanced draws; no CPU/GPU timing is collected."
+    },
+    "capacityModel": {
+      "method": "conservative-measured-incremental-envelope-v1",
+      "reserveFraction": 0.25,
+      "description": "75% of the measured low-to-high frustum-triangle range; no frame-time slope extrapolation. Candidate only until the load populations are controlled."
+    }
   },
   "scenes": [],
   "assetInventory": {
-    "capturedUtc": "2026-11-11T07:20:32.907926+00:00",
+    "capturedUtc": "2026-11-11T00:20:32.907926-07:00",
     "method": "Blender 4.5.14 FBX import; source polygon faces and triangulated Unity geometry counted separately",
     "tool": "tools/inspect_fbx_geometry.py",
     "fileCount": 61,
@@ -638,5 +1007,21 @@
         "sha256": "1aa3fe523ad53aeb3909607a61b80b7ab66f7f8f7e6b42e83c0834ca892bae7c"
       }
     ]
+  },
+  "calibrationFailureReason": "Low- and high-load captures were taken at the same scene/camera but entity composition changed independently: 15 entities (1 player, 5 AI units, 9 AI buildings) at low load versus 35 (13 player including 12 diagnostic units, 12 AI units, 10 AI buildings) at high load. The triangle delta is therefore evidence only, not a controlled geometry-only capacity pair.",
+  "measurementCapacityEstimate": {
+    "targetFps": 60.0,
+    "targetFrameTimeMs": 16.666666666666668,
+    "fitMethod": "conservative-measured-incremental-envelope-v1",
+    "capacityScope": "incremental-asset-geometry-above-lowest-observed-load",
+    "observedBaselineTriangles": 110175,
+    "observedMaximumTriangles": 401462,
+    "observedTriangleRange": 291287,
+    "sceneTriangleCapacity": 218465,
+    "reservedTriangleHeadroom": 72822,
+    "safetyReserveFraction": 0.25,
+    "maxMeasuredP95FrameIntervalMs": 12.1604,
+    "extrapolationUsed": false,
+    "estimateStatus": "measured-envelope-candidate"
   }
 }
