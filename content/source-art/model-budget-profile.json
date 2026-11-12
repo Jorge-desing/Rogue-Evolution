@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "profileId": "rogue-command-local-pc-dense-rts-60fps",
   "calibrationStatus": "uncalibrated",
-  "calibrationFailureReason": "No dense gameplay frame-time samples or per-frame visible-triangle counts were captured. The profile remains gated until a repeatable in-game scene measurement is available.",
+  "calibrationFailureReason": "No complete unpaused schema-v2 runtime captures or authored dense-scene demands are available. The paused probe verification is not eligible for calibration.",
   "targetFps": 60.0,
   "targetFrameTimeMs": 16.666666666666668,
   "hardware": {
@@ -17,7 +17,8 @@
     "maximumVisibleInstances": 0,
     "samples": [],
     "minimumSamples": 3,
-    "sampleMetric": "p95 of the maximum of CPU frame time and GPU frame time, paired with visible triangles rendered by the active game camera"
+    "sampleMetric": "p95 UnityEngine.Time.unscaledDeltaTime interval in ms, paired with a one-time camera-frustum mesh triangle count; realized frame pacing, not a CPU/GPU breakdown",
+    "geometryMetric": "enabled MeshRenderer and SkinnedMeshRenderer sharedMesh triangles intersecting the reference camera frustum; excludes occlusion, particles, terrain-specific paths, shadows, and GPU-instanced draws"
   },
   "scenes": [],
   "assetInventory": {

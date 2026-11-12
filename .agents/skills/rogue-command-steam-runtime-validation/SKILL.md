@@ -115,6 +115,7 @@ python tools/runtime_profile_checkpoint.py verify `
 | **Sub-screen Actions** | `diagnostics_get_intermission_reward_state` currency readback | Assuming default player balances |
 | **Level Transition** | Node selection + `LoadLevel()` + `LoadingHider` **INICIAR** click | Level count text change alone |
 | **Tactical AI** | Profile tick trace, evaluated candidate, dispatched bounded order | Attaching profile without trace |
+| **Geometry calibration** | At least three complete schema-v2 probe reports from one scene, camera pose, Unity version, and resolution, captured unpaused over at least 120 rendered frames each; the ingester fits p95 unscaled frame intervals against camera-frustum mesh triangles, and the profile declares matching resolution and complete demands | Paused captures, single captures, mixed camera/viewpoint reports, loader's one-frame census, or estimates presented as CPU/GPU timing |
 
 ---
 

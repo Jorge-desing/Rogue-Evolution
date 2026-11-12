@@ -1,7 +1,7 @@
 """Performance-calibrated model triangle and face budgets.
 
 The policy deliberately has no per-asset face ceiling.  It derives one scene
-triangle capacity from measured frame-time samples, then distributes that
+triangle capacity from measured unscaled frame-interval samples, then distributes that
 capacity across the scene's visible assets and LODs.  Blender face counts are
 reported separately because Unity renders triangulated meshes.
 """
@@ -27,7 +27,7 @@ class ModelBudgetError(ValueError):
 @dataclass(frozen=True)
 class FrameSample:
     triangles: int
-    p95_frame_time_ms: float
+    p95_unscaled_frame_interval_ms: float
 
 
 @dataclass(frozen=True)
@@ -46,12 +46,12 @@ def _frame_samples(values: Iterable[Mapping[str, Any]]) -> list[FrameSample]:
     for index, item in enumerate(values):
         try:
             triangles = int(item["triangles"])
-            frame_time = float(item["p95FrameTimeMs"])
+            frame_interval = float(item["p95UnscaledFrameIntervalMs"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ModelBudgetError(f"calibrationSamples[{index}] is invalid") from exc
-        if triangles < 0 or not math.isfinite(frame_time) or frame_time <= 0.0:
-            raise ModelBudgetError(f"calibrationSamples[{index}] must have nonnegative triangles and positive p95 time")
-        samples.append(FrameSample(triangles, frame_time))
+        if triangles < 0 or not math.isfinite(frame_interval) or frame_interval <= 0.0:
+            raise ModelBudgetError(f"calibrationSamples[{index}] must have nonnegative triangles and positive p95 frame interval")
+        samples.append(FrameSample(triangles, frame_interval))
     return samples
 
 
@@ -59,7 +59,7 @@ def fit_triangle_capacity(
     samples: Sequence[FrameSample],
     target_fps: float = DEFAULT_TARGET_FPS,
 ) -> dict[str, float | int]:
-    """Fit p95 frame time to triangle count and find the 60-FPS scene capacity.
+    """Fit p95 unscaled frame interval to triangle count and find scene capacity.
 
     At least three measurements with two distinct geometry loads are required.
     A negative or flat slope is rejected rather than inventing a safe cap.
@@ -70,9 +70,9 @@ def fit_triangle_capacity(
         raise ModelBudgetError("calibration needs at least three samples at two or more triangle loads")
 
     x_mean = sum(sample.triangles for sample in samples) / len(samples)
-    y_mean = sum(sample.p95_frame_time_ms for sample in samples) / len(samples)
+    y_mean = sum(sample.p95_unscaled_frame_interval_ms for sample in samples) / len(samples)
     covariance = sum(
-        (sample.triangles - x_mean) * (sample.p95_frame_time_ms - y_mean)
+        (sample.triangles - x_mean) * (sample.p95_unscaled_frame_interval_ms - y_mean)
         for sample in samples
     )
     variance = sum((sample.triangles - x_mean) ** 2 for sample in samples)
@@ -81,7 +81,7 @@ def fit_triangle_capacity(
     slope = covariance / variance
     intercept = y_mean - slope * x_mean
     if not math.isfinite(slope) or slope <= 0.0 or not math.isfinite(intercept):
-        raise ModelBudgetError("frame-time samples do not show a positive geometry cost")
+        raise ModelBudgetError("frame-interval samples do not show a positive geometry cost")
 
     target_frame_time_ms = 1000.0 / target_fps
     if intercept >= target_frame_time_ms:
@@ -91,11 +91,11 @@ def fit_triangle_capacity(
         )
     capacity = math.floor((target_frame_time_ms - intercept) / slope)
     if capacity <= 0:
-        raise ModelBudgetError("measured frame-time headroom yields no positive triangle capacity")
+        raise ModelBudgetError("measured frame-interval headroom yields no positive triangle capacity")
     return {
         "targetFps": float(target_fps),
         "targetFrameTimeMs": target_frame_time_ms,
-        "baselineFrameTimeMs": intercept,
+        "baselineFrameIntervalMs": intercept,
         "millisecondsPerTriangle": slope,
         "sceneTriangleCapacity": int(capacity),
     }
@@ -271,9 +271,11 @@ def build_budget_report(profile: Mapping[str, Any]) -> dict[str, Any]:
     fit = fit_triangle_capacity(samples, target_fps)
     if int(calibration.get("resolutionWidth", 0)) <= 0 or int(calibration.get("resolutionHeight", 0)) <= 0:
         raise ModelBudgetError("calibration resolution must be positive")
-    if not str(calibration.get("cameraReference", "")).strip():
+    camera_reference = str(calibration.get("cameraReference", "")).strip()
+    if not camera_reference or camera_reference.lower().startswith(("pending", "unknown", "unverified")):
         raise ModelBudgetError("calibration.cameraReference must identify the reference camera")
-    if not str(calibration.get("sceneMix", "")).strip():
+    scene_mix = str(calibration.get("sceneMix", "")).strip()
+    if not scene_mix or scene_mix.lower().startswith(("pending", "unknown", "unverified")):
         raise ModelBudgetError("calibration.sceneMix must describe the benchmark scene")
     if int(calibration.get("maximumVisibleInstances", 0)) <= 0:
         raise ModelBudgetError("calibration.maximumVisibleInstances must be positive")
@@ -442,7 +444,11 @@ def calibrate_profile(profile: Mapping[str, Any]) -> dict[str, Any]:
         fit = fit_triangle_capacity(_frame_samples(calibration.get("samples", [])), result["targetFps"])
         if int(calibration.get("resolutionWidth", 0)) <= 0 or int(calibration.get("resolutionHeight", 0)) <= 0:
             raise ModelBudgetError("calibration resolution must be positive")
-        if not str(calibration.get("cameraReference", "")).strip() or not str(calibration.get("sceneMix", "")).strip():
+        camera_reference = str(calibration.get("cameraReference", "")).strip()
+        scene_mix = str(calibration.get("sceneMix", "")).strip()
+        if (not camera_reference or not scene_mix or
+                camera_reference.lower().startswith(("pending", "unknown", "unverified")) or
+                scene_mix.lower().startswith(("pending", "unknown", "unverified"))):
             raise ModelBudgetError("cameraReference and sceneMix are required")
         if int(calibration.get("maximumVisibleInstances", 0)) <= 0:
             raise ModelBudgetError("maximumVisibleInstances must be positive")

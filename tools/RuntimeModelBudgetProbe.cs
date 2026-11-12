@@ -1,0 +1,362 @@
+// Temporary source for BepInEx MCP mod_inject_class.
+// This is intentionally not compiled into RogueCommandExpansionLoader.
+// Geometry is counted once from the chosen camera frustum before frame timing
+// starts, so the scene scan does not run on every frame or add observer
+// components to rendered objects.
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+public sealed class RuntimeModelBudgetProbeV2 : MonoBehaviour
+{
+    private static RuntimeModelBudgetProbeV2 _controller;
+    private static Camera _targetCamera;
+    private static bool _captureActive;
+    private static bool _eventSubscribed;
+    private static int _requestedFrames;
+    private static int _lastCapturedFrame = -1;
+    private static long _cameraFrustumTriangles;
+    private static int _cameraFrustumRendererCount;
+    private static int _candidateRendererCount;
+    private static int _unsupportedMeshRendererCount;
+    private static readonly List<double> _frameIntervalsMs = new List<double>();
+    private static readonly List<int> _frameIds = new List<int>();
+    private static string _lastError;
+    private static string _sceneName;
+    private static string _cameraName;
+    private static int _cameraId;
+    private static int _screenWidth;
+    private static int _screenHeight;
+    private static float _timeScaleAtStart;
+    private static float _cameraFieldOfView;
+    private static float _cameraOrthographicSize;
+    private static bool _cameraOrthographic;
+    private static Vector3 _cameraPosition;
+    private static Vector3 _cameraRotationEuler;
+    private static string _captureStartedUtc;
+
+    public string BeginCapture(string targetCameraName, int requestedFrameCount)
+    {
+        if (_captureActive)
+            return "{\"success\":false,\"error\":\"capture already active\"}";
+        if (requestedFrameCount < 120 || requestedFrameCount > 3600)
+            return "{\"success\":false,\"error\":\"requested frame count must be between 120 and 3600\"}";
+
+        Camera camera = ResolveCamera(targetCameraName);
+        if (camera == null)
+            return "{\"success\":false,\"error\":\"active target camera not found\"}";
+        if (camera.pixelWidth <= 0 || camera.pixelHeight <= 0)
+            return "{\"success\":false,\"error\":\"target camera has no rendered pixel area\"}";
+
+        _controller = this;
+        _targetCamera = camera;
+        _requestedFrames = requestedFrameCount;
+        _lastCapturedFrame = -1;
+        _cameraFrustumTriangles = 0;
+        _cameraFrustumRendererCount = 0;
+        _candidateRendererCount = 0;
+        _unsupportedMeshRendererCount = 0;
+        _frameIntervalsMs.Clear();
+        _frameIds.Clear();
+        _lastError = null;
+        _sceneName = camera.gameObject.scene.name;
+        _cameraName = camera.name;
+        _cameraId = camera.GetInstanceID();
+        _screenWidth = camera.pixelWidth;
+        _screenHeight = camera.pixelHeight;
+        _timeScaleAtStart = Time.timeScale;
+        _cameraFieldOfView = camera.fieldOfView;
+        _cameraOrthographicSize = camera.orthographicSize;
+        _cameraOrthographic = camera.orthographic;
+        _cameraPosition = camera.transform.position;
+        _cameraRotationEuler = camera.transform.eulerAngles;
+        _captureStartedUtc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+
+        CountCameraFrustumTriangles(camera);
+        if (_cameraFrustumTriangles <= 0 || _cameraFrustumRendererCount <= 0)
+        {
+            _lastError = "target camera frustum contains no supported triangle meshes";
+            return "{\"success\":false,\"error\":\"" + Escape(_lastError) + "\",\"candidateMeshRenderers\":" +
+                _candidateRendererCount.ToString(CultureInfo.InvariantCulture) + "}";
+        }
+
+        _captureActive = true;
+        RenderPipelineManager.endContextRendering += OnEndContextRendering;
+        _eventSubscribed = true;
+
+        return "{\"success\":true,\"status\":\"collecting\",\"scene\":\"" + Escape(_sceneName) +
+            "\",\"camera\":\"" + Escape(_cameraName) + "\",\"cameraInstanceId\":" + _cameraId.ToString(CultureInfo.InvariantCulture) +
+            ",\"resolutionWidth\":" + _screenWidth.ToString(CultureInfo.InvariantCulture) +
+            ",\"resolutionHeight\":" + _screenHeight.ToString(CultureInfo.InvariantCulture) +
+            ",\"requestedFrames\":" + _requestedFrames.ToString(CultureInfo.InvariantCulture) +
+            ",\"cameraFrustumMeshTriangles\":" + _cameraFrustumTriangles.ToString(CultureInfo.InvariantCulture) +
+            ",\"cameraFrustumMeshRenderers\":" + _cameraFrustumRendererCount.ToString(CultureInfo.InvariantCulture) + "}";
+    }
+
+    public string GetReportJson()
+    {
+        double p50IntervalMs = Percentile(_frameIntervalsMs, 0.50);
+        double p95IntervalMs = Percentile(_frameIntervalsMs, 0.95);
+        double maxIntervalMs = Maximum(_frameIntervalsMs);
+        double minIntervalMs = Minimum(_frameIntervalsMs);
+        bool complete = !_captureActive && _frameIntervalsMs.Count >= _requestedFrames;
+        bool calibrationReady = complete && _cameraFrustumTriangles > 0 && _timeScaleAtStart > 0.0f;
+
+        StringBuilder json = new StringBuilder(2048 + _frameIntervalsMs.Count * 24);
+        json.Append('{');
+        json.Append("\"schema\":\"rogue-command/runtime-geometry-sample/v2\",");
+        json.Append("\"status\":\"").Append(_captureActive ? "collecting" : (complete ? "complete" : "stopped")).Append("\",");
+        json.Append("\"captureStartedUtc\":\"").Append(Escape(_captureStartedUtc ?? "")).Append("\",");
+        json.Append("\"scene\":\"").Append(Escape(_sceneName ?? "")).Append("\",");
+        json.Append("\"unityVersion\":\"").Append(Escape(Application.unityVersion)).Append("\",");
+        json.Append("\"camera\":{\"name\":\"").Append(Escape(_cameraName ?? "")).Append("\",");
+        json.Append("\"instanceId\":").Append(_cameraId.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"pixelWidth\":").Append(_screenWidth.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"pixelHeight\":").Append(_screenHeight.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"fieldOfView\":").Append(Number(_cameraFieldOfView)).Append(',');
+        json.Append("\"orthographic\":").Append(_cameraOrthographic ? "true" : "false").Append(',');
+        json.Append("\"orthographicSize\":").Append(Number(_cameraOrthographicSize)).Append(',');
+        json.Append("\"position\":[").Append(Number(_cameraPosition.x)).Append(',').Append(Number(_cameraPosition.y)).Append(',').Append(Number(_cameraPosition.z)).Append("],");
+        json.Append("\"rotationEuler\":[").Append(Number(_cameraRotationEuler.x)).Append(',').Append(Number(_cameraRotationEuler.y)).Append(',').Append(Number(_cameraRotationEuler.z)).Append("]},");
+        json.Append("\"capture\":{\"requestedFrames\":").Append(_requestedFrames.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"sampleCount\":").Append(_frameIntervalsMs.Count.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"timeScaleAtStart\":").Append(Number(_timeScaleAtStart)).Append(',');
+        json.Append("\"frameIntervalMetric\":\"UnityEngine.Time.unscaledDeltaTime\",");
+        json.Append("\"frameIntervalUnit\":\"ms\",");
+        json.Append("\"geometryMetric\":\"cameraFrustumMeshTriangles\",");
+        json.Append("\"geometrySource\":\"one-time camera-frustum bounds test and MeshRenderer/SkinnedMeshRenderer sharedMesh topology\",");
+        json.Append("\"candidateMeshRenderers\":").Append(_candidateRendererCount.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"countedMeshRenderers\":").Append(_cameraFrustumRendererCount.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"unsupportedMeshRenderers\":").Append(_unsupportedMeshRendererCount.ToString(CultureInfo.InvariantCulture)).Append("},");
+        json.Append("\"summary\":{\"p50UnscaledFrameIntervalMs\":").Append(Number(p50IntervalMs)).Append(',');
+        json.Append("\"p95UnscaledFrameIntervalMs\":").Append(Number(p95IntervalMs)).Append(',');
+        json.Append("\"minUnscaledFrameIntervalMs\":").Append(Number(minIntervalMs)).Append(',');
+        json.Append("\"maxUnscaledFrameIntervalMs\":").Append(Number(maxIntervalMs)).Append(',');
+        json.Append("\"cameraFrustumMeshTriangles\":").Append(_cameraFrustumTriangles.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"cameraFrustumMeshRenderers\":").Append(_cameraFrustumRendererCount.ToString(CultureInfo.InvariantCulture)).Append("},");
+        json.Append("\"fitSample\":{\"triangles\":").Append(_cameraFrustumTriangles.ToString(CultureInfo.InvariantCulture)).Append(',');
+        json.Append("\"p95UnscaledFrameIntervalMs\":").Append(Number(p95IntervalMs)).Append(',');
+        json.Append("\"calibrationReady\":").Append(calibrationReady ? "true" : "false").Append("},");
+        json.Append("\"frameIntervalsMs\":");
+        AppendDoubleArray(json, _frameIntervalsMs);
+        json.Append(",\"frameIds\":");
+        AppendIntArray(json, _frameIds);
+        json.Append(",\"limitations\":[\"Geometry is a one-time camera-frustum estimate from enabled MeshRenderer and SkinnedMeshRenderer meshes; occlusion and GPU-instanced draws are not counted.\",\"Terrain-specific paths, particles, shadows, and draw amplification are excluded.\",\"Unscaled frame interval is realized frame pacing, not a CPU/GPU time breakdown.\",\"Use an unpaused, repeatable scene and stable camera; each report is one geometry-load sample.\"]");
+        if (!String.IsNullOrEmpty(_lastError))
+            json.Append(",\"error\":\"").Append(Escape(_lastError)).Append('"');
+        json.Append('}');
+        return json.ToString();
+    }
+
+    public string StopCapture()
+    {
+        StopObserving();
+        return GetReportJson();
+    }
+
+    public string Cleanup()
+    {
+        string report = GetReportJson();
+        StopObserving();
+        if (_controller == this)
+            _controller = null;
+        MonoBehaviour[] behaviours = GetComponents<MonoBehaviour>();
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            MonoBehaviour behaviour = behaviours[i];
+            if (behaviour != null && behaviour != this && behaviour.GetType().FullName == "RuntimeModelBudgetProbe")
+                UnityEngine.Object.Destroy(behaviour);
+        }
+        UnityEngine.Object.Destroy(this);
+        return report;
+    }
+
+    private static Camera ResolveCamera(string requestedName)
+    {
+        Camera[] cameras = UnityEngine.Object.FindObjectsOfType<Camera>();
+        Camera fallback = null;
+        for (int i = 0; i < cameras.Length; i++)
+        {
+            Camera candidate = cameras[i];
+            if (candidate == null || !candidate.enabled || !candidate.gameObject.activeInHierarchy)
+                continue;
+            if (String.Equals(candidate.name, requestedName, StringComparison.Ordinal))
+                return candidate;
+            if (String.IsNullOrEmpty(requestedName) && candidate.CompareTag("MainCamera"))
+                fallback = candidate;
+        }
+        return fallback;
+    }
+
+    private static void CountCameraFrustumTriangles(Camera camera)
+    {
+        Renderer[] renderers = UnityEngine.Object.FindObjectsOfType<Renderer>();
+        Plane[] planes = new Plane[6];
+        GeometryUtility.CalculateFrustumPlanes(camera, planes);
+        int cameraMask = camera.cullingMask;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (!IsSupportedRenderer(renderer) || (cameraMask & (1 << renderer.gameObject.layer)) == 0 ||
+                renderer.shadowCastingMode == ShadowCastingMode.ShadowsOnly || !GeometryUtility.TestPlanesAABB(planes, renderer.bounds))
+                continue;
+
+            _candidateRendererCount++;
+            Mesh mesh = GetSharedMesh(renderer);
+            if (mesh == null)
+            {
+                _unsupportedMeshRendererCount++;
+                continue;
+            }
+
+            long triangles = CountTriangles(mesh);
+            if (triangles <= 0)
+            {
+                _unsupportedMeshRendererCount++;
+                continue;
+            }
+            _cameraFrustumTriangles += triangles;
+            _cameraFrustumRendererCount++;
+        }
+    }
+
+    private static bool IsSupportedRenderer(Renderer renderer)
+    {
+        return renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy &&
+            (renderer is MeshRenderer || renderer is SkinnedMeshRenderer);
+    }
+
+    private static Mesh GetSharedMesh(Renderer renderer)
+    {
+        SkinnedMeshRenderer skinned = renderer as SkinnedMeshRenderer;
+        if (skinned != null)
+            return skinned.sharedMesh;
+        MeshFilter filter = renderer.GetComponent<MeshFilter>();
+        return filter != null ? filter.sharedMesh : null;
+    }
+
+    private static long CountTriangles(Mesh mesh)
+    {
+        long triangles = 0;
+        for (int subMesh = 0; subMesh < mesh.subMeshCount; subMesh++)
+        {
+            long indices = mesh.GetIndexCount(subMesh);
+            MeshTopology topology = mesh.GetTopology(subMesh);
+            if (topology == MeshTopology.Triangles)
+                triangles += indices / 3;
+            else if (topology == MeshTopology.Quads)
+                triangles += (indices / 4) * 2;
+        }
+        return triangles;
+    }
+
+    private static void OnEndContextRendering(ScriptableRenderContext context, List<Camera> cameras)
+    {
+        if (!_captureActive || _targetCamera == null || cameras == null)
+            return;
+        int currentFrame = Time.frameCount;
+        if (_lastCapturedFrame == currentFrame)
+            return;
+
+        bool targetWasRendered = false;
+        for (int i = 0; i < cameras.Count; i++)
+        {
+            Camera camera = cameras[i];
+            if (camera != null && camera.GetInstanceID() == _cameraId)
+            {
+                targetWasRendered = true;
+                break;
+            }
+        }
+        if (!targetWasRendered)
+            return;
+
+        _lastCapturedFrame = currentFrame;
+        _frameIntervalsMs.Add(Time.unscaledDeltaTime * 1000.0);
+        _frameIds.Add(currentFrame);
+        if (_frameIntervalsMs.Count >= _requestedFrames)
+            StopObserving();
+    }
+
+    private static void StopObserving()
+    {
+        _captureActive = false;
+        if (_eventSubscribed)
+        {
+            RenderPipelineManager.endContextRendering -= OnEndContextRendering;
+            _eventSubscribed = false;
+        }
+    }
+
+    private static double Percentile(List<double> values, double percentile)
+    {
+        if (values == null || values.Count == 0)
+            return 0.0;
+        List<double> sorted = new List<double>(values);
+        sorted.Sort();
+        int index = Math.Max(0, (int)Math.Ceiling(percentile * sorted.Count) - 1);
+        return sorted[Math.Min(index, sorted.Count - 1)];
+    }
+
+    private static double Maximum(List<double> values)
+    {
+        if (values == null || values.Count == 0)
+            return 0.0;
+        double result = Double.MinValue;
+        for (int i = 0; i < values.Count; i++)
+            result = Math.Max(result, values[i]);
+        return result;
+    }
+
+    private static double Minimum(List<double> values)
+    {
+        if (values == null || values.Count == 0)
+            return 0.0;
+        double result = Double.MaxValue;
+        for (int i = 0; i < values.Count; i++)
+            result = Math.Min(result, values[i]);
+        return result;
+    }
+
+    private static void AppendDoubleArray(StringBuilder json, List<double> values)
+    {
+        json.Append('[');
+        for (int i = 0; i < values.Count; i++)
+        {
+            if (i != 0)
+                json.Append(',');
+            json.Append(Number(values[i]));
+        }
+        json.Append(']');
+    }
+
+    private static void AppendIntArray(StringBuilder json, List<int> values)
+    {
+        json.Append('[');
+        for (int i = 0; i < values.Count; i++)
+        {
+            if (i != 0)
+                json.Append(',');
+            json.Append(values[i].ToString(CultureInfo.InvariantCulture));
+        }
+        json.Append(']');
+    }
+
+    private static string Number(double value)
+    {
+        if (Double.IsNaN(value) || Double.IsInfinity(value))
+            return "0";
+        return value.ToString("0.######", CultureInfo.InvariantCulture);
+    }
+
+    private static string Escape(string value)
+    {
+        if (value == null)
+            return String.Empty;
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
+    }
+}

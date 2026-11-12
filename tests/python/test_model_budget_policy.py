@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+import tempfile
 import unittest
 
 from tools.model_budget_policy import (
@@ -11,6 +14,7 @@ from tools.model_budget_policy import (
     fit_triangle_capacity,
     resolve_asset_budget,
 )
+from tools.profile_model_budgets import _read_samples
 
 TEST_LOD_HEIGHTS = (0.54, 0.23, 0.07)
 
@@ -37,10 +41,110 @@ class ModelBudgetPolicyTests(unittest.TestCase):
                 target_fps=60,
             )
 
+    def test_runtime_capture_is_normalized_for_profile_calibration(self):
+        report = {
+            "schema": "rogue-command/runtime-geometry-sample/v2",
+            "status": "complete",
+            "captureStartedUtc": "2026-11-11T00:00:00Z",
+            "scene": "Game",
+            "unityVersion": "2021.3.45f2",
+            "camera": {
+                "name": "Main Camera", "pixelWidth": 1920, "pixelHeight": 1080,
+                "fieldOfView": 26.0, "orthographic": False, "orthographicSize": 42.0,
+                "position": [0.0, 10.0, 20.0], "rotationEuler": [45.0, 0.0, 0.0],
+            },
+            "capture": {
+                "requestedFrames": 120,
+                "sampleCount": 120,
+                "timeScaleAtStart": 1.0,
+                "frameIntervalMetric": "UnityEngine.Time.unscaledDeltaTime",
+                "frameIntervalUnit": "ms",
+                "geometryMetric": "cameraFrustumMeshTriangles",
+                "countedMeshRenderers": 5,
+            },
+            "summary": {"cameraFrustumMeshTriangles": 185_000},
+            "fitSample": {
+                "triangles": 185_000,
+                "p95UnscaledFrameIntervalMs": 13.5,
+                "calibrationReady": True,
+            },
+            "frameIntervalsMs": [13.5] * 120,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "capture.json"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            rows = _read_samples(path)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["triangles"], 185_000)
+        self.assertEqual(rows[0]["p95UnscaledFrameIntervalMs"], 13.5)
+        self.assertEqual(rows[0]["measurementSource"], "runtime-model-budget-probe-v2")
+        self.assertEqual(rows[0]["unityVersion"], "2021.3.45f2")
+
+        different_view = json.loads(json.dumps(report))
+        different_view["camera"]["position"][0] += 1.0
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "captures.json"
+            path.write_text(json.dumps({"reports": [report, different_view]}), encoding="utf-8")
+            with self.assertRaisesRegex(ModelBudgetError, "one scene, camera pose"):
+                _read_samples(path)
+
+    def test_runtime_capture_rejects_paused_or_incomplete_runs(self):
+        report = {
+            "schema": "rogue-command/runtime-geometry-sample/v2",
+            "status": "complete",
+            "scene": "Game",
+            "camera": {"name": "Main Camera", "pixelWidth": 1920, "pixelHeight": 1080},
+            "capture": {
+                "requestedFrames": 120,
+                "sampleCount": 120,
+                "timeScaleAtStart": 0.0,
+                "frameIntervalMetric": "UnityEngine.Time.unscaledDeltaTime",
+                "frameIntervalUnit": "ms",
+                "geometryMetric": "cameraFrustumMeshTriangles",
+            },
+            "fitSample": {"triangles": 185_000, "p95UnscaledFrameIntervalMs": 13.5, "calibrationReady": False},
+            "frameIntervalsMs": [13.5] * 120,
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "capture.json"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            with self.assertRaisesRegex(ModelBudgetError, "not eligible for calibration"):
+                _read_samples(path)
+
+    def test_profile_sample_input_rejects_unverified_raw_rows(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "samples.json"
+            path.write_text(json.dumps({"samples": [
+                {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 10.0},
+            ]}), encoding="utf-8")
+            with self.assertRaisesRegex(ModelBudgetError, "schema-v2 runtime report"):
+                _read_samples(path)
+
     def test_project_profile_keeps_the_required_sixty_fps_target(self):
         result = calibrate_profile({"schemaVersion": 1, "targetFps": 30})
         self.assertEqual(result["calibrationStatus"], "uncalibrated")
         self.assertIn("must target 60 FPS", result["calibrationFailureReason"])
+
+    def test_profile_rejects_pending_camera_or_scene_metadata(self):
+        result = calibrate_profile({
+            "schemaVersion": 1,
+            "targetFps": 60,
+            "calibration": {
+                "resolutionWidth": 1920,
+                "resolutionHeight": 1080,
+                "cameraReference": "pending: identify camera",
+                "sceneMix": "dense armored RTS scene",
+                "maximumVisibleInstances": 20,
+                "samples": [
+                    {"triangles": 0, "p95UnscaledFrameIntervalMs": 8},
+                    {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 12},
+                    {"triangles": 200_000, "p95UnscaledFrameIntervalMs": 16},
+                ],
+            },
+        })
+        self.assertEqual(result["calibrationStatus"], "uncalibrated")
+        self.assertIn("cameraReference and sceneMix are required", result["calibrationFailureReason"])
 
     def test_scene_allocation_obeys_aggregate_capacity_and_lod_order(self):
         report = allocate_scene_budgets(
@@ -100,9 +204,9 @@ class ModelBudgetPolicyTests(unittest.TestCase):
                 "resolutionWidth": 1920,
                 "resolutionHeight": 1080,
                 "samples": [
-                    {"triangles": 0, "p95FrameTimeMs": 8},
-                    {"triangles": 100_000, "p95FrameTimeMs": 12},
-                    {"triangles": 200_000, "p95FrameTimeMs": 16},
+                    {"triangles": 0, "p95UnscaledFrameIntervalMs": 8},
+                    {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 12},
+                    {"triangles": 200_000, "p95UnscaledFrameIntervalMs": 16},
                 ],
             },
             "scenes": [{"sceneId": "dense", "assets": []}],
@@ -123,9 +227,9 @@ class ModelBudgetPolicyTests(unittest.TestCase):
                 "sceneMix": "dense mixed scene",
                 "maximumVisibleInstances": 1,
                 "samples": [
-                    {"triangles": 0, "p95FrameTimeMs": 8},
-                    {"triangles": 100_000, "p95FrameTimeMs": 12},
-                    {"triangles": 200_000, "p95FrameTimeMs": 16},
+                    {"triangles": 0, "p95UnscaledFrameIntervalMs": 8},
+                    {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 12},
+                    {"triangles": 200_000, "p95UnscaledFrameIntervalMs": 16},
                 ],
             },
             "scenes": [{"sceneId": "dense", "assets": [{
@@ -164,9 +268,9 @@ class ModelBudgetPolicyTests(unittest.TestCase):
                 "sceneMix": "mixed armor and structures",
                 "maximumVisibleInstances": 12,
                 "samples": [
-                    {"triangles": 0, "p95FrameTimeMs": 8},
-                    {"triangles": 100_000, "p95FrameTimeMs": 12},
-                    {"triangles": 200_000, "p95FrameTimeMs": 16},
+                    {"triangles": 0, "p95UnscaledFrameIntervalMs": 8},
+                    {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 12},
+                    {"triangles": 200_000, "p95UnscaledFrameIntervalMs": 16},
                 ],
             },
             "scenes": [
@@ -207,9 +311,9 @@ class ModelBudgetPolicyTests(unittest.TestCase):
                 "sceneMix": "mixed scene",
                 "maximumVisibleInstances": 1,
                 "samples": [
-                    {"triangles": 0, "p95FrameTimeMs": 8},
-                    {"triangles": 100_000, "p95FrameTimeMs": 12},
-                    {"triangles": 200_000, "p95FrameTimeMs": 16},
+                    {"triangles": 0, "p95UnscaledFrameIntervalMs": 8},
+                    {"triangles": 100_000, "p95UnscaledFrameIntervalMs": 12},
+                    {"triangles": 200_000, "p95UnscaledFrameIntervalMs": 16},
                 ],
             },
             "scenes": [{"sceneId": "empty", "assets": []}],

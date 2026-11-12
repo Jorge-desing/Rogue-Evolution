@@ -57,10 +57,16 @@ Los vehículos, módulos visuales y estructuras comparten la política de [`cont
 El objetivo local es 60 FPS (16,67 ms por frame). Prefabs y paquetes exigen un perfil calibrado y rechazan assets que superen su asignación. La medición usa la misma resolución, cámara RTS y mezcla densa de escena, con al menos tres muestras de tiempo de frame p95 a dos cargas de triángulos distintas. Para compilar muestras reales:
 
 ```powershell
-python -m tools.profile_model_budgets --profile content/source-art/model-budget-profile.json --samples artifacts/model-budget-measured-samples.json --output content/source-art/model-budget-profile.json
+python -m tools.profile_model_budgets --profile content/source-art/model-budget-profile.json --samples artifacts/model-budget-captures.json --output content/source-art/model-budget-profile.json
 ```
 
-Cada muestra JSON registra `triangles` visibles y `p95FrameTimeMs` medidos en la misma cámara, resolución y mezcla de escena. Declara también las demandas de assets por escena en el perfil (`sourceFaces`, `sourceTriangles`, `maxVisibleInstances`, `screenHeightFraction`, `rolePriority` y tres `lodScreenHeights`).
+El medidor temporal `tools/RuntimeModelBudgetProbe.cs` se inyecta de forma temporal con BepInEx MCP; no forma parte del loader. Cuenta una vez los triángulos de `MeshRenderer` y `SkinnedMeshRenderer` cuyos bounds intersectan el frustum de la cámara y luego recoge al menos 120 intervalos de `Time.unscaledDeltaTime`. La captura no añade componentes a cada renderer. Guarda cada JSON del esquema `rogue-command/runtime-geometry-sample/v2`; `tools/profile_model_budgets.py --samples` acepta un informe o `{ "reports": [...] }` y solo ingiere capturas completas, sin pausa, con la misma escena, pose de cámara, versión de Unity y resolución que coincida con el perfil. El intervalo observado no es un desglose CPU/GPU y el conteo no incluye oclusión, partículas, rutas de terreno, sombras ni draws instanciados por GPU.
+
+Cada muestra del perfil registra `triangles` y `p95UnscaledFrameIntervalMs` medidos con la misma cámara, resolución y mezcla de escena. Declara también las demandas de assets por escena en el perfil (`sourceFaces`, `sourceTriangles`, `maxVisibleInstances`, `screenHeightFraction`, `rolePriority` y tres `lodScreenHeights`). Conserva el estado `uncalibrated` hasta obtener al menos tres capturas válidas con dos cargas geométricas diferentes y completar las demandas de escena.
+
+```powershell
+python -m tools.profile_model_budgets --profile content/source-art/model-budget-profile.json --samples artifacts/model-budget-captures.json --output content/source-art/model-budget-profile.json
+```
 
 El perfil del checkout está marcado `uncalibrated`: aún no contiene mediciones de una escena de juego. Por eso los builds de prefab y paquetes se detienen hasta completar esa medición; no uses números sintéticos para habilitarlos. Unity cambia de LOD por tamaño en pantalla con las mallas ya exportadas; no genera geometría durante la partida. Para repetir el piloto Gravitas aislado, ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File tools/Run-GravitasBreakerHardflowPilot.ps1`. Para la fábrica HQ, ejecuta Blender 4.5.14 con `tools/Run-OverlordCommandHQFactoryHardflowPilot.py`; prepara vistas y compara el candidato Hardflow con el replay nativo bajo `artifacts/`. `tools/Build-OverlordCommandHQFactoryModel.py` aplica el mismo replay y bloquea el FBX LOD mientras el perfil siga sin calibrar.
 
