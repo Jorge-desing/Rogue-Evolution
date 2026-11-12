@@ -45,9 +45,6 @@ def build_model() -> None:
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
-
     armatures = [o for o in bpy.context.scene.objects if o.type == "ARMATURE"]
     if len(armatures) != 1:
         raise ValueError(f"AtlasCraneMech: expected exactly one armature, found {len(armatures)}")
@@ -59,6 +56,8 @@ def build_model() -> None:
     if not meshes:
         raise ValueError("AtlasCraneMech source contains no mesh parts")
     rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
 
     # Delete old NLA tracks and Action_* clips (Walk is an alias of Drive for bipeds).
     if armature.animation_data:

@@ -38,10 +38,6 @@ PREVIEW_PATH = REPO_ROOT / "artifacts" / "previews" / "colossus-siege.png"
 
 def build_colossus_siege_model():
     rmk.clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     # 1. Disciplined 5-Tone Material Palette (Heavy Industrial / Siege Set)
     armor_primary = rmk.make_material("ColossusArmor", (0.12, 0.19, 0.24), metallic=0.42, roughness=0.58)
     armor_light = rmk.make_material("ColossusLightArmor", (0.22, 0.32, 0.38), metallic=0.34, roughness=0.60)
@@ -333,6 +329,9 @@ def build_colossus_siege_model():
         materials={"armor": armor_primary, "gunmetal": gunmetal, "warning": warning_amber, "tread": tread_mat},
     ))
     rmk.enforce_face_budget_before_export(model_objects, "ColossusSiegePlatform")
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     # 8. Automated Quality Diagnostics & Validation
     diagnostics = rmk.validate_model_mesh_quality(model_objects)

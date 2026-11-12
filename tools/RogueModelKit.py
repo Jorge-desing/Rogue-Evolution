@@ -16368,9 +16368,6 @@ class RogueVehicleBuilder:
         unity_batch_names: bool = False,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
-        blend_path.parent.mkdir(parents=True, exist_ok=True)
-        fbx_path.parent.mkdir(parents=True, exist_ok=True)
-
         if target_budget is not None:
             raise ValueError("fixed target_budget overrides are retired; provide a calibrated scene profile")
         if not generate_lods:
@@ -16419,6 +16416,11 @@ class RogueVehicleBuilder:
                 f"Blender faces and {source_triangle_count}/{triangle_budget_limit} Unity triangles after "
                 "safe reduction; revise the asset for the calibrated camera and scene role."
             )
+
+        # Do not touch output paths until the calibrated demand and this asset's
+        # actual LOD0 geometry have both passed their gates.
+        blend_path.parent.mkdir(parents=True, exist_ok=True)
+        fbx_path.parent.mkdir(parents=True, exist_ok=True)
 
         # 2. Smart UV Projection for lightmapping
         generate_lightmap_uvs(self.objects)
@@ -17457,9 +17459,6 @@ class RogueStructureBuilder:
         budget_profile_path: Path | None = None,
         budget_scene_id: str | None = None,
     ) -> dict[str, Any]:
-        blend_path.parent.mkdir(parents=True, exist_ok=True)
-        fbx_path.parent.mkdir(parents=True, exist_ok=True)
-
         if target_budget is not None:
             raise ValueError("fixed target_budget overrides are retired; provide a calibrated scene profile")
         if not generate_lods:
@@ -17505,6 +17504,11 @@ class RogueStructureBuilder:
                 f"Blender faces and {source_triangle_count}/{triangle_budget_limit} Unity triangles after "
                 "safe reduction; revise the asset for the calibrated camera and scene role."
             )
+
+        # The source and FBX destinations remain untouched until both the
+        # calibrated demand and measured asset geometry have passed.
+        blend_path.parent.mkdir(parents=True, exist_ok=True)
+        fbx_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Procedural multi-channel vertex shading & cavity AO for structures
         if bake_vertex_shading and wear_level and wear_level != "none":

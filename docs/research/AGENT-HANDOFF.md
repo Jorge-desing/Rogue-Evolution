@@ -1,6 +1,6 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
-**Updated:** 2026-11-11
+**Updated:** 2026-11-12
 **Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
@@ -1650,6 +1650,13 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
 - **Profile and cleanup:** The test used selector `3`, not a clean profile. The game exited normally. Post-test Profile3 was preserved under `artifacts/runtime-smoke/bridge-building-placement-20261111/Profile3-after-test-generated/Profile3`; the original four Profile3 files and selector byte `2` were restored. The full original checkpoint verified exact (`profileFilesExactMatch=true`, `selectorMatch=true`, `safe_to_finalize=true`). Steam Cloud was not changed.
 - **Deployment:** Game process was closed before deploy. Release and installed DLL match SHA-256 `c1ae90b31a58dca68c941c05d4e1fe0ed4c9a8d97c103529fc433767e9655428`; pre-deploy backup and verification: `artifacts/deployment-backups/active-building-placement-ghost-20261111/deployment-manifest.json`.
 - **Artifacts and skill sync:** Runtime result and checkpoints are in `artifacts/runtime-smoke/bridge-building-placement-20261111/`. Updated Harmony policy, Modding Tools, Clean-Room Diagnostics, Unit Authoring, and this handoff with active-ghost preflight and placement-evidence boundaries.
+
+## 2026-11-12 Dynamic Geometry Calibration Follow-Up
+
+- **Measurement verdict:** Two low-load schema-v3 captures passed the technical gate at 120,110 / 120,354 frustum triangles and 12.123564 / 12.125100 ms p95. Three same-camera high-load captures at 328,924–330,460 triangles all failed `geometryLoadStable`; none were admitted. Their timing values are not calibration data, so `content/source-art/model-budget-profile.json` stays uncalibrated and no model exports were promoted. Details and raw-report paths: [DYNAMIC-GEOMETRY-CALIBRATION-2026-11-12.md](DYNAMIC-GEOMETRY-CALIBRATION-2026-11-12.md).
+- **Probe limit:** v3 compares the exact renderer/mesh signature every 30 rendered frames but records only its initial geometry census, not each recheck. Keep the rejection gate intact. Any future aggregate-tolerance approach needs a new schema that records per-check counts and defines renderer-count and low/high separation gates.
+- **Builder write-order guard:** Five recipe builders that could save wave details over their canonical `.blend` before rejection now replay in memory (Arc Lance Walker, Field Medic Rover, Salvage Hauler, Skyguard SAM, Tidebreaker Hovercraft). Output-directory creation in thirteen direct builders, Bulwark, Ironclad, `RogueVehicleBuilder`, and `RogueStructureBuilder` now follows the calibrated demand and measured LOD0 geometry gates. The regression `tests/python/test_model_builder_budget_gate_order.py` covers the direct builders, shared methods, and source preservation.
+- **Runtime safety/deployment:** The temporary probe was removed; Rogue Command exited normally. The only changed Profile2 file was `metaSavegame.dat`, restored byte-for-byte; the full 21-entry checkpoint then matched exactly with selector `2`. With the process closed, Release, backup, and installed loader all matched SHA-256 `81573ca10d6b78c4b8e4ed9985f3987f17fcf1ebc9d6a19475b6c7547ec545b7`; manifest: `artifacts/deployment-backups/dynamic-model-budget-calibration-20261112T0232Z/deployment-manifest.json`.
 
 ## 2026-11-11 Dynamic Geometry Policy Documentation and Inventory Audit
 

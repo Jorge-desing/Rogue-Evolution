@@ -47,10 +47,6 @@ def build_bulwark_siege_tank_model() -> None:
     wave2_objects = apply_wave2_details(UNIT_NAME)
     wave34_objects = apply_wave34_details(UNIT_NAME)
     contact_repairs = apply_bulwark_contact_repairs(list(bpy.context.scene.objects))
-    if radiator_vent["applied"] or wave2_objects or wave34_objects or contact_repairs["applied"]:
-        bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
 
     meshes = [
         obj for obj in bpy.context.scene.objects
@@ -58,7 +54,13 @@ def build_bulwark_siege_tank_model() -> None:
     ]
     if not meshes:
         raise ValueError("Bulwark Siege Tank source contains no mesh parts")
+
+    # Replay authored recipes in memory. Check the calibrated geometry demand
+    # before creating outputs or saving any blend so a blocked build cannot
+    # rewrite the source or leave partial deliverables behind.
     rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
 
     # Preserve the authored source file; the rigged, editable deliverable is a separate copy.
     armature = rmk.generate_procedural_armature(

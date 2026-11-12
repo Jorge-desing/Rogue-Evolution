@@ -46,9 +46,6 @@ def build_model() -> None:
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
-
     armatures = [o for o in bpy.context.scene.objects if o.type == "ARMATURE"]
     if len(armatures) != 1:
         raise ValueError(f"BastionSiegeMech: expected exactly one armature, found {len(armatures)}")
@@ -60,6 +57,8 @@ def build_model() -> None:
     if not meshes:
         raise ValueError("BastionSiegeMech source contains no mesh parts")
     rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
 
     if armature.animation_data:
         for track in list(armature.animation_data.nla_tracks):

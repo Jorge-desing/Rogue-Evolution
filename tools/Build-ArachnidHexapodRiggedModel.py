@@ -187,9 +187,6 @@ def build_arachnid_hexapod_rigged_model() -> None:
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
-
     meshes = [
         obj for obj in bpy.context.scene.objects
         if obj.type == "MESH" and not obj.name.lower().startswith("preview")
@@ -197,6 +194,8 @@ def build_arachnid_hexapod_rigged_model() -> None:
     if not meshes:
         raise ValueError("Arachnid Hexapod source contains no mesh parts")
     rmk.enforce_face_budget_before_export(meshes, UNIT_NAME)
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
 
     armature = bpy.data.objects.get("ArachnidHexapod_Armature")
     if armature is None or armature.type != "ARMATURE":

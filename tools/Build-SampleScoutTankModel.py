@@ -56,9 +56,6 @@ def finish_mesh(obj, material):
 
 def build() -> None:
     rmk.clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     armor = make_material(f"{UNIT_NAME}_Armor", (0.20, 0.24, 0.30), 0.55, 0.55)
     light = make_material(f"{UNIT_NAME}_LightArmor", (0.45, 0.52, 0.62), 0.45, 0.50)
     gunmetal = make_material(f"{UNIT_NAME}_Gunmetal", (0.07, 0.09, 0.12), 0.75, 0.40)
@@ -126,6 +123,8 @@ def build() -> None:
         materials={"armor": armor, "gunmetal": gunmetal, "warning": warning, "tread": tread},
     ))
     rmk.enforce_face_budget_before_export(objects, UNIT_NAME)
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
     armature = rmk.generate_procedural_armature(objects, prefix=UNIT_NAME, turret_center=Vector((0.0, -0.1, 1.6)), gun_pivot=Vector((0.0, 0.4, 1.6)), hull_deck_z=0.95, leg_type=None, with_ik=False)
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type=None, fire_profile="light")
     from VisualModelAuthoringSupport import validate_root_motion, validate_rigid_weights

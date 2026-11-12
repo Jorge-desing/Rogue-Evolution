@@ -162,10 +162,6 @@ def add_preview_stage(model_objects):
 
 def main():
     clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     armor = make_material("Sandlance Armor", (0.105, 0.185, 0.225), 0.42, 0.37)
     armor_light = make_material("Sandlance Light Armor", (0.24, 0.34, 0.36), 0.32, 0.4)
     tread = make_material("Sandlance Tread", (0.045, 0.055, 0.06), 0.18, 0.74)
@@ -297,6 +293,9 @@ def main():
         materials={"armor": armor, "gunmetal": gunmetal, "warning": amber, "tread": tread},
     ))
     modelkit.enforce_face_budget_before_export(model_objects, "SandlanceScout")
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     diagnostics = modelkit.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:

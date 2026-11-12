@@ -187,10 +187,6 @@ def add_preview_stage(model_objects):
 
 def main():
     clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     armor = make_material("Strike Bike Armor", (0.055, 0.13, 0.19), 0.46, 0.34)
     armor_light = make_material("Strike Bike Light Armor", (0.20, 0.34, 0.40), 0.34, 0.39)
     rubber = make_material("Strike Bike Tire", (0.025, 0.033, 0.04), 0.08, 0.78)
@@ -360,6 +356,9 @@ def main():
 
     fit_length_to_native_footprint(model_objects)
     modelkit.enforce_face_budget_before_export(model_objects, "SkirmishStrikeBike")
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
     diagnostics = modelkit.validate_model_mesh_quality(model_objects)
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
         raise ValueError("Strike bike model failed ground-contact or material validation")

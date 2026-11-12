@@ -30,8 +30,6 @@ FBX_PATH = (
 def build_ironclad_walker_model() -> None:
     """Create a reinforced dual-Gatling biped within the native walker envelope."""
     rmk.clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     builder = rmk.RogueVehicleBuilder(UNIT_NAME, faction="vanguard")
     builder.add_bipedal_legs(hip_height=1.45, hip_spacing_x=0.88)

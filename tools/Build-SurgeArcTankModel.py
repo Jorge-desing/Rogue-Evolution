@@ -31,9 +31,6 @@ FBX_PATH = (
 def build_surge_arc_tank_model() -> None:
     """Build a tracked electromagnetic tank around a vertical induction accelerator."""
     rmk.clear_scene()
-    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
-
     builder = rmk.RogueVehicleBuilder(UNIT_NAME, faction="syndicate", ground_clearance=0.06)
     builder.add_sloped_hull(length=2.35, width=1.78, height=0.78, bevel=0.055)
     builder.add_continuous_tracks(
@@ -233,6 +230,8 @@ def build_surge_arc_tank_model() -> None:
     ))
 
     rmk.enforce_face_budget_before_export(builder.objects, UNIT_NAME)
+    BLEND_PATH.parent.mkdir(parents=True, exist_ok=True)
+    FBX_PATH.parent.mkdir(parents=True, exist_ok=True)
     diagnostics = rmk.validate_model_mesh_quality(builder.objects)
     bounds = diagnostics["bounds"]
     if not diagnostics["ground_contact_valid"] or diagnostics["missing_materials"]:
