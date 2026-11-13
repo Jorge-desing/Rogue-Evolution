@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Agent sequence checks
+
+- `automation_run_sequence` accepts up to eight `expect` checks per step, each `{ "path": "/json/pointer", "equals": <JSON value> }`. Matching is type-sensitive; missing values, mismatches and failure of a guarded call stop the sequence even when `stopOnFailure=false`. Results include each observed value or lookup error. Checks are local snapshots and do not lock Unity state. Static preflight checks their shape; runtime reference and timeout limitations remain.
+- Local mock-based tests cover passing, mismatch, missing data, failed calls and invalid preflight. No in-game behavior was tested.
+
 ## 2026-11-13 BepInEx MCP error handling
 
 - **Local validation:** After Codex restart, the active chat discovered 228 canonical BepInEx MCP tools and called process-state and discovery successfully. The game was closed; no live bridge or gameplay was tested.

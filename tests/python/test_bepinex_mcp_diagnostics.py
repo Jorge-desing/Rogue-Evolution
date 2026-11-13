@@ -13,6 +13,36 @@ SERVER = load_tool_module("bepinex_mcp_server")
 
 
 class RuntimeDiagnosticsTests(unittest.TestCase):
+    def test_sequence_checks_gate_subsequent_actions(self) -> None:
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps({"ready": False})) as bridge:
+            response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
+                {"tool": "diagnostics_get_game_time_scale", "expect": [{"path": "/ready", "equals": True}]},
+                {"tool": "diagnostics_get_game_time_scale"},
+            ]})
+        data = json.loads(response["content"][0]["text"])
+        self.assertTrue(response["isError"])
+        self.assertEqual(bridge.call_count, 1)
+        self.assertEqual(data["results"][0]["checks"][0]["actual"], False)
+        self.assertFalse(data["results"][0]["checks"][0]["matched"])
+
+    def test_sequence_checks_pass_and_fail_closed_on_missing_or_failed_data(self) -> None:
+        steps = [{"tool": "diagnostics_get_game_time_scale", "expect": [{"path": "/ready", "equals": True}]},
+                 {"tool": "diagnostics_get_game_time_scale"}]
+        for payload, count in [({"ready": True}, 2), ({"other": True}, 1), ({"error": "offline"}, 1)]:
+            with self.subTest(payload=payload), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(payload)) as bridge:
+                response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": steps})
+                self.assertEqual(bridge.call_count, count)
+                self.assertEqual(response["isError"], count == 1)
+
+    def test_sequence_rejects_invalid_check_before_calls(self) -> None:
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as bridge:
+            response = SERVER.execute_tool("automation_run_sequence", {"steps": [
+                {"tool": "diagnostics_get_game_time_scale"},
+                {"tool": "diagnostics_get_game_time_scale", "expect": [{"path": "bad", "equals": True}]},
+            ]})
+        self.assertTrue(response["isError"])
+        bridge.assert_not_called()
+
     def test_bridge_errors_are_mcp_errors_without_reclassifying_nested_data(self) -> None:
         with mock.patch.object(SERVER, "_call_http", return_value=json.dumps({"error": "connection refused"})):
             self.assertTrue(SERVER.execute_tool("system_ping", {})["isError"])

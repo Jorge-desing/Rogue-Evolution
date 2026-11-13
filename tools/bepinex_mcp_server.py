@@ -833,6 +833,14 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     return _tool_response(json.dumps({"error": f"steps[{index}].tool is not an allowed diagnostics tool", "tool": step_tool}), is_error=True)
                 if not isinstance(step.get("arguments", {}), dict):
                     return _tool_response(json.dumps({"error": f"steps[{index}].arguments must be an object"}), is_error=True)
+                checks = step.get("expect", [])
+                if not isinstance(checks, list) or len(checks) > 8:
+                    return _tool_response(json.dumps({"error": f"steps[{index}].expect must be an array of at most 8 checks"}), is_error=True)
+                for check in checks:
+                    if (not isinstance(check, dict) or set(check) != {"path", "equals"}
+                            or not isinstance(check["path"], str) or not check["path"].startswith("/")
+                            or re.search(r"~(?![01])", check["path"])):
+                        return _tool_response(json.dumps({"error": f"steps[{index}].expect requires path (JSON Pointer) and equals"}), is_error=True)
                 try:
                     delay = int(step.get("delayAfterMs", 0))
                 except (TypeError, ValueError):
@@ -893,6 +901,21 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 budget_exceeded = time.monotonic() > deadline
                 if budget_exceeded:
                     step_failed = True
+                check_results = []
+                if not step_failed:
+                    for check in step.get("expect", []):
+                        try:
+                            actual = _resolve_sequence_references(
+                                {"$ref": {"step": 0, "path": check["path"]}}, 1,
+                                [{"success": True, "result": step_result}],
+                            )
+                            matched = json.dumps(actual, sort_keys=True, separators=(",", ":")) == json.dumps(check["equals"], sort_keys=True, separators=(",", ":"))
+                            check_results.append({"path": check["path"], "matched": matched, "actual": actual, "expected": check["equals"]})
+                        except ValueError as exc:
+                            matched = False
+                            check_results.append({"path": check["path"], "matched": False, "error": str(exc)})
+                        if not matched:
+                            step_failed = True
                 sequence_results.append({
                     "index": index,
                     "tool": step_tool,
@@ -900,10 +923,11 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     "budgetExceeded": budget_exceeded,
                     "durationMs": round((time.monotonic() - step_started) * 1000, 1),
                     "result": step_result,
+                    "checks": check_results,
                 })
                 if step_failed:
                     failed = True
-                    if stop_on_failure:
+                    if stop_on_failure or step.get("expect"):
                         break
                 if delay_after_ms:
                     remaining = max_duration - (time.monotonic() - started)

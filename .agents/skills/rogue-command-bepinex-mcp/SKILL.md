@@ -9,6 +9,8 @@ Use this skill as the single workflow for controlling or inspecting the live Rog
 
 ## Fast tool discovery
 
+**Required:** Before working in an area, consult its row in the table below and use the relevant discovery terms to find the current tools for the requested operation. If the task spans multiple areas, consult each applicable row. Repeat discovery when the task moves to another area or the needed capability is unclear; use the live tool descriptions and schemas to select the operation.
+
 The `bepinex_mcp` namespace is the authoritative current inventory. Before deciding a capability is missing, call `discover_tools` with `includeAliases=false` and a short English keyword, then call `describe_tool` with the exact returned name when its parameters are unclear. Search matches literal substrings in names and descriptions, not intent: try several related words, or call `discover_tools` without filters for the complete index. A `category` filter can hide matches; omit it when exploring. Inspect the tool's mutation warning and live preconditions before invoking it. Hidden compatibility aliases do not remove canonical tools.
 
 | Task | First tools and search terms |
@@ -36,7 +38,7 @@ Use the live index rather than treating this table as exhaustive. `diagnostics_g
 - Start UI discovery with `diagnostics_get_runtime_control_surface` when available. It reads the active scene, Unity frame, and accessible UI on one Unity-thread call, and includes a bounded native Shop/RemoveCardView panel state; run, route, reward/deck, and navigator sections appear on an active intermission scene. Section failures remain isolated in the returned payload. `diagnostics_fast_snapshot` presets `gui` and `intermission` remain useful broader best-effort multi-read views; refresh the target census immediately before an action.
 - For accessible menus and the run director, follow [Native UI and intermission](references/ui-intermission.md).
 - Native Shop purchases/rerolls and RemoveCardView actions use the dedicated `diagnostics_get_intermission_native_panel_state` census and typed native actions. Treat `nativeCallInvoked` and `effectObserved` separately; if a native call was issued without an observed postcondition, refresh state before taking another action. No Harmony patch is used for these controls.
-- For multi-step operations, `automation_run_sequence` checks the static structure of all steps before execution; references still resolve at runtime and must use exact typed values from earlier successful steps. A timed-out in-flight action has an unknown result; query its postcondition before retrying.
+- For multi-step operations, `automation_run_sequence` checks the static structure of all steps before execution; references still resolve at runtime and must use exact typed values from earlier successful steps. Add `expect: [{"path":"/field","equals":true}]` to a census or action step to require exact JSON equality before proceeding. A missing path, mismatch, or failed guarded call stops the sequence even with `stopOnFailure=false`; inspect `checks` and the original result. Checks are snapshots, not locks or proof of future state. A timed-out in-flight action has an unknown result; query its postcondition before retrying.
 
 ## Live runtime workflow
 
