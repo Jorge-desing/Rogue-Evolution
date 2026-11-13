@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 MCP request boundary hardening
+
+- Invalid RPC envelopes and non-object params/arguments are rejected before dispatch. Tool notifications cannot execute operations without a result channel. Zero-valued IDs remain valid. Reload dispatch handles invalid non-object input without crashing its response path.
+- Stdio messages are limited to 16 MiB, framed headers to 8 KiB. Invalid framing returns a parse error and closes the transport rather than interpreting trailing bytes as another command. Parser/host edits require one client process reload. Local tests cover these cases; no game was launched.
+
 ## 2026-11-13 Persistent MCP handler reload
 
 - Stdio keeps a persistent process and reloads server/schema handlers between requests on source-content changes. Code is compiled from the fingerprinted bytes without stale pycache; failed reloads reject the current request and can recover after source repair. Diagnostics instance IDs reset per request, not during an in-flight sequence. Schema changes notify the client through tools/list_changed; client schema refresh remains client-dependent.

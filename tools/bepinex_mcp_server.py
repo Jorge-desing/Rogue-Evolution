@@ -3557,6 +3557,21 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
+    def invalid(code: int, text: str) -> dict[str, Any]:
+        rid = message.get("id") if isinstance(message, dict) else None
+        if isinstance(rid, (dict, list, bool, float)):
+            rid = None
+        return {"jsonrpc": "2.0", "id": rid, "error": {"code": code, "message": text}}
+
+    if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or not isinstance(message.get("method"), str):
+        return invalid(-32600, "Invalid Request")
+    if "id" in message and isinstance(message["id"], (bool, float, dict, list)):
+        return invalid(-32600, "Request id must be a string, integer or null")
+    # Notifications cannot invoke tools: mutations must have a result channel.
+    if "id" not in message:
+        return None
+    if "params" in message and not isinstance(message["params"], dict):
+        return invalid(-32602, "params must be an object")
     method = message.get("method")
     request_id = message.get("id")
 
@@ -3590,6 +3605,10 @@ def handle_request(message: dict[str, Any]) -> dict[str, Any] | None:
 
     if method == "tools/call":
         params = message.get("params") or {}
+        if not isinstance(params.get("name"), str) or not params["name"].strip():
+            return invalid(-32602, "Tool name must be a non-empty string")
+        if "arguments" in params and not isinstance(params["arguments"], dict):
+            return invalid(-32602, "Tool arguments must be an object")
         tool_name = params.get("name")
         arguments = params.get("arguments") or {}
         result = execute_tool(tool_name, arguments)
@@ -3715,10 +3734,19 @@ def generate_agent_configs(repo_root: Path | None = None) -> dict[str, str]:
     }
 
 
+MAX_MESSAGE_BYTES = 16 * 1024 * 1024
+
+
+class MessageFramingError(ValueError):
+    """Unrecoverable framing error; the stream must not be reused."""
+
+
 def _read_framed_message() -> dict[str, Any] | None:
     stream = sys.stdin.buffer
     while True:
-        first_line = stream.readline()
+        first_line = stream.readline(MAX_MESSAGE_BYTES + 1)
+        if len(first_line) > MAX_MESSAGE_BYTES:
+            raise MessageFramingError("Message exceeds 16 MiB")
         if not first_line:
             return None
         line = first_line.strip()
@@ -3728,10 +3756,14 @@ def _read_framed_message() -> dict[str, Any] | None:
     if line.lower().startswith(b"content-length:"):
         try:
             length = int(line.split(b":", 1)[1].strip())
-            if length < 0:
-                raise ValueError("negative Content-Length")
+            if not 0 <= length <= MAX_MESSAGE_BYTES:
+                raise ValueError("Content-Length outside 0..16 MiB")
+            header_bytes = len(first_line)
             while True:
-                sep = stream.readline()
+                sep = stream.readline(8193)
+                header_bytes += len(sep)
+                if header_bytes > 8192:
+                    raise ValueError("headers exceed 8192 bytes")
                 if not sep:
                     raise EOFError("incomplete headers")
                 if sep in (b"\r\n", b"\n"):
@@ -3741,7 +3773,7 @@ def _read_framed_message() -> dict[str, Any] | None:
                 raise EOFError("incomplete message body")
             return json.loads(body.decode("utf-8"))
         except Exception as exc:
-            raise ValueError(f"Failed to read Content-Length framed message: {exc}")
+            raise MessageFramingError(f"Failed to read Content-Length framed message: {exc}")
 
     return json.loads(line.decode("utf-8"))
 
@@ -3838,6 +3870,10 @@ def main() -> int:
             if catalog_changed:
                 sys.stdout.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}) + "\n")
                 sys.stdout.flush()
+        except MessageFramingError as exc:
+            sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": str(exc)}}) + "\n")
+            sys.stdout.flush()
+            break
         except json.JSONDecodeError:
             response = {
                 "jsonrpc": "2.0",

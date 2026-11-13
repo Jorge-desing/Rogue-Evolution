@@ -7,6 +7,7 @@ import json
 import io
 import os
 import tempfile
+import subprocess
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -17,6 +18,36 @@ SERVER = load_tool_module("bepinex_mcp_server")
 
 
 class RuntimeDiagnosticsTests(unittest.TestCase):
+    def test_stdio_process_recovers_invalid_envelope_but_closes_bad_frame(self) -> None:
+        command = [SERVER.sys.executable, str(Path(SERVER.__file__).resolve())]
+        ping = b'{"jsonrpc":"2.0","id":7,"method":"ping"}\n'
+        result = subprocess.run(command, input=b'[]\n' + ping, capture_output=True, timeout=15)
+        rows = [json.loads(row) for row in result.stdout.splitlines()]
+        self.assertEqual(rows[0]["error"]["code"], -32600)
+        self.assertEqual(rows[1]["id"], 7)
+        result = subprocess.run(command, input=b'Content-Length: 999999999\r\n\r\n' + ping, capture_output=True, timeout=15)
+        rows = [json.loads(row) for row in result.stdout.splitlines()]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["error"]["code"], -32700)
+
+    def test_invalid_rpc_inputs_do_not_execute_tools(self) -> None:
+        bad = [[], None, {"jsonrpc": "1.0", "id": 1, "method": "ping"},
+               {"jsonrpc": "2.0", "id": True, "method": "ping"},
+               {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": []},
+               {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "system_ping", "arguments": []}}]
+        with mock.patch.object(SERVER, "execute_tool") as execute:
+            for request in bad:
+                self.assertIn("error", SERVER.handle_request(request))
+            self.assertIsNone(SERVER.handle_request({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "system_ping"}}))
+            execute.assert_not_called()
+        self.assertEqual(SERVER.handle_request({"jsonrpc": "2.0", "id": 0, "method": "ping"})["id"], 0)
+
+    def test_stdio_rejects_oversized_frame_before_reading_body(self) -> None:
+        data = b"Content-Length: 999999999999\r\n\r\n"
+        with mock.patch.object(SERVER.sys, "stdin", io.TextIOWrapper(io.BytesIO(data), encoding="utf-8")):
+            with self.assertRaises(SERVER.MessageFramingError):
+                SERVER._read_framed_message()
+
     def test_ui_value_dispatch_preserves_types_and_submission(self) -> None:
         for kind, value in (("slider", 0.5), ("toggle", True), ("switch", False), ("dropdown", 2), ("text", "42")):
             with self.subTest(kind=kind), mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true}') as call:

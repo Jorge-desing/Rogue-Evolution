@@ -51,6 +51,6 @@ class ReloadingHandler:
         # Keep the cache only within this request (including its sequence).
         self.module._DIAGNOSTICS_GO_ID = None
         response = self.module.handle_request(message)
-        if message.get("method") == "initialize" and response and "result" in response:
+        if isinstance(message, dict) and message.get("method") == "initialize" and response and "result" in response:
             response["result"]["capabilities"]["tools"]["listChanged"] = True
         return response, changed
