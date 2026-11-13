@@ -13,6 +13,21 @@ SERVER = load_tool_module("bepinex_mcp_server")
 
 
 class RuntimeDiagnosticsTests(unittest.TestCase):
+    def test_bridge_errors_are_mcp_errors_without_reclassifying_nested_data(self) -> None:
+        with mock.patch.object(SERVER, "_call_http", return_value=json.dumps({"error": "connection refused"})):
+            self.assertTrue(SERVER.execute_tool("system_ping", {})["isError"])
+            self.assertTrue(SERVER.execute_tool("system_capabilities", {})["isError"])
+        self.assertFalse(SERVER._tool_response(json.dumps({"sections": {"error": "partial"}}))["isError"])
+
+    def test_sequence_validates_later_steps_before_bridge_calls(self) -> None:
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as bridge:
+            result = SERVER.execute_tool("automation_run_sequence", {"steps": [
+                {"tool": "diagnostics_get_game_time_scale"},
+                {"tool": "system_ping"},
+            ]})
+        self.assertTrue(result["isError"])
+        bridge.assert_not_called()
+
     def test_renderer_frame_probe_tools_dispatch_without_image_capture(self) -> None:
         calls: list[tuple[str, list[object]]] = []
 
@@ -271,7 +286,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         payload = json.loads(response["content"][0]["text"])
         step_result = payload["results"][0]["result"]
-        self.assertFalse(response["isError"])
+        self.assertTrue(response["isError"])
         self.assertTrue(payload["results"][0]["budgetExceeded"])
         self.assertFalse(step_result["conditionMet"])
         self.assertTrue(step_result["timedOut"])

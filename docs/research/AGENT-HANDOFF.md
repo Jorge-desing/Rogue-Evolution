@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 BepInEx MCP error handling
+
+- **Local validation:** After Codex restart, the active chat discovered 228 canonical BepInEx MCP tools and called process-state and discovery successfully. The game was closed; no live bridge or gameplay was tested.
+- **Fix:** Top-level JSON errors now set MCP `isError`; failed automation sequences also set it while preserving detailed results. The sequence validates all step types, tool names, argument containers and delays before making bridge calls. Runtime reference resolution and in-flight timeout postcondition rules remain necessary; this preflight does not validate all tool-specific arguments or future values.
+
 ## 2026-11-13 Codex BepInEx MCP catalog
 
 - **Repair:** The project MCP server remains `bepinex_mcp` and launches through `.agents/skills/rogue-command-bepinex-mcp/scripts/start-server.ps1`. Its project config now sets `BEPINEX_MCP_TOOL_FILTER=includeAliases=false`, removing only 20 duplicate aliases while retaining all 228 canonical tools and native intermission controls.

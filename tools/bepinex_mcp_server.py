@@ -355,6 +355,14 @@ def _call_http(endpoint: str, method: str = "GET", params: dict[str, Any] | None
 
 
 def _tool_response(text: str, is_error: bool = False) -> dict[str, Any]:
+    # Transport and diagnostics helpers encode failures as top-level JSON errors.
+    # Preserve ordinary data (including nested error fields) without reclassifying it.
+    if not is_error:
+        try:
+            payload = json.loads(text)
+            is_error = isinstance(payload, dict) and bool(payload.get("error"))
+        except (TypeError, ValueError):
+            pass
     return {
         "content": [{"type": "text", "text": text}],
         "isError": is_error,
@@ -816,25 +824,29 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "diagnostics_jump_to_level",
                 "diagnostics_load_next_level",
             }
+            # Validate the complete static sequence before issuing any bridge calls.
+            for index, step in enumerate(steps):
+                if not isinstance(step, dict):
+                    return _tool_response(json.dumps({"error": f"steps[{index}] must be an object"}), is_error=True)
+                step_tool = str(step.get("tool", "")).strip()
+                if step_tool not in known_tools or not step_tool.startswith("diagnostics_") or step_tool in forbidden:
+                    return _tool_response(json.dumps({"error": f"steps[{index}].tool is not an allowed diagnostics tool", "tool": step_tool}), is_error=True)
+                if not isinstance(step.get("arguments", {}), dict):
+                    return _tool_response(json.dumps({"error": f"steps[{index}].arguments must be an object"}), is_error=True)
+                try:
+                    delay = int(step.get("delayAfterMs", 0))
+                except (TypeError, ValueError):
+                    return _tool_response(json.dumps({"error": f"steps[{index}].delayAfterMs must be an integer"}), is_error=True)
+                if not 0 <= delay <= 2000:
+                    return _tool_response(json.dumps({"error": f"steps[{index}].delayAfterMs must be in [0, 2000]"}), is_error=True)
             started = time.monotonic()
             deadline = started + max_duration
             sequence_results: list[dict[str, Any]] = []
             failed = False
             for index, step in enumerate(steps):
-                if not isinstance(step, dict):
-                    return _tool_response(json.dumps({"error": f"steps[{index}] must be an object"}), is_error=True)
                 step_tool = str(step.get("tool", "")).strip()
                 step_arguments = step.get("arguments", {})
-                if step_tool not in known_tools or not step_tool.startswith("diagnostics_") or step_tool in forbidden:
-                    return _tool_response(json.dumps({"error": f"steps[{index}].tool is not an allowed diagnostics tool", "tool": step_tool}), is_error=True)
-                if not isinstance(step_arguments, dict):
-                    return _tool_response(json.dumps({"error": f"steps[{index}].arguments must be an object"}), is_error=True)
-                try:
-                    delay_after_ms = int(step.get("delayAfterMs", 0))
-                except (TypeError, ValueError):
-                    return _tool_response(json.dumps({"error": f"steps[{index}].delayAfterMs must be an integer"}), is_error=True)
-                if not 0 <= delay_after_ms <= 2000:
-                    return _tool_response(json.dumps({"error": f"steps[{index}].delayAfterMs must be in [0, 2000]"}), is_error=True)
+                delay_after_ms = int(step.get("delayAfterMs", 0))
                 if time.monotonic() - started >= max_duration:
                     failed = True
                     sequence_results.append({"index": index, "tool": step_tool, "success": False, "error": "sequence time budget exhausted"})
@@ -900,14 +912,15 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                         break
                     time.sleep(min(delay_after_ms / 1000.0, remaining))
 
+            sequence_success = not failed and len(sequence_results) == len(steps)
             return _tool_response(json.dumps({
-                "success": not failed and len(sequence_results) == len(steps),
+                "success": sequence_success,
                 "completedSteps": len(sequence_results),
                 "requestedSteps": len(steps),
                 "elapsedSeconds": round(time.monotonic() - started, 3),
                 "results": sequence_results,
                 "source": "ordered BepInEx MCP tool calls; no computer-use interaction or screenshot",
-            }, indent=2))
+            }, indent=2), is_error=not sequence_success)
         # ---- Core Bridge & System ----
         if name == "system_get_game_process_state":
             if os.name != "nt":
