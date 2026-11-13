@@ -104,3 +104,7 @@ When removing or consolidating Python tests, compare complete before/after inven
 For internal subcase cleanup, retain distinct boundaries, types and before/after states; consolidate identical positive controls outside invalid-input loops. Deterministic mandatory fixtures must fail when missing rather than skip.
 
 When two cases use identical inputs and call the same function, consolidate their distinct assertions before removing one. Keep direct tests of separate public entry points even when their implementations delegate to the same helper. Validating an unchanged baseline sample again is redundant when class setup already enforces it.
+
+The Surge Arc Tank source check retains the suspension envelope assertion; the former 7,000-polygon guard is obsolete under the global diagnostic-only geometry policy. Do not reinstate geometry build gates as test expectations.
+
+Ironclad asset tests inspect the current source blend with pinned Blender and current bundle with UnityPy; never depend on ignored reports from a previous session. Structural profile expectations must follow reviewed hardware removals (Arachnid, Sentinel and Command Relay), including exact absence checks. Missing rigged bundle clips require repairing the FBX/avatar and rebuilding, not weakening animation assertions.

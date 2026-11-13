@@ -59,7 +59,7 @@ class MechRiggingBundleTests(unittest.TestCase):
             "CommandRelayVisual",
         }
 
-        self.assertEqual(set(audits_by_name), expected)
+        self.assertEqual(set(audits_by_name), expected | {"BulwarkFoundryVisual", "RCLModule_arc_lance_walker_plasma_arc_containment"})
         for model_name in sorted(expected):
             audit = audits_by_name[model_name]
             with self.subTest(model=model_name):

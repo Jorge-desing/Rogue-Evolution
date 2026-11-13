@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import tempfile
+import UnityPy
 import re
 from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 CONTROLLER_PATH = ROOT / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Animations/IroncladWalkerController.controller"
-BLEND_REPORT = ROOT / "artifacts/ironclad-diagnostic/blender-source.json"
-BUNDLE_REPORT = ROOT / "artifacts/ironclad-diagnostic/inspection.json"
 PREFAB_PATH = ROOT / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/IroncladWalkerVisual.prefab"
 MATERIAL_ROOT = ROOT / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Materials"
 SHADER_PATH = ROOT / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Shaders/VehiclePBR_VertexWear.shader"
@@ -70,8 +71,23 @@ class IroncladWalkerAssetContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.controller_text = CONTROLLER_PATH.read_text(encoding="utf-8")
-        cls.blend = json.loads(BLEND_REPORT.read_text(encoding="utf-8"))
-        cls.bundle = json.loads(BUNDLE_REPORT.read_text(encoding="utf-8"))
+        # Inspect current sources, rather than reports from a prior local session.
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "actions.json"
+            script = Path(directory) / "inspect.py"
+            script.write_text("import bpy,json\nfrom pathlib import Path\nbpy.ops.wm.open_mainfile(filepath=" + repr(str(ROOT / "content/source-art/ironclad-walker.blend")) + ")\nactions=[{'name':a.name,'tracks':[{'bone':f.data_path.split(chr(34))[1]} for f in a.fcurves if 'pose.bones[' in f.data_path]} for a in bpy.data.actions]\nPath(" + repr(str(output)) + ").write_text(json.dumps({'actions':actions}))\n", encoding="utf-8")
+            subprocess.run([str(ROOT / ".tools/Blender-4.5.14/blender-4.5.14-windows-x64/blender.exe"), "--background", "--python-exit-code", "1", "--python", str(script)], check=True, capture_output=True, timeout=120)
+            cls.blend = json.loads(output.read_text())
+        env = UnityPy.load(str(ROOT / "content/packs/sample-native-expansion/bundles/sample-native-expansion.bundle"))
+        hierarchy, materials = [], []
+        for obj in env.objects:
+            if obj.type.name == "GameObject":
+                data = obj.read()
+                hierarchy.append({"gameobject": data.m_Name, "component_types": [pair.component.deref().type.name for pair in data.m_Component]})
+            elif obj.type.name == "Material":
+                data = obj.read()
+                materials.append({"name": data.m_Name, "textures": [{"property": name, "path_id": value.m_Texture.path_id} for name, value in data.m_SavedProperties.m_TexEnvs]})
+        cls.bundle = {"hierarchy": hierarchy, "materials": materials}
         cls.prefab_text = PREFAB_PATH.read_text(encoding="utf-8")
         cls.states, cls.transitions, cls.any_transitions = parse_controller(cls.controller_text)
 

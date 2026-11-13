@@ -54,3 +54,5 @@ An Editor build and successful AssetBundle import are local authoring evidence. 
 ## Bulwark foundry
 
 `TacticalOperationsPackScaffolder.BuildBulwarkFoundry` uses the global no-calibration-limits authoring policy, imports its PBR maps and RGBA mesh attributes, creates a script-free three-LOD prefab, and rebuilds the tactical bundle under `artifacts/bulwark-foundry-build/bundles/`. It reopens both bundles and rejects removal of any prior asset address. Check `content/source-art/bulwarkfoundry-build-report.json` for hashes and `UNCALIBRATED_USER_AUTHORIZED` status. Native factory scale, registration, and appearance require separate in-game evidence.
+
+Before rebuilding the sample-native bundle, ensure ArachnidHexapod.fbx is the animated armature export from arachnidhexapod-rigged.blend. A static export at the same path produces an invalid Generic Avatar and omits action clips. Preserve the source blend and back up the replaced FBX.

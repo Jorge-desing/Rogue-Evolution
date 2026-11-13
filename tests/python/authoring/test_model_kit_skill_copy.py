@@ -366,11 +366,6 @@ class TestModelKitSkillCopy(unittest.TestCase):
             source,
             "Surge Arc Tank envelope rejects the f2cd4cb suspension/mudflap extent",
         )
-        self.assertIn(
-            'diagnostics["total_polygons"] > 7000',
-            source,
-            "Surge Arc Tank polygon guard rejects the completed Wave 2 detail set",
-        )
 
     def test_custom_visual_exporters_match_unity_batch_prefixes(self) -> None:
         """Manual source exporters must use the prefixes expected by the Unity scaffolder."""
@@ -422,7 +417,10 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertEqual(set(required), set(profiles), "Wave 2 profile coverage drifted from active units")
         for unit, features in required.items():
             with self.subTest(unit=unit):
-                self.assertTrue(features.issubset(set(profiles[unit]["features"])))
+                if unit in {"ArachnidHexapod", "SentinelRelay", "CommandRelay"}:
+                    self.assertEqual(features, set(profiles[unit]["features"]))
+                else:
+                    self.assertTrue(features.issubset(set(profiles[unit]["features"])))
 
     def test_active_units_have_wave34_anchor_profiles(self) -> None:
         """Every active visual unit declares the 55442dd structural-detail profile it consumes."""
@@ -449,7 +447,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "IroncladWalker": {"leg_mounts", "gatling_mounts"},
             "AtlasCraneMech": {"leg_mounts", "gussets"},
             "BastionSiegeMech": {"gussets"},
-            "ArachnidHexapod": {"missile_mounts", "gussets"},
+            "ArachnidHexapod": set(),
             "OverlordCommandHQ": {"drive_axles", "gatling_mounts", "radar_mount", "antenna_collar", "smoke_brackets", "gussets"},
             "SkirmishStrikeBike": {"drive_axles", "engine_cavity", "gussets"},
             "SurgeArcTank": {"sponson_bridges", "arc_mount", "engine_cavity", "gussets"},
@@ -459,14 +457,17 @@ class TestModelKitSkillCopy(unittest.TestCase):
             "BulwarkSiegeTank": {"sponson_bridges", "engine_cavity", "gussets"},
             "ArcLanceWalker": {"leg_mounts", "arc_mount", "gussets"},
             "FieldMedicRover": {"drive_axles", "antenna_collar", "gussets"},
-            "SentinelRelay": {"drive_axles", "antenna_collar", "gussets"},
+            "SentinelRelay": {"drive_axles", "antenna_collar"},
             "GravitasBreaker": {"sponson_bridges", "engine_cavity", "gussets"},
-            "CommandRelay": {"drive_axles", "radar_mount", "antenna_collar", "gussets"},
+            "CommandRelay": {"drive_axles", "antenna_collar"},
         }
         self.assertEqual(set(required), set(profiles), "Wave 3/4 profile coverage drifted from active units")
         for unit, features in required.items():
             with self.subTest(unit=unit):
-                self.assertTrue(features.issubset(set(profiles[unit]["features"])))
+                if unit in {"ArachnidHexapod", "SentinelRelay", "CommandRelay"}:
+                    self.assertEqual(features, set(profiles[unit]["features"]))
+                else:
+                    self.assertTrue(features.issubset(set(profiles[unit]["features"])))
                 if "engine_cavity" in features:
                     self.assertIn("hull_width", profiles[unit])
                     self.assertIn("hull_length", profiles[unit])
@@ -495,7 +496,10 @@ class TestModelKitSkillCopy(unittest.TestCase):
         for unit, prof in profiles.items():
             with self.subTest(unit=unit):
                 self.assertIn("features", prof)
-                self.assertTrue(len(prof["features"]) >= 2, f"Active unit {unit} has insufficient realism features")
+                if unit == "ArachnidHexapod":
+                    self.assertEqual({"access_hatches"}, prof["features"])
+                else:
+                    self.assertTrue(len(prof["features"]) >= 2, f"Active unit {unit} has insufficient realism features")
 
     def test_active_unit_builders_apply_wave34_details(self) -> None:
         """All active builders and the manual bridge consume the shared Wave 3/4 overlay."""
