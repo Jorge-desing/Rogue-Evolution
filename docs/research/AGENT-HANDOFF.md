@@ -5,6 +5,13 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Stateless HTTP MCP transport
+
+- Supersedes per-chat stdio adapters: global/project Codex now use `http://127.0.0.1:18764/mcp`; Antigravity uses the same serverUrl. The loopback frontend authenticates bearer credentials, closes HTTP connections after each response, keeps no per-chat session, and forwards serialized calls to the existing shared worker without replay. HTTP chunk framing is explicit because the local network layer rewrote Content-Length responses incorrectly.
+- Endpoint `tools/bepinex_mcp_http.py` runs hidden via pinned pythonw, and HKCU Run entry `RogueCommandMcp` starts it at sign-in independently of chat lifetime. Token is in ignored `artifacts/mcp-http/token`, and global client headers; no secret is in tracked project config. Prior configs: `artifacts/mcp-http/backup-20261113T205223Z/`. Legacy stdio clients were stopped after confirming the HTTP endpoint. Reconnect old clients once to adopt URL transport.
+- Three real MCP SDK sessions initialized, listed 230 tools and called process-state successfully with no per-chat process creation. No game was started. Legacy stdio scripts remain available for explicit compatibility, but are no longer the configured transport.
+- Fresh Codex Desktop app-server inventory also listed 230 tools over HTTP. Isolated HTTP authentication/connection-close test passes. Full report `artifacts/mcp-http/full.json` records 718 passes, six existing asset failures, one fixture error and one skip; unrelated concurrent test maintenance changed the suite inventory. No new MCP failure is reported.
+
 ## 2026-11-13 Hidden MCP client startup
 
 - Global/project Codex and Antigravity configuration now launch `tools/bepinex_mcp_client.cjs` with Node. It pipes stdio to the Python shared adapter with `windowsHide=true`; the authenticated singleton backend stays alive across chats. Two real adapter connections reused worker PID 6104 and closed successfully. Its pre-existing console was hidden without stopping it. Configuration backups: `artifacts/mcp-hidden-start/20261113T203922Z/`.
