@@ -14,6 +14,13 @@ namespace RogueCommandExpansionLoader.Runtime
             object before = null;
             try
             {
+                if (valueJson != null && valueJson.StartsWith("base64:", StringComparison.Ordinal))
+                    valueJson = new System.Text.UTF8Encoding(false, true).GetString(Convert.FromBase64String(valueJson.Substring(7)));
+                // The installed bridge can retain one string-argument escape
+                // layer. Normalize that known wire form once, before parsing.
+                // Ordinary JSON (including embedded backslashes) stays intact.
+                if (kind == "text" && valueJson != null && valueJson.StartsWith("\\\"", StringComparison.Ordinal) && valueJson.EndsWith("\\\"", StringComparison.Ordinal))
+                    valueJson = Newtonsoft.Json.JsonConvert.DeserializeObject<string>("\"" + valueJson + "\"");
                 JToken value = JToken.Parse(valueJson);
                 JObject census = JObject.Parse(RuntimeUiAccessibility.GetCensusJson(path, false, 100));
                 var rows = ((JArray)census["candidates"]).OfType<JObject>().Where(r => (string)r["hierarchyPath"] == path).ToArray();

@@ -24,6 +24,17 @@ input.readOnly = true; Check(!(bool)Set("text", "\"other\"")["nativeCallInvoked"
 input.readOnly = false; input.validate = true;
 var result = Set("text", "\"other\"", true);
 Check((bool)result["nativeCallInvoked"] && !(bool)result["effectObserved"] && input.onEndEdit.calls == 1);
+input.validate = false;
+foreach (string text in new[] { "0", "quote\"slash\\", "línea\n日本語", "comma,value" })
+{
+    string json = Newtonsoft.Json.JsonConvert.SerializeObject(text);
+    string escaped = Newtonsoft.Json.JsonConvert.SerializeObject(json);
+    escaped = escaped.Substring(1, escaped.Length - 2);
+    Check((bool)Set("text", escaped, true)["success"] && input.text == text);
+    Check((bool)Set("text", json, true)["success"] && input.text == text);
+    string wire = "base64:" + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+    Check((bool)Set("text", wire, true)["success"] && input.text == text);
+}
 Setup(sw); ObjectStore.Components = new Component[] {sw, new Michsky.UI.Reach.SwitchManager()};
 Check(!(bool)Set("switch", "false")["nativeCallInvoked"]);
 Console.WriteLine($"PASS {checks} simulated director assertions; no Unity runtime evidence");

@@ -14,6 +14,7 @@ import sys
 import time
 import csv
 import copy
+import base64
 import subprocess
 import contextvars
 import math
@@ -828,7 +829,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     or (submit and kind != "text")):
                 return _tool_response(json.dumps({"error": "Invalid UI target or typed value"}), is_error=True)
             try:
-                value_json = json.dumps(value, allow_nan=False)
+                value_json = "base64:" + base64.b64encode(json.dumps(value, allow_nan=False, ensure_ascii=False).encode("utf-8")).decode("ascii")
             except ValueError:
                 return _tool_response(json.dumps({"error": "Value must be finite"}), is_error=True)
             return _tool_response(_call_diagnostics_method("SetUiValueJson", [path, object_id, kind, value_json, submit]))

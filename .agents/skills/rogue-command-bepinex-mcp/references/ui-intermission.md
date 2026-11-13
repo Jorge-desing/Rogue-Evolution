@@ -6,6 +6,8 @@ Use this reference for screenshot-free control discovery and the run director be
 
 Local verification uses `dotnet run --project tests/UiValueDirector/UiValueDirector.csproj -c Release`: it compiles the real value director with simulated controls and checks dispatch, stale/disabled/ambiguous targets, native event invocation and TMP validation rejection. This harness does not establish Unity or in-game behavior.
 
+The value payload uses Base64-encoded UTF-8 JSON internally because the installed generic bridge splits arguments on commas and strips quotes. Keep this encoding in the MCP handler; callers still supply ordinary typed `value` fields. After restarting the game, re-resolve LoaderDiagnostics IDs; an existing MCP process can retain an obsolete ID.
+
 ## Discover and operate native UI
 
 1. Start with `diagnostics_get_runtime_control_surface` for the active scene, frame number, and accessible UI census in one Unity-thread call. It also returns bounded native Shop/RemoveCardView state; an active `Intermission` scene adds run progression, the node census and graph/routes, reward/deck state, and navigator state. On other scenes the intermission section is marked as excluded. Use `diagnostics_get_ui_accessibility_census` with a label query when you need a narrower or refreshed control list; both reads are screenshot-free.

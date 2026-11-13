@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import io
 import os
@@ -23,7 +24,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 self.assertFalse(result.get("isError", False))
                 self.assertEqual("SetUiValueJson", call.call_args.args[0])
                 args = call.call_args.args[1]
-                self.assertEqual(value, json.loads(args[3]))
+                self.assertEqual(value, json.loads(base64.b64decode(args[3][7:]).decode("utf-8")))
                 self.assertEqual(kind == "text", args[4])
 
     def test_ui_value_invalid_types_never_call_bridge(self) -> None:
