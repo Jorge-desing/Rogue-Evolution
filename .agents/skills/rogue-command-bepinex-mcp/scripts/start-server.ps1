@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\..'))
 $pythonPath = Join-Path $repositoryRoot '.tools\BepInExMCP\.venv\Scripts\python.exe'
-$serverPath = Join-Path $repositoryRoot 'tools\bepinex_mcp_server.py'
+$serverPath = Join-Path $repositoryRoot 'tools\bepinex_mcp_shared.py'
 
 if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
     [Console]::Error.WriteLine("BepInEx MCP Python environment is missing: $pythonPath")

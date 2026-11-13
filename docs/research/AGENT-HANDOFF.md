@@ -5,6 +5,12 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Shared MCP worker
+
+- The project launcher now starts a stdio adapter connected to a singleton worker via authenticated Windows named pipes (Unix sockets on other hosts). An OS startup lock prevents duplicate workers; checkout and URL/filter isolate workers. Requests and sequences execute serially. Closing adapters does not stop the worker, and adapter transport errors never replay a submitted request. Handler/schema/reader hot reload remains supported.
+- Local test launches two real stdio clients, verifies the same worker PID, closes one client and verifies the other still calls successfully. Existing direct-server clients need one launcher reload to join the shared worker. Game runtime remains untested.
+- Real project launcher smoke: two connections reported worker PID 17944 and successful process-state reads; closing both adapters left the worker available. Antigravity config now uses the pinned Python shared adapter, with prior config backed up under `artifacts/mcp-shared-config-backup/20261113T181306Z/`. Full Python report `artifacts/mcp-shared-validation/full.json`: 726 passed, seven failed, one fixture error and one skip, matching the prior failed/error cases; all 26 bpy cases ran. No game was started.
+
 ## 2026-11-13 Bounded agent state waits
 
 - `automation_wait_for_state` polls six explicitly allowed read-only queries with 1-8 strict JSON Pointer equality checks, a 0.1-30s timeout and 100-2000ms poll interval (defaults 10s/250ms). Missing values remain pending; invalid/failed queried sections and transport errors stop. Only the latest observation is retained. Waits inherit the sequence deadline and never repeat mutations; failed waits halt even with `stopOnFailure=false`. Sequence responses add structured `stopReason`.

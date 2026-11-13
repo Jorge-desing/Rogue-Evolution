@@ -28,6 +28,8 @@ Use the live index rather than treating this table as exhaustive. `diagnostics_g
 
 ## MCP configuration and tool selection
 
+- The launcher uses `tools/bepinex_mcp_shared.py`: each client has a stdio adapter, while one authenticated local worker per checkout and URL/filter configuration executes requests serially. Closing a chat leaves that worker available. Never replay a request after a lost response; inspect postconditions. Existing clients need one launcher reload to migrate; future chats reuse the worker automatically. Different checkouts/configurations intentionally remain separate.
+
 - Tool arguments are validated against the advertised schema before dispatch, including CLI and resolved sequence steps. Static sequence preflight defers exact references only until resolution. Errors identify the tool and argument path; values are not coerced. Install `jsonschema==4.26.0` from project requirements in the server's Python environment; missing validation dependency blocks tools.
 - HTTP response bodies are limited to 16 MiB, decoded as strict UTF-8 and checked against valid Content-Length. Transport/body failures after sending report `completionStatus=unknown` even outside sequences; inspect postconditions before retrying. Expired pre-send budgets report `not_started`.
 
