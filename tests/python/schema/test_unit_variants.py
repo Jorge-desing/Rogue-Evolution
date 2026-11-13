@@ -35,8 +35,6 @@ class UnitVariantSchemaTests(unittest.TestCase):
         self.assertEqual(list(caught.exception.absolute_path), VARIANT_PATH + path)
         self.assertEqual(caught.exception.validator, keyword)
 
-    def test_variants_are_optional(self) -> None:
-        self.validator.validate(copy.deepcopy(self.sample))
 
     def test_ap_and_he_with_raw_balance_override_are_accepted(self) -> None:
         variants = [

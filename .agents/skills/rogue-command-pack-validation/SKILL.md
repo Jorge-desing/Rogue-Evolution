@@ -102,3 +102,5 @@ When removing or consolidating Python tests, compare complete before/after inven
 - A 2026-11-10 BepInEx MCP readback observed an 8/8-bound Ironclad clone in `Action_FireRecoil` with mapped yaw/pitch targets matching computed poses. This is runtime transform telemetry, not rendered appearance; death appearance and natural pooled reuse are still unknown.
 
 For internal subcase cleanup, retain distinct boundaries, types and before/after states; consolidate identical positive controls outside invalid-input loops. Deterministic mandatory fixtures must fail when missing rather than skip.
+
+When two cases use identical inputs and call the same function, consolidate their distinct assertions before removing one. Keep direct tests of separate public entry points even when their implementations delegate to the same helper. Validating an unchanged baseline sample again is redundant when class setup already enforces it.

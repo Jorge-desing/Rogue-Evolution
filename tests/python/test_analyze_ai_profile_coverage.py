@@ -14,6 +14,7 @@ def _valid_pack():
 class AnalyzeAiProfileCoverageTests(unittest.TestCase):
     def test_empty_pack_ok(self):
         report = AIC.analyze_ai_profile_coverage({})
+        self.assertEqual(23, report["registeredModuleCount"])
         self.assertEqual(0, report["profileCount"])
         self.assertEqual([], report["issues"])
 
@@ -58,9 +59,6 @@ class AnalyzeAiProfileCoverageTests(unittest.TestCase):
         report = AIC.analyze_ai_profile_coverage(pack)
         self.assertEqual([], report["issues"])
 
-    def test_registered_module_count(self):
-        report = AIC.analyze_ai_profile_coverage({})
-        self.assertEqual(23, report["registeredModuleCount"])
 
 
 if __name__ == "__main__":

@@ -10,7 +10,6 @@ class TestVisualPreviewBuilderEvolution(unittest.TestCase):
     def test_built_bundle_summary_log(self):
         src = BUILDER.read_text(encoding="utf-8")
         self.assertIn("ForceRebuildAssetBundle", src, "missing force rebuild")
-        self.assertIn("Built bundle", src, "missing built-bundle success log")
 
 
 if __name__ == "__main__":

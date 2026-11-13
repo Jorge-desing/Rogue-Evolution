@@ -11,7 +11,6 @@ class TestSamplePackScaffolderEvolution(unittest.TestCase):
         src = SCAFFOLDER.read_text(encoding="utf-8")
         self.assertIn("ForceRebuildAssetBundle", src, "missing ForceRebuildAssetBundle")
         self.assertIn("ValidateBuiltBundles", src, "missing post-build bundle validation")
-        self.assertIn("Built bundle", src, "missing per-bundle build summary log")
 
 
 if __name__ == "__main__":

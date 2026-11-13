@@ -28,6 +28,7 @@ class AnalyzeUnitMechanicsTests(unittest.TestCase):
         pack["units"][0]["aura"] = {"auraRadius": 5}
         report = MECHANICS.analyze_mechanics(pack)
         unit = report["units"][0]
+        self.assertEqual(1, report["usage"]["aura"])
         self.assertIn("aura", unit["mechanics"])
         self.assertNotIn("aura", report["unusedMechanics"])
         self.assertIn("shieldRegeneration", report["unusedMechanics"])
@@ -38,11 +39,6 @@ class AnalyzeUnitMechanicsTests(unittest.TestCase):
         report = MECHANICS.analyze_mechanics(pack)
         self.assertNotIn("aura", report["units"][0]["mechanics"])
 
-    def test_usage_histogram(self) -> None:
-        pack = SCAFFOLD.generate_scaffold("ns:pack", "alpha")
-        pack["units"][0]["aura"] = {"auraRadius": 5}
-        report = MECHANICS.analyze_mechanics(pack)
-        self.assertEqual(1, report["usage"]["aura"])
 
     def test_empty_pack(self) -> None:
         report = MECHANICS.analyze_mechanics({})

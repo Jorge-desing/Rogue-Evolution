@@ -9,7 +9,6 @@ BUILDER = REPO_ROOT / "unity" / "RogueCommandAssetAuthoring" / "Assets" / "Edito
 class TestVehiclePrefabBuilderEvolution(unittest.TestCase):
     def test_turret_socket_helper_and_call_site(self):
         src = BUILDER.read_text(encoding="utf-8")
-        self.assertIn("EnsureTurretAndRadarSockets", src, "missing turret socket helper")
         self.assertIn("Socket_TurretPivot", src, "missing turret pivot guarantee")
         # called after canonical VFX sockets in gameplay builder
         self.assertIn("EnsureTurretAndRadarSockets(root", src, "helper not called in BuildPrefabFromGameplayJson")

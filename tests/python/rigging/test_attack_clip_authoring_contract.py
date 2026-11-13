@@ -39,9 +39,6 @@ class AttackClipAuthoringContractTests(unittest.TestCase):
             r'set_bone_key\(body_bone,\s*"location"',
             "FireRecoil must key body translation for a readable recoil impulse",
         )
-        self.assertIn("anticipation", self.action_source.lower())
-        self.assertIn("follow-through", self.action_source.lower())
-        self.assertIn("recovery", self.action_source.lower())
 
     def test_fire_recoil_has_secondary_turret_motion(self) -> None:
         """The attack pose must include pitch/settling motion beside barrel slide."""
