@@ -88,11 +88,11 @@
           "unityTriangles": 2848
         },
         "LOD1": {
-          "blenderFaces": 900,
+          "blenderFaces": 886,
           "unityTriangles": 1424
         },
         "LOD2": {
-          "blenderFaces": 404,
+          "blenderFaces": 403,
           "unityTriangles": 710
         }
       }
@@ -214,11 +214,11 @@
           "unityTriangles": 2672
         },
         "LOD1": {
-          "blenderFaces": 724,
+          "blenderFaces": 726,
           "unityTriangles": 1336
         },
         "LOD2": {
-          "blenderFaces": 376,
+          "blenderFaces": 366,
           "unityTriangles": 666
         }
       }
@@ -298,11 +298,11 @@
           "unityTriangles": 2480
         },
         "LOD1": {
-          "blenderFaces": 559,
+          "blenderFaces": 566,
           "unityTriangles": 1240
         },
         "LOD2": {
-          "blenderFaces": 292,
+          "blenderFaces": 280,
           "unityTriangles": 620
         }
       }
@@ -382,11 +382,11 @@
           "unityTriangles": 2588
         },
         "LOD1": {
-          "blenderFaces": 761,
+          "blenderFaces": 750,
           "unityTriangles": 1294
         },
         "LOD2": {
-          "blenderFaces": 374,
+          "blenderFaces": 376,
           "unityTriangles": 646
         }
       }
@@ -508,11 +508,11 @@
           "unityTriangles": 1656
         },
         "LOD1": {
-          "blenderFaces": 372,
+          "blenderFaces": 369,
           "unityTriangles": 828
         },
         "LOD2": {
-          "blenderFaces": 200,
+          "blenderFaces": 202,
           "unityTriangles": 412
         }
       }
@@ -634,11 +634,11 @@
           "unityTriangles": 2588
         },
         "LOD1": {
-          "blenderFaces": 761,
+          "blenderFaces": 750,
           "unityTriangles": 1294
         },
         "LOD2": {
-          "blenderFaces": 374,
+          "blenderFaces": 376,
           "unityTriangles": 646
         }
       }
@@ -970,11 +970,11 @@
           "unityTriangles": 1720
         },
         "LOD1": {
-          "blenderFaces": 442,
+          "blenderFaces": 436,
           "unityTriangles": 860
         },
         "LOD2": {
-          "blenderFaces": 255,
+          "blenderFaces": 249,
           "unityTriangles": 428
         }
       }
@@ -1054,11 +1054,11 @@
           "unityTriangles": 1440
         },
         "LOD1": {
-          "blenderFaces": 352,
+          "blenderFaces": 356,
           "unityTriangles": 720
         },
         "LOD2": {
-          "blenderFaces": 188,
+          "blenderFaces": 186,
           "unityTriangles": 358
         }
       }
@@ -1096,11 +1096,11 @@
           "unityTriangles": 1372
         },
         "LOD1": {
-          "blenderFaces": 360,
+          "blenderFaces": 358,
           "unityTriangles": 686
         },
         "LOD2": {
-          "blenderFaces": 175,
+          "blenderFaces": 174,
           "unityTriangles": 342
         }
       }
@@ -1222,11 +1222,11 @@
           "unityTriangles": 1736
         },
         "LOD1": {
-          "blenderFaces": 497,
+          "blenderFaces": 496,
           "unityTriangles": 868
         },
         "LOD2": {
-          "blenderFaces": 214,
+          "blenderFaces": 218,
           "unityTriangles": 432
         }
       }
@@ -1306,11 +1306,11 @@
           "unityTriangles": 2892
         },
         "LOD1": {
-          "blenderFaces": 823,
+          "blenderFaces": 817,
           "unityTriangles": 1446
         },
         "LOD2": {
-          "blenderFaces": 455,
+          "blenderFaces": 439,
           "unityTriangles": 722
         }
       }
@@ -1348,11 +1348,11 @@
           "unityTriangles": 1280
         },
         "LOD1": {
-          "blenderFaces": 352,
+          "blenderFaces": 342,
           "unityTriangles": 640
         },
         "LOD2": {
-          "blenderFaces": 154,
+          "blenderFaces": 155,
           "unityTriangles": 318
         }
       }
@@ -1474,11 +1474,11 @@
           "unityTriangles": 2524
         },
         "LOD1": {
-          "blenderFaces": 528,
+          "blenderFaces": 535,
           "unityTriangles": 1262
         },
         "LOD2": {
-          "blenderFaces": 318,
+          "blenderFaces": 320,
           "unityTriangles": 630
         }
       }
@@ -1558,11 +1558,11 @@
           "unityTriangles": 2564
         },
         "LOD1": {
-          "blenderFaces": 723,
+          "blenderFaces": 717,
           "unityTriangles": 1282
         },
         "LOD2": {
-          "blenderFaces": 315,
+          "blenderFaces": 311,
           "unityTriangles": 640
         }
       }
@@ -1642,11 +1642,11 @@
           "unityTriangles": 4724
         },
         "LOD1": {
-          "blenderFaces": 1128,
+          "blenderFaces": 1136,
           "unityTriangles": 2362
         },
         "LOD2": {
-          "blenderFaces": 609,
+          "blenderFaces": 597,
           "unityTriangles": 1180
         }
       }
@@ -1894,11 +1894,11 @@
           "unityTriangles": 6304
         },
         "LOD1": {
-          "blenderFaces": 1495,
+          "blenderFaces": 1475,
           "unityTriangles": 3152
         },
         "LOD2": {
-          "blenderFaces": 751,
+          "blenderFaces": 748,
           "unityTriangles": 1576
         }
       }
@@ -2188,11 +2188,11 @@
           "unityTriangles": 3120
         },
         "LOD1": {
-          "blenderFaces": 912,
+          "blenderFaces": 890,
           "unityTriangles": 1560
         },
         "LOD2": {
-          "blenderFaces": 487,
+          "blenderFaces": 493,
           "unityTriangles": 780
         }
       }
@@ -2402,7 +2402,7 @@
           "unityTriangles": 926
         },
         "LOD2": {
-          "blenderFaces": 235,
+          "blenderFaces": 241,
           "unityTriangles": 462
         }
       }

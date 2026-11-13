@@ -39,7 +39,9 @@ from hard_surface_geometry_presets import (
     THERMAL_ARMORED_RADIATOR_V2_PRESET_ID,
     _apply_hardflow_or_builtin_bevel,
     _apply_hardflow_or_builtin_boolean,
+    _local_y_outward_frame,
     _orientation_frame,
+    _side_mount_frame,
     _transform_world,
 )
 
@@ -409,7 +411,7 @@ def create_fuel_aux_jerrycan_rack_v2_preset(
     """Build a polished tactical jerrycan basket v2 with vibration pucks and hinged gate."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -679,7 +681,7 @@ def create_slat_armor_screen_v2_preset(
     """Build a polished standoff slat armor screen v2 with knife-edge bars and maintenance hinges."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -887,7 +889,7 @@ def create_ordnance_mine_dispenser_v2_preset(
     """Build a polished modular mine dispenser rack v2 with backblast shield and quick-release clamps."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -1121,7 +1123,7 @@ def create_ordnance_mine_dispenser_v2_preset(
 
 @dataclass(frozen=True)
 class ThermalArmoredRadiatorV2Config:
-    """Dimensions and placement for a polished heavy armored radiator sponson pack v2."""
+    """Flank radiator dimensions; local +X is outward, +Y forward, and +Z vertical."""
     center: tuple[float, float, float] = (0.0, 0.0, 0.0)
     normal: tuple[float, float, float] = (1.0, 0.0, 0.0)
     cowl_size: tuple[float, float, float] = (0.36, 0.62, 0.42)
@@ -1157,7 +1159,7 @@ def create_thermal_armored_radiator_v2_preset(
     """Build a polished heavy armored radiator sponson pack v2 with auxiliary fan cowls and flanged valves."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _side_mount_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -1378,7 +1380,7 @@ def create_autocannon_remote_sponson_v2_preset(
     """Build a polished remote 30mm autocannon pod v2 with mantlet shield and linkless feed chute."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _side_mount_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -1840,7 +1842,7 @@ def create_plasma_containment_cell_v2_preset(
     """Build a polished plasma containment vault v2 with quad coils and triple manifold."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _side_mount_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -2203,7 +2205,7 @@ def create_plasma_torpedo_magazine_v2_preset(
     """Build a polished quantum torpedo magazine rack v2 with linear induction accelerator rails."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -2342,7 +2344,7 @@ def create_plasma_torpedo_magazine_v2_preset(
 
 @dataclass(frozen=True)
 class TachyonicRadiatorArrayV2Config:
-    """Dimensions and placement for a polished tachyonic radiator array v2."""
+    """Flank radiator dimensions; local +X is outward, +Y forward, and +Z vertical."""
     center: tuple[float, float, float] = (0.0, 0.0, 0.0)
     normal: tuple[float, float, float] = (1.0, 0.0, 0.0)
     array_size: tuple[float, float, float] = (0.36, 0.64, 0.38)
@@ -2378,7 +2380,7 @@ def create_tachyonic_radiator_array_v2_preset(
     """Build a polished tachyonic radiator array v2 with dual resonance rods and 8 serrated fins."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _side_mount_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -2538,7 +2540,7 @@ def create_nanite_repair_dispenser_v2_preset(
     """Build a polished nanite repair dispenser pod v2 with 4-nozzle manifold and micro-drone bay."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 

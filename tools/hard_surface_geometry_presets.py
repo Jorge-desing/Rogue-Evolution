@@ -807,6 +807,36 @@ def _orientation_frame(normal_vec: tuple[float, float, float], roll_degrees: flo
     return Quaternion(normal, math.radians(roll_degrees)) @ frame
 
 
+def _local_y_outward_frame(normal_vec: tuple[float, float, float], roll_degrees: float = 0.0) -> Quaternion:
+    """Orient local +Y outward, +Z upward, and +X lateral for rack/screen mounts."""
+    normal = Vector(normal_vec).normalized()
+    local_z = Vector((0.0, 0.0, 1.0)) - normal * normal.z
+    if local_z.length <= 1.0e-8:
+        reference = Vector((1.0, 0.0, 0.0))
+        local_z = reference - normal * reference.dot(normal)
+    local_z.normalize()
+    local_x = normal.cross(local_z).normalized()
+    frame = Matrix((local_x, normal, local_z)).transposed().to_quaternion()
+    return Quaternion(normal, math.radians(roll_degrees)) @ frame
+
+
+def _side_mount_frame(normal_vec: tuple[float, float, float], roll_degrees: float = 0.0) -> Quaternion:
+    """Orient local +X outward, +Y forward, and +Z upward for flank-mounted parts."""
+    normal = Vector(normal_vec).normalized()
+    forward_reference = Vector((0.0, 1.0, 0.0))
+    local_y = forward_reference - normal * forward_reference.dot(normal)
+    if local_y.length <= 1.0e-8:
+        forward_reference = Vector((0.0, 0.0, 1.0))
+        local_y = forward_reference - normal * forward_reference.dot(normal)
+    local_y.normalize()
+    local_z = normal.cross(local_y).normalized()
+    if local_z.dot(Vector((0.0, 0.0, 1.0))) < 0.0:
+        local_y.negate()
+        local_z.negate()
+    frame = Matrix((normal, local_y, local_z)).transposed().to_quaternion()
+    return Quaternion(normal, math.radians(roll_degrees)) @ frame
+
+
 def _transform_world(center: tuple[float, float, float], frame: Quaternion, local: tuple[float, float, float]) -> Vector:
     return Vector(center) + frame @ Vector(local)
 
@@ -1592,7 +1622,7 @@ def create_fuel_aux_jerrycan_rack_preset(
     """Build a contemporary tactical rack carrying dual stamped-steel jerrycans."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -1891,7 +1921,7 @@ def create_slat_armor_screen_preset(
     """Build a statistical standoff slat/bar armor screen module."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -2390,7 +2420,7 @@ def create_plasma_containment_cell_preset(
     """Build a futuristic polyhedral plasma magnetic confinement vault module."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _side_mount_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -2860,7 +2890,7 @@ def create_ordnance_mine_dispenser_preset(
     """Build a contemporary tactical mine dispensing carrier with multi-cassette launch blocks."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -3082,7 +3112,7 @@ def create_thermal_armored_radiator_preset(
     """Build a heavy armored louvered radiator sponson pack with hydraulic coolant manifolds."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _side_mount_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -3283,7 +3313,7 @@ def create_autocannon_remote_sponson_preset(
     """Build a remote 30mm point-defense autocannon sponson pod with ammo magazine and targeting optics."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _side_mount_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -3518,7 +3548,7 @@ def create_plasma_torpedo_magazine_preset(
     """Build a futuristic magnetic accelerator magazine carrying quantum plasma torpedoes."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -3701,7 +3731,7 @@ def create_tachyonic_radiator_array_preset(
     """Build a futuristic tachyonic superconducting radiator array with quantum heat sinks."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _side_mount_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
@@ -3817,8 +3847,8 @@ def create_tachyonic_radiator_array_preset(
 class NaniteRepairDispenserConfig:
     """Dimensions and placement for an autonomous nanite hive repair dispenser pod.
 
-    Mounts at Socket_Hardpoint_Sponsons (hull flank). Local +X is outward
-    normal, local +Y is forward dispersal axis, local +Z is vertical.
+    Mounts at Socket_Hardpoint_Sponsons (hull flank). Local +Y is the outward
+    dispersal axis, local +Z is vertical, and local +X is lateral.
     """
     center: tuple[float, float, float] = (0.0, 0.0, 0.0)
     normal: tuple[float, float, float] = (1.0, 0.0, 0.0)
@@ -3855,7 +3885,7 @@ def create_nanite_repair_dispenser_preset(
     """Build an autonomous nanite hive dispenser pod with storage cylinders and dispersal nozzles."""
     if not prefix:
         raise ValueError("Preset prefix must not be empty")
-    frame = _orientation_frame(config.normal, config.roll_degrees)
+    frame = _local_y_outward_frame(config.normal, config.roll_degrees)
     rotation = frame.to_euler()
     created: list[bpy.types.Object] = []
 
