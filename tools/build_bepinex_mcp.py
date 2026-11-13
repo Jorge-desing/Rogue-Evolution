@@ -1441,6 +1441,15 @@ def _optimise_spec(spec: dict) -> dict:
     }
 
 
+for _spec in TOOL_SPECS:
+    if _spec["name"] == "diagnostics_post_agent_message":
+        _params = _spec["parameters"]
+        for _alias in ("senderId", "payload", "recipientId"):
+            _params["properties"][_alias] = {"type": "string"}
+        _params.pop("required", None)
+        _params["allOf"] = [{"anyOf": [{"required": ["senderAgentId"]}, {"required": ["senderId"]}]},
+                            {"anyOf": [{"required": ["content"]}, {"required": ["payload"]}]}]
+
 TOOL_SPECS = [_optimise_spec(spec) for spec in TOOL_SPECS]
 
 _BY_NAME: dict[str, dict] = {spec["name"]: spec for spec in TOOL_SPECS}

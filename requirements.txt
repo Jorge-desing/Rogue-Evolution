@@ -2,3 +2,4 @@ UnityPy==1.25.4
 TypeTreeGeneratorAPI==0.0.10
 dnfile==0.18.0
 Pillow==13.0.0
+jsonschema==4.26.0

@@ -35,6 +35,28 @@ class ReloadTests(unittest.TestCase):
                 self.assertNotEqual(first["result"]["serverInfo"]["version"], second["result"]["serverInfo"]["version"])
                 self.assertEqual(pid, process.pid)
                 self.assertIsNone(process.poll())
+                process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 20, "method": "tools/call", "params": {"name": "system_ping", "arguments": {"extra": True}}}) + "\n")
+                process.stdin.flush()
+                invalid = json.loads(process.stdout.readline())
+                self.assertTrue(invalid["result"]["isError"])
+                self.assertIn("argumentPath", json.loads(invalid["result"]["content"][0]["text"]))
+                self.assertIn("result", initialize(21))
+                builder = root / "build_bepinex_mcp.py"
+                builder.write_text(builder.read_text(encoding="utf-8") + '\nfor spec in TOOL_SPECS:\n    if spec["name"] == "system_ping":\n        spec["parameters"] = {"type":"object", "required":["marker"]}\n', encoding="utf-8")
+                process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 22, "method": "tools/call", "params": {"name": "system_ping", "arguments": {}}}) + "\n")
+                process.stdin.flush()
+                row = json.loads(process.stdout.readline())
+                if "method" in row:
+                    row = json.loads(process.stdout.readline())
+                self.assertIn("marker", row["result"]["content"][0]["text"])
+                # Restore catalog before the existing reader test.
+                builder.write_bytes((source / "build_bepinex_mcp.py").read_bytes())
+                process.stdin.write(json.dumps({"jsonrpc": "2.0", "id": 23, "method": "ping"}) + "\n")
+                process.stdin.flush()
+                row = json.loads(process.stdout.readline())
+                if "method" in row:
+                    row = json.loads(process.stdout.readline())
+                self.assertEqual(23, row["id"])
                 # The currently blocked reader may finish one message using
                 # old code; after dispatch the next read must use new code.
                 code = server.read_text(encoding="utf-8")

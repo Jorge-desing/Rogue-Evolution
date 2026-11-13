@@ -5,6 +5,12 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 HTTP bounds and schema validation
+
+- HTTP replies are bounded to 16 MiB, strictly UTF-8 decoded and checked against valid Content-Length. Post-send errors report unknown completion outside sequences as well as inside them. No automatic replay was added.
+- Central argument validation uses jsonschema 4.26.0 and module-local cached validators. Sequence static checks defer reference subtrees, then fully validate resolved arguments. Missing dependency blocks tool execution. Existing message aliases are now advertised; the renderer test's ignored pollIntervalMs parameter was removed rather than implementing an unsupported option.
+- Full acceptance report `artifacts/mcp-hardening/final.json`: 726 discovered IDs, 712 passed, seven failed cases, one fixture error and one skip; six discovered cases remain prevented by the fixture error. All 26 bpy cases ran. Failed/error IDs match `artifacts/python-optimization/fix-4.json` exactly. The numeric-string intermission test now requires rejection, per the no-coercion contract. A real persistent-process test verifies schema/validator refresh on the same PID. Canonical catalog: 229 tools, 88,361 bytes. Antigravity synchronization reports zero drift; client schema visibility is separate from file synchronization. No live game was started.
+
 ## 2026-11-13 Python timing regression correction
 
 - The default runner now schedules two isolated CPython unit workers alongside one exclusive worker for tests that launch Blender. No module/class fixture is split. Blender test-directory modules, Blender variable/member bindings and explicit Blender subprocess sources route to the exclusive worker; bpy-only modules run serially after those workers finish. `--jobs 1` retains the fully serial reference; `--jobs 2..4` bounds unit workers. Each worker writes a distinct report and retains nonzero failures.

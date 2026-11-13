@@ -26,6 +26,47 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+try:
+    from jsonschema import Draft202012Validator, validators as schema_validators
+except ImportError:
+    Draft202012Validator = None
+
+MAX_HTTP_RESPONSE_BYTES = 16 * 1024 * 1024
+_VALIDATORS: dict = {}
+
+
+def _contains_reference(value):
+    if isinstance(value, dict):
+        return "$ref" in value or any(_contains_reference(v) for v in value.values())
+    return isinstance(value, list) and any(_contains_reference(v) for v in value)
+
+
+def _validate_tool_arguments(name, arguments, partial=False):
+    if Draft202012Validator is None:
+        return {"error": "jsonschema 4.26.0 is required; install project requirements", "tool": name, "argumentPath": "/"}
+    spec = next((t for t in TOOLS if t["name"] == name), None)
+    if spec is None:
+        return {"error": "Unknown tool", "tool": name, "argumentPath": "/"}
+    key = (name, partial)
+    if key not in _VALIDATORS:
+        cls = Draft202012Validator
+        if partial:
+            def wrap(keyword, implementation):
+                def check(validator, constraint, instance, schema):
+                    if isinstance(instance, dict) and set(instance) == {"$ref"}:
+                        return
+                    if keyword in ("oneOf", "uniqueItems") and _contains_reference(instance):
+                        return
+                    yield from implementation(validator, constraint, instance, schema)
+                return check
+            cls = schema_validators.extend(cls, {k: wrap(k, v) for k, v in cls.VALIDATORS.items()})
+        _VALIDATORS[key] = cls(spec["inputSchema"])
+    error = next(_VALIDATORS[key].iter_errors(arguments), None)
+    if error is not None:
+        path = "/" + "/".join(str(p).replace("~", "~0").replace("/", "~1") for p in error.absolute_path)
+        return {"error": error.message, "tool": name, "argumentPath": path}
+    return None
+
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
 SERVER_VERSION = "1.6.0"
@@ -336,22 +377,26 @@ def _call_http(endpoint: str, method: str = "GET", params: dict[str, Any] | None
 
     try:
         with urllib.request.urlopen(req, timeout=effective_timeout) as resp:
-            return resp.read().decode("utf-8", errors="replace")
+            raw = resp.read(MAX_HTTP_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_HTTP_RESPONSE_BYTES:
+                raise ValueError("HTTP response exceeds 16 MiB")
+            length = resp.headers.get("Content-Length") if hasattr(resp, "headers") else None
+            if isinstance(length, str) and length.isascii() and length.isdigit() and len(raw) != int(length):
+                raise ValueError("HTTP response body length does not match Content-Length")
+            return raw.decode("utf-8", errors="strict")
     except urllib.error.URLError as err:
         failure = {
             "error": f"Failed to communicate with BepInEx MCP on {url}: {err}. Ensure Rogue Command is running."
         }
-        if automation_deadline is not None:
-            failure["completionStatus"] = "unknown"
-            failure["message"] = "the request may have been processed remotely; inspect its postcondition before retrying"
+        failure["completionStatus"] = "unknown"
+        failure["message"] = "the request may have been processed remotely; inspect its postcondition before retrying"
         return json.dumps(failure)
     except Exception as exc:
         failure = {
             "error": f"Unexpected error communicating with BepInEx MCP: {exc}"
         }
-        if automation_deadline is not None:
-            failure["completionStatus"] = "unknown"
-            failure["message"] = "the request may have been processed remotely; inspect its postcondition before retrying"
+        failure["completionStatus"] = "unknown"
+        failure["message"] = "the request may have been processed remotely; inspect its postcondition before retrying"
         return json.dumps(failure)
 
 
@@ -813,6 +858,9 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
 
 def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     try:
+        invalid = _validate_tool_arguments(name, arguments)
+        if invalid:
+            return _tool_response(json.dumps(invalid), is_error=True)
         # ---- Discovery (lazy, lightweight) ----
         if name == "diagnostics_ui_set_value":
             path = arguments.get("hierarchyPath")
@@ -876,6 +924,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     return _tool_response(json.dumps({"error": f"steps[{index}].arguments must be an object"}), is_error=True)
                 try:
                     _validate_sequence_references(step.get("arguments", {}), index)
+                    invalid = _validate_tool_arguments(step_tool, step.get("arguments", {}), partial=True)
+                    if invalid:
+                        return _tool_response(json.dumps({**invalid, "step": index}), is_error=True)
                 except ValueError as exc:
                     return _tool_response(json.dumps({"error": f"steps[{index}].arguments: {exc}"}), is_error=True)
                 checks = step.get("expect", [])

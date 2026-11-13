@@ -316,7 +316,6 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "activeClipContains": "Action_Death",
                 "requiredEvidence": ["moving"],
                 "timeoutSeconds": 1,
-                "pollIntervalMs": 1000,
             })
 
         payload = json.loads(response["content"][0]["text"])
@@ -2025,7 +2024,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(411, total_props)
+        self.assertEqual(414, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()

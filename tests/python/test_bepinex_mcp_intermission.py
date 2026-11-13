@@ -89,7 +89,7 @@ class IntermissionDiagnosticsTests(unittest.TestCase):
         self.assertEqual([3, 1], calls[0]["args"])
         self.assertEqual(FULL_COMPONENT, calls[0]["params"]["componentName"])
 
-    def test_enter_level_casts_numeric_strings_to_int(self) -> None:
+    def test_enter_level_rejects_numeric_strings_before_bridge(self) -> None:
         calls = []
 
         with (
@@ -100,8 +100,8 @@ class IntermissionDiagnosticsTests(unittest.TestCase):
                 "diagnostics_order_enter_level", {"level": "3", "field": "1"}
             )
 
-        self.assertFalse(response["isError"])
-        self.assertEqual([3, 1], calls[0]["args"])
+        self.assertTrue(response["isError"])
+        self.assertEqual([], calls)
 
     def test_enter_level_rejects_missing_or_non_numeric_level(self) -> None:
         calls = []
