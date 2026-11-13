@@ -204,6 +204,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     Type type = behaviour.GetType();
                     bool isMichskyButton = string.Equals(type.FullName, MichskyButtonManagerTypeName, StringComparison.Ordinal);
                     bool isNativePointerControl = behaviour is IPointerClickHandler && IsCanvasUiControl(behaviour);
+                    isNativePointerControl |= type.FullName == "Michsky.UI.Reach.Dropdown" && IsCanvasUiControl(behaviour);
                     if (!isMichskyButton && !isNativePointerControl) continue;
 
                     bool enabled = false;
@@ -277,6 +278,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         existing["label"] = label;
                     }
+                    AddValueState(control, existing);
                     existing["enabled"] = (bool)existing["enabled"] || enabled;
                     existing["interactable"] = (bool)existing["interactable"] || (active && enabled && canInteract);
                     return;
@@ -288,7 +290,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Dictionary<string, object> screenRect = ReadScreenRect(rect, out bool onScreen);
             bool interactable = active && enabled && canInteract;
             bool visible = active && onScreen && IsCanvasVisible(control);
-            rows.Add(new Dictionary<string, object>
+            Dictionary<string, object> row = new Dictionary<string, object>
             {
                 ["label"] = label,
                 ["gameObjectName"] = gameObject.name ?? string.Empty,
@@ -304,7 +306,55 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["selected"] = EventSystemSelectionIs(gameObject),
                 ["onScreen"] = onScreen,
                 ["screenRect"] = screenRect
-            });
+            };
+            AddValueState(control, row);
+            rows.Add(row);
+        }
+
+        private static void AddValueState(Component control, Dictionary<string, object> row)
+        {
+            if (control is Slider slider)
+            {
+                row["value"] = slider.value;
+                row["minValue"] = slider.minValue;
+                row["maxValue"] = slider.maxValue;
+                row["wholeNumbers"] = slider.wholeNumbers;
+            }
+            else if (control is Toggle toggle)
+            {
+                row["value"] = toggle.isOn;
+            }
+            else if (control is Dropdown dropdown)
+            {
+                row["value"] = dropdown.value;
+                List<string> options = new List<string>();
+                int optionCount = Math.Min(dropdown.options.Count, MaxResultsLimit);
+                for (int i = 0; i < optionCount; i++) options.Add(dropdown.options[i].text ?? string.Empty);
+                row["options"] = options;
+                row["omittedOptionCount"] = Math.Max(0, dropdown.options.Count - optionCount);
+            }
+            else if (control is Michsky.UI.Reach.SwitchManager nativeSwitch)
+            {
+                row["valueControlType"] = control.GetType().FullName;
+                row["value"] = nativeSwitch.isOn;
+            }
+            else if (control is Michsky.UI.Reach.Dropdown nativeDropdown)
+            {
+                row["valueControlType"] = control.GetType().FullName;
+                row["value"] = nativeDropdown.selectedItemIndex;
+                List<string> options = new List<string>();
+                int count = Math.Min(nativeDropdown.items.Count, MaxResultsLimit);
+                for (int i = 0; i < count; i++) options.Add(nativeDropdown.items[i].itemName ?? string.Empty);
+                row["options"] = options;
+                row["omittedOptionCount"] = Math.Max(0, nativeDropdown.items.Count - count);
+            }
+            else if (control.GetType().FullName == "TMPro.TMP_InputField")
+            {
+                row["valueControlType"] = control.GetType().FullName;
+                row["value"] = ReadInstanceMember(control, "text") as string ?? string.Empty;
+                row["readOnly"] = ReadInstanceMember(control, "readOnly");
+                row["characterLimit"] = ReadInstanceMember(control, "characterLimit");
+            }
         }
 
         private static bool Matches(string query, string label, string name, string path, bool exactMatch)

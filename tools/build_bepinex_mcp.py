@@ -1377,6 +1377,16 @@ TOOL_SPECS = [
 #   every alias deep-equal its canonical tool. All names, types,
 #   required lists, enums, and handler endpoints are preserved.
 
+TOOL_SPECS.append({
+    "name": "diagnostics_ui_set_value",
+    "description": "MUTATION: set slider/toggle/switch/dropdown/TMP text by current census path and ID; re-read after unobserved effects.",
+    "parameters": {"type": "object", "properties": {
+        "hierarchyPath": {"type": "string"}, "gameObjectId": {"type": "integer"},
+        "kind": {"type": "string", "enum": ["slider", "toggle", "switch", "dropdown", "text"]},
+        "value": {"oneOf": [{"type": "number"}, {"type": "boolean"}, {"type": "string"}]}, "submit": {"type": "boolean"}
+    }, "required": ["hierarchyPath", "gameObjectId", "kind", "value"], "additionalProperties": False}
+})
+
 _PROPERTY_DESCRIPTION_SHORTENING: dict[str, str] = {
     "GameObject instance ID.": "GameObject ID.",
     "Parent GameObject instance ID.": "Parent GameObject ID.",

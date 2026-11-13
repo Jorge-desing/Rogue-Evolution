@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)../../artifacts/ui-value-tests/bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../../artifacts/ui-value-tests/obj/</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>

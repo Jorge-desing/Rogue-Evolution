@@ -813,6 +813,25 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
 def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     try:
         # ---- Discovery (lazy, lightweight) ----
+        if name == "diagnostics_ui_set_value":
+            path = arguments.get("hierarchyPath")
+            object_id = arguments.get("gameObjectId")
+            kind = arguments.get("kind")
+            value = arguments.get("value")
+            submit = arguments.get("submit", False)
+            valid = ((kind == "slider" and isinstance(value, (int, float)) and not isinstance(value, bool))
+                     or (kind in ("toggle", "switch") and isinstance(value, bool))
+                     or (kind == "dropdown" and isinstance(value, int) and not isinstance(value, bool))
+                     or (kind == "text" and isinstance(value, str) and len(value) <= 4096))
+            if (not isinstance(path, str) or "::" not in path or not isinstance(object_id, int)
+                    or isinstance(object_id, bool) or not isinstance(submit, bool) or not valid
+                    or (submit and kind != "text")):
+                return _tool_response(json.dumps({"error": "Invalid UI target or typed value"}), is_error=True)
+            try:
+                value_json = json.dumps(value, allow_nan=False)
+            except ValueError:
+                return _tool_response(json.dumps({"error": "Value must be finite"}), is_error=True)
+            return _tool_response(_call_diagnostics_method("SetUiValueJson", [path, object_id, kind, value_json, submit]))
         if name == "discover_tools":
             page, _nc, total = _filter_and_page_tools({**arguments, "detail": "summary"})
             for entry in page:

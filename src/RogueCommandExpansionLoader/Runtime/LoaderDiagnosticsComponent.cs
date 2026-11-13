@@ -1114,6 +1114,11 @@ namespace RogueCommandExpansionLoader.Runtime
             return RuntimeUiAccessibility.TryClickTextJson(label, exactMatch, hierarchyPath);
         }
 
+        public string SetUiValueJson(string hierarchyPath, int gameObjectId, string kind, string valueJson, bool submit)
+        {
+            return RuntimeUiValueDirector.SetValue(hierarchyPath, gameObjectId, kind, valueJson, submit);
+        }
+
         /// <summary>
         /// Requests normal Unity player shutdown after the caller explicitly
         /// confirms. This lets the host bridge close the game without window

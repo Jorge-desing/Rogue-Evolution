@@ -2,9 +2,14 @@
 
 Use this reference for screenshot-free control discovery and the run director between combat stages. It does not cover the combat AI Director.
 
+`diagnostics_ui_set_value` targets an exact current census `hierarchyPath` and `gameObjectId`. Its `kind` selects slider (number), toggle/switch (boolean), dropdown (integer index), or TMP text (string); `submit=true` dispatches TMP end-edit. Inspect `nativeCallInvoked` and `effectObserved` separately. Use only for an authorized UI change; local simulated validation does not prove in-game operation. A switch already at the requested value reports the observed state without invoking its event again.
+
+Local verification uses `dotnet run --project tests/UiValueDirector/UiValueDirector.csproj -c Release`: it compiles the real value director with simulated controls and checks dispatch, stale/disabled/ambiguous targets, native event invocation and TMP validation rejection. This harness does not establish Unity or in-game behavior.
+
 ## Discover and operate native UI
 
 1. Start with `diagnostics_get_runtime_control_surface` for the active scene, frame number, and accessible UI census in one Unity-thread call. It also returns bounded native Shop/RemoveCardView state; an active `Intermission` scene adds run progression, the node census and graph/routes, reward/deck state, and navigator state. On other scenes the intermission section is marked as excluded. Use `diagnostics_get_ui_accessibility_census` with a label query when you need a narrower or refreshed control list; both reads are screenshot-free.
+   Unity UI sliders report `value`, `minValue`, `maxValue` and `wholeNumbers`; toggles report `value`; Unity UI dropdowns report their selected index, bounded option labels and `omittedOptionCount`. Michsky switches/dropdowns also report values; dropdowns include bounded options. TMP inputs report text, readOnly and characterLimit. valueControlType identifies the native value component when components share a GameObject. Read a fresh census before acting.
 2. If a screen is changing, use `diagnostics_wait_for_ui_text` with the exact label or current hierarchy path and a bounded timeout. Re-run the census after every scene or panel transition; Unity instance IDs and paths can become stale.
 3. For a Unity `Selectable` or a canvas-backed native `IPointerClickHandler`, use `diagnostics_ui_click_text` with a unique exact label or the exact scene-qualified census path. This uses the native EventSystem click path and fails closed for ambiguous, occluded, inactive, or non-interactable targets.
 4. For a non-Selectable `Michsky.UI.Reach.ButtonManager`, use `diagnostics_ui_invoke_native_button` with the current scene, exact object selector, expected button text, and hierarchy path when needed to disambiguate. Before invoking a control that opens a dialog or advances a flow, inspect its listener target and method; do not invoke arbitrary callbacks through generic reflection.

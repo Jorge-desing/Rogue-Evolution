@@ -16,6 +16,23 @@ SERVER = load_tool_module("bepinex_mcp_server")
 
 
 class RuntimeDiagnosticsTests(unittest.TestCase):
+    def test_ui_value_dispatch_preserves_types_and_submission(self) -> None:
+        for kind, value in (("slider", 0.5), ("toggle", True), ("switch", False), ("dropdown", 2), ("text", "42")):
+            with self.subTest(kind=kind), mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true}') as call:
+                result = SERVER.execute_tool("diagnostics_ui_set_value", {"hierarchyPath": "MainMenu::/Canvas/Input", "gameObjectId": 5, "kind": kind, "value": value, "submit": kind == "text"})
+                self.assertFalse(result.get("isError", False))
+                self.assertEqual("SetUiValueJson", call.call_args.args[0])
+                args = call.call_args.args[1]
+                self.assertEqual(value, json.loads(args[3]))
+                self.assertEqual(kind == "text", args[4])
+
+    def test_ui_value_invalid_types_never_call_bridge(self) -> None:
+        for kind, value in (("slider", True), ("slider", float("nan")), ("toggle", 1), ("dropdown", True), ("dropdown", 1.5), ("text", "x" * 4097)):
+            with self.subTest(kind=kind, value=str(value)[:30]), mock.patch.object(SERVER, "_call_diagnostics_method") as call:
+                result = SERVER.execute_tool("diagnostics_ui_set_value", {"hierarchyPath": "MainMenu::/Canvas/Input", "gameObjectId": 5, "kind": kind, "value": value})
+                self.assertTrue(result["isError"])
+                call.assert_not_called()
+
     def test_uncertain_sequence_outcomes_stop_even_if_continuation_requested(self) -> None:
         for result in ({"error": "timeout", "completionStatus": "unknown"},
                        {"nativeCallInvoked": True, "effectObserved": False}):
@@ -1345,7 +1362,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(248, len(names))
+        self.assertEqual(249, len(names))
 
     def test_initialize_reports_current_bridge_version(self) -> None:
         response = SERVER.handle_request({
@@ -1359,7 +1376,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(248, len(tools))
+        self.assertEqual(249, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -1373,7 +1390,8 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(len(names) >= 1)
         self.assertTrue(len(names) >= 1)
         resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
-        self.assertLess(len(resp2["result"]["tools"]), 229)
+        self.assertEqual(len(resp2["result"]["tools"]), 229)
+        self.assertLess(len(json.dumps(resp2["result"], separators=(",", ":")).encode("utf-8")), 91000)
         self.assertNotIn("ping_unity_bridge", [t["name"] for t in resp2["result"]["tools"]])
         self.assertIn("system_ping", [t["name"] for t in resp2["result"]["tools"]])
 
@@ -1919,13 +1937,13 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(248, len(names))
+        self.assertEqual(249, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
-        self.assertEqual(228, len(specs) - len(aliases))
+        self.assertEqual(229, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
-        self.assertLess(compact, 95000, f"optimised schemas too large: {compact} bytes")
+        self.assertLess(compact, 96000, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
         for spec in specs:
             params = spec["parameters"]
@@ -1936,7 +1954,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             for req in required:
                 self.assertIn(req, properties, f"{spec['name']} required {req} missing from properties")
             for pname, pval in properties.items():
-                self.assertIn(pval.get("type"), ("string", "integer", "number", "boolean", "array", "object"), f"{spec['name']}.{pname}")
+                self.assertTrue(pval.get("type") in ("string", "integer", "number", "boolean", "array", "object") or pval.get("oneOf"), f"{spec['name']}.{pname}")
         # Enums preserved (no functionality lost via stringly-typed enums).
         by_name = {s["name"]: s for s in specs}
         self.assertEqual(
@@ -1975,7 +1993,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(406, total_props)
+        self.assertEqual(411, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()
@@ -2073,9 +2091,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("Parent GameObject instance ID.", blob)
         resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = resp["result"]["tools"]
-        self.assertEqual(248, len(tools))
+        self.assertEqual(249, len(tools))
         payload = json.dumps(resp["result"], separators=(",", ":"))
-        self.assertLess(len(payload), 95000, f"tools/list payload too large: {len(payload)} bytes")
+        self.assertLess(len(payload), 96000, f"tools/list payload too large: {len(payload)} bytes")
 
 if __name__ == "__main__":
     unittest.main()

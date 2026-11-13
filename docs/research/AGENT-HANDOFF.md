@@ -5,6 +5,13 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Typed UI values
+
+- `diagnostics_ui_set_value` resolves the exact scene-qualified census path plus current instance ID and requires one enabled value component. Slider, toggle, Michsky switch/dropdown and TMP text values use native properties/events; `submit=true` dispatches TMP end-edit only when native text validation preserves the requested text. Invoked and observed effects remain distinct. Census values include bounded dropdown options and TMP restrictions, including components merged on the same GameObject.
+- Static installed identity: Rogue Command 1.0.9; Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`; MVID `db0e9462-128d-4296-9900-de18b4bd0c00`. No live game was started.
+- Local checks: Release build succeeds; 68 Python tests and 13 assertions compiling the real director with simulated controls pass; skill validation passes. Canonical tool catalog remains below 91 KB. Antigravity sync reports zero drift. The broad harness reports 572/577 passed, one symlink skip and four visual-census failures; all four reproduce in a clean HEAD archive (which additionally lacks ignored bundles). Reports: `artifacts/ui-value-final-validation.log` and `artifacts/ui-baseline-validation.log`. This is local simulated evidence, not Unity runtime acceptance.
+- With the game closed, deployed Release SHA-256 `46C44485703C190D75F461FA677856AB87ADE8B71935E0A7CABC14D464CD61A9`; backup and verified manifest: `artifacts/deployment-backups/ui-values-20261113T162426Z/`. Existing MCP processes must reload to advertise the added tool; no client reconnection is claimed.
+
 ## 2026-11-13 Agent sequence uncertainty handling
 
 - Diagnostics method calls only retry explicit stale-ID errors, not generic response text, HTTP errors, or transport uncertainty. Sequences stop on unknown completion or native calls whose effect was not observed even with `stopOnFailure=false`; `postconditionInspectionRequired` marks the affected step. Budget exhaustion also halts. Agents must refresh state before retrying uncertain actions.
