@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import io
+import os
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -13,6 +16,22 @@ SERVER = load_tool_module("bepinex_mcp_server")
 
 
 class RuntimeDiagnosticsTests(unittest.TestCase):
+    def test_stdio_reads_utf8_frames_and_lines_without_losing_boundaries(self) -> None:
+        one = json.dumps({"id": 1, "label": "ñ🚀"}, ensure_ascii=False).encode("utf-8")
+        two = b'{"id":2}'
+        framed = b"Content-Length: " + str(len(one)).encode() + b"\r\n\r\n" + one
+        framed += b"Content-Length: " + str(len(two)).encode() + b"\r\n\r\n" + two + b'{"id":3}\n'
+        with mock.patch.object(SERVER.sys, "stdin", io.TextIOWrapper(io.BytesIO(framed), encoding="utf-8")):
+            self.assertEqual(SERVER._read_framed_message()["label"], "ñ🚀")
+            self.assertEqual(SERVER._read_framed_message()["id"], 2)
+            self.assertEqual(SERVER._read_framed_message()["id"], 3)
+            self.assertIsNone(SERVER._read_framed_message())
+
+    def test_stdio_rejects_incomplete_frame(self) -> None:
+        with mock.patch.object(SERVER.sys, "stdin", io.TextIOWrapper(io.BytesIO(b"Content-Length: 20\r\n\r\n{}"), encoding="utf-8")):
+            with self.assertRaisesRegex(ValueError, "incomplete message body"):
+                SERVER._read_framed_message()
+
     def test_sequence_checks_gate_subsequent_actions(self) -> None:
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps({"ready": False})) as bridge:
             response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
@@ -1235,7 +1254,8 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual([], calls[1][1])
 
     def test_generate_agent_configs(self) -> None:
-        configs = SERVER.generate_agent_configs()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"LOCALAPPDATA": tmp}):
+            configs = SERVER.generate_agent_configs(Path(tmp) / "repo")
         self.assertIn("claude", configs)
         self.assertIn("cursor", configs)
         self.assertIn("vscode", configs)

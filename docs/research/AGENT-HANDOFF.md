@@ -5,6 +5,12 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Antigravity MCP integration
+
+- The MCP stdio reader handles UTF-8 `Content-Length` as bytes and supports consecutive frames and newline-delimited requests. The configuration-generation test uses an isolated temporary repository and LOCALAPPDATA.
+- `python -m tools.sync_antigravity_bepinex` syncs the 248 current tool schema files and an adapted global skill to Antigravity. It preserves unmanaged files and creates verified backups under `artifacts/antigravity-backups/`; `--check` reports drift without writing. The skill uses the current checkout for supporting resources and must be resynchronized when that checkout moves or its skill/schema changes.
+- Local validation: 65 isolated tests passed; installed schemas and skill match the sync payload and linked resources exist. Antigravity's existing `~/.gemini/config/mcp_config.json` points to this checkout's `tools/bepinex_mcp_server.py`; Antigravity was not running, so discovery in its client is unverified. An isolated instance of the Desktop app-server listed 228 canonical tools, and a direct launcher process call reported the game closed. The existing chat's MCP transport was closed, so its reconnection is unverified. Project `.codex/config.toml` still uses an absolute checkout path; a portable replacement is not verified and remains open.
+
 ## 2026-11-13 Sequence reference preflight
 
 - `automation_run_sequence` validates nested reference shape, earlier-step ordering, and JSON Pointer escapes across all steps before any bridge call. It still resolves values and checks prior success at runtime. This prevents a malformed later reference from being discovered only after an earlier mutation. Local mock tests cover the contract; no in-game behavior was tested.

@@ -3687,26 +3687,34 @@ def generate_agent_configs(repo_root: Path | None = None) -> dict[str, str]:
 
 
 def _read_framed_message() -> dict[str, Any] | None:
-    first_line = sys.stdin.readline()
-    if not first_line:
-        return None
-    line = first_line.strip()
-    if not line:
-        return _read_framed_message()
+    stream = sys.stdin.buffer
+    while True:
+        first_line = stream.readline()
+        if not first_line:
+            return None
+        line = first_line.strip()
+        if line:
+            break
 
-    if line.lower().startswith("content-length:"):
+    if line.lower().startswith(b"content-length:"):
         try:
-            length = int(line.split(":", 1)[1].strip())
+            length = int(line.split(b":", 1)[1].strip())
+            if length < 0:
+                raise ValueError("negative Content-Length")
             while True:
-                sep = sys.stdin.readline()
-                if sep in ("\r\n", "\n", ""):
+                sep = stream.readline()
+                if not sep:
+                    raise EOFError("incomplete headers")
+                if sep in (b"\r\n", b"\n"):
                     break
-            body = sys.stdin.read(length)
-            return json.loads(body)
+            body = stream.read(length)
+            if len(body) != length:
+                raise EOFError("incomplete message body")
+            return json.loads(body.decode("utf-8"))
         except Exception as exc:
             raise ValueError(f"Failed to read Content-Length framed message: {exc}")
 
-    return json.loads(line)
+    return json.loads(line.decode("utf-8"))
 
 
 def main() -> int:
