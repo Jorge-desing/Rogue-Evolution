@@ -863,7 +863,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         snapshot = json.loads(response["content"][0]["text"])
         self.assertFalse(response["isError"])
-        self.assertEqual(48, len(snapshot))
+        self.assertEqual(49, len(snapshot))
         getter_values = {k: v for k, v in snapshot.items() if k != "_meta"}
         self.assertTrue(all(isinstance(value, dict) for value in getter_values.values()))
         self.assertTrue(all(value == expected for value in getter_values.values()))
@@ -920,6 +920,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 "GetIntermissionCensusJson": [64],
                 "GetIntermissionGraphJson": ["", 8, 64],
                 "GetIntermissionRewardStateJson": [32],
+                "GetIntermissionNativePanelStateJson": [32],
                 "GetNavigatorStateJson": [],
                 "GetUiAccessibilityCensusJson": ["", False, 100],
             },
@@ -1220,6 +1221,11 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_ui_click",
             "diagnostics_ui_press_button",
             "diagnostics_get_intermission_census",
+            "diagnostics_get_intermission_native_panel_state",
+            "diagnostics_order_buy_intermission_shop_offer",
+            "diagnostics_order_reroll_intermission_shop",
+            "diagnostics_order_remove_intermission_card",
+            "diagnostics_order_cancel_intermission_card_removal",
             "diagnostics_order_enter_level",
             "diagnostics_order_select_level_node",
             "diagnostics_get_navigator_state",
@@ -1234,7 +1240,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(243, len(names))
+        self.assertEqual(248, len(names))
 
     def test_initialize_reports_current_bridge_version(self) -> None:
         response = SERVER.handle_request({
@@ -1248,7 +1254,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(243, len(tools))
+        self.assertEqual(248, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -1262,7 +1268,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(len(names) >= 1)
         self.assertTrue(len(names) >= 1)
         resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
-        self.assertLess(len(resp2["result"]["tools"]), 224)
+        self.assertLess(len(resp2["result"]["tools"]), 229)
         self.assertNotIn("ping_unity_bridge", [t["name"] for t in resp2["result"]["tools"]])
         self.assertIn("system_ping", [t["name"] for t in resp2["result"]["tools"]])
 
@@ -1808,11 +1814,11 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(243, len(names))
+        self.assertEqual(248, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
-        self.assertEqual(223, len(specs) - len(aliases))
+        self.assertEqual(228, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
         self.assertLess(compact, 95000, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
@@ -1864,12 +1870,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(403, total_props)
+        self.assertEqual(406, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()
         empty = [s for s in specs if not s["parameters"].get("properties")]
-        self.assertEqual(81, len(empty))
+        self.assertEqual(83, len(empty))
         for spec in empty:
             self.assertEqual(
                 {"type": "object", "additionalProperties": False},
@@ -1962,7 +1968,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("Parent GameObject instance ID.", blob)
         resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = resp["result"]["tools"]
-        self.assertEqual(243, len(tools))
+        self.assertEqual(248, len(tools))
         payload = json.dumps(resp["result"], separators=(",", ":"))
         self.assertLess(len(payload), 95000, f"tools/list payload too large: {len(payload)} bytes")
 

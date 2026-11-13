@@ -5,6 +5,13 @@ using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
+    public enum IntermissionNodeFlowKind
+    {
+        Unknown = 0,
+        Reward = 1,
+        Combat = 2,
+    }
+
     /// <summary>
     /// Pure result of selecting an intermission level node without loading.
     /// </summary>
@@ -38,7 +45,10 @@ namespace RogueCommandExpansionLoader.Runtime
             bool success,
             string message,
             bool selected,
-            bool entered)
+            bool entered,
+            string nodeFlowKind = "Unknown",
+            bool nativeCallInvoked = false,
+            bool effectObserved = false)
         {
             Level = level;
             Field = field;
@@ -47,6 +57,9 @@ namespace RogueCommandExpansionLoader.Runtime
             Message = message ?? string.Empty;
             Selected = selected;
             Entered = entered;
+            NodeFlowKind = nodeFlowKind ?? "Unknown";
+            NativeCallInvoked = nativeCallInvoked;
+            EffectObserved = effectObserved;
         }
 
         public int Level { get; }
@@ -56,6 +69,9 @@ namespace RogueCommandExpansionLoader.Runtime
         public string Message { get; }
         public bool Selected { get; }
         public bool Entered { get; }
+        public string NodeFlowKind { get; }
+        public bool NativeCallInvoked { get; }
+        public bool EffectObserved { get; }
     }
 
     /// <summary>
@@ -170,6 +186,47 @@ namespace RogueCommandExpansionLoader.Runtime
 
             row = best;
             return true;
+        }
+
+        /// <summary>
+        /// Classifies a native map detail without guessing when the map or its
+        /// reward-predicate surface is unavailable. Bosses use the combat
+        /// corridor; explicit rewards (including blueprint pools) use only
+        /// LoadScene.LoadLevel and never fall through to LoadNextLevel.
+        /// </summary>
+        public static IntermissionNodeFlowKind ClassifyNodeFlow(
+            IntermissionNodeDetail detail,
+            bool nativeRewardPredicatesAvailable)
+        {
+            if (!detail.Found || !detail.IsChoosable)
+            {
+                return IntermissionNodeFlowKind.Unknown;
+            }
+
+            if (detail.IsBoss)
+            {
+                return IntermissionNodeFlowKind.Combat;
+            }
+
+            bool hasReward = detail.IsRestSite || detail.IsShop
+                || detail.HasCardReward || detail.HasUpgradeReward || detail.HasRelicReward
+                || detail.HasResearchReward || detail.HasCoinReward || detail.HasStartCrystalReward
+                || detail.HasResearchPointsReward || detail.HasDropReward
+                || !string.IsNullOrWhiteSpace(detail.BlueprintPoolId);
+            if (hasReward)
+            {
+                return IntermissionNodeFlowKind.Reward;
+            }
+
+            return nativeRewardPredicatesAvailable
+                ? IntermissionNodeFlowKind.Combat
+                : IntermissionNodeFlowKind.Unknown;
+        }
+
+        /// <summary>Pure safety gate: only classified combat nodes use LoadNextLevel.</summary>
+        public static bool ShouldStartCombatLoadNextLevelCorridor(IntermissionNodeFlowKind flowKind)
+        {
+            return flowKind == IntermissionNodeFlowKind.Combat;
         }
 
         private static int CompareFrontier(IntermissionNodeRow a, IntermissionNodeRow b)
@@ -334,6 +391,8 @@ namespace RogueCommandExpansionLoader.Runtime
             result = default(IntermissionLevelEntry);
             string beforeScene = RuntimeIntermissionCensus.SafeActiveSceneName();
             int beforeLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
+            bool loadCallInvoked = false;
+            bool coroutineInvoked = false;
             try
             {
                 IntermissionCensus census = RuntimeIntermissionCensus.Current();
@@ -348,6 +407,27 @@ namespace RogueCommandExpansionLoader.Runtime
                     return false;
                 }
 
+                IntermissionNodeDetail nodeDetail = RuntimeIntermissionDeepReads.InspectNode(picked.Level, picked.Field);
+                bool rewardPredicatesAvailable = HasNativeRewardPredicateSurface();
+                IntermissionNodeFlowKind flowKind = ClassifyNodeFlow(nodeDetail, rewardPredicatesAvailable);
+                string flowKindName = flowKind.ToString();
+                if (flowKind == IntermissionNodeFlowKind.Unknown)
+                {
+                    result = new IntermissionLevelEntry(
+                        picked.Level, picked.Field, picked.InstanceId, false,
+                        "The selected node could not be classified from the current native LevelMap reward predicates; no load action was issued.",
+                        false, false, flowKindName);
+                    return false;
+                }
+
+                IntermissionRewardState beforeRewardState = flowKind == IntermissionNodeFlowKind.Reward
+                    ? RuntimeIntermissionRewards.GetState(32)
+                    : IntermissionRewardState.Unavailable;
+                IntermissionNativePanelState beforeNativePanels = flowKind == IntermissionNodeFlowKind.Reward
+                    ? RuntimeIntermissionNativePanels.GetState(32)
+                    : IntermissionNativePanelState.Unavailable;
+                string beforeNavigatorState = ReadNavigatorSceneState();
+
                 IntermissionNodeSelection selection = TrySelectLevelNode(picked.Level, picked.Field);
                 if (!selection.Selected)
                 {
@@ -356,24 +436,92 @@ namespace RogueCommandExpansionLoader.Runtime
                         "Selection did not stick for level " + picked.Level + " field "
                         + picked.Field + ": " + selection.Reason
                         + " (stop point: selection).",
-                        false, false);
+                        false, false, flowKindName);
                     return false;
                 }
 
-                 string afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
+                string afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
                 int afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
                 bool hasOpenRewards = ReadPlayerHasOpenRewards();
                 bool nextLevelLoading = RuntimeIntermissionCensus.IsNextLevelLoading();
-                if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel) || hasOpenRewards || nextLevelLoading)
+
+                if (flowKind == IntermissionNodeFlowKind.Reward)
+                {
+                    IntermissionRewardState afterSelectionRewards = RuntimeIntermissionRewards.GetState(32);
+                    IntermissionNativePanelState afterSelectionPanels = RuntimeIntermissionNativePanels.GetState(32);
+                    IntermissionNodeDetail afterSelectionDetail = RuntimeIntermissionDeepReads.InspectNode(picked.Level, picked.Field);
+                    bool rewardEffectObserved = HasRewardResolutionPostcondition(
+                        beforeScene, beforeLevel, beforeNavigatorState, beforeRewardState, beforeNativePanels,
+                        afterScene, afterLevel, hasOpenRewards, afterSelectionRewards, afterSelectionPanels,
+                        nodeDetail, afterSelectionDetail);
+                    bool nativeCallInvoked = false;
+
+                    if (!rewardEffectObserved && !nextLevelLoading)
+                    {
+                        IntermissionActionResult rewardAction = RuntimeIntermissionRewards.TryTriggerLoadLevel();
+                        nativeCallInvoked = rewardAction.NativeCallInvoked;
+                        afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
+                        afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
+                        hasOpenRewards = ReadPlayerHasOpenRewards();
+                        nextLevelLoading = RuntimeIntermissionCensus.IsNextLevelLoading();
+                        IntermissionRewardState afterLoadRewards = RuntimeIntermissionRewards.GetState(32);
+                        IntermissionNativePanelState afterLoadPanels = RuntimeIntermissionNativePanels.GetState(32);
+                        IntermissionNodeDetail afterLoadDetail = RuntimeIntermissionDeepReads.InspectNode(picked.Level, picked.Field);
+                        rewardEffectObserved = HasRewardResolutionPostcondition(
+                            beforeScene, beforeLevel, beforeNavigatorState, beforeRewardState, beforeNativePanels,
+                            afterScene, afterLevel, hasOpenRewards, afterLoadRewards, afterLoadPanels,
+                            nodeDetail, afterLoadDetail);
+                    }
+
+                    result = new IntermissionLevelEntry(
+                        picked.Level, picked.Field, picked.InstanceId, rewardEffectObserved,
+                        rewardEffectObserved
+                            ? "Reward node " + picked.Level + ":" + picked.Field
+                                + " resolved through the native reward flow; no combat LoadNextLevel corridor was used."
+                            : "Reward node " + picked.Level + ":" + picked.Field
+                                + (nativeCallInvoked
+                                    ? " was selected and LoadScene.LoadLevel was invoked, but no reward postcondition is observable yet; no LoadNextLevel corridor was used."
+                                    : " was selected, but no reward postcondition is observable yet; no additional level load was issued."),
+                        true, false, flowKindName, nativeCallInvoked, rewardEffectObserved);
+                    return rewardEffectObserved;
+                }
+
+                if (!ShouldStartCombatLoadNextLevelCorridor(flowKind))
+                {
+                    result = new IntermissionLevelEntry(
+                        picked.Level, picked.Field, picked.InstanceId, false,
+                        "Node flow did not pass the combat LoadNextLevel gate; no level load was issued.",
+                        true, false, flowKindName);
+                    return false;
+                }
+
+                if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel))
                 {
                     result = new IntermissionLevelEntry(
                         picked.Level, picked.Field, picked.InstanceId, true,
-                        "Level " + picked.Level + " node field " + picked.Field
-                        + " entered via coordinate click / LoadLevel"
-                        + " (scene '" + beforeScene + "' -> '" + afterScene
+                        "Combat node " + picked.Level + ":" + picked.Field
+                        + " entered through the native route (scene '" + beforeScene + "' -> '" + afterScene
                         + "', level " + beforeLevel + " -> " + afterLevel + ").",
-                        true, true);
+                        true, true, flowKindName, false, true);
                     return true;
+                }
+
+                if (hasOpenRewards)
+                {
+                    result = new IntermissionLevelEntry(
+                        picked.Level, picked.Field, picked.InstanceId, false,
+                        "A reward screen is open after combat-node selection; the director stopped before LoadNextLevel.",
+                        true, false, flowKindName, false, true);
+                    return false;
+                }
+
+                if (nextLevelLoading)
+                {
+                    result = new IntermissionLevelEntry(
+                        picked.Level, picked.Field, picked.InstanceId, false,
+                        "The combat level load is already in progress; the director will not start a second corridor before scene transition evidence.",
+                        true, false, flowKindName, false, true);
+                    return false;
                 }
 
                 Type loadSceneType = RuntimeIntermissionCensus.FindGameType("LoadScene");
@@ -387,7 +535,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         "Selection confirmed for level " + picked.Level + " field " + picked.Field
                         + " but the LoadScene corridor is not available"
                         + " (stop point: corridor missing).",
-                        true, false);
+                        true, false, flowKindName);
                     return false;
                 }
 
@@ -398,6 +546,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     try
                     {
+                        loadCallInvoked = true;
                         loadLevelMethod.Invoke(loadSceneInstance, null);
                     }
                     catch
@@ -407,7 +556,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
                     afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
                     hasOpenRewards = ReadPlayerHasOpenRewards();
-                    if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel) || hasOpenRewards)
+                    nextLevelLoading = RuntimeIntermissionCensus.IsNextLevelLoading();
+                    if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel))
                     {
                         result = new IntermissionLevelEntry(
                             picked.Level, picked.Field, picked.InstanceId, true,
@@ -415,8 +565,26 @@ namespace RogueCommandExpansionLoader.Runtime
                             + " entered via LoadScene.LoadLevel"
                             + " (scene '" + beforeScene + "' -> '" + afterScene
                             + "', level " + beforeLevel + " -> " + afterLevel + ").",
-                            true, true);
+                            true, true, flowKindName, loadCallInvoked, true);
                         return true;
+                    }
+
+                    if (hasOpenRewards)
+                    {
+                        result = new IntermissionLevelEntry(
+                            picked.Level, picked.Field, picked.InstanceId, false,
+                            "A reward screen opened during combat-node LoadLevel; the director stopped before LoadNextLevel.",
+                            true, false, flowKindName, loadCallInvoked, true);
+                        return false;
+                    }
+
+                    if (nextLevelLoading)
+                    {
+                        result = new IntermissionLevelEntry(
+                            picked.Level, picked.Field, picked.InstanceId, false,
+                            "Combat LoadLevel started a transition; the director stopped before a duplicate LoadNextLevel call.",
+                            true, false, flowKindName, loadCallInvoked, true);
+                        return false;
                     }
                 }
 
@@ -428,7 +596,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         picked.Level, picked.Field, picked.InstanceId, false,
                         "Selection confirmed but MonoBehaviour.StartCoroutine(String) is not available"
                         + " (stop point: corridor missing).",
-                        true, false);
+                        true, false, flowKindName, loadCallInvoked, false);
                     return false;
                 }
 
@@ -437,6 +605,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     try
                     {
                         startCoroutine.Invoke(loadSceneInstance, new object[] { "LoadNextLevel" });
+                        coroutineInvoked = true;
                     }
                     catch (Exception ex)
                     {
@@ -444,13 +613,14 @@ namespace RogueCommandExpansionLoader.Runtime
                             picked.Level, picked.Field, picked.InstanceId, false,
                             "LoadNextLevel corridor threw: " + ex.Message
                             + " (stop point: corridor missing).",
-                            true, false);
+                            true, false, flowKindName, loadCallInvoked || coroutineInvoked, false);
                         return false;
                     }
                 }
 
                 afterScene = RuntimeIntermissionCensus.SafeActiveSceneName();
                 afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
+                nextLevelLoading = RuntimeIntermissionCensus.IsNextLevelLoading();
                 if (HasTransitioned(beforeScene, beforeLevel, afterScene, afterLevel))
                 {
                     result = new IntermissionLevelEntry(
@@ -459,7 +629,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         + " entered via LoadScene.LoadNextLevel"
                         + " (scene '" + beforeScene + "' -> '" + afterScene
                         + "', level " + beforeLevel + " -> " + afterLevel + ").",
-                        true, true);
+                        true, true, flowKindName, loadCallInvoked || coroutineInvoked, true);
                     return true;
                 }
 
@@ -468,7 +638,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     "LoadNextLevel started for level " + picked.Level + " field " + picked.Field
                     + " but no scene or level transition was observed yet (scene stays '"
                     + afterScene + "') (stop point: transition observation).",
-                    true, false);
+                    true, false, flowKindName, loadCallInvoked || coroutineInvoked, nextLevelLoading);
                 return false;
             }
             catch (Exception ex)
@@ -479,6 +649,88 @@ namespace RogueCommandExpansionLoader.Runtime
                     false, false);
                 return false;
             }
+        }
+
+        private static bool HasNativeRewardPredicateSurface()
+        {
+            object levelMap = RuntimeIntermissionDeepReads.ResolveCurrentLevelMap();
+            if (levelMap == null) return false;
+            string[] predicateNames =
+            {
+                "IsRestSite", "IsShop", "IsCardReward", "IsUpgradeReward", "IsRelicReward",
+                "IsResearchReward", "IsCoinReward", "IsStartCrystalReward", "IsResearchPointsReward", "IsDropReward",
+            };
+            Type type = levelMap.GetType();
+            Type[] parameters = { typeof(int), typeof(int) };
+            for (int i = 0; i < predicateNames.Length; i++)
+            {
+                MethodInfo method = type.GetMethod(predicateNames[i], InstanceMethods, null, parameters, null);
+                if (method == null || method.ReturnType != typeof(bool)) return false;
+            }
+            return true;
+        }
+
+        private static bool HasRewardResolutionPostcondition(
+            string beforeScene,
+            int beforeLevel,
+            string beforeNavigatorState,
+            IntermissionRewardState beforeRewards,
+            IntermissionNativePanelState beforePanels,
+            string afterScene,
+            int afterLevel,
+            bool hasOpenRewards,
+            IntermissionRewardState afterRewards,
+            IntermissionNativePanelState afterPanels,
+            IntermissionNodeDetail beforeNode,
+            IntermissionNodeDetail afterNode)
+        {
+            if (hasOpenRewards || beforeLevel != afterLevel
+                || !string.Equals(beforeScene, afterScene, StringComparison.Ordinal)
+                || !string.Equals(beforeNavigatorState, ReadNavigatorSceneState(), StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (beforeRewards.IsAvailable && afterRewards.IsAvailable
+                && (beforeRewards.CurrentCoins != afterRewards.CurrentCoins
+                    || beforeRewards.CurrentStartCrystals != afterRewards.CurrentStartCrystals
+                    || beforeRewards.CurrentDropPodCount != afterRewards.CurrentDropPodCount
+                    || beforeRewards.CurrentResearchPoints != afterRewards.CurrentResearchPoints
+                    || beforeRewards.OpenEngineerRewardCount != afterRewards.OpenEngineerRewardCount
+                    || beforeRewards.OpenEconomyRewardCount != afterRewards.OpenEconomyRewardCount
+                    || beforeRewards.OpenSpecialistRewardCount != afterRewards.OpenSpecialistRewardCount
+                    || beforeRewards.OpenSpecialistRelicRewardCount != afterRewards.OpenSpecialistRelicRewardCount
+                    || beforeRewards.OpenCardRewardCount != afterRewards.OpenCardRewardCount
+                    || beforeRewards.OpenRelicRewardCount != afterRewards.OpenRelicRewardCount
+                    || beforeRewards.OpenUpgradeRewardCount != afterRewards.OpenUpgradeRewardCount
+                    || beforeRewards.OpenResearchRewardCount != afterRewards.OpenResearchRewardCount))
+            {
+                return true;
+            }
+
+            if (beforePanels.IsAvailable && afterPanels.IsAvailable
+                && (beforePanels.IsShopActive != afterPanels.IsShopActive
+                    || beforePanels.IsRemoveCardActive != afterPanels.IsRemoveCardActive
+                    || beforePanels.ShopOfferCount != afterPanels.ShopOfferCount))
+            {
+                return true;
+            }
+
+            return beforeNode.Found && afterNode.Found
+                && beforeNode.IsChoosable && !afterNode.IsChoosable;
+        }
+
+        private static string ReadNavigatorSceneState()
+        {
+            try
+            {
+                Type type = RuntimeIntermissionCensus.FindGameType("Navigator");
+                PropertyInfo prop = type?.GetProperty("CurrentSceneState", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (prop != null && prop.CanRead) return prop.GetValue(null, null)?.ToString() ?? string.Empty;
+                FieldInfo field = type?.GetField("CurrentSceneState", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                return field?.GetValue(null)?.ToString() ?? string.Empty;
+            }
+            catch { return string.Empty; }
         }
 
         // ---- Live-node helpers (reflection, scene-bound) ----

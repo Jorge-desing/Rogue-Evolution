@@ -823,6 +823,41 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeIntermissionRewards.GetState(maxCards));
         }
 
+        /// <summary>Reads bounded offers and removal candidates from the native Shop and RemoveCardView.</summary>
+        public string GetIntermissionNativePanelStateJson(int maxRows = 32)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionNativePanelState(
+                RuntimeIntermissionNativePanels.GetState(maxRows));
+        }
+
+        /// <summary>Buys one currently registered native Shop offer by its census offerId.</summary>
+        public string OrderBuyIntermissionShopOfferJson(string offerId)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionNativePanels.TryBuyShopOffer(offerId));
+        }
+
+        /// <summary>Invokes the active native Shop reroll control after checking the live state.</summary>
+        public string OrderRerollIntermissionShopJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionNativePanels.TryRerollShop());
+        }
+
+        /// <summary>Removes one unique current RemoveCardView candidate by CardNew.EntityId.</summary>
+        public string OrderRemoveIntermissionCardJson(string entityId)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionNativePanels.TryRemoveCard(entityId));
+        }
+
+        /// <summary>Closes the native RemoveCardView through its exact cancel handler.</summary>
+        public string OrderCancelIntermissionCardRemovalJson()
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionNativePanels.TryCancelCardRemoval());
+        }
+
         /// <summary>
         /// Triggers the native LoadScene.LoadLevel() flow when a node or boss is selected on CurrentLevelMap.
         /// </summary>
@@ -972,6 +1007,9 @@ namespace RogueCommandExpansionLoader.Runtime
             Dictionary<string, object> intermissionGraph = null;
             Dictionary<string, object> rewardState = null;
             Dictionary<string, object> navigatorState = null;
+            Dictionary<string, object> nativePanels = CaptureControlSurfaceSection(
+                "nativePanelState",
+                () => GetIntermissionNativePanelStateJson(32));
             if (activeSceneName.IndexOf("Intermission", StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 runProgression = CaptureControlSurfaceSection("runProgression", GetRunProgressionCensusJson);
@@ -990,7 +1028,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 intermissionCensus,
                 intermissionGraph,
                 rewardState,
-                navigatorState);
+                navigatorState,
+                nativePanels);
         }
 
         private static Dictionary<string, object> CaptureControlSurfaceSection(string sectionName, Func<string> capture)

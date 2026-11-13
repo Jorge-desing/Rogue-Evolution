@@ -534,6 +534,40 @@ class JumpToLevelTests(unittest.TestCase):
             [{"method": c["method"], "args": c["args"]} for c in calls],
         )
 
+    def test_native_shop_and_removal_panel_tools(self) -> None:
+        calls = []
+        with (
+            mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 77),
+            mock.patch.object(SERVER, "_call_http", side_effect=_diag_fake_http(calls)),
+        ):
+            r_state = SERVER.execute_tool("diagnostics_get_intermission_native_panel_state", {"maxRows": 12})
+            r_state_bad = SERVER.execute_tool("diagnostics_get_intermission_native_panel_state", {"maxRows": "bad"})
+            r_buy = SERVER.execute_tool("diagnostics_order_buy_intermission_shop_offer", {"offerId": "RelicCard:123"})
+            r_buy_bad = SERVER.execute_tool("diagnostics_order_buy_intermission_shop_offer", {"offerId": " "})
+            r_reroll = SERVER.execute_tool("diagnostics_order_reroll_intermission_shop", {})
+            r_remove = SERVER.execute_tool("diagnostics_order_remove_intermission_card", {"entityId": "Factory_Tank"})
+            r_remove_bad = SERVER.execute_tool("diagnostics_order_remove_intermission_card", {"entityId": ""})
+            r_cancel = SERVER.execute_tool("diagnostics_order_cancel_intermission_card_removal", {})
+
+        self.assertFalse(r_state["isError"])
+        self.assertTrue(r_state_bad["isError"])
+        self.assertFalse(r_buy["isError"])
+        self.assertTrue(r_buy_bad["isError"])
+        self.assertFalse(r_reroll["isError"])
+        self.assertFalse(r_remove["isError"])
+        self.assertTrue(r_remove_bad["isError"])
+        self.assertFalse(r_cancel["isError"])
+        self.assertEqual(
+            [
+                {"method": "GetIntermissionNativePanelStateJson", "args": [12]},
+                {"method": "OrderBuyIntermissionShopOfferJson", "args": ["RelicCard:123"]},
+                {"method": "OrderRerollIntermissionShopJson", "args": []},
+                {"method": "OrderRemoveIntermissionCardJson", "args": ["Factory_Tank"]},
+                {"method": "OrderCancelIntermissionCardRemovalJson", "args": []},
+            ],
+            [{"method": c["method"], "args": c["args"]} for c in calls],
+        )
+
     def test_intermission_action_tools_passthrough_and_validation(self) -> None:
         calls = []
         with (

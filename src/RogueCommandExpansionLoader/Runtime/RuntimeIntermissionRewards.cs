@@ -287,7 +287,9 @@ namespace RogueCommandExpansionLoader.Runtime
             int slotIndex,
             string navigatorSceneState,
             bool playerHasOpenRewards,
-            string message)
+            string message,
+            bool nativeCallInvoked = false,
+            bool effectObserved = false)
         {
             Success = success;
             Action = action ?? string.Empty;
@@ -296,6 +298,8 @@ namespace RogueCommandExpansionLoader.Runtime
             NavigatorSceneState = navigatorSceneState ?? string.Empty;
             PlayerHasOpenRewards = playerHasOpenRewards;
             Message = message ?? string.Empty;
+            NativeCallInvoked = nativeCallInvoked;
+            EffectObserved = effectObserved;
         }
 
         public bool Success { get; }
@@ -305,6 +309,8 @@ namespace RogueCommandExpansionLoader.Runtime
         public string NavigatorSceneState { get; }
         public bool PlayerHasOpenRewards { get; }
         public string Message { get; }
+        public bool NativeCallInvoked { get; }
+        public bool EffectObserved { get; }
     }
 
     /// <summary>
@@ -475,6 +481,7 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public static IntermissionActionResult TryTriggerLoadLevel()
         {
+            bool nativeCallInvoked = false;
             try
             {
                 object levelMap = RuntimeIntermissionDeepReads.ResolveCurrentLevelMap();
@@ -539,6 +546,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         "LoadScene.LoadLevel() method was not found (stop point: method lookup).");
                 }
 
+                nativeCallInvoked = true;
                 loadLevelMethod.Invoke(loadScene, null);
 
                 int afterLevel = RuntimeIntermissionCensus.SafeCurrentLevel();
@@ -552,7 +560,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     return new IntermissionActionResult(
                         true, "TriggerLoadLevel", targetDesc, chosenField, navState, hasOpenRewards,
-                        "LoadScene.LoadLevel() opened RewardScreen for node " + targetDesc + ".");
+                        "LoadScene.LoadLevel() opened RewardScreen for node " + targetDesc + ".", true, true);
                 }
 
                 if (afterLevel != beforeLevel && !nextLoading)
@@ -560,7 +568,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     return new IntermissionActionResult(
                         true, "TriggerLoadLevel", targetDesc, chosenField, navState, hasOpenRewards,
                         "LoadScene.LoadLevel() resolved instant reward at node " + targetDesc
-                        + " (level " + beforeLevel + " -> " + afterLevel + ").");
+                        + " (level " + beforeLevel + " -> " + afterLevel + ").", true, true);
                 }
 
                 if (!string.Equals(beforeScene, afterScene, StringComparison.Ordinal) || nextLoading)
@@ -568,19 +576,19 @@ namespace RogueCommandExpansionLoader.Runtime
                     return new IntermissionActionResult(
                         true, "TriggerLoadLevel", targetDesc, chosenField, navState, hasOpenRewards,
                         "LoadScene.LoadLevel() initiated level/shop transition for node " + targetDesc
-                        + " (scene '" + beforeScene + "' -> '" + afterScene + "', loading=" + nextLoading + ").");
+                        + " (scene '" + beforeScene + "' -> '" + afterScene + "', loading=" + nextLoading + ").", true, true);
                 }
 
                 return new IntermissionActionResult(
                     false, "TriggerLoadLevel", targetDesc, chosenField, navState, hasOpenRewards,
-                    "LoadScene.LoadLevel() invoked but no reward, level advance, or scene load was observed.");
+                    "LoadScene.LoadLevel() invoked but no reward, level advance, or scene load was observed.", nativeCallInvoked, false);
             }
             catch (Exception ex)
             {
                 return new IntermissionActionResult(
                     false, "TriggerLoadLevel", string.Empty, -1,
                     ReadNavigatorSceneState(), ReadStaticPlayerHasOpenRewards(),
-                    "TriggerLoadLevel failed: " + ex.Message);
+                    "TriggerLoadLevel failed: " + ex.Message, nativeCallInvoked, false);
             }
         }
 

@@ -1445,10 +1445,13 @@ namespace RogueCommandExpansionLoader.Runtime
             Dictionary<string, object> intermissionCensus,
             Dictionary<string, object> intermissionGraph,
             Dictionary<string, object> intermissionRewardState,
-            Dictionary<string, object> navigatorState)
+            Dictionary<string, object> navigatorState,
+            Dictionary<string, object> nativePanelState = null)
         {
             string sceneName = activeSceneName ?? string.Empty;
             bool intermissionActive = sceneName.IndexOf("Intermission", StringComparison.OrdinalIgnoreCase) >= 0;
+            Dictionary<string, object> nativePanels = nativePanelState
+                ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
             var intermission = new Dictionary<string, object>
             {
                 ["included"] = intermissionActive,
@@ -1460,6 +1463,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 intermission["graphAndRoutes"] = intermissionGraph ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
                 intermission["rewardAndDeckState"] = intermissionRewardState ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
                 intermission["navigator"] = navigatorState ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
+                intermission["nativePanels"] = nativePanels;
             }
             else
             {
@@ -1474,6 +1478,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["frameCount"] = frameCount,
                 ["maxUiResults"] = Math.Max(1, Math.Min(100, maxUiResults)),
                 ["uiCensus"] = uiCensus ?? new Dictionary<string, object> { ["error"] = "section_not_captured" },
+                ["nativePanelState"] = nativePanels,
                 ["isIntermissionActive"] = intermissionActive,
                 ["intermission"] = intermission,
             };
@@ -1514,6 +1519,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["level"] = result.Level,
                 ["field"] = result.Field,
                 ["instanceId"] = result.InstanceId,
+                ["nodeFlowKind"] = result.NodeFlowKind ?? "Unknown",
+                ["nativeCallInvoked"] = result.NativeCallInvoked,
+                ["effectObserved"] = result.EffectObserved,
                 ["message"] = result.Message ?? string.Empty,
             };
             return Serialize(view);
@@ -1753,6 +1761,82 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes the native Shop and RemoveCardView snapshot. Omission and
+        /// unsupported-row counts precede their bounded detail collections.
+        /// </summary>
+        public static string SerializeIntermissionNativePanelState(IntermissionNativePanelState state)
+        {
+            return Serialize(BuildIntermissionNativePanelView(state ?? IntermissionNativePanelState.Unavailable));
+        }
+
+        private static Dictionary<string, object> BuildIntermissionNativePanelView(IntermissionNativePanelState s)
+        {
+            var shopRows = new List<Dictionary<string, object>>();
+            if (s.ShopOffers != null)
+            {
+                for (int i = 0; i < s.ShopOffers.Count; i++)
+                {
+                    IntermissionShopOfferRow offer = s.ShopOffers[i];
+                    shopRows.Add(new Dictionary<string, object>
+                    {
+                        ["offerId"] = offer.OfferId ?? string.Empty,
+                        ["kind"] = offer.Kind ?? string.Empty,
+                        ["nativeId"] = offer.NativeId ?? string.Empty,
+                        ["name"] = offer.Name ?? string.Empty,
+                        ["priceText"] = offer.PriceText ?? string.Empty,
+                        ["instanceId"] = offer.InstanceId,
+                        ["hasPrice"] = offer.HasPrice,
+                        ["price"] = offer.Price,
+                    });
+                }
+            }
+
+            var removalRows = new List<Dictionary<string, object>>();
+            if (s.RemovalCards != null)
+            {
+                for (int i = 0; i < s.RemovalCards.Count; i++)
+                {
+                    IntermissionRemovalCardRow card = s.RemovalCards[i];
+                    removalRows.Add(new Dictionary<string, object>
+                    {
+                        ["slotIndex"] = card.SlotIndex,
+                        ["entityId"] = card.EntityId ?? string.Empty,
+                        ["productId"] = card.ProductId ?? string.Empty,
+                        ["name"] = card.Name ?? string.Empty,
+                        ["instanceId"] = card.InstanceId,
+                    });
+                }
+            }
+
+            return new Dictionary<string, object>
+            {
+                ["kind"] = "intermissionNativePanelState",
+                ["isAvailable"] = s.IsAvailable,
+                ["omittedShopOfferCount"] = s.OmittedShopOfferCount,
+                ["unsupportedShopOfferCount"] = s.UnsupportedShopOfferCount,
+                ["shopOfferCount"] = s.ShopOfferCount,
+                ["omittedRemovalCardCount"] = s.OmittedRemovalCardCount,
+                ["unsupportedRemovalCardCount"] = s.UnsupportedRemovalCardCount,
+                ["removalCardCount"] = s.RemovalCardCount,
+                ["isShopAvailable"] = s.IsShopAvailable,
+                ["isShopActive"] = s.IsShopActive,
+                ["shopInstanceId"] = s.ShopInstanceId,
+                ["currentCoins"] = s.CurrentCoins,
+                ["currentRerolls"] = s.CurrentRerolls,
+                ["currentStartCrystals"] = s.CurrentStartCrystals,
+                ["currentDropPodCount"] = s.CurrentDropPodCount,
+                ["currentResearchPoints"] = s.CurrentResearchPoints,
+                ["canReroll"] = s.CanReroll,
+                ["shopOffers"] = shopRows,
+                ["isRemoveCardViewAvailable"] = s.IsRemoveCardViewAvailable,
+                ["isRemoveCardActive"] = s.IsRemoveCardActive,
+                ["isRemoveCardClickReady"] = s.IsRemoveCardClickReady,
+                ["removeCardCoinCompensation"] = s.RemoveCardCoinCompensation,
+                ["removalCards"] = removalRows,
+            };
+        }
+
+        /// <summary>
         /// Serializes an intermission sub-screen or LoadLevel action result with status flags first.
         /// </summary>
         public static string SerializeIntermissionActionResult(IntermissionActionResult result)
@@ -1766,6 +1850,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["slotIndex"] = result.SlotIndex,
                 ["navigatorSceneState"] = result.NavigatorSceneState ?? string.Empty,
                 ["playerHasOpenRewards"] = result.PlayerHasOpenRewards,
+                ["nativeCallInvoked"] = result.NativeCallInvoked,
+                ["effectObserved"] = result.EffectObserved,
                 ["message"] = result.Message ?? string.Empty,
             };
             return Serialize(view);
@@ -4211,7 +4297,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "GetBaseIntegrityCensusJson", ["description"] = "Player command HQ and enemy base structure integrity telemetry." },
                 new Dictionary<string, object> { ["name"] = "OrderFactoryProduceJson", ["description"] = "Trigger in-game unit production order on a player factory." },
                 new Dictionary<string, object> { ["name"] = "GetRunProgressionCensusJson", ["description"] = "Run progression parameters, active relics, offered blueprints, and scene telemetry." },
-                new Dictionary<string, object> { ["name"] = "GetRuntimeControlSurfaceJson", ["description"] = "Single-Unity-thread accessible UI snapshot with conditional intermission, route, reward/deck, and navigator state." },
+                new Dictionary<string, object> { ["name"] = "GetRuntimeControlSurfaceJson", ["description"] = "Single-Unity-thread accessible UI snapshot with native Shop/RemoveCardView, conditional intermission, route, reward/deck, and navigator state." },
+                new Dictionary<string, object> { ["name"] = "GetIntermissionNativePanelStateJson", ["description"] = "Bounded current native Shop offers and RemoveCardView candidates with reroll/removal readiness." },
+                new Dictionary<string, object> { ["name"] = "OrderBuyIntermissionShopOfferJson", ["description"] = "Invoke one current native Shop offer by scene-local offer id and report observed postconditions." },
+                new Dictionary<string, object> { ["name"] = "OrderRerollIntermissionShopJson", ["description"] = "Invoke the active native Shop reroll control and report observed postconditions." },
+                new Dictionary<string, object> { ["name"] = "OrderRemoveIntermissionCardJson", ["description"] = "Invoke native RemoveCardView.RemoveCard for one unique current CardNew entity id." },
+                new Dictionary<string, object> { ["name"] = "OrderCancelIntermissionCardRemovalJson", ["description"] = "Invoke the native RemoveCardView cancellation control." },
                 new Dictionary<string, object> { ["name"] = "GrantPlayerCreditsJson", ["description"] = "Grant economy credits to player bank balance." },
                 new Dictionary<string, object> { ["name"] = "ApplyInGameCardChangeJson", ["description"] = "Apply a data-driven card change to an entity via native EntityBalancingStore." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitMoveJson", ["description"] = "Dispatch an in-game move command to a unit by entity key id." },

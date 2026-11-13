@@ -280,6 +280,7 @@ _RUNTIME_SNAPSHOT_GETTERS = [
     "GetGameTimeScaleJson",
     "GetPerformanceCensusJson",
     "GetIntermissionCensusJson",
+    "GetIntermissionNativePanelStateJson",
     "GetNavigatorStateJson",
 ]
 
@@ -296,6 +297,7 @@ _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
     "GetIntermissionCensusJson": [64],
     "GetIntermissionGraphJson": ["", 8, 64],
     "GetIntermissionRewardStateJson": [32],
+    "GetIntermissionNativePanelStateJson": [32],
     "GetUiAccessibilityCensusJson": ["", False, 100],
     "GetRelicCensusJson": [64],
     "GetUpgradeCensusJson": [64],
@@ -2937,7 +2939,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "match": ["GetSystemHealthJson", "GetMatchSummaryJson", "GetBattlefieldCensusJson", "GetRunProgressionCensusJson", "GetActiveStageAiAssociationJson", "GetGameTimeScaleJson"],
                 "combat": ["GetBattlefieldCensusJson", "GetPlayerRosterJson", "GetAiRosterJson", "GetCombatStatusCensusJson", "GetUnitThreatAssessmentJson"],
                 "health": ["GetSystemHealthJson", "GetBaseIntegrityCensusJson", "GetProductionCensusJson", "GetAiDirectorCensusJson"],
-                "intermission": ["GetRunProgressionCensusJson", "GetIntermissionCensusJson", "GetIntermissionGraphJson", "GetIntermissionRewardStateJson", "GetNavigatorStateJson", "GetUiAccessibilityCensusJson"],
+                "intermission": ["GetRunProgressionCensusJson", "GetIntermissionCensusJson", "GetIntermissionGraphJson", "GetIntermissionRewardStateJson", "GetIntermissionNativePanelStateJson", "GetNavigatorStateJson", "GetUiAccessibilityCensusJson"],
             }
             getters = presets.get(preset, presets["match"])
             results = {}
@@ -3061,6 +3063,40 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         elif name == "diagnostics_get_intermission_reward_state":
             max_cards = int(arguments.get("maxCards", 32))
             res = _call_diagnostics_method("GetIntermissionRewardStateJson", [max_cards])
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_intermission_native_panel_state":
+            raw_max_rows = arguments.get("maxRows", 32)
+            if isinstance(raw_max_rows, bool):
+                return _tool_response(json.dumps({"error": "maxRows must be an integer"}), is_error=True)
+            try:
+                max_rows = int(raw_max_rows)
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "maxRows must be an integer"}), is_error=True)
+            max_rows = max(1, min(128, max_rows))
+            res = _call_diagnostics_method("GetIntermissionNativePanelStateJson", [max_rows])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_buy_intermission_shop_offer":
+            offer_id = arguments.get("offerId", "")
+            if not isinstance(offer_id, str) or not offer_id.strip():
+                return _tool_response(json.dumps({"error": "offerId is required"}), is_error=True)
+            res = _call_diagnostics_method("OrderBuyIntermissionShopOfferJson", [offer_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_reroll_intermission_shop":
+            res = _call_diagnostics_method("OrderRerollIntermissionShopJson", [])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_remove_intermission_card":
+            entity_id = arguments.get("entityId", "")
+            if not isinstance(entity_id, str) or not entity_id.strip():
+                return _tool_response(json.dumps({"error": "entityId is required"}), is_error=True)
+            res = _call_diagnostics_method("OrderRemoveIntermissionCardJson", [entity_id])
+            return _tool_response(res)
+
+        elif name == "diagnostics_order_cancel_intermission_card_removal":
+            res = _call_diagnostics_method("OrderCancelIntermissionCardRemovalJson", [])
             return _tool_response(res)
 
         elif name == "diagnostics_order_trigger_load_level":

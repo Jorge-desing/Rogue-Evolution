@@ -4371,6 +4371,11 @@ internal static partial class ValidationTestRunner
             {
                 "GetRunProgressionCensusJson",
                 "GetRuntimeControlSurfaceJson",
+                "GetIntermissionNativePanelStateJson",
+                "OrderBuyIntermissionShopOfferJson",
+                "OrderRerollIntermissionShopJson",
+                "OrderRemoveIntermissionCardJson",
+                "OrderCancelIntermissionCardRemovalJson",
                 "GrantPlayerCreditsJson",
                 "ApplyInGameCardChangeJson",
                 "OrderUnitMoveJson",
@@ -4426,6 +4431,12 @@ internal static partial class ValidationTestRunner
             ["error"] = "section_capture_failed",
             ["section"] = "rewardAndDeckState"
         };
+        var nativePanels = new Dictionary<string, object>
+        {
+            ["kind"] = "intermissionNativePanelState",
+            ["isShopActive"] = true,
+            ["shopOfferCount"] = 2
+        };
         string intermissionJson = AgentDiagnosticsFormatter.SerializeRuntimeControlSurface(
             "IntermissionScreen", 913, 0,
             new Dictionary<string, object> { ["error"] = "section_capture_failed", ["section"] = "uiCensus" },
@@ -4433,7 +4444,8 @@ internal static partial class ValidationTestRunner
             new Dictionary<string, object> { ["kind"] = "intermissionCensus", ["nodeCount"] = 4 },
             new Dictionary<string, object> { ["kind"] = "intermissionGraph", ["routeCount"] = 2 },
             rewardError,
-            new Dictionary<string, object> { ["kind"] = "navigatorState", ["isPaused"] = false });
+            new Dictionary<string, object> { ["kind"] = "navigatorState", ["isPaused"] = false },
+            nativePanels);
         using (JsonDocument doc = JsonDocument.Parse(intermissionJson))
         {
             JsonElement root = doc.RootElement;
@@ -4446,9 +4458,97 @@ internal static partial class ValidationTestRunner
                 || intermission.GetProperty("nodeCensus").GetProperty("nodeCount").GetInt32() != 4
                 || intermission.GetProperty("graphAndRoutes").GetProperty("routeCount").GetInt32() != 2
                 || intermission.GetProperty("rewardAndDeckState").GetProperty("error").GetString() != "section_capture_failed"
-                || intermission.GetProperty("navigator").GetProperty("isPaused").GetBoolean())
+                || intermission.GetProperty("navigator").GetProperty("isPaused").GetBoolean()
+                || root.GetProperty("nativePanelState").GetProperty("shopOfferCount").GetInt32() != 2
+                || intermission.GetProperty("nativePanels").GetProperty("isShopActive").GetBoolean() != true)
             {
-                throw new InvalidOperationException("Intermission control-surface snapshot must retain bounded sections and independent errors.");
+                throw new InvalidOperationException("Intermission control-surface snapshot must retain bounded sections, native panels, and independent errors.");
+            }
+        }
+    }),
+    ("intermission node-flow classifier keeps rewards and unknown nodes out of the combat corridor", () =>
+    {
+        var reward = new IntermissionNodeDetail(
+            true, 1, 2, true, false, true, false, false, false, false,
+            false, false, false, false, false, string.Empty, 0, 0, 1);
+        var blueprintReward = new IntermissionNodeDetail(
+            true, 1, 3, true, false, false, false, false, false, false,
+            false, false, false, false, false, "BlueprintPool_1_3", 0, 0, 1);
+        var combat = new IntermissionNodeDetail(
+            true, 2, 0, true, false, false, false, false, false, false,
+            false, false, false, false, false, string.Empty, 0, 1, 1);
+        var unknown = IntermissionNodeDetail.NotFound(8, 9);
+
+        if (RuntimeIntermissionDirector.ClassifyNodeFlow(reward, true) != IntermissionNodeFlowKind.Reward
+            || RuntimeIntermissionDirector.ClassifyNodeFlow(blueprintReward, true) != IntermissionNodeFlowKind.Reward
+            || RuntimeIntermissionDirector.ClassifyNodeFlow(combat, true) != IntermissionNodeFlowKind.Combat
+            || RuntimeIntermissionDirector.ClassifyNodeFlow(combat, false) != IntermissionNodeFlowKind.Unknown
+            || RuntimeIntermissionDirector.ClassifyNodeFlow(unknown, true) != IntermissionNodeFlowKind.Unknown
+            || RuntimeIntermissionDirector.ShouldStartCombatLoadNextLevelCorridor(IntermissionNodeFlowKind.Reward)
+            || RuntimeIntermissionDirector.ShouldStartCombatLoadNextLevelCorridor(IntermissionNodeFlowKind.Unknown)
+            || !RuntimeIntermissionDirector.ShouldStartCombatLoadNextLevelCorridor(IntermissionNodeFlowKind.Combat))
+        {
+            throw new InvalidOperationException("Reward and unknown node kinds must fail the LoadNextLevel corridor gate.");
+        }
+
+        string rewardEntryJson = AgentDiagnosticsFormatter.SerializeIntermissionLevelEntryResult(
+            new IntermissionLevelEntry(1, 2, 33, true, "reward resolved", true, false, "Reward", true, true));
+        using (JsonDocument doc = JsonDocument.Parse(rewardEntryJson))
+        {
+            JsonElement root = doc.RootElement;
+            if (!root.GetProperty("success").GetBoolean()
+                || !root.GetProperty("selected").GetBoolean()
+                || root.GetProperty("entered").GetBoolean()
+                || root.GetProperty("nodeFlowKind").GetString() != "Reward"
+                || !root.GetProperty("nativeCallInvoked").GetBoolean()
+                || !root.GetProperty("effectObserved").GetBoolean())
+            {
+                throw new InvalidOperationException("Reward node entry result must distinguish reward resolution from combat entry.");
+            }
+        }
+    }),
+    ("native intermission panel serializer preserves bounded Shop and removal details", () =>
+    {
+        var panelState = new IntermissionNativePanelState(
+            true, true, true, 44, 90, 2, 3, 1, 7, true,
+            2, 1, 3,
+            new[] { new IntermissionShopOfferRow("RelicCard:44", "RelicCard", "Relic_01", "Shield", "20", 44, true, 20) },
+            true, true, false, 100,
+            2, 1, 0,
+            new[] { new IntermissionRemovalCardRow(0, "Unit_Tank", "Unit_Tank", "Tank", 91) });
+        string json = AgentDiagnosticsFormatter.SerializeIntermissionNativePanelState(panelState);
+        using (JsonDocument doc = JsonDocument.Parse(json))
+        {
+            JsonElement root = doc.RootElement;
+            if (!root.GetProperty("isAvailable").GetBoolean()
+                || root.GetProperty("omittedShopOfferCount").GetInt32() != 1
+                || root.GetProperty("unsupportedShopOfferCount").GetInt32() != 3
+                || root.GetProperty("shopOffers")[0].GetProperty("offerId").GetString() != "RelicCard:44"
+                || root.GetProperty("shopOffers")[0].GetProperty("priceText").GetString() != "20"
+                || root.GetProperty("omittedRemovalCardCount").GetInt32() != 1
+                || root.GetProperty("removalCards")[0].GetProperty("entityId").GetString() != "Unit_Tank"
+                || root.GetProperty("isRemoveCardClickReady").GetBoolean())
+            {
+                throw new InvalidOperationException("Native panel serializer must retain bounded current offers, removal candidates, and readiness.");
+            }
+            if (json.IndexOf("\"omittedShopOfferCount\"", StringComparison.Ordinal)
+                > json.IndexOf("\"shopOffers\"", StringComparison.Ordinal)
+                || json.IndexOf("\"omittedRemovalCardCount\"", StringComparison.Ordinal)
+                > json.IndexOf("\"removalCards\"", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Native panel omission counters must precede their detail arrays.");
+            }
+        }
+
+        string invokedUnknownJson = AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+            new IntermissionActionResult(false, "BuyShopOffer", "RelicCard:44", -1, "", false,
+                "effect pending", true, false));
+        using (JsonDocument doc = JsonDocument.Parse(invokedUnknownJson))
+        {
+            if (!doc.RootElement.GetProperty("nativeCallInvoked").GetBoolean()
+                || doc.RootElement.GetProperty("effectObserved").GetBoolean())
+            {
+                throw new InvalidOperationException("Native panel action result must distinguish a dispatched call from an observed effect.");
             }
         }
     }),
