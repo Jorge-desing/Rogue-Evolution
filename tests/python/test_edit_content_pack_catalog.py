@@ -36,7 +36,6 @@ class OperationsCatalogTests(unittest.TestCase):
             self.assertIn("op", entry)
             self.assertIn("summary", entry)
             self.assertIn("args", entry)
-            self.assertIn("op", entry)
             self.assertTrue(entry["summary"].strip())
 
     def test_operations_json_cli(self) -> None:

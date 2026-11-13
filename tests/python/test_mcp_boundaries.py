@@ -71,7 +71,8 @@ class BoundaryTests(unittest.TestCase):
             spec = {'name': 'fixture', 'inputSchema': schema}
             with self.subTest(value=value), mock.patch.object(S, 'TOOLS', [spec]), mock.patch.object(S, '_VALIDATORS', {}):
                 self.assertIsNotNone(S._validate_tool_arguments('fixture', value))
-                self.assertIsNone(S._validate_tool_arguments('fixture', [2, 3]))
+        with mock.patch.object(S, 'TOOLS', [spec]), mock.patch.object(S, '_VALIDATORS', {}):
+            self.assertIsNone(S._validate_tool_arguments('fixture', [2, 3]))
 
     def test_missing_dependency_fails_closed(self):
         with mock.patch.object(S, 'Draft202012Validator', None), mock.patch.object(S, '_call_http') as send:

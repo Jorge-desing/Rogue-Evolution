@@ -155,7 +155,6 @@ class TacticalAnimationImprovementTests(unittest.TestCase):
         # El vehículo es el último else, no el quad.
         m = re.search(r"else\s+(-0\.\d+)\s*\)", self.death)
         self.assertIsNotNone(m, "Death debe definir collapse_z para vehículo en el else final")
-        self.assertIsNotNone(m)
         # m.group es el literal de vehículo; debe ser profundo
         lit = float(m.group(1))
         self.assertLessEqual(lit, -0.20, "El colapso de Death en vehículos debe ser <=-0.20 m para leerse a distancia RTS")

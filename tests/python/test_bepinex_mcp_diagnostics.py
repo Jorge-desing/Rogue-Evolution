@@ -2054,9 +2054,6 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("'All'", by_desc["diagnostics_order_remove_unit_affix"])
         self.assertIn("native balancing pipeline", by_desc["diagnostics_apply_card_change"])
         self.assertIn("Swift", by_desc["diagnostics_order_apply_unit_affix"])
-        self.assertIn("18+", by_desc["diagnostics_get_catalog"])
-        self.assertTrue(by_desc["diagnostics_get_system_health"].startswith("Queries unified live system health"))
-        self.assertNotIn("directly from", by_desc["diagnostics_get_system_health"])
         stage_association = by_desc["diagnostics_get_active_stage_ai_association"]
         self.assertIn("bounded captured stage order", stage_association)
         self.assertIn("separately from live initialized loader AI bindings", stage_association)

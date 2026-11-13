@@ -25,8 +25,6 @@ class ExportUnitCatalogTests(unittest.TestCase):
 
     def test_stage_mapping(self):
         pack = _valid_pack()
-        if not pack.get("units"):
-            self.skipTest("no units")
         uid = pack["units"][0]["id"]
         # Fuerza una etapa que ofrezca la unidad.
         stage = {"id": "ns:stage-x", "unitIds": [uid]}

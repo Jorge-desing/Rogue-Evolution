@@ -19,16 +19,12 @@ class AnalyzeAiProfileCoverageTests(unittest.TestCase):
 
     def test_unknown_module_flagged(self):
         pack = _valid_pack()
-        if not pack.get("aiProfiles"):
-            self.skipTest("no ai profiles in scaffold")
         pack["aiProfiles"][0]["modules"] = [{"moduleId": "sample:nope", "parameters": []}]
         report = AIC.analyze_ai_profile_coverage(pack)
         self.assertTrue(any("moduleId no registrado" in i for i in report["issues"]))
 
     def test_duplicate_module_flagged(self):
         pack = _valid_pack()
-        if not pack.get("aiProfiles"):
-            self.skipTest("no ai profiles in scaffold")
         pack["aiProfiles"][0]["modules"] = [
             {"moduleId": "sample:trace-default", "parameters": []},
             {"moduleId": "sample:trace-default", "parameters": []},
@@ -38,8 +34,6 @@ class AnalyzeAiProfileCoverageTests(unittest.TestCase):
 
     def test_unit_entry_unresolved_flagged(self):
         pack = _valid_pack()
-        if not pack.get("aiProfiles"):
-            self.skipTest("no ai profiles in scaffold")
         pack["aiProfiles"][0]["unitEntries"] = [{"unitId": "ns:nope"}]
         report = AIC.analyze_ai_profile_coverage(pack)
         self.assertTrue(any("unitEntry unitId no resuelve" in i for i in report["issues"]))
@@ -57,8 +51,6 @@ class AnalyzeAiProfileCoverageTests(unittest.TestCase):
 
     def test_tactical_director_modules_are_registered(self):
         pack = _valid_pack()
-        if not pack.get("aiProfiles"):
-            self.skipTest("no ai profiles in scaffold")
         pack["aiProfiles"][0]["modules"] = [
             {"moduleId": "sample:tactical-director", "parameters": []},
             {"moduleId": "sample:squad-operations-director", "parameters": []},
