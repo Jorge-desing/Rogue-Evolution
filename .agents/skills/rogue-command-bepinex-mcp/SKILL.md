@@ -7,6 +7,23 @@ description: "Control Rogue Command at runtime through the project BepInEx MCP b
 
 Use this skill as the single workflow for controlling or inspecting the live Rogue Command runtime. It uses the project-maintained MCP bridge and Unity telemetry; it does not require images or desktop automation.
 
+## Fast tool discovery
+
+The `bepinex_mcp` namespace is the authoritative current inventory. Before deciding a capability is missing, call `discover_tools` with `includeAliases=false` and a short English keyword, then call `describe_tool` with the exact returned name when its parameters are unclear. Search matches literal substrings in names and descriptions, not intent: try several related words, or call `discover_tools` without filters for the complete index. A `category` filter can hide matches; omit it when exploring. Inspect the tool's mutation warning and live preconditions before invoking it. Hidden compatibility aliases do not remove canonical tools.
+
+| Task | First tools and search terms |
+| --- | --- |
+| Availability and setup | `system_get_game_process_state`, `system_ping`, `system_capabilities`; search `system` or `preflight` |
+| Native UI and intermission | `diagnostics_get_runtime_control_surface`, `diagnostics_get_ui_accessibility_census`; search separately for `ui`, `intermission`, `shop`, `reward`, `navigator`, `deck` and `level` |
+| Units, commands and construction | Search `entity`, `selection`, `unit`, `production`, `placement`, `building`, `move` and `attack` |
+| AI and director | `diagnostics_get_active_stage_ai_association`; search `ai`, `director`, `doctrine`, `threat` and `wave` |
+| Economy and gameplay | Search `economy`, `resource`, `card`, `upgrade`, `relic`, `hazard` and `veterancy` |
+| Scene, components and reflection | Search `scene`, `gameobject`, `component` and `type`; inspect the exact current selector and overload |
+| Harmony and observation | Search `patch`, `inject`, `watch`, `renderer`, `camera`, `visual` and `frame`; follow the Harmony policy before patching |
+| Coordination and sequences | Search `agent`, `lock`, `batch` and `sequence`; inspect per-step results and postconditions |
+
+Use the live index rather than treating this table as exhaustive. `diagnostics_get_catalog` and `diagnostics_list_runtime_getters` enumerate loader diagnostics, while `discover_tools` indexes MCP tools; they answer different questions. An empty filtered search is not evidence that the capability is absent.
+
 ## MCP configuration and tool selection
 
 - The trusted project configuration in `.codex/config.toml` maps the existing `bepinex_mcp` server name to this skill's `scripts/start-server.ps1`. It starts `tools/bepinex_mcp_server.py` with the repository's `.tools/BepInExMCP/.venv`; do not replace it with the upstream `ModdersHelperApp.py` entry. Set `BEPINEX_MCP_TOOL_FILTER = "includeAliases=false"` in this project server's `env` table: this omits only duplicate compatibility aliases, keeps every canonical tool (including native intermission controls), and keeps the advertised schema below 91,000 bytes.
