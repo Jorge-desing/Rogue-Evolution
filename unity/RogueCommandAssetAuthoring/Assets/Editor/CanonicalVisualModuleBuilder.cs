@@ -193,11 +193,7 @@ namespace RogueCommandExpansion.Authoring
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
             bool uncalibratedBuild = ModelGeometryBudgetProfile.IsUncalibratedCanonicalLevel2BuildAuthorized(repositoryRoot);
-            if (!uncalibratedBuild)
-            {
-                ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
-            }
-            else
+            if (uncalibratedBuild)
             {
                 Debug.LogWarning("[CanonicalVisualModuleBuilder] Explicit user authorization is bypassing the uncalibrated geometry budget gate for Level 2 modules. No geometry ceiling is applied; outputs remain marked uncalibrated.");
             }

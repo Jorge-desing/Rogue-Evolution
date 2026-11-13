@@ -55,6 +55,38 @@ namespace RogueCommandExpansion.Authoring
             BulwarkFoundryBuilder.Build();
         }
 
+        [MenuItem("Rogue Command/Tactical Operations/Build Bulwark Tank Visual and Bundle")]
+        public static void BuildBulwarkTank()
+        {
+            TacticalUnitSpec spec = Array.Find(UnitSpecs, item => item.UnitName == "BulwarkSiegeTank");
+            if (spec == null) throw new InvalidDataException("Bulwark tank spec missing.");
+            string prefabPath = spec.PrefabPath;
+            string[] dependencies = AssetDatabase.GetDependencies(prefabPath, true);
+            if (Array.IndexOf(dependencies, spec.ModelPath) < 0)
+                throw new InvalidDataException("Bulwark prefab does not reference the rebuilt primary FBX.");
+            GameObject root = PrefabUtility.LoadPrefabContents(prefabPath);
+            try
+            {
+                Animator[] animators = root.GetComponentsInChildren<Animator>(true);
+                if (animators.Length != 1 || animators[0].avatar == null ||
+                    !animators[0].avatar.isValid || animators[0].runtimeAnimatorController == null)
+                    throw new InvalidDataException("Existing Bulwark Animator must remain valid and unique.");
+                Transform[] sockets = Array.FindAll(root.GetComponentsInChildren<Transform>(true),
+                    item => item.name == "Socket_Hardpoint_ERA");
+                if (sockets.Length != 1) throw new InvalidDataException("Bulwark requires one ERA socket.");
+                sockets[0].localPosition = Vector3.zero;
+                sockets[0].localRotation = Quaternion.identity;
+                sockets[0].localScale = Vector3.one;
+                bool saved;
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out saved);
+                if (!saved) throw new IOException("Could not save Bulwark ERA socket override.");
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            BulwarkFoundryBuilder.BuildExistingBundle("artifacts/bulwark-global-unlimited-build/bundles");
+        }
+
         /// <summary>
         /// Declarative specification for one Tactical Operations visual.
         /// Unifies the previous per-unit hardcoded creation methods (Atlas for

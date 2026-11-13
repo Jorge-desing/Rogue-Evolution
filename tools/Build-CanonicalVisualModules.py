@@ -29,6 +29,7 @@ import RogueModelKit as rmk  # noqa: E402
 import inspect_fbx_geometry as fbx_inspector  # noqa: E402
 from canonical_module_inventory_staging import (  # noqa: E402
     InventoryCapacityGate,
+    InventoryStageContext,
     stage_candidate_inventory,
     validate_candidate_export_path,
     validate_candidate_triangle_count,
@@ -199,11 +200,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--capacity-evidence",
         type=Path,
-        help="Hashed runtime evidence bundle required by --inventory-staging.",
+        help="Legacy argument; accepted but not used as a build gate or calibration evidence.",
     )
     args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
-    if bool(args.inventory_staging) != bool(args.capacity_evidence):
-        parser.error("--inventory-staging and --capacity-evidence must be supplied together")
+    if args.capacity_evidence and not args.inventory_staging:
+        parser.error("--capacity-evidence requires --inventory-staging")
     if args.inventory_staging and args.force:
         parser.error("--force is not available for staging-only candidate inventory")
     return args
@@ -732,7 +733,7 @@ def prepare_module_export_geometry(
 def export_inventory_candidate_fbx(
     fbx_path: Path,
     model_objects: list[bpy.types.Object],
-    gate: InventoryCapacityGate,
+    gate: InventoryCapacityGate | InventoryStageContext,
     *,
     asset_id: str,
 ) -> None:
@@ -775,7 +776,7 @@ def export_inventory_candidate_fbx(
 def build_candidate_module_fbx(
     entry: dict[str, Any],
     fbx_path: Path,
-    gate: InventoryCapacityGate,
+    gate: InventoryCapacityGate | InventoryStageContext,
 ) -> dict[str, Any]:
     """Replay one module in memory, export to staging, then inspect its actual FBX."""
     rmk.clear_scene()
@@ -807,16 +808,9 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
     if (retention_ratios[0] != 1.0 or not 0.0 < retention_ratios[2] < retention_ratios[1] < 1.0 or
             not 0.0 < transition_heights[2] < transition_heights[1] < transition_heights[0] <= 1.0):
         raise ValueError("Canonical Level 2 LOD ratios and thresholds must descend from LOD0 to LOD2")
-    profile = json.loads(BUDGET_PROFILE_PATH.read_text(encoding="utf-8"))
-    profile_is_calibrated = profile.get("calibrationStatus") == "calibrated"
-    uncalibrated_authorized = (
-        build_policy.get("allowUncalibratedCanonicalLevel2") is True and
-        build_policy.get("authorizationStatus") == "user-authorized-until-revoked"
-    )
-    uncalibrated_build = not profile_is_calibrated and uncalibrated_authorized
-    if not profile_is_calibrated and not uncalibrated_build:
-        # Fail before inspecting or creating any production output path.
-        rmk.resolve_geometry_budget(entries[0]["moduleName"])
+    # Calibration is diagnostic, never an authoring/build gate. Do not label
+    # outputs calibrated even if a profile happens to be present.
+    uncalibrated_build = True
 
     outputs = [SOURCE_BLEND]
     outputs.extend(ROOT / entry["fbxFilePath"] for entry in entries)
@@ -970,7 +964,7 @@ def main() -> None:
             output = ROOT / output
         print(
             f"Staged {manifest['assetInventory']['fileCount']} candidate Level 2 FBXs under "
-            f"{output.resolve()} (candidate inventory only; normal build/promotion remains gated).",
+            f"{output.resolve()} (candidate inventory only; no calibration limits applied).",
             flush=True,
         )
         return

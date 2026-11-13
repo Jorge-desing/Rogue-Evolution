@@ -133,28 +133,26 @@ class CanonicalModuleInventoryStagingTests(unittest.TestCase):
             "visualEngineeringRole": "aps_sensor_suite",
         }
 
-    def test_ineligible_measurement_refuses_before_directory_or_candidate_write(self):
+    def test_missing_calibration_does_not_block_candidate_inventory(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            profile, evidence = self._write_profile_and_bundle(root, capacity_eligible=False)
+            profile, evidence = root / "missing-profile.json", root / "missing-evidence.json"
             stage = root / "artifacts" / "inventory" / "run-1"
             calls: list[str] = []
 
-            def should_not_build(entry, candidate_path, gate):
+            def build(entry, candidate_path, gate):
                 calls.append(str(candidate_path))
-                raise AssertionError("candidate export callback must not run")
+                candidate_path.parent.mkdir(parents=True)
+                candidate_path.write_bytes(b"candidate")
+                return {"assetId":entry["moduleName"],"sourceFaces":20,"sourceTriangles":30,
+                        "meshObjects":1,"vertices":42,"sha256":sha256_file(candidate_path)}
 
-            with self.assertRaisesRegex(ModelBudgetError, "not eligible for capacity staging"):
-                stage_candidate_inventory(
-                    repo_root=root,
-                    staging_root=stage,
-                    profile_path=profile,
-                    evidence_bundle_path=evidence,
-                    entries=[self._entry()],
-                    build_candidate=should_not_build,
-                )
-            self.assertFalse(stage.exists())
-            self.assertEqual(calls, [])
+            result = stage_candidate_inventory(repo_root=root, staging_root=stage,
+                profile_path=profile, evidence_bundle_path=evidence,
+                entries=[self._entry()], build_candidate=build)
+            self.assertEqual(result["status"], "candidate-inventory-ready")
+            self.assertEqual(len(calls), 1)
+            self.assertFalse(result["capacityGate"]["geometryLimitsApplied"])
 
     def test_candidate_inventory_keeps_inspector_counts_and_file_sha_exact(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -187,8 +185,9 @@ class CanonicalModuleInventoryStagingTests(unittest.TestCase):
 
             self.assertEqual(manifest["status"], "candidate-inventory-ready")
             self.assertFalse(manifest["promotionAllowed"])
-            self.assertFalse(manifest["normalBuildAllowed"])
-            self.assertEqual(manifest["capacityGate"]["sceneTriangleCapacity"], 7_500)
+            self.assertTrue(manifest["normalBuildAllowed"])
+            self.assertFalse(manifest["capacityGate"]["geometryLimitsApplied"])
+            self.assertEqual(manifest["capacityGate"]["geometryBudgetStatus"], "UNCALIBRATED_USER_AUTHORIZED")
             row = manifest["assetInventory"]["assets"][0]
             candidate = root / row["candidateFbxPath"]
             self.assertEqual(row["sourceFaces"], 20)
@@ -198,7 +197,7 @@ class CanonicalModuleInventoryStagingTests(unittest.TestCase):
             self.assertEqual(profile.read_bytes(), profile_before)
             self.assertTrue((stage / "candidate-inventory.json").is_file())
 
-    def test_module_over_measured_capacity_is_rejected_before_export_callback_writes(self):
+    def test_candidate_triangle_count_has_no_calibration_ceiling(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             profile, evidence = self._write_profile_and_bundle(root)
@@ -206,24 +205,18 @@ class CanonicalModuleInventoryStagingTests(unittest.TestCase):
             writes: list[str] = []
 
             def build_candidate(entry, candidate_path, gate):
-                validate_candidate_triangle_count(gate.scene_triangle_capacity + 1, gate, entry["moduleName"])
+                validate_candidate_triangle_count(100_000_000, gate, entry["moduleName"])
                 writes.append(str(candidate_path))
                 candidate_path.parent.mkdir(parents=True, exist_ok=True)
-                candidate_path.write_bytes(b"should never be written")
-                raise AssertionError("over-capacity candidate must stop before export")
+                candidate_path.write_bytes(b"candidate")
+                return {"assetId":entry["moduleName"],"sourceFaces":20,"sourceTriangles":100_000_000,
+                        "meshObjects":1,"vertices":42,"sha256":sha256_file(candidate_path)}
 
-            with self.assertRaisesRegex(ModelBudgetError, "above the measured scene capacity"):
-                stage_candidate_inventory(
-                    repo_root=root,
-                    staging_root=stage,
-                    profile_path=profile,
-                    evidence_bundle_path=evidence,
-                    entries=[self._entry()],
-                    build_candidate=build_candidate,
-                )
-            self.assertEqual(writes, [])
-            self.assertFalse((stage / "fbx" / "RCLModule_demo_test.fbx").exists())
-            self.assertEqual(json.loads((stage / "candidate-inventory.json").read_text(encoding="utf-8"))["status"], "failed")
+            result = stage_candidate_inventory(repo_root=root, staging_root=stage,
+                profile_path=profile, evidence_bundle_path=evidence,
+                entries=[self._entry()], build_candidate=build_candidate)
+            self.assertEqual(len(writes), 1)
+            self.assertEqual(result["assetInventory"]["assets"][0]["sourceTriangles"], 100_000_000)
 
     def test_output_location_must_be_new_and_inside_artifacts(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -279,7 +272,7 @@ class CanonicalModuleInventoryStagingTests(unittest.TestCase):
         self.assertIn(staging_call, list(ast.walk(stage_branch)))
         self.assertTrue(any(isinstance(node, ast.Return) for node in ast.walk(stage_branch)))
 
-    def test_candidate_builder_checks_capacity_before_export_and_inspects_after_export(self):
+    def test_candidate_builder_checks_nonempty_geometry_and_inspects_after_export(self):
         builder_path = Path(__file__).resolve().parents[2] / "tools" / "Build-CanonicalVisualModules.py"
         module = ast.parse(builder_path.read_text(encoding="utf-8"))
         candidate_builder = next(

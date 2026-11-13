@@ -80,13 +80,14 @@
   },
   "bundleManifest": {
     "path": "content/packs/tactical-operations/bundles/assetbundle-manifest.bundle",
-    "sha256": "332f93d925fc69e39da1dc931479c6ec963c30e814ab927154f4bba1184641e7",
+    "sha256": "78001cfbf00eebff230596b25a8f123a35208a4de18cac7add1b9d838ad687c7",
     "bytes": 1584
   },
   "evidence": {
     "local": "Blender 4.5.14; Material Maker 1.7; Unity 2021.3.45f2; pack and bundle reference validation",
     "runtime": "NOT_TESTED",
     "gameplayBalance": "unchanged",
-    "lodTriangleCounts": "Blender triangulated mesh counts; Unity runtime draw calls not measured"
+    "lodTriangleCounts": "Blender triangulated mesh counts; Unity runtime draw calls not measured",
+    "bundleUpdate": "Rebuilt alongside Bulwark tank under the global no-calibration-limits policy; foundry asset retained."
   }
 }

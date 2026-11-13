@@ -1,12 +1,13 @@
 """Replay the user-authorized Bulwark Foundry source and LOD FBX in Blender 4.5."""
 import bpy, math, json, pathlib
 from mathutils import Vector
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 POLICY = ROOT / 'content/source-art/bulwark-foundry-build-policy.json'
-policy = json.loads(POLICY.read_text(encoding='utf-8'))
-if policy.get('schemaVersion') != 1 or policy.get('assetId') != 'BulwarkFoundry' or policy.get('authorizationStatus') != 'user-authorized-foundry-only-2026-11-13' or policy.get('geometryBudgetStatus') != 'UNCALIBRATED_USER_AUTHORIZED':
-    raise RuntimeError('BulwarkFoundry scoped build authorization missing or invalid')
+sys.path.insert(0, str(ROOT / 'tools'))
+from model_build_policy import authoring_settings
+settings = authoring_settings('BulwarkFoundry')
 OUT = ROOT / 'artifacts/bulwark-foundry-build/candidate'
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
@@ -104,8 +105,7 @@ assert 3.65 - .36 / 2 > 3.25 + .26 / 2
 assert 2.775 + 1.65 / 2 < 3.7  # side panels stay on the flat wing section
 assert 2.775 + 1.36 / 2 < 3.7  # service door frame stays on its armor panel
 
-import hashlib, sys
-sys.path.insert(0, str(ROOT / 'tools'))
+import hashlib
 import RogueModelKit as rmk
 
 # Material Maker's emission mask is confined to the middle of the texture.
@@ -149,8 +149,8 @@ def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 report={
     'schemaVersion':1, 'assetId':'BulwarkFoundry',
     'geometryBudgetStatus':'UNCALIBRATED_USER_AUTHORIZED',
-    'policySha256':digest(POLICY), 'sourceSha256':digest(source), 'fbxSha256':digest(fbx),
-    'lodScreenRelativeTransitionHeights':policy['lodScreenRelativeTransitionHeights'],
+    'policySha256':digest(POLICY) if POLICY.is_file() else None, 'sourceSha256':digest(source), 'fbxSha256':digest(fbx),
+    'lodScreenRelativeTransitionHeights':[lod['screenRelativeTransitionHeight'] for lod in settings['lods']],
     'lods': {name:{'objects':len(objects),'blenderFaces':sum(len(o.data.polygons) for o in objects),
                    'triangles':rmk.count_mesh_triangles(objects)} for name,objects in lods.items()},
     'limitations':['Native bounds and runtime appearance unverified.','Not performance-calibrated.']

@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace RogueCommandExpansion.Authoring
 {
-    // This one-asset build is authorized separately from the Level 2 policy.
+    // Calibration data is diagnostic; foundry builds have no geometry ceiling.
     public static class BulwarkFoundryBuilder
     {
         private const string Name = "BulwarkFoundry";
@@ -23,19 +23,14 @@ namespace RogueCommandExpansion.Authoring
             public float[] lodScreenRelativeTransitionHeights;
         }
 
-        private static Policy RequirePolicy(string root)
+        private static Policy AuthoringSettings(string root)
         {
-            string path = Path.Combine(root, "content/source-art/bulwark-foundry-build-policy.json");
-            Policy policy = JsonUtility.FromJson<Policy>(File.ReadAllText(path));
-            if (policy == null || policy.schemaVersion != 1 || policy.assetId != Name ||
-                policy.authorizationStatus != "user-authorized-foundry-only-2026-11-13" ||
-                policy.geometryBudgetStatus != "UNCALIBRATED_USER_AUTHORIZED" ||
-                policy.lodScreenRelativeTransitionHeights == null || policy.lodScreenRelativeTransitionHeights.Length != 3 ||
-                policy.lodScreenRelativeTransitionHeights[0] <= policy.lodScreenRelativeTransitionHeights[1] ||
-                policy.lodScreenRelativeTransitionHeights[1] <= policy.lodScreenRelativeTransitionHeights[2] ||
-                policy.lodScreenRelativeTransitionHeights[0] > 1 || policy.lodScreenRelativeTransitionHeights[2] <= 0)
-                throw new InvalidDataException("Bulwark Foundry scoped geometry policy is absent or invalid.");
-            return policy;
+            return new Policy {
+                schemaVersion = 1, assetId = Name,
+                authorizationStatus = "user-authorized-global",
+                geometryBudgetStatus = "UNCALIBRATED_USER_AUTHORIZED",
+                lodScreenRelativeTransitionHeights = ModelGeometryBudgetProfile.GetLodTransitions(root, Name)
+            };
         }
 
         private static Texture2D Texture(string suffix, bool linear, bool normal)
@@ -76,7 +71,7 @@ namespace RogueCommandExpansion.Authoring
 
         public static string BuildPrefab(string root)
         {
-            Policy policy = RequirePolicy(root);
+            Policy policy = AuthoringSettings(root);
             if (Application.unityVersion != "2021.3.45f2") throw new InvalidOperationException("Wrong Unity version.");
             Texture2D albedo=Texture("Albedo",false,false), metallic=Texture("MetallicGloss",true,false),
                 normal=Texture("Normal",false,true), emission=Texture("Emission",false,false);
@@ -144,16 +139,29 @@ namespace RogueCommandExpansion.Authoring
 
         public static void Build()
         {
+            BuildBundle(true, "artifacts/bulwark-foundry-build/bundles");
+        }
+
+        public static void BuildExistingBundle(string outputRelativePath)
+        {
+            BuildBundle(false, outputRelativePath);
+        }
+
+        private static void BuildBundle(bool refreshFoundry, string outputRelativePath)
+        {
             string root=Path.GetFullPath(Path.Combine(Application.dataPath,"..","..",".."));
-            RequirePolicy(root); // before prefab, output directory, or bundle writes
+            AuthoringSettings(root);
             string old=Path.Combine(root,"content/packs/tactical-operations/bundles/"+Bundle);
             var existing=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             AssetBundle baseline=AssetBundle.LoadFromFile(old);
             if(baseline==null) throw new IOException("Cannot open current Tactical Operations bundle.");
             try { foreach(string path in baseline.GetAllAssetNames()) existing.Add(path); }
             finally { baseline.Unload(true); }
-            BuildPrefab(root);
-            string output=Path.Combine(root,"artifacts/bulwark-foundry-build/bundles");
+            if (refreshFoundry) BuildPrefab(root);
+            string output=Path.GetFullPath(Path.Combine(root,outputRelativePath));
+            string artifacts=Path.GetFullPath(Path.Combine(root,"artifacts")).TrimEnd(Path.DirectorySeparatorChar)+Path.DirectorySeparatorChar;
+            if(!output.StartsWith(artifacts,StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Bundle output must remain under artifacts/.");
             Directory.CreateDirectory(output);
             string[] paths=AssetDatabase.GetAssetPathsFromAssetBundle(Bundle);
             if(Array.IndexOf(paths,Prefab)<0) throw new InvalidDataException("Foundry prefab bundle label missing.");
@@ -174,6 +182,12 @@ namespace RogueCommandExpansion.Authoring
                 GameObject prefab=result.LoadAsset<GameObject>(address);
                 if(prefab==null || prefab.GetComponent<LODGroup>()==null || prefab.GetComponentsInChildren<MonoBehaviour>(true).Length!=0)
                     throw new InvalidDataException("Foundry prefab missing or invalid in built bundle.");
+                GameObject tank=result.LoadAsset<GameObject>("assets/tacticaloperations/prefabs/bulwarksiegetankvisual.prefab");
+                if(tank==null) throw new InvalidDataException("Bulwark tank prefab missing in built bundle.");
+                Animator[] animators=tank.GetComponentsInChildren<Animator>(true);
+                if(animators.Length!=1 || animators[0].avatar==null || !animators[0].avatar.isValid ||
+                    animators[0].runtimeAnimatorController==null)
+                    throw new InvalidDataException("Bulwark tank Animator missing or invalid in built bundle.");
             }
             finally { result.Unload(true); }
             File.Copy(Path.Combine(output,"bundles"),Path.Combine(output,"assetbundle-manifest.bundle"),true);

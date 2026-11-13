@@ -27,18 +27,9 @@ def resolve_geometry_budget(
     profile_path: Path | None = None,
     scene_id: str | None = None,
 ) -> Dict[str, Any]:
-    """Return the calibrated scene allocation for one named asset.
-
-    There is intentionally no numeric fallback: a missing, uncalibrated, or
-    incomplete profile is a build error rather than a hidden geometry ceiling.
-    """
-    from model_budget_policy import ModelBudgetError, load_budget_profile, resolve_asset_budget
-
-    path = Path(profile_path) if profile_path is not None else MODEL_BUDGET_PROFILE_PATH
-    try:
-        return resolve_asset_budget(load_budget_profile(path), asset_id, scene_id)
-    except ModelBudgetError as exc:
-        raise ValueError(f"{asset_id}: calibrated model-budget profile required ({exc})") from exc
+    """Return LOD authoring settings without imposing calibration limits."""
+    from model_build_policy import authoring_settings
+    return authoring_settings(asset_id, scene_id)
 
 
 def count_mesh_triangles(objects: Sequence[bpy.types.Object]) -> int:
@@ -59,15 +50,12 @@ def lod_ratios_from_budget(
         raise ValueError(f"{asset_budget.get('assetId', 'asset')}: source geometry has no triangles")
     lods = asset_budget.get("lods")
     if not isinstance(lods, list) or len(lods) != 3:
-        raise ValueError(f"{asset_budget.get('assetId', 'asset')}: calibrated LOD0/LOD1/LOD2 allocations are required")
+        raise ValueError(f"{asset_budget.get('assetId', 'asset')}: three authored LOD0/LOD1/LOD2 settings are required")
     ratios: list[Tuple[str, float]] = []
     for index, (name, lod) in enumerate(zip(("LOD0", "LOD1", "LOD2"), lods)):
         if lod.get("lod") != name:
             raise ValueError(f"{asset_budget.get('assetId', 'asset')}: LOD allocation order is invalid")
-        target = int(lod.get("targetTrianglesPerInstance", 0))
-        if target <= 0:
-            raise ValueError(f"{asset_budget.get('assetId', 'asset')}: {name} has no triangle allowance")
-        ratio = 1.0 if index == 0 else min(1.0, target / source_triangles)
+        ratio = float(lod["retentionRatio"])
         ratios.append((name, ratio))
     return ratios
 
@@ -85,30 +73,24 @@ def summarize_lod_budget(
             if obj is not None and obj.type == "MESH" and "_COLLIDER_" not in obj.name
         )
         triangles = count_mesh_triangles(objects)
-        target_faces = int(target["targetFacesPerInstance"])
-        target_triangles = int(target["targetTrianglesPerInstance"])
         lod_rows.append({
             "lod": name,
             "screenRelativeTransitionHeight": float(target["screenRelativeTransitionHeight"]),
-            "targetBlenderFaces": target_faces,
-            "targetUnityTriangles": target_triangles,
+            "retentionRatio": float(target["retentionRatio"]),
             "actualBlenderFaces": faces,
-            "actualUnityTriangles": triangles,
-            "verdict": "PASS" if faces <= target_faces and triangles <= target_triangles else "FAIL",
+            "blenderTriangulatedFaces": triangles,
+            "verdict": "UNCALIBRATED_USER_AUTHORIZED",
         })
     return {
         "schemaVersion": 1,
         "assetId": asset_budget["assetId"],
         "sceneId": asset_budget["sceneId"],
-        "targetFps": asset_budget["targetFps"],
-        "resolution": asset_budget["resolution"],
-        "sceneTriangleCapacity": asset_budget["sceneTriangleCapacity"],
-        "sceneBudgetPassed": bool(asset_budget["sceneBudgetPassed"]),
-        "sceneTriangleBudgetByLod": asset_budget["sceneTriangleBudgetByLod"],
+        "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
+        "geometryLimitsApplied": False,
         "sourceBlenderFaces": lod_rows[0]["actualBlenderFaces"],
-        "sourceUnityTriangles": lod_rows[0]["actualUnityTriangles"],
+        "sourceBlenderTriangles": lod_rows[0]["blenderTriangulatedFaces"],
         "lods": lod_rows,
-        "verdict": "PASS" if asset_budget["sceneBudgetPassed"] and all(row["verdict"] == "PASS" for row in lod_rows) else "FAIL",
+        "verdict": "UNCALIBRATED_USER_AUTHORIZED",
     }
 
 
@@ -126,10 +108,6 @@ def write_lod_budget_report(
         raise ValueError("model-budget report assetId is not a valid filename")
     output_path = output_dir / f"{safe_asset_id}.json"
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    if report["verdict"] != "PASS":
-        raise ValueError(
-            f"{asset_budget['assetId']} LOD geometry exceeds its calibrated allocation; report: {output_path}"
-        )
     return output_path
 
 
@@ -354,13 +332,8 @@ def enforce_face_budget_before_export(
     profile_path: Path | None = None,
     scene_id: str | None = None,
 ) -> Dict[str, Any]:
-    """Apply safe fitting reduction against this asset's calibrated LOD0 allocation."""
+    """Count geometry without applying a calibration-derived ceiling."""
     resolved_asset_id = asset_id or model_name
-    allocation = resolve_geometry_budget(resolved_asset_id, profile_path, scene_id)
-    lod0 = allocation["lods"][0]
-    max_faces = int(lod0["targetFacesPerInstance"])
-    max_triangles = int(lod0["targetTrianglesPerInstance"])
-    reduction = reduce_subpixel_details_to_budget(objects, max_faces=max_faces)
     face_count = sum(
         len(obj.data.polygons)
         for obj in objects
@@ -369,21 +342,16 @@ def enforce_face_budget_before_export(
         and "_COLLIDER_" not in obj.name
     )
     triangle_count = count_mesh_triangles(objects)
-    if face_count > max_faces or triangle_count > max_triangles:
-        raise ValueError(
-            f"{model_name} exceeds its calibrated LOD0 allocation "
-            f"({face_count}/{max_faces} Blender faces, {triangle_count}/{max_triangles} Unity triangles "
-            f"after safe reduction; {reduction['faces_removed']} faces removed). Redesign geometry "
-            "against the authored camera and role without simplifying the silhouette."
-        )
-    reduction.update({
+    return {
         "asset_id": resolved_asset_id,
-        "lod0_target_faces": max_faces,
-        "lod0_target_triangles": max_triangles,
+        "faces_before": face_count,
+        "faces_after": face_count,
+        "faces_removed": 0,
+        "changed_meshes": 0,
         "source_triangles_after_reduction": triangle_count,
-        "budget_verdict": "PASS",
-    })
-    return reduction
+        "budget_verdict": "UNCALIBRATED_USER_AUTHORIZED",
+        "geometryLimitsApplied": False,
+    }
 
 
 def make_material(
@@ -7708,7 +7676,7 @@ def batch_and_join_by_material(
     so broad armor plates remain flat without shading pinch across 1-segment bevels.
     """
     if max_faces is not None:
-        raise ValueError("fixed max_faces overrides are retired; use the calibrated scene allocation")
+        print("[model-build] Ignoring retired face-budget argument; no geometry ceiling is applied.")
     if not allow_uncalibrated_geometry:
         enforce_face_budget_before_export(objects, prefix, asset_id=asset_id, profile_path=profile_path, scene_id=scene_id)
     material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
@@ -8002,7 +7970,7 @@ def generate_lod_chain(
         raise ValueError(f"{prefix}: pass LOD ratios derived from its calibrated geometry profile")
     lod_names = [name for name, _ in lod_levels]
     if lod_names != ["LOD0", "LOD1", "LOD2"]:
-        raise ValueError(f"{prefix}: the calibrated pipeline requires LOD0, LOD1, and LOD2")
+        raise ValueError(f"{prefix}: the authored LOD chain requires LOD0, LOD1, and LOD2")
     if any(not math.isfinite(ratio) or ratio <= 0.0 or ratio > 1.0 for _, ratio in lod_levels):
         raise ValueError(f"{prefix}: LOD ratios must be within (0, 1]")
     lod_dict: Dict[str, list[bpy.types.Object]] = {}
@@ -8131,7 +8099,6 @@ def profile_model_budget_and_drawcalls(
     """Provides face-budget, true triangulation, and draw-call diagnostics by subsystem."""
     if asset_budget is None:
         asset_budget = resolve_geometry_budget(prefix)
-    lod0_budget = asset_budget["lods"][0]
 
     subsystems = {
         "Chassis & Hull": 0,
@@ -8175,10 +8142,6 @@ def profile_model_budget_and_drawcalls(
         else:
             subsystems["Chassis & Hull"] += faces
 
-    target_faces = int(lod0_budget["targetFacesPerInstance"])
-    target_triangles = int(lod0_budget["targetTrianglesPerInstance"])
-    pct_of_budget = round((total_triangles / max(1, target_triangles)) * 100, 1)
-
     lod_summary = {}
     lod_triangle_summary = {}
     if lod_dict:
@@ -8200,11 +8163,12 @@ def profile_model_budget_and_drawcalls(
         "asset_id": asset_budget["assetId"],
         "source_faces": total_faces,
         "source_triangles": total_triangles,
-        "target_lod0_faces": target_faces,
-        "target_lod0_triangles": target_triangles,
-        "budget_percentage": pct_of_budget,
+        "target_lod0_faces": None,
+        "target_lod0_triangles": None,
+        "budget_percentage": None,
         "lod_budget": asset_budget["lods"],
-        "budget_verdict": "PASS" if total_triangles <= target_triangles else "FAIL",
+        "budget_verdict": "UNCALIBRATED_USER_AUTHORIZED",
+        "geometryLimitsApplied": False,
         "subsystems": subsystems,
         "subsystem_faces": subsystems.copy(),
         "lod_levels": lod_summary,
@@ -8213,7 +8177,7 @@ def profile_model_budget_and_drawcalls(
 
     print(f"\n================ [ {prefix} Subsystem Budget & Profiling ] ================")
     print(f"Total Faces: {total_faces} | True Triangles: {total_triangles} | Vertices: {total_verts} | Materials: {len(materials_used)}")
-    print(f"LOD0 Triangles: {total_triangles}/{target_triangles} ({pct_of_budget}%) | Blender Faces: {total_faces}/{target_faces}")
+    print(f"LOD0 Triangles: {total_triangles} | Blender Faces: {total_faces} | No calibration limits")
     print("Subsystem Breakdown:")
     for sub, count in subsystems.items():
         sub_pct = round((count / max(1, total_faces)) * 100, 1)
@@ -8512,12 +8476,11 @@ def _validate_export_budget_token(
     asset_budget: Dict[str, Any] | None,
     expected_asset_id: str | None,
 ) -> None:
-    from model_budget_policy import ModelBudgetError, validate_prevalidated_export_budget
-
-    try:
-        validate_prevalidated_export_budget(asset_budget, expected_asset_id=expected_asset_id)
-    except ModelBudgetError as exc:
-        raise ValueError(str(exc)) from exc
+    if asset_budget is not None:
+        if not isinstance(asset_budget, dict):
+            raise ValueError("authoring settings must be a dictionary")
+        if expected_asset_id and asset_budget.get("assetId") != expected_asset_id:
+            raise ValueError("authoring settings belong to a different asset")
 
 
 def export_unity_fbx(
@@ -8533,9 +8496,7 @@ def export_unity_fbx(
     prevalidated_budget: Dict[str, Any] | None = None,
     allow_uncalibrated_export: bool = False,
 ) -> None:
-    """Export FBX under a calibrated budget or an explicit scoped override."""
-    if allow_uncalibrated_export and (generate_profiled_lods or prevalidated_budget is not None):
-        raise ValueError("uncalibrated export override cannot be combined with a calibrated budget")
+    """Export FBX with optional authored LODs; no calibration gate is applied."""
     asset_budget = None
     mesh_objects: list[bpy.types.Object] = []
     ratios: list[Tuple[str, float]] = []
@@ -8544,35 +8505,23 @@ def export_unity_fbx(
             raise ValueError("profile-driven LOD export requires an explicit asset_id")
         if prevalidated_budget is not None:
             raise ValueError("profile-driven LOD export resolves its own budget; do not pass prevalidated_budget")
-        # Resolve and validate the profile before touching the FBX destination.
-        # A missing or infeasible calibration must not partially export LOD0.
         asset_budget = resolve_geometry_budget(asset_id, profile_path, scene_id)
         mesh_objects = [
             obj for obj in model_objects
             if obj is not None and obj.type == "MESH" and "_COLLIDER_" not in obj.name
         ]
         source_triangles = count_mesh_triangles(mesh_objects)
-        lod0_target = int(asset_budget["lods"][0]["targetTrianglesPerInstance"])
-        if source_triangles > lod0_target:
-            raise ValueError(
-                f"{asset_id} has {source_triangles} LOD0 triangles above its calibrated {lod0_target}-triangle allocation"
-            )
         ratios = lod_ratios_from_budget(asset_budget, source_triangles)
     else:
-        if prevalidated_budget is None:
-            if not allow_uncalibrated_export or not asset_id:
-                raise ValueError(
-                    "FBX export requires a calibrated budget or an explicit uncalibrated export override with asset_id"
-                )
         asset_budget = prevalidated_budget
 
     if asset_id is None and isinstance(asset_budget, dict):
         asset_id = str(asset_budget.get("assetId", "")) or None
-    if not allow_uncalibrated_export:
-        _validate_export_budget_token(asset_budget, expected_asset_id=asset_id)
+    _validate_export_budget_token(asset_budget, expected_asset_id=asset_id)
     if not model_objects:
         raise ValueError("FBX export requires at least one object")
 
+    print(f"[model-build] {asset_id or fbx_path.stem}: UNCALIBRATED_USER_AUTHORIZED; no calibration limits applied")
     fbx_path.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     for obj in model_objects:
@@ -8606,7 +8555,7 @@ def export_unity_fbx(
     )
 
     if generate_profiled_lods:
-        lod_dict = generate_lod_chain(mesh_objects, prefix=asset_id, lod_levels=ratios)
+        lod_dict = generate_lod_chain(mesh_objects, prefix=asset_id, lod_levels=ratios, lod_name_first=True)
         report_path = write_lod_budget_report(asset_budget, lod_dict)
         lod_objects = list(lod_dict["LOD0"]) + list(lod_dict["LOD1"]) + list(lod_dict["LOD2"])
         if include_armature:
@@ -16449,7 +16398,7 @@ class RogueVehicleBuilder:
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
         if target_budget is not None:
-            raise ValueError("fixed target_budget overrides are retired; provide a calibrated scene profile")
+            print("[model-build] Ignoring retired target_budget; no geometry ceiling is applied.")
         if not generate_lods:
             raise ValueError(f"{self.name}: exported gameplay assets require profile-driven LOD0/LOD1/LOD2")
         asset_budget = resolve_geometry_budget(self.name, budget_profile_path, budget_scene_id)
@@ -16462,16 +16411,7 @@ class RogueVehicleBuilder:
         if include_shield_bubble:
             self.add_shield_bubble()
 
-        # The LOD0 allowance comes from measured scene demand and this asset's
-        # screen area and role. Safe detail reduction is bounded by its reported
-        # Blender-face equivalent, then checked against Unity triangle cost.
-        lod0_budget = asset_budget["lods"][0]
-        face_budget_limit = int(lod0_budget["targetFacesPerInstance"])
-        triangle_budget_limit = int(lod0_budget["targetTrianglesPerInstance"])
-        face_reduction = reduce_subpixel_details_to_budget(
-            self.objects,
-            max_faces=face_budget_limit,
-        )
+        face_reduction = enforce_face_budget_before_export(self.objects, self.name)
         bpy.context.view_layer.update()
         diagnostics = validate_model_mesh_quality(self.objects, allow_hover=self.is_hover)
         source_face_count = sum(
@@ -16486,19 +16426,11 @@ class RogueVehicleBuilder:
         diagnostics["geometry_budget"] = asset_budget
         diagnostics["source_face_count"] = source_face_count
         diagnostics["source_triangle_count"] = source_triangle_count
-        diagnostics["target_lod0_faces"] = face_budget_limit
-        diagnostics["target_lod0_triangles"] = triangle_budget_limit
-        diagnostics["face_budget_passed"] = source_face_count <= face_budget_limit
-        diagnostics["triangle_budget_passed"] = source_triangle_count <= triangle_budget_limit
-        if source_face_count > face_budget_limit or source_triangle_count > triangle_budget_limit:
-            raise ValueError(
-                f"{self.name} exceeds calibrated LOD0 allocation: {source_face_count}/{face_budget_limit} "
-                f"Blender faces and {source_triangle_count}/{triangle_budget_limit} Unity triangles after "
-                "safe reduction; revise the asset for the calibrated camera and scene role."
-            )
+        diagnostics["target_lod0_faces"] = None
+        diagnostics["target_lod0_triangles"] = None
+        diagnostics["geometryLimitsApplied"] = False
 
-        # Do not touch output paths until the calibrated demand and this asset's
-        # actual LOD0 geometry have both passed their gates.
+        # Create output paths only after in-memory geometry diagnostics.
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -17558,7 +17490,7 @@ class RogueStructureBuilder:
         budget_scene_id: str | None = None,
     ) -> dict[str, Any]:
         if target_budget is not None:
-            raise ValueError("fixed target_budget overrides are retired; provide a calibrated scene profile")
+            print("[model-build] Ignoring retired target_budget; no geometry ceiling is applied.")
         if not generate_lods:
             raise ValueError(f"{self.name}: exported gameplay assets require profile-driven LOD0/LOD1/LOD2")
         asset_budget = resolve_geometry_budget(self.name, budget_profile_path, budget_scene_id)
@@ -17569,13 +17501,7 @@ class RogueStructureBuilder:
         if not self.locator_sockets:
             self.add_unity_locators()
 
-        lod0_budget = asset_budget["lods"][0]
-        face_budget_limit = int(lod0_budget["targetFacesPerInstance"])
-        triangle_budget_limit = int(lod0_budget["targetTrianglesPerInstance"])
-        face_reduction = reduce_subpixel_details_to_budget(
-            self.objects,
-            max_faces=face_budget_limit,
-        )
+        face_reduction = enforce_face_budget_before_export(self.objects, self.name)
         diagnostics = validate_model_mesh_quality(
             self.objects,
             allow_hover=False,
@@ -17592,19 +17518,11 @@ class RogueStructureBuilder:
         diagnostics["geometry_budget"] = asset_budget
         diagnostics["source_face_count"] = source_face_count
         diagnostics["source_triangle_count"] = source_triangle_count
-        diagnostics["target_lod0_faces"] = face_budget_limit
-        diagnostics["target_lod0_triangles"] = triangle_budget_limit
-        diagnostics["face_budget_passed"] = source_face_count <= face_budget_limit
-        diagnostics["triangle_budget_passed"] = source_triangle_count <= triangle_budget_limit
-        if source_face_count > face_budget_limit or source_triangle_count > triangle_budget_limit:
-            raise ValueError(
-                f"{self.name} exceeds calibrated LOD0 allocation: {source_face_count}/{face_budget_limit} "
-                f"Blender faces and {source_triangle_count}/{triangle_budget_limit} Unity triangles after "
-                "safe reduction; revise the asset for the calibrated camera and scene role."
-            )
+        diagnostics["target_lod0_faces"] = None
+        diagnostics["target_lod0_triangles"] = None
+        diagnostics["geometryLimitsApplied"] = False
 
-        # The source and FBX destinations remain untouched until both the
-        # calibrated demand and measured asset geometry have passed.
+        # Create output paths only after in-memory geometry diagnostics.
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
 

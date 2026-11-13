@@ -1,9 +1,8 @@
-"""Build the Overlord HQ factory's profile-driven LOD FBX.
+"""Build the Overlord HQ factory's authored LOD FBX.
 
 This is the normal Blender-native replay path for
 ``overlord_hq_factory_hardflow_recipe.py``. Hardflow is not imported here.
-The authoring export stops unless the current measured model-budget profile
-contains a calibrated demand and all generated LODs fit that allocation.
+Geometry counts are reported without imposing a calibration-derived limit.
 """
 
 from __future__ import annotations
@@ -100,13 +99,10 @@ def main() -> None:
         ratios = rmk.lod_ratios_from_budget(asset_budget, source_triangles)
         lods = rmk.generate_lod_chain(meshes, prefix=ASSET_ID, lod_levels=ratios)
         budget_summary = rmk.summarize_lod_budget(asset_budget, lods)
-        report["calibrationStatus"] = "calibrated"
+        report["calibrationStatus"] = "uncalibrated"
+        report["geometryBudgetStatus"] = "UNCALIBRATED_USER_AUTHORIZED"
         report["lodRatios"] = [{"lod": name, "ratio": ratio} for name, ratio in ratios]
         report["geometryBudget"] = budget_summary
-        if budget_summary["verdict"] != "PASS":
-            report.update({"verdict": "BLOCKED_OVER_CAPACITY", "outputWritten": False})
-            report_path = _write_report(report, "over-capacity")
-            raise RuntimeError(f"{ASSET_ID}: generated LOD chain exceeds its measured allocation; report: {report_path}")
 
         lod_objects = [obj for level in ("LOD0", "LOD1", "LOD2") for obj in lods[level]]
         if not lod_objects:
@@ -114,15 +110,14 @@ def main() -> None:
 
         candidate_dir = ROOT / "artifacts" / "overlord-hq-factory-build" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         candidate_dir.mkdir(parents=True, exist_ok=False)
-        candidate_base = candidate_dir / f"{ASSET_ID}.fbx"
+        candidate_lods = candidate_dir / f"{ASSET_ID}_LODs.fbx"
         rmk.export_unity_fbx(
-            candidate_base,
+            candidate_lods,
             lod_objects,
             include_empties=False,
             asset_id=ASSET_ID,
             prevalidated_budget=asset_budget,
         )
-        candidate_lods = candidate_dir / f"{ASSET_ID}_LODs.fbx"
         if not candidate_lods.is_file():
             raise IOError(f"{ASSET_ID}: profile LOD exporter did not create {candidate_lods}")
         candidate_hash = _sha256(candidate_lods)
@@ -158,7 +153,7 @@ def main() -> None:
             "outputWritten": True,
             "outputSha256": _sha256(OUTPUT_FBX),
         })
-        report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        report_path = _write_report(report, "complete")
     except Exception:
         raise
 

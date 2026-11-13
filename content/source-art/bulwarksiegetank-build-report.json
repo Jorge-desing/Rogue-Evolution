@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "assetId": "BulwarkSiegeTank",
+  "sceneId": null,
+  "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
+  "geometryLimitsApplied": false,
+  "sourceBlenderFaces": 13556,
+  "lods": [
+    {
+      "lod": "LOD0",
+      "screenRelativeTransitionHeight": 0.6,
+      "retentionRatio": 1.0,
+      "actualBlenderFaces": 13556,
+      "verdict": "UNCALIBRATED_USER_AUTHORIZED",
+      "blenderTriangulatedFaces": 25746
+    },
+    {
+      "lod": "LOD1",
+      "screenRelativeTransitionHeight": 0.3,
+      "retentionRatio": 0.5,
+      "actualBlenderFaces": 6735,
+      "verdict": "UNCALIBRATED_USER_AUTHORIZED",
+      "blenderTriangulatedFaces": 12872
+    },
+    {
+      "lod": "LOD2",
+      "screenRelativeTransitionHeight": 0.1,
+      "retentionRatio": 0.25,
+      "actualBlenderFaces": 3842,
+      "verdict": "UNCALIBRATED_USER_AUTHORIZED",
+      "blenderTriangulatedFaces": 6650
+    }
+  ],
+  "verdict": "UNCALIBRATED_USER_AUTHORIZED",
+  "sourceBlenderTriangles": 25746,
+  "sourceBlend": {
+    "path": "content/source-art/bulwarksiegetank.blend",
+    "sha256": "7e6d076b89d4c6e9bc7768750df0eda6c26bfb5c3f049e0aee4d68a6e70570b2",
+    "bytes": 3800435
+  },
+  "riggedSourceBlend": {
+    "path": "content/source-art/bulwarksiegetank-rigged.blend",
+    "sha256": "5e962006647df6606f01cf4fc805c2dbf141ccf1f355ef71336faf40cee6e369",
+    "bytes": 4737529
+  },
+  "fbx": {
+    "path": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx",
+    "sha256": "039dd86280858c351ea76fd09b43088a7cff129d64b47055d5d60fb521c56cbb",
+    "bytes": 1653148
+  },
+  "lodFbx": {
+    "path": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank_LODs.fbx",
+    "sha256": "e22a82e3459ef0a647ee1bafa3c7f8f4a33917fc0d03a418be030a214bcc4e5f",
+    "bytes": 1613068
+  },
+  "prefab": {
+    "path": "unity/RogueCommandAssetAuthoring/Assets/TacticalOperations/Prefabs/BulwarkSiegeTankVisual.prefab",
+    "sha256": "184054a2dff2515227de259dfaa0e0134d2bf9e8abef569f835afd74e6c2c820",
+    "bytes": 173749
+  },
+  "bundle": {
+    "path": "content/packs/tactical-operations/bundles/tactical-operations.bundle",
+    "sha256": "2c6d3ff36fd1428b2b8c1167b0c18d742bc3d93562d40dea390f520431a2ee0c",
+    "bytes": 181535503
+  },
+  "bundleManifest": {
+    "path": "content/packs/tactical-operations/bundles/assetbundle-manifest.bundle",
+    "sha256": "78001cfbf00eebff230596b25a8f123a35208a4de18cac7add1b9d838ad687c7",
+    "bytes": 1584
+  },
+  "evidence": {
+    "build": "Blender 4.5.14, Unity 2021.3.45f2; 45 bundle references resolved",
+    "geometry": "reimported base FBX mesh geometry, socket names and action names match prior FBX; ERA fit tests pass",
+    "calibration": "No geometry limits applied; no performance calibration claimed",
+    "runtime": "NOT_TESTED"
+  }
+}

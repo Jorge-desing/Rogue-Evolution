@@ -1,201 +1,50 @@
-"""Guard filesystem side effects behind calibrated geometry budgets."""
-
+"""Regression tests for geometry builds without calibration limits."""
 from __future__ import annotations
-
 import ast
+import json
+import subprocess
+import tempfile
 from pathlib import Path
 import unittest
 
+ROOT = Path(__file__).resolve().parents[2]
+BLENDER = ROOT / '.tools/Blender-4.5.14/blender-4.5.14-windows-x64/blender.exe'
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DIRECT_BUILDERS = (
-    "Build-ArcLanceWalkerModel.py",
-    "Build-AtlasCraneMechModel.py",
-    "Build-ArachnidHexapodRiggedModel.py",
-    "Build-BastionSiegeMechModel.py",
-    "Build-BulwarkSiegeTankModel.py",
-    "Build-ColossusSiegeModel.py",
-    "Build-ColossusSiegeRiggedModel.py",
-    "Build-FieldMedicRoverModel.py",
-    "Build-OverlordCommandHQRiggedModel.py",
-    "Build-SalvageHaulerModel.py",
-    "Build-SampleScoutModel.py",
-    "Build-SampleScoutTankModel.py",
-    "Build-SandlanceScoutRiggedModel.py",
-    "Build-SkirmishStrikeBikeModel.py",
-    "Build-SkirmishStrikeBikeRiggedModel.py",
-    "Build-SkyguardSAMModel.py",
-    "Build-SurgeArcTankModel.py",
-    "Build-SurgeArcTankRiggedModel.py",
-    "Build-TidebreakerHovercraftModel.py",
-)
-SOURCE_PRESERVING_BUILDERS = (
-    "Build-ArcLanceWalkerModel.py",
-    "Build-BulwarkSiegeTankModel.py",
-    "Build-FieldMedicRoverModel.py",
-    "Build-SalvageHaulerModel.py",
-    "Build-SkyguardSAMModel.py",
-    "Build-TidebreakerHovercraftModel.py",
-)
-SIDE_EFFECT_CALLS = {
-    "mkdir",
-    "save_as_mainfile",
-    "export_scene.fbx",
-    "write_text",
-    "write_bytes",
-}
+class ModelBuildWithoutCalibrationTests(unittest.TestCase):
+    def test_asset_build_settings_do_not_depend_on_calibration(self):
+        from tools.model_build_policy import authoring_settings, STATUS
+        settings = authoring_settings('BulwarkSiegeTank')
+        self.assertEqual(settings['geometryBudgetStatus'], STATUS)
+        self.assertFalse(settings['calibrated'])
+        self.assertFalse(settings['geometryLimitsApplied'])
+        self.assertEqual([x['retentionRatio'] for x in settings['lods']], [1.0, .5, .25])
+        self.assertTrue(all('targetTrianglesPerInstance' not in x for x in settings['lods']))
+        with self.assertRaises(ValueError): authoring_settings('')
 
+    @unittest.skipUnless(BLENDER.exists(), 'Blender 4.5.14 is required')
+    def test_fbx_and_lods_build_with_missing_profile_without_claiming_calibration(self):
+        with tempfile.TemporaryDirectory(prefix='rcl-unlimited-') as tmp:
+            tmpdir=Path(tmp); script=tmpdir/'probe.py'; fbx=tmpdir/'candidate.fbx'
+            script.write_text('''\nimport json, sys\nfrom pathlib import Path\nimport bpy\nsys.path.insert(0,str(Path.cwd()/"tools"))\nimport RogueModelKit as kit\nbpy.ops.object.select_all(action="SELECT"); bpy.ops.object.delete(use_global=False)\nbpy.ops.mesh.primitive_uv_sphere_add(segments=64, ring_count=32)\nobj=bpy.context.object\nmissing=Path(sys.argv[sys.argv.index("--")+1])\noutput=Path(sys.argv[sys.argv.index("--")+2])\nsettings=kit.resolve_geometry_budget("Fixture", profile_path=missing)\nassert settings["calibrated"] is False and settings["geometryLimitsApplied"] is False\nbefore=len(obj.data.polygons); counts=kit.enforce_face_budget_before_export([obj],"Fixture",profile_path=missing)\nassert counts["faces_removed"] == 0 and len(obj.data.polygons)==before\nkit.export_unity_fbx(output,[obj],asset_id="Fixture",profile_path=missing,generate_profiled_lods=True)\nassert output.exists() and output.with_name("candidate_LODs.fbx").exists()\nassert kit.summarize_lod_budget(settings,{"LOD0":[obj]})["verdict"] == "UNCALIBRATED_USER_AUTHORIZED"\ntry: kit._validate_export_budget_token(kit.resolve_geometry_budget("Different"),"Fixture")\nexcept ValueError: pass\nelse: raise AssertionError("cross-asset settings accepted")\nprint("UNLIMITED_BUILD_TEST_OK")\n''',encoding='utf-8')
+            proc=subprocess.run([str(BLENDER),'--background','--python-exit-code','1','--python',str(script),'--',str(tmpdir/'missing-profile.json'),str(fbx)],cwd=ROOT,capture_output=True,text=True,timeout=180)
+            self.assertEqual(proc.returncode,0,proc.stdout[-3000:]+proc.stderr[-3000:])
+            self.assertIn('UNLIMITED_BUILD_TEST_OK',proc.stdout)
 
-def _dotted_name(node: ast.AST) -> str:
-    if isinstance(node, ast.Name):
-        return node.id
-    if isinstance(node, ast.Attribute):
-        parent = _dotted_name(node.value)
-        return f"{parent}.{node.attr}" if parent else node.attr
-    return ""
+    @unittest.skipUnless(BLENDER.exists(), 'Blender 4.5.14 is required')
+    def test_vehicle_and_structure_export_without_profile_or_old_budget_limit(self):
+        with tempfile.TemporaryDirectory(prefix='rcl-generic-build-') as tmp:
+            out=Path(tmp); script=out/'generic.py'
+            script.write_text('''\nimport bpy,sys\nfrom pathlib import Path\nsys.path.insert(0,str(Path.cwd()/"tools"));import RogueModelKit as m\nout=Path(sys.argv[sys.argv.index("--")+1])\nm.clear_scene();v=m.RogueVehicleBuilder("NoCalibrationVehicle")\nv.objects.append(m.make_box("NoCalibrationVehicleHull",(0,0,.5),(2,3,1),v.palette.primary_armor,bevel=0))\nr=v.build_and_export(out/"vehicle.fbx",out/"vehicle.blend",include_locators=False,generate_lods=True,wear_level="none",bake_vertex_dirt=False,weighted_normals=False,target_budget=1,budget_profile_path=out/"missing.json")\nassert r["geometryLimitsApplied"] is False and r["geometry_budget"]["calibrated"] is False\nm.clear_scene();s=m.RogueStructureBuilder("NoCalibrationStructure");s.build_factory(width=3,length=4,height=2)\nr=s.build_and_export(out/"structure.fbx",out/"structure.blend",generate_lods=True,generate_colliders=False,bake_vertex_shading=False,weighted_normals=False,target_budget=1,budget_profile_path=out/"missing.json")\nassert r["geometryLimitsApplied"] is False and r["geometry_budget"]["calibrated"] is False\nassert (out/"vehicle_LODs.fbx").is_file() and (out/"structure_LODs.fbx").is_file()\nprint("GENERIC_BUILDERS_NO_CALIBRATION_OK")\n''',encoding='utf-8')
+            proc=subprocess.run([str(BLENDER),'--background','--python-exit-code','1','--python',str(script),'--',str(out)],cwd=ROOT,capture_output=True,text=True,timeout=180)
+            self.assertEqual(proc.returncode,0,proc.stdout[-3000:]+proc.stderr[-3000:])
+            self.assertIn('GENERIC_BUILDERS_NO_CALIBRATION_OK',proc.stdout)
 
+    def test_recipe_builders_do_not_save_over_the_source_blend(self):
+        for name in ('Build-ArcLanceWalkerModel.py','Build-BulwarkSiegeTankModel.py','Build-FieldMedicRoverModel.py','Build-SalvageHaulerModel.py','Build-SkyguardSAMModel.py','Build-TidebreakerHovercraftModel.py'):
+            with self.subTest(builder=name):
+                tree=ast.parse((ROOT/'tools'/name).read_text(encoding='utf-8'))
+                for node in ast.walk(tree):
+                    if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute) and node.func.attr=='save_as_mainfile':
+                        self.assertFalse(any(isinstance(n,ast.Name) and n.id=='SOURCE_BLEND' for n in ast.walk(node)))
 
-def _calls(node: ast.AST) -> list[ast.Call]:
-    return sorted(
-        (item for item in ast.walk(node) if isinstance(item, ast.Call)),
-        key=lambda item: (item.lineno, item.col_offset),
-    )
-
-
-def _build_function(module: ast.Module, path: Path) -> ast.FunctionDef:
-    functions = [node for node in module.body if isinstance(node, ast.FunctionDef)]
-    functions = [
-        function for function in functions
-        if any(
-            _dotted_name(call.func).endswith((
-                "enforce_face_budget_before_export",
-                "resolve_geometry_budget",
-            ))
-            for call in _calls(function)
-        )
-    ]
-    if len(functions) != 1:
-        raise AssertionError(f"{path.name}: expected exactly one top-level build_* function")
-    return functions[0]
-
-
-class ModelBuilderBudgetGateOrderTests(unittest.TestCase):
-    def test_every_fbx_export_requires_a_profile_or_prevalidated_budget(self) -> None:
-        for path in sorted((REPO_ROOT / "tools").glob("*.py")):
-            module = ast.parse(path.read_text(encoding="utf-8-sig"))
-            for call in _calls(module):
-                if not _dotted_name(call.func).endswith("export_unity_fbx"):
-                    continue
-                with self.subTest(path=path.name, line=call.lineno):
-                    keywords = {keyword.arg: keyword.value for keyword in call.keywords}
-                    profiled = isinstance(keywords.get("generate_profiled_lods"), ast.Constant) and keywords["generate_profiled_lods"].value is True
-                    prevalidated = "prevalidated_budget" in keywords
-                    self.assertTrue(
-                        profiled or prevalidated,
-                        f"{path.name}:{call.lineno}: FBX export has no calibrated budget path",
-                    )
-                    if prevalidated:
-                        self.assertIn("asset_id", keywords, f"{path.name}:{call.lineno}: budget token needs an expected asset id")
-
-    def test_low_level_export_validates_budget_before_touching_destination(self) -> None:
-        path = REPO_ROOT / "tools" / "RogueModelKit.py"
-        module = ast.parse(path.read_text(encoding="utf-8"))
-        exporter = next(
-            node for node in module.body
-            if isinstance(node, ast.FunctionDef) and node.name == "export_unity_fbx"
-        )
-        calls = _calls(exporter)
-        validate_lines = [
-            call.lineno for call in calls
-            if _dotted_name(call.func).endswith("_validate_export_budget_token")
-        ]
-        destination_lines = [
-            call.lineno for call in calls
-            if _dotted_name(call.func).endswith(("mkdir", "bpy.ops.export_scene.fbx"))
-        ]
-        self.assertTrue(validate_lines, "export_unity_fbx must validate its budget token")
-        self.assertTrue(destination_lines, "export_unity_fbx must create or write the FBX destination")
-        self.assertLess(max(validate_lines), min(destination_lines))
-
-    def test_direct_builder_outputs_follow_geometry_gate(self) -> None:
-        for filename in DIRECT_BUILDERS:
-            with self.subTest(builder=filename):
-                path = REPO_ROOT / "tools" / filename
-                module = ast.parse(path.read_text(encoding="utf-8"))
-                calls = _calls(_build_function(module, path))
-                gate_lines = [
-                    call.lineno for call in calls
-                    if _dotted_name(call.func).endswith((
-                        "enforce_face_budget_before_export",
-                        "resolve_geometry_budget",
-                    ))
-                ]
-                self.assertTrue(gate_lines, f"{filename}: missing calibrated geometry gate")
-                first_gate = min(gate_lines)
-                side_effects = [
-                    call for call in calls
-                    if any(_dotted_name(call.func).endswith(name) for name in SIDE_EFFECT_CALLS)
-                ]
-                self.assertTrue(side_effects, f"{filename}: expected output side effects")
-                early = [
-                    f"{_dotted_name(call.func)} at line {call.lineno}"
-                    for call in side_effects if call.lineno < first_gate
-                ]
-                self.assertEqual(early, [], f"{filename}: writes before geometry gate: {early}")
-
-    def test_recipe_builders_never_save_over_canonical_source(self) -> None:
-        for filename in SOURCE_PRESERVING_BUILDERS:
-            with self.subTest(builder=filename):
-                path = REPO_ROOT / "tools" / filename
-                module = ast.parse(path.read_text(encoding="utf-8"))
-                calls = _calls(_build_function(module, path))
-                source_saves = [
-                    call for call in calls
-                    if _dotted_name(call.func) == "bpy.ops.wm.save_as_mainfile"
-                    and any(
-                        isinstance(node, ast.Name) and node.id == "SOURCE_BLEND"
-                        for node in ast.walk(call)
-                    )
-                ]
-                self.assertEqual(source_saves, [], f"{filename}: source blend must remain untouched")
-
-    def test_shared_vehicle_and_structure_builders_gate_before_mkdir(self) -> None:
-        path = REPO_ROOT / "tools" / "RogueModelKit.py"
-        module = ast.parse(path.read_text(encoding="utf-8"))
-        classes = {node.name: node for node in module.body if isinstance(node, ast.ClassDef)}
-        for class_name in ("RogueVehicleBuilder", "RogueStructureBuilder"):
-            with self.subTest(builder=class_name):
-                class_node = classes[class_name]
-                method = next(
-                    node for node in class_node.body
-                    if isinstance(node, ast.FunctionDef) and node.name == "build_and_export"
-                )
-                calls = _calls(method)
-                gate_lines = [
-                    call.lineno for call in calls
-                    if _dotted_name(call.func).endswith("resolve_geometry_budget")
-                ]
-                mkdir_lines = [
-                    call.lineno for call in calls
-                    if _dotted_name(call.func).endswith("mkdir")
-                ]
-                self.assertTrue(gate_lines)
-                self.assertTrue(mkdir_lines)
-                self.assertGreater(min(mkdir_lines), min(gate_lines))
-
-    def test_ironclad_defers_paths_to_the_shared_gated_builder(self) -> None:
-        path = REPO_ROOT / "tools" / "Build-IroncladWalkerModel.py"
-        module = ast.parse(path.read_text(encoding="utf-8"))
-        builder = next(
-            node for node in module.body
-            if isinstance(node, ast.FunctionDef) and node.name == "build_ironclad_walker_model"
-        )
-        early_path_creation = [
-            call.lineno for call in _calls(builder)
-            if _dotted_name(call.func).endswith("mkdir")
-        ]
-        self.assertEqual(early_path_creation, [])
-
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == '__main__': unittest.main()

@@ -162,15 +162,6 @@ namespace RogueCommandExpansion.Authoring
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
-            bool canonicalLevel2Pair = packNames.Length == 2 &&
-                Array.IndexOf(packNames, "sample-native-expansion") >= 0 &&
-                Array.IndexOf(packNames, "tactical-operations") >= 0;
-            bool uncalibratedOverride = canonicalLevel2Pair &&
-                ModelGeometryBudgetProfile.IsUncalibratedCanonicalLevel2BuildAuthorized(repositoryRoot);
-            if (!uncalibratedOverride)
-            {
-                ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
-            }
             string artifactRoot = Path.Combine(ResolveCanonicalVisualArtifactRoot(repositoryRoot), "content-packs");
             Directory.CreateDirectory(artifactRoot);
             string artifactDiagnostic;

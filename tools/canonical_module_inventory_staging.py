@@ -1,9 +1,9 @@
-"""Measured-capacity-gated staging for canonical Level 2 FBX inventory.
+"""Isolated staging for canonical Level 2 FBX inventory.
 
 This is a bootstrap path only. It writes candidate FBXs and a candidate
 inventory under ignored ``artifacts/``; it never changes the authored profile,
-canonical source blend, production FBXs, prefabs, or bundles. A normal builder
-run still requires the completed calibrated profile and exact asset demands.
+canonical source blend, production FBXs, prefabs, or bundles. Measurements can
+be verified separately but do not restrict authoring or the candidate geometry.
 """
 
 from __future__ import annotations
@@ -95,6 +95,20 @@ class InventoryCapacityGate:
             "verifiedReportSha256": [report_sha for _, report_sha in self.report_sources],
             "measurementContext": dict(self.measurement_context),
             "scope": "candidate inventory export only; this is not an export/build/promotion budget",
+        }
+
+
+@dataclass(frozen=True)
+class InventoryStageContext:
+    repo_root: Path
+    staging_root: Path
+
+    def to_manifest(self) -> dict[str, Any]:
+        return {
+            "gate": "no-calibration-limits",
+            "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
+            "geometryLimitsApplied": False,
+            "scope": "candidate inventory only; no performance calibration is claimed",
         }
 
 
@@ -239,7 +253,9 @@ def validate_measured_capacity_gate(
     )
 
 
-def verify_gate_unchanged(gate: InventoryCapacityGate) -> None:
+def verify_gate_unchanged(gate: InventoryCapacityGate | InventoryStageContext) -> None:
+    if isinstance(gate, InventoryStageContext):
+        return
     if sha256_file(gate.profile_path) != gate.profile_sha256:
         raise ModelBudgetError("model budget profile changed during inventory staging")
     if sha256_file(gate.evidence_bundle_path) != gate.evidence_bundle_sha256:
@@ -249,17 +265,12 @@ def verify_gate_unchanged(gate: InventoryCapacityGate) -> None:
             raise ModelBudgetError(f"verified runtime report changed during inventory staging: {report_path.name}")
 
 
-def validate_candidate_triangle_count(triangles: int, gate: InventoryCapacityGate, asset_id: str) -> None:
+def validate_candidate_triangle_count(triangles: int, gate: InventoryCapacityGate | InventoryStageContext, asset_id: str) -> None:
     if triangles <= 0:
         raise ModelBudgetError(f"{asset_id}: candidate FBX must contain positive Unity triangles")
-    if triangles > gate.scene_triangle_capacity:
-        raise ModelBudgetError(
-            f"{asset_id}: candidate LOD0 has {triangles} triangles above the measured scene capacity "
-            f"{gate.scene_triangle_capacity}; no candidate FBX was exported"
-        )
 
 
-def validate_candidate_export_path(path: Path, gate: InventoryCapacityGate) -> Path:
+def validate_candidate_export_path(path: Path, gate: InventoryCapacityGate | InventoryStageContext) -> Path:
     candidate = Path(path).resolve()
     try:
         candidate.relative_to(gate.staging_root)
@@ -339,31 +350,32 @@ def stage_candidate_inventory(
     repo_root: Path,
     staging_root: Path,
     profile_path: Path,
-    evidence_bundle_path: Path,
+    evidence_bundle_path: Path | None,
     entries: Sequence[Mapping[str, Any]],
-    build_candidate: Callable[[Mapping[str, Any], Path, InventoryCapacityGate], Mapping[str, Any]],
+    build_candidate: Callable[[Mapping[str, Any], Path, InventoryCapacityGate | InventoryStageContext], Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """Replay and inspect candidates under artifacts only after measured gate passes."""
+    """Replay and inspect candidates under artifacts without a calibration gate."""
     if not entries:
         raise ModelBudgetError("canonical Level 2 inventory staging requires at least one module entry")
     ids = [str(entry.get("moduleName", "")) for entry in entries]
     if any(not _ASSET_ID.fullmatch(asset_id) for asset_id in ids) or len(ids) != len(set(ids)):
         raise ModelBudgetError("canonical module asset ids must be valid and unique before staging")
 
-    gate = validate_measured_capacity_gate(repo_root, staging_root, profile_path, evidence_bundle_path)
-    verify_gate_unchanged(gate)
+    root = Path(repo_root).resolve()
+    gate = InventoryStageContext(root, resolve_artifact_stage_root(root, staging_root))
     stage_root = gate.staging_root
     stage_root.mkdir(parents=True, exist_ok=False)
     manifest: dict[str, Any] = {
         "schema": INVENTORY_SCHEMA,
         "status": "in_progress",
         "promotionAllowed": False,
-        "normalBuildAllowed": False,
+        "normalBuildAllowed": True,
         "profileUpdated": False,
-        "finalCalibratedProfileRequired": True,
+        "finalCalibratedProfileRequired": False,
         "createdUtc": datetime.now(timezone.utc).isoformat(),
         "moduleCountExpected": len(entries),
         "capacityGate": gate.to_manifest(),
+        "measurementEvidenceUsed": False,
         "inventoryMethod": "Blender FBX import for faces/triangles/vertices; SHA-256 over exact candidate FBX bytes",
         "assetInventory": {"fileCount": 0, "assets": []},
     }
@@ -386,9 +398,8 @@ def stage_candidate_inventory(
         manifest["assetInventory"] = {"fileCount": len(rows), "assets": rows}
         manifest.pop("currentAsset", None)
         manifest["completionNote"] = (
-            "Candidate inventory only. Merge reviewed counts/hashes into an authored profile copy, "
-            "pass the normal calibrated scene-demand policy, then run the production builder. "
-            "Reinspect final production FBXs before Unity prefab or bundle work."
+            "Candidate inventory only. Review the counts, geometry and final production FBXs "
+            "before Unity prefab or bundle work; no performance calibration is implied."
         )
         _atomic_write_manifest(manifest_path, manifest)
         return manifest

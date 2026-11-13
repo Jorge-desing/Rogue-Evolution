@@ -3044,7 +3044,7 @@ def build_vehicle_model(
     )
 
     if lod_diagnostics:
-        print("\n--- Calibrated Geometry & Camera-Aware LOD Diagnostics ---")
+        print("\n--- Uncalibrated Geometry & LOD Diagnostics ---")
         true_triangles = res.get("profile_report", {}).get("total_triangles", res["total_polygons"])
         print(f"LOD0 (Current): {res['total_polygons']} faces / {true_triangles} triangles | {res['total_vertices']} verts (RTS Combat Camera)")
         print(f"  Profile verdict: {res.get('profile_report', {}).get('budget_verdict', 'unavailable')}")
@@ -3654,7 +3654,9 @@ def main():
             "target_lod0_faces": res.get("target_lod0_faces"),
             "target_lod0_triangles": res.get("target_lod0_triangles"),
             "geometry_budget": res.get("geometry_budget", {}),
-            "face_budget_passed": res.get("face_budget_passed", False),
+            "face_budget_passed": None,
+            "geometryLimitsApplied": False,
+            "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(json.dumps(report_data, indent=2), encoding="utf-8")

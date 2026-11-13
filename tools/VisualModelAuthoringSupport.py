@@ -56,16 +56,10 @@ def reduce_subpixel_details_to_budget(
     builder,
     max_dimension_m: float = 0.60,
 ) -> dict[str, Any]:
-    """Apply the calibrated per-asset LOD0 face allocation to protected cleanup."""
+    """Report geometry without applying a calibration-derived limit."""
     import RogueModelKit as rmk
 
-    allocation = rmk.resolve_geometry_budget(builder.name)
-    target_faces = int(allocation["lods"][0]["targetFacesPerInstance"])
-    return rmk.reduce_subpixel_details_to_budget(
-        builder.objects,
-        max_faces=target_faces,
-        max_dimension_m=max_dimension_m,
-    )
+    return rmk.enforce_face_budget_before_export(builder.objects, builder.name)
 
 
 def simplify_low_value_bevel_details(

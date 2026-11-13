@@ -506,12 +506,10 @@ def validate_prevalidated_export_budget(
     budget: Mapping[str, Any] | None,
     expected_asset_id: str | None = None,
 ) -> None:
-    """Fail closed unless an FBX export carries a real resolved allocation.
+    """Validate an optional claim of calibrated allocation for diagnostics.
 
-    This boundary is intentionally structural: builders obtain the value from
-    :func:`resolve_asset_budget` before they create output paths, then pass it
-    to the low-level exporter. It prevents accidental unbudgeted exports and
-    cross-asset token reuse without adding a fixed geometry ceiling.
+    Authoring and FBX exports no longer call this validator or require a budget.
+    It remains available solely when assessing a measured-calibration claim.
     """
     if not isinstance(budget, Mapping):
         raise ModelBudgetError("a resolved calibrated geometry budget is required for FBX export")

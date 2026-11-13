@@ -143,7 +143,6 @@ namespace RogueCommandExpansion.Authoring
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
-            ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
             float[] lodTransitions = ModelGeometryBudgetProfile.GetLodTransitions(repositoryRoot, unitName);
             RogueCommandVisualSampleScaffolder.EnsureUrpAuthoringPipeline();
 
