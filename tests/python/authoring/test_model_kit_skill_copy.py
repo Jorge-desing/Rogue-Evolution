@@ -44,11 +44,6 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertTrue(SKILL_RMK.is_file(), f"Missing {SKILL_RMK}")
         tools_bytes = TOOLS_RMK.read_bytes()
         skill_bytes = SKILL_RMK.read_bytes()
-        self.assertEqual(
-            len(tools_bytes),
-            len(skill_bytes),
-            f"File sizes differ: tools={len(tools_bytes)} vs skill={len(skill_bytes)}",
-        )
         self.assertEqual(tools_bytes, skill_bytes, "RogueModelKit.py differs from skill twin copy.")
 
     def test_generate_unit_model_byte_parity(self) -> None:
@@ -57,11 +52,6 @@ class TestModelKitSkillCopy(unittest.TestCase):
         self.assertTrue(SKILL_GUM.is_file(), f"Missing {SKILL_GUM}")
         tools_bytes = TOOLS_GUM.read_bytes()
         skill_bytes = SKILL_GUM.read_bytes()
-        self.assertEqual(
-            len(tools_bytes),
-            len(skill_bytes),
-            f"File sizes differ: tools={len(tools_bytes)} vs skill={len(skill_bytes)}",
-        )
         self.assertEqual(tools_bytes, skill_bytes, "generate_unit_model.py differs from skill twin copy.")
 
     def test_wave7_archetypes_and_defaults(self) -> None:

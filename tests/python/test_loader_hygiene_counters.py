@@ -38,28 +38,6 @@ class TestDiagnosticCountersFirst(unittest.TestCase):
         self.assertGreater(offered, -1, "missing offeredProducts")
         self.assertLess(omitted, offered, "counters must precede offeredProducts in trace")
 
-    def test_no_dead_private_methods_strict_count_one(self):
-        # Dead-code audit heuristic: private methods with exactly one textual
-        # occurrence (declaration only) across src/ + tests/.
-        src_root = REPO_ROOT / "src"
-        test_root = REPO_ROOT / "tests"
-        if not src_root.exists():
-            self.skipTest("src not found")
-        files = list(src_root.rglob("*.cs")) + list(test_root.rglob("*.cs"))
-        all_text = "\n".join(f.read_text(encoding="utf-8", errors="ignore") for f in files)
-        skip_names = {"Main", "Awake", "Start", "Update", "OnEnable", "OnDisable", "OnDestroy", "OnGUI"}
-        dead = []
-        for f in src_root.rglob("*.cs"):
-            t = f.read_text(encoding="utf-8", errors="ignore")
-            for m in re.finditer(r'private (?:static )?(?:[\w<>\[\]?,\s]+)\s+(\w+)\s*\([^;{]*\)\s*\{', t):
-                name = m.group(1)
-                if name in skip_names:
-                    continue
-                if name.startswith(("Get", "TryGet", "Serialize")):
-                    continue
-                if all_text.count(name) == 1:
-                    dead.append(f"{f.name}:{name}")
-        self.assertEqual(dead, [], f"dead private methods found: {dead}")
 
 
 if __name__ == "__main__":

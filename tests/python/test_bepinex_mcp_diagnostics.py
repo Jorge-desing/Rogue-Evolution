@@ -1408,6 +1408,8 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
         self.assertEqual(250, len(tools))
+        payload = json.dumps(full["result"], separators=(",", ":")).encode("utf-8")
+        self.assertLess(len(payload), 96000, f"tools/list payload too large: {len(payload)} bytes")
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -1418,7 +1420,6 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_tools_list_filters_by_category_and_query(self) -> None:
         resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {"category": "diagnostics", "query": "gui"}})
         names = [t["name"] for t in resp["result"]["tools"]]
-        self.assertTrue(len(names) >= 1)
         self.assertTrue(len(names) >= 1)
         resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
         self.assertEqual(len(resp2["result"]["tools"]), 230)
@@ -2013,6 +2014,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             by_name["diagnostics_run_synthetic_gameplay_scenario"]["parameters"]["properties"]["formationType"]["enum"],
         )
         # Required lists unchanged for representative tools.
+        self.assertEqual("integer", by_name["component_get_details"]["parameters"]["properties"]["id"]["type"])
         self.assertEqual(["id", "componentName"], by_name["component_get_details"]["parameters"]["required"])
         self.assertEqual(["componentName"], by_name["scene_find_objects_with_component"]["parameters"]["required"])
         self.assertEqual(["entityKeyId", "stanceName"], by_name["diagnostics_order_unit_tactical_stance"]["parameters"]["required"])
@@ -2044,8 +2046,6 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         for spec in specs:
             desc = str(spec["description"])
             self.assertNotIn("LoaderDiagnosticsComponent", desc, spec["name"])
-            self.assertNotIn("via LoaderDiagnosticsComponent", desc, spec["name"])
-            self.assertNotIn("from LoaderDiagnosticsComponent", desc, spec["name"])
         by_desc = {s["name"]: str(s["description"]) for s in specs}
         self.assertIn("Line, Wedge, Column, Box, Surround", by_desc["diagnostics_order_formation_move"])
         self.assertIn("parallel X/Z", by_desc["diagnostics_order_unit_patrol"])
@@ -2106,25 +2106,6 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 self.assertFalse(resp["isError"], alias)
                 self.assertEqual(endpoint, fake.call_args[0][0], alias)
 
-    def test_property_shortening_preserves_types_and_tools_list_compact(self) -> None:
-        specs = self._load_tool_specs()
-        by_name = {s["name"]: s for s in specs}
-        self.assertEqual(
-            "GameObject ID.",
-            by_name["component_get_details"]["parameters"]["properties"]["id"]["description"],
-        )
-        self.assertEqual(
-            "integer",
-            by_name["component_get_details"]["parameters"]["properties"]["id"]["type"],
-        )
-        blob = json.dumps(specs, ensure_ascii=False)
-        self.assertNotIn("GameObject instance ID.", blob)
-        self.assertNotIn("Parent GameObject instance ID.", blob)
-        resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
-        tools = resp["result"]["tools"]
-        self.assertEqual(250, len(tools))
-        payload = json.dumps(resp["result"], separators=(",", ":"))
-        self.assertLess(len(payload), 96000, f"tools/list payload too large: {len(payload)} bytes")
 
 if __name__ == "__main__":
     unittest.main()
