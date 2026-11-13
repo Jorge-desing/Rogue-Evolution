@@ -64,6 +64,8 @@
              Link="Runtime/RuntimeBaseIntegrityCensus.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeRunProgressionCensus.cs"
              Link="Runtime/RuntimeRunProgressionCensus.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeEntityKeyResolver.cs"
+             Link="Runtime/RuntimeEntityKeyResolver.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeGameplayCommandDirector.cs"
              Link="Runtime/RuntimeGameplayCommandDirector.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RuntimeSyntheticGameplayScenario.cs"
