@@ -29,6 +29,8 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--output", default="artifacts/canonical-two-level/modules-contact-sheet.png")
     parser.add_argument("--columns", type=int, default=5)
     parser.add_argument("--tile-size", type=int, default=480)
+    parser.add_argument("--view", choices=("top", "side", "isometric"), default="top")
+    parser.add_argument("--module", help="Render one manifest module name or geometry preset id")
     return parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
 
 
@@ -65,9 +67,18 @@ def object_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
 def main() -> None:
     args = arguments()
     entries: list[dict[str, Any]] = json.loads(MANIFEST.read_text(encoding="utf-8"))["modules"]
-    if len(entries) != 35:
-        raise ValueError(f"Expected 35 modules, found {len(entries)}")
+    if not entries:
+        raise ValueError("Canonical visual module manifest is empty")
+    if args.columns <= 0 or args.tile_size <= 0:
+        raise ValueError("Contact sheet columns and tile size must be positive")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
+    if args.module:
+        entries = [
+            entry for entry in entries
+            if entry["moduleName"] == args.module or entry.get("geometryPreset") == args.module
+        ]
+        if len(entries) != 1:
+            raise ValueError(f"--module must resolve exactly one canonical module, found {len(entries)}")
     bpy.context.scene.render.engine = "BLENDER_EEVEE_NEXT"
     scene = bpy.context.scene
     scene.render.resolution_x = args.columns * args.tile_size
@@ -93,28 +104,56 @@ def main() -> None:
     camera_data.ortho_scale = grid_height
     camera = bpy.data.objects.new("RCLModuleContactCamera", camera_data)
     scene.collection.objects.link(camera)
-    camera.location = (0.0, 0.0, max(grid_width, grid_height) * 2.5)
-    camera.rotation_euler = (0.0, 0.0, 0.0)
+    if args.view == "top":
+        camera.location = (0.0, 0.0, max(grid_width, grid_height) * 2.5)
+        camera.rotation_euler = (0.0, 0.0, 0.0)
+    elif args.view == "side":
+        camera.location = (grid_height * 1.5, 0.0, grid_height * 1.5)
+        camera.rotation_euler = (Vector((0.0, 0.0, 0.0)) - camera.location).to_track_quat("-Z", "Y").to_euler()
+    else:
+        camera.location = (0.0, -grid_height * 1.5, grid_height * 1.5)
+        camera.rotation_euler = (Vector((0.0, 0.0, 0.0)) - camera.location).to_track_quat("-Z", "Y").to_euler()
     scene.camera = camera
 
     scene.world.use_nodes = True
     background = scene.world.node_tree.nodes.get("Background")
     if background:
-        background.inputs["Color"].default_value = (0.012, 0.017, 0.026, 1.0)
-        background.inputs["Strength"].default_value = 0.22
-    area_light("RCLContactKey", (-grid_width * 0.25, grid_height * 0.18, grid_height), 1800.0, grid_width * 0.8)
-    area_light("RCLContactFill", (grid_width * 0.3, -grid_height * 0.12, grid_height * 0.7), 900.0, grid_width * 0.65)
+        background.inputs["Color"].default_value = (0.025, 0.032, 0.045, 1.0)
+        background.inputs["Strength"].default_value = 0.35
+    light_scale = (grid_height / 36.0) ** 2
+    area_light("RCLContactKey", (-grid_width * 0.25, grid_height * 0.18, grid_height), 9000.0 * light_scale, grid_width * 0.8)
+    area_light("RCLContactFill", (grid_width * 0.3, -grid_height * 0.12, grid_height * 0.7), 4500.0 * light_scale, grid_width * 0.65)
 
     tile_materials = [
         neutral_material("RCLContactTileDark", (0.075, 0.09, 0.112)),
         neutral_material("RCLContactTileLight", (0.095, 0.112, 0.135)),
     ]
+    # Hide all module source and nested LOD objects first. Each tile then shows
+    # only its direct LOD0 source meshes, with no overlaps from other modules.
+    for collection in bpy.data.collections:
+        if collection.name.startswith("RCLModule_"):
+            collection.hide_render = True
+            for obj in collection.objects:
+                if obj.type == "MESH":
+                    obj.hide_render = True
     for index, entry in enumerate(entries):
         column = index % args.columns
         row = index // args.columns
         center_x = (column - (args.columns - 1) / 2.0) * cell
         center_y = ((rows - 1) / 2.0 - row) * cell
         collection = bpy.data.collections.get(entry["moduleName"])
+        if collection is None:
+            # Blender truncates collection identifiers to 63 characters. Pick
+            # the longest direct-mesh collection that is a prefix of the
+            # manifest name; nested LOD collections include an extra suffix.
+            candidates = [
+                item for item in bpy.data.collections
+                if item.name.startswith("RCLModule_")
+                and entry["moduleName"].startswith(item.name)
+                and any(obj.type == "MESH" for obj in item.objects)
+            ]
+            if candidates:
+                collection = max(candidates, key=lambda item: len(item.name))
         if collection is None:
             raise ValueError(f"Source blend has no collection for {entry['moduleName']}")
         objects = [obj for obj in collection.objects if obj.type == "MESH"]
@@ -134,6 +173,8 @@ def main() -> None:
                          -minimum.z + 0.02))
         for obj in objects:
             obj.location += offset
+            obj.hide_render = False
+        collection.hide_render = False
 
         bpy.ops.mesh.primitive_cube_add(size=1.0, location=(center_x, center_y, 0.0))
         tile = bpy.context.object

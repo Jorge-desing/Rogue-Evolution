@@ -314,14 +314,16 @@ ACTIVE_UNIT_REALISM_PROFILES = {
         "turret_ring_location": (0.0, -0.55, 1.68), "turret_ring_radius": 0.62,
     },
     "BulwarkSiegeTank": {
-        "features": {"access_hatches", "final_drive", "track_tensioners", "pioneer_racks", "turret_ring_guard", "coaxial_port", "driver_periscope", "weapon_trunnions"},
+        "features": {"access_hatches", "final_drive", "track_tensioners", "pioneer_racks", "coaxial_port", "driver_periscope", "weapon_trunnions"},
         "hull_width": 2.35, "hull_length": 3.25, "deck_z": 1.45, "ground_clearance": 0.06,
         "hatch_location": (0.45, -0.65, 1.48),
-        "periscope_location": (0.0, 1.35, 1.38),
+        "periscope_location": (-0.55, -1.00, 1.08),
+        "periscope_size": (0.18, 0.20, 0.14),
         "tool_rack_location": (-1.02, -0.25, 1.45),
-        "turret_ring_location": (0.0, 0.25, 1.45), "turret_ring_radius": 0.70,
-        "coaxial_location": (0.32, 0.95, 1.62),
-        "weapon_trunnion_center": (0.0, 1.05, 1.62),
+        "coaxial_location": (0.32, 0.95, 1.495),
+        "weapon_trunnion_center": (0.0, 0.33, 1.495),
+        "trunnion_spacing": 1.35,
+        "trunnion_bracket_height": 0.16,
         "drive_center": (0.0, -1.35, 0.36),
         "idler_center": (0.0, 1.35, 0.36),
     },
@@ -620,11 +622,14 @@ def _add_realism_driver_periscope(prefix: str, profile: Mapping[str, object], ar
     loc = profile.get("periscope_location")
     if not loc:
         return []
+    size_value = profile.get("periscope_size")
+    size = tuple(float(value) for value in size_value) if size_value is not None else (0.24, 0.28, 0.18)
     return rmk.make_driver_periscope_hood(
         f"{prefix}Sensor_DriverPeriscope",
         location=loc,
         armor_mat=armor,
         optic_mat=gunmetal,
+        size=size,
     )
 
 
@@ -679,13 +684,32 @@ def _add_realism_weapon_trunnions(prefix: str, profile: Mapping[str, object], ar
     if not loc:
         return []
     spacing = float(profile.get("trunnion_spacing", 0.60))
-    return rmk.make_weapon_trunnion_bracket_assembly(
+    objects = rmk.make_weapon_trunnion_bracket_assembly(
         f"{prefix}Armor_TrunnionBracket",
         pivot_center=loc,
         spacing_x=spacing,
+        bracket_height=float(profile.get("trunnion_bracket_height", 0.22)),
+        bracket_width=float(profile.get("trunnion_bracket_width", 0.12)),
+        bracket_depth=float(profile.get("trunnion_bracket_depth", 0.28)),
         armor_mat=armor,
         gunmetal_mat=gunmetal,
     )
+    if prefix == "BulwarkSiegeTank":
+        # The generic bottom flange sits below the Bulwark's tapered bearing
+        # cheek and is not seated to the turret shell. The cheek itself spans
+        # the trunnion socket and is the functional mount, so omit the floating
+        # redundant flange on this chassis.
+        kept = []
+        for obj in objects:
+            if "_MountFlange_" in obj.name:
+                mesh = obj.data if obj.type == "MESH" else None
+                bpy.data.objects.remove(obj, do_unlink=True)
+                if mesh is not None and mesh.users == 0:
+                    bpy.data.meshes.remove(mesh)
+                continue
+            kept.append(obj)
+        objects = kept
+    return objects
 
 
 def _add_realism_final_drive(prefix: str, profile: Mapping[str, object], armor, gunmetal) -> list:
@@ -732,6 +756,26 @@ def apply_realism_details(
     profile = ACTIVE_UNIT_REALISM_PROFILES[unit_name]
     prefix = object_prefix or unit_name
     features = set(profile["features"])
+    if unit_name == "BulwarkSiegeTank":
+        # These assemblies were previously baked into the promoted source
+        # replay. Reconcile them against the corrected Bulwark-specific mounts:
+        # the old ring collar had no deck seat, and trunnions/periscope must be
+        # regenerated at their validated hardpoints rather than silently kept
+        # at their obsolete transforms.
+        stale_clusters = ["Armor_TurretRingGuard_"]
+        if "driver_periscope" in features:
+            stale_clusters.append("Sensor_DriverPeriscope_")
+        if "weapon_trunnions" in features:
+            stale_clusters.append("Armor_TrunnionBracket_")
+        if "coaxial_port" in features:
+            stale_clusters.append("Weapon_CoaxialPort_")
+        for suffix in stale_clusters:
+            for obj in list(bpy.context.scene.objects):
+                if obj.name.startswith(prefix + suffix):
+                    mesh = obj.data if obj.type == "MESH" else None
+                    bpy.data.objects.remove(obj, do_unlink=True)
+                    if mesh is not None and mesh.users == 0:
+                        bpy.data.meshes.remove(mesh)
     armor = _resolve_material(materials, "armor", (0.18, 0.24, 0.28))
     gunmetal = _resolve_material(materials, "gunmetal", (0.07, 0.09, 0.11))
     result = []

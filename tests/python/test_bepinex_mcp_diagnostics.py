@@ -950,6 +950,38 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         )
         self.assertIn("best-effort", tool["description"])
 
+    def test_runtime_control_surface_dispatch_is_bounded_read_only_and_typed(self) -> None:
+        calls: list[tuple[str, list[object]]] = []
+
+        def fake_diagnostics_method(method: str, args: list[object] | None = None) -> str:
+            calls.append((method, list(args or [])))
+            return json.dumps({"kind": "runtimeControlSurface", "activeSceneName": "IntermissionScreen"})
+
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method):
+            response = SERVER.execute_tool(
+                "diagnostics_get_runtime_control_surface",
+                {"query": "Continue", "includeInactive": True, "maxUiResults": 1000},
+            )
+
+        self.assertFalse(response["isError"])
+        self.assertEqual(
+            [("GetRuntimeControlSurfaceJson", ["Continue", True, 100])],
+            calls,
+        )
+        tool = next(tool for tool in SERVER.TOOLS if tool["name"] == "diagnostics_get_runtime_control_surface")
+        self.assertEqual({"query", "includeInactive", "maxUiResults"}, set(tool["inputSchema"]["properties"]))
+        self.assertIn("single-Unity-thread", tool["description"])
+
+        for invalid in (
+            {"includeInactive": "yes"},
+            {"maxUiResults": True},
+            {"maxUiResults": "many"},
+        ):
+            with self.subTest(invalid=invalid):
+                rejected = SERVER.execute_tool("diagnostics_get_runtime_control_surface", invalid)
+                self.assertTrue(rejected["isError"])
+        self.assertEqual(1, len(calls), "invalid arguments must not call Unity")
+
     def test_call_getters_passes_safe_args_to_optional_param_getters(self) -> None:
         calls: list[tuple[str, list[object]]] = []
 
@@ -1170,6 +1202,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "diagnostics_get_navigator_state",
             "diagnostics_order_navigator_pause",
             "diagnostics_fast_snapshot",
+            "diagnostics_get_runtime_control_surface",
             "diagnostics_get_upgrade_census",
             "diagnostics_get_relic_census",
             "diagnostics_order_apply_visual_variant",
@@ -1178,7 +1211,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(242, len(names))
+        self.assertEqual(243, len(names))
 
     def test_initialize_reports_current_bridge_version(self) -> None:
         response = SERVER.handle_request({
@@ -1187,12 +1220,12 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "method": "initialize",
             "params": {"protocolVersion": "2024-11-05"},
         })
-        self.assertEqual("1.5.0", response["result"]["serverInfo"]["version"])
+        self.assertEqual("1.6.0", response["result"]["serverInfo"]["version"])
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(242, len(tools))
+        self.assertEqual(243, len(tools))
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -1752,7 +1785,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(242, len(names))
+        self.assertEqual(243, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
@@ -1906,7 +1939,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("Parent GameObject instance ID.", blob)
         resp = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = resp["result"]["tools"]
-        self.assertEqual(242, len(tools))
+        self.assertEqual(243, len(tools))
         payload = json.dumps(resp["result"], separators=(",", ":"))
         self.assertLess(len(payload), 93000, f"tools/list payload too large: {len(payload)} bytes")
 

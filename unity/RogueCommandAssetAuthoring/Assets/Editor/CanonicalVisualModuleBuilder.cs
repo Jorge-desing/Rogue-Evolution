@@ -19,6 +19,7 @@ namespace RogueCommandExpansion.Authoring
         private const string MaterialFolder = ModuleAssetRoot + "/Materials";
         private const string ManifestRelativePath = "content/source-art/canonical-visual-modules.json";
         private const string GeometryPresetRegistryRelativePath = "content/source-art/canonical-visual-module-roles.json";
+        private const string GeometryBuildPolicyRelativePath = "content/source-art/canonical-visual-module-build-policy.json";
         private const float FactoryNewWearStrength = 0.55f;
         private const int ExpectedTextureResolution = 2048;
 
@@ -27,6 +28,9 @@ namespace RogueCommandExpansion.Authoring
         {
             public int schemaVersion;
             public string geometryPresetRegistrySha256;
+            public string geometryBuildPolicySha256;
+            public string geometryBudgetStatus;
+            public string geometryLodPolicy;
             public ModuleEntry[] modules;
         }
 
@@ -188,7 +192,15 @@ namespace RogueCommandExpansion.Authoring
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
-            ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
+            bool uncalibratedBuild = ModelGeometryBudgetProfile.IsUncalibratedCanonicalLevel2BuildAuthorized(repositoryRoot);
+            if (!uncalibratedBuild)
+            {
+                ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
+            }
+            else
+            {
+                Debug.LogWarning("[CanonicalVisualModuleBuilder] Explicit user authorization is bypassing the uncalibrated geometry budget gate for Level 2 modules. No geometry ceiling is applied; outputs remain marked uncalibrated.");
+            }
             string geometryPresetRegistryPath = Path.Combine(repositoryRoot,
                 GeometryPresetRegistryRelativePath.Replace('/', Path.DirectorySeparatorChar));
             if (!File.Exists(geometryPresetRegistryPath))
@@ -217,6 +229,23 @@ namespace RogueCommandExpansion.Authoring
                 StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException("Canonical visual module manifest is stale relative to its geometry preset registry.");
+            }
+            string geometryBuildPolicyPath = Path.Combine(repositoryRoot,
+                GeometryBuildPolicyRelativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(geometryBuildPolicyPath) ||
+                !String.Equals(manifest.geometryBuildPolicySha256, ComputeSha256(geometryBuildPolicyPath),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("Canonical visual module manifest is stale relative to its geometry build policy.");
+            }
+            string expectedBudgetStatus = uncalibratedBuild ? "UNCALIBRATED_USER_AUTHORIZED" : "CALIBRATED";
+            if (!String.Equals(manifest.geometryBudgetStatus, expectedBudgetStatus, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException("Canonical visual module manifest geometry-budget status does not match the active build policy.");
+            }
+            if (String.IsNullOrWhiteSpace(manifest.geometryLodPolicy))
+            {
+                throw new InvalidDataException("Canonical visual module manifest must describe the LOD policy used for its geometry.");
             }
             if (manifest.modules.Length != geometryPresetRegistry.variantRoles.Length)
             {
@@ -263,7 +292,7 @@ namespace RogueCommandExpansion.Authoring
                     materials = BuildMaterials(entry, shader);
                     materialSets.Add(entry.preset, materials);
                 }
-                BuildPrefab(entry, materials, repositoryRoot);
+                BuildPrefab(entry, materials, repositoryRoot, uncalibratedBuild);
                 Debug.Log("[CanonicalVisualModuleBuilder] Built visual-only module " + (i + 1) + "/" +
                     manifest.modules.Length + ": " + entry.variantId + " at " + entry.prefabAssetPath + ".");
             }
@@ -272,8 +301,8 @@ namespace RogueCommandExpansion.Authoring
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
             int referencedAssets = 0;
-            referencedAssets += AssignContentPackReferences("sample-native-expansion", repositoryRoot);
-            referencedAssets += AssignContentPackReferences("tactical-operations", repositoryRoot);
+            referencedAssets += AssignContentPackReferences("sample-native-expansion", repositoryRoot, manifest.modules);
+            referencedAssets += AssignContentPackReferences("tactical-operations", repositoryRoot, manifest.modules);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
             ValidateBundleAssignments(manifest.modules);
@@ -425,6 +454,61 @@ namespace RogueCommandExpansion.Authoring
                         socketCounts[slot]++;
                     }
 
+                    // The Bulwark ERA layout is authored in unit-local space because
+                    // one module spans both hull skirts. The aligned Blender source
+                    // places this anchor at the unit origin; until its Level 1 FBX is
+                    // eligible for regeneration, repair the imported prefab override
+                    // here so runtime parenting does not translate the whole module
+                    // onto the turret. Keep this correction inside the Level 2 build.
+                    if (String.Equals(unit.id, "tactical-operations:bulwark-siege-tank", StringComparison.Ordinal) &&
+                        requiredSlots.Contains("ERA"))
+                    {
+                        Transform eraSocket = null;
+                        for (int transformIndex = 0; transformIndex < hierarchy.Length; transformIndex++)
+                        {
+                            if (String.Equals(hierarchy[transformIndex].name, "Socket_Hardpoint_ERA",
+                                StringComparison.OrdinalIgnoreCase))
+                            {
+                                eraSocket = hierarchy[transformIndex];
+                                break;
+                            }
+                        }
+
+                        if (eraSocket == null)
+                        {
+                            throw new InvalidDataException("Bulwark ERA module requires its canonical unit-origin socket: " +
+                                primaryAssetPath);
+                        }
+
+                        bool anchorChanged = eraSocket.localPosition.sqrMagnitude > 1e-8f ||
+                            Quaternion.Angle(eraSocket.localRotation, Quaternion.identity) > 0.01f ||
+                            (eraSocket.localScale - Vector3.one).sqrMagnitude > 1e-8f;
+                        if (anchorChanged)
+                        {
+                            eraSocket.localPosition = Vector3.zero;
+                            eraSocket.localRotation = Quaternion.identity;
+                            eraSocket.localScale = Vector3.one;
+                            bool saved;
+                            PrefabUtility.SaveAsPrefabAsset(primaryRoot, primaryAssetPath, out saved);
+                            if (!saved)
+                            {
+                                throw new InvalidOperationException("Unity could not save the Bulwark unit-origin ERA socket override: " +
+                                    primaryAssetPath);
+                            }
+                            AssetDatabase.SaveAssets();
+                            Debug.Log("[CanonicalVisualModuleBuilder] Normalized Bulwark Socket_Hardpoint_ERA to unit-local origin for " +
+                                "the side-skirt Level 2 layout.");
+                        }
+
+                        if (eraSocket.localPosition.sqrMagnitude > 1e-8f ||
+                            Quaternion.Angle(eraSocket.localRotation, Quaternion.identity) > 0.01f ||
+                            (eraSocket.localScale - Vector3.one).sqrMagnitude > 1e-8f)
+                        {
+                            throw new InvalidDataException("Bulwark Socket_Hardpoint_ERA must remain at unit-local origin: " +
+                                primaryAssetPath);
+                        }
+                    }
+
                     foreach (KeyValuePair<string, int> socket in socketCounts)
                     {
                         if (socket.Value > 1)
@@ -510,7 +594,10 @@ namespace RogueCommandExpansion.Authoring
             return resolvedPath;
         }
 
-        private static int AssignContentPackReferences(string packName, string repositoryRoot)
+        private static int AssignContentPackReferences(
+            string packName,
+            string repositoryRoot,
+            ModuleEntry[] manifestEntries)
         {
             string packPath = Path.Combine(repositoryRoot, "content", "packs", packName, "content.json");
             if (!File.Exists(packPath))
@@ -525,6 +612,7 @@ namespace RogueCommandExpansion.Authoring
             }
 
             var bundleNamesById = new Dictionary<string, string>(StringComparer.Ordinal);
+            var declaredBundleNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < pack.assetBundles.Length; i++)
             {
                 ContentAssetBundleReference bundle = pack.assetBundles[i];
@@ -533,6 +621,18 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidDataException("Content pack contains an incomplete bundle declaration: " + packName);
                 }
                 bundleNamesById.Add(bundle.id, Path.GetFileName(bundle.path));
+                declaredBundleNames.Add(Path.GetFileName(bundle.path));
+            }
+
+            var activeModulePrefabPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (manifestEntries != null)
+            {
+                for (int i = 0; i < manifestEntries.Length; i++)
+                {
+                    ModuleEntry entry = manifestEntries[i];
+                    if (entry == null || !String.Equals(entry.packName, packName, StringComparison.Ordinal)) continue;
+                    activeModulePrefabPaths.Add(entry.prefabAssetPath.Replace('\\', '/'));
+                }
             }
 
             var assetPathsByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -637,9 +737,47 @@ namespace RogueCommandExpansion.Authoring
                 importer.SetAssetBundleNameAndVariant(assignment.Value, String.Empty);
             }
 
+            int clearedStaleModuleLabels = ClearStaleModuleBundleLabels(
+                declaredBundleNames, activeModulePrefabPaths);
+
             Debug.Log("[CanonicalVisualModuleBuilder] Labeled " + assignments.Count +
-                " referenced Unity assets for pack '" + packName + "'.");
+                " referenced Unity assets and cleared " + clearedStaleModuleLabels +
+                " stale module prefab bundle label(s) for pack '" + packName + "'.");
             return assignments.Count;
+        }
+
+        private static int ClearStaleModuleBundleLabels(
+            HashSet<string> declaredBundleNames,
+            HashSet<string> activeModulePrefabPaths)
+        {
+            if (declaredBundleNames == null || declaredBundleNames.Count == 0 ||
+                activeModulePrefabPaths == null)
+            {
+                throw new ArgumentException("Canonical module bundle reconciliation requires current pack assignments.");
+            }
+
+            string prefabRoot = ModuleAssetRoot + "/Prefabs/";
+            string[] allAssetPaths = AssetDatabase.GetAllAssetPaths();
+            int cleared = 0;
+            for (int i = 0; i < allAssetPaths.Length; i++)
+            {
+                string assetPath = allAssetPaths[i];
+                if (String.IsNullOrEmpty(assetPath) ||
+                    !assetPath.StartsWith(prefabRoot, StringComparison.OrdinalIgnoreCase) ||
+                    !assetPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase) ||
+                    !Path.GetFileName(assetPath).StartsWith("RCLModule_", StringComparison.OrdinalIgnoreCase) ||
+                    activeModulePrefabPaths.Contains(assetPath))
+                {
+                    continue;
+                }
+
+                AssetImporter importer = AssetImporter.GetAtPath(assetPath);
+                if (importer == null || !declaredBundleNames.Contains(importer.assetBundleName)) continue;
+                importer.SetAssetBundleNameAndVariant(String.Empty, String.Empty);
+                cleared++;
+            }
+
+            return cleared;
         }
 
         private static void AddContentAssetReference(
@@ -1073,7 +1211,7 @@ namespace RogueCommandExpansion.Authoring
             return material;
         }
 
-        private static void BuildPrefab(ModuleEntry entry, ModuleMaterials materials, string repositoryRoot)
+        private static void BuildPrefab(ModuleEntry entry, ModuleMaterials materials, string repositoryRoot, bool uncalibratedBuild)
         {
             ModelImporter modelImporter = AssetImporter.GetAtPath(entry.fbxAssetPath) as ModelImporter;
             if (modelImporter == null)
@@ -1126,7 +1264,8 @@ namespace RogueCommandExpansion.Authoring
                 {
                     throw new InvalidDataException(entry.moduleName + " is missing a required LOD0/LOD1/LOD2 renderer group.");
                 }
-                float[] transitions = ModelGeometryBudgetProfile.GetLodTransitions(repositoryRoot, entry.moduleName);
+                float[] transitions = ModelGeometryBudgetProfile.GetLodTransitions(
+                    repositoryRoot, entry.moduleName, uncalibratedBuild);
                 LODGroup lodGroup = wrapper.AddComponent<LODGroup>();
                 lodGroup.SetLODs(new[]
                 {
@@ -1164,10 +1303,12 @@ namespace RogueCommandExpansion.Authoring
         {
             Renderer[] all = root.GetComponentsInChildren<Renderer>(true);
             var matching = new List<Renderer>();
-            string token = "_" + lodName + "_";
+            string token = lodName + "_";
             for (int i = 0; i < all.Length; i++)
             {
-                if (all[i] != null && all[i].gameObject.name.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0)
+                string objectName = all[i] != null ? all[i].gameObject.name : String.Empty;
+                if (objectName.StartsWith(token, StringComparison.OrdinalIgnoreCase) ||
+                    objectName.IndexOf("_" + token, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     matching.Add(all[i]);
                 }
@@ -1273,7 +1414,8 @@ namespace RogueCommandExpansion.Authoring
             foreach (KeyValuePair<string, List<ModuleEntry>> pair in bundleModules)
             {
                 string bundleName = pair.Value[0].assetBundleName;
-                string bundlePath = Path.Combine(repositoryRoot, "artifacts", "canonical-two-level",
+                string bundlePath = Path.Combine(
+                    RogueCommandAssetBundleBuilder.ResolveCanonicalVisualArtifactRoot(repositoryRoot),
                     "content-packs", pair.Key, "bundles", bundleName);
                 AssetBundle bundle = AssetBundle.LoadFromFile(bundlePath);
                 if (bundle == null)

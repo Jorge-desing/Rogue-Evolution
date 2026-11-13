@@ -49,6 +49,7 @@ def find_blender() -> str | None:
 
 BLENDER_PROXY_SNIPPET = """
 from pathlib import Path
+import sys
 import bpy
 
 argv = sys.argv[sys.argv.index("--") + 1:]

@@ -16,6 +16,13 @@ Examples:
         --profiles-root "C:/Users/Alex/AppData/LocalLow/Feneq/Rogue Command/Profiles" \
         --selector "C:/Users/Alex/AppData/LocalLow/Feneq/Rogue Command/Profiles/currentProfile.txt" \
         --allow-relative Profile2/metaSavegame.dat
+
+    # After selecting a save-free QA profile through the native profile UI:
+    python tools/runtime_profile_checkpoint.py verify \
+        --manifest artifacts/runtime-smoke/session/profile-checkpoint.json \
+        --profiles-root "C:/Users/Alex/AppData/LocalLow/Feneq/Rogue Command/Profiles" \
+        --selector "C:/Users/Alex/AppData/LocalLow/Feneq/Rogue Command/Profiles/currentProfile.txt" \
+        --qa-profile Profile3 --qa-active
 """
 
 from __future__ import annotations
@@ -24,6 +31,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import stat
 import sys
 import tempfile
@@ -335,12 +343,17 @@ def verify_checkpoint(
     profiles_root: Path,
     selector_path: Path,
     allowed_relative_paths: Iterable[str] = (),
+    qa_profile: str | None = None,
+    qa_active: bool = False,
 ) -> dict:
     """Compare the live profile tree with a checkpoint.
 
     ``allowed_relative_paths`` can be used for an explicitly expected autosave,
-    such as ``Profile2/metaSavegame.dat``.  Added, missing, selector, and any
-    other changed files remain failures.
+    such as ``Profile2/metaSavegame.dat``. ``qa_profile`` allows changes only
+    inside a named, pre-existing profile that had no saved run in the baseline.
+    With ``qa_active=True``, the selector must point to that QA profile and it
+    must still have no ``savegame.dat``; all other profiles must match exactly.
+    Without ``qa_active``, the selector must match the baseline for finalization.
     """
     manifest_path = manifest_path.expanduser().resolve()
     manifest = _load_manifest(manifest_path)
@@ -375,7 +388,28 @@ def verify_checkpoint(
             + ", ".join(invalid)
         )
 
+    if qa_active and qa_profile is None:
+        raise ValueError("--qa-active requires an explicit --qa-profile")
+    qa_name = None
+    qa_number = None
+    if qa_profile is not None:
+        match = re.fullmatch(r"Profile([1-9][0-9]*)", qa_profile)
+        if match is None:
+            raise ValueError("QA profile must be an exact name such as Profile3")
+        qa_name = qa_profile
+        qa_number = match.group(1)
+
     expected = {str(entry["path"]): entry for entry in manifest["profileFiles"]}
+    if qa_name is not None:
+        qa_prefix = qa_name + "/"
+        baseline_qa_entries = [path for path in expected if path.startswith(qa_prefix)]
+        if not baseline_qa_entries:
+            raise ValueError("QA profile must already exist in the checkpoint baseline")
+        if qa_name + "/savegame.dat" in expected:
+            raise ValueError("QA profile has a saved run in the checkpoint baseline")
+        if str(manifest["selector"].get("value", "")).strip() == qa_number:
+            raise ValueError("QA profile must differ from the checkpoint's active profile")
+
     actual_entries = _collect_profile_files(profiles_root)
     actual = {str(entry["path"]): entry for entry in actual_entries}
     added = sorted(set(actual) - set(expected))
@@ -383,8 +417,11 @@ def verify_checkpoint(
     changed = sorted(
         path for path in (set(expected) & set(actual)) if expected[path] != actual[path]
     )
-    allowed_changed = sorted(path for path in changed if path in allowed)
-    unexpected_changed = sorted(path for path in changed if path not in allowed)
+    qa_prefix = qa_name + "/" if qa_name is not None else None
+    qa_added = sorted(path for path in added if qa_prefix is not None and path.startswith(qa_prefix))
+    unexpected_added = sorted(path for path in added if path not in qa_added)
+    qa_changed = sorted(path for path in changed if qa_prefix is not None and path.startswith(qa_prefix))
+    allowed_changed = sorted(path for path in changed if path in allowed and path not in qa_changed)
 
     expected_selector = manifest["selector"]
     actual_selector = _stable_text_record(selector_path)
@@ -392,6 +429,37 @@ def verify_checkpoint(
         expected_selector.get("value") == actual_selector["value"]
         and expected_selector.get("size") == actual_selector["size"]
         and expected_selector.get("sha256") == actual_selector["sha256"]
+    )
+    qa_selector_match = (
+        qa_name is not None
+        and str(actual_selector.get("value", "")).strip() == qa_number
+    )
+    selector_relative_path = Path(str(expected_selector["path"])).name
+    selector_relative_key = selector_relative_path.casefold()
+    qa_selector_changed = bool(
+        qa_active
+        and qa_selector_match
+        and any(path.casefold() == selector_relative_key for path in changed)
+    )
+    unexpected_changed = sorted(
+        path
+        for path in changed
+        if path not in allowed_changed
+        and path not in qa_changed
+        and not (qa_selector_changed and path.casefold() == selector_relative_key)
+    )
+    qa_has_saved_run = (
+        qa_name is not None
+        and qa_name + "/savegame.dat" in actual
+    )
+    safe_to_proceed = bool(
+        qa_active
+        and qa_name is not None
+        and qa_selector_match
+        and not qa_has_saved_run
+        and not missing
+        and not unexpected_added
+        and not unexpected_changed
     )
 
     return {
@@ -401,13 +469,21 @@ def verify_checkpoint(
         "selectorPath": str(selector_path),
         "profileFilesExactMatch": not added and not missing and not changed,
         "added": added,
+        "qaProfileAdded": qa_added,
+        "unexpectedAdded": unexpected_added,
         "missing": missing,
         "changed": changed,
+        "qaProfileChanged": qa_changed,
         "allowedChanged": allowed_changed,
         "unexpectedChanged": unexpected_changed,
         "selectorMatch": selector_match,
+        "qaProfile": qa_name,
+        "qaSelectorMatch": qa_selector_match,
+        "qaSelectorChanged": qa_selector_changed,
+        "qaProfileHasSavedRun": qa_has_saved_run,
+        "safe_to_proceed": safe_to_proceed,
         "safe_to_finalize": (
-            not added
+            not unexpected_added
             and not missing
             and not unexpected_changed
             and selector_match
@@ -429,6 +505,8 @@ def _build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--profiles-root", required=True, type=Path)
     verify.add_argument("--selector", required=True, type=Path)
     verify.add_argument("--allow-relative", action="append", default=[], metavar="PATH")
+    verify.add_argument("--qa-profile", metavar="PROFILE")
+    verify.add_argument("--qa-active", action="store_true")
     return parser
 
 
@@ -444,9 +522,11 @@ def main(argv: list[str] | None = None) -> int:
             args.profiles_root,
             args.selector,
             args.allow_relative,
+            args.qa_profile,
+            args.qa_active,
         )
         print(json.dumps(result, indent=2, ensure_ascii=False))
-        return 0 if result["safe_to_finalize"] else 1
+        return 0 if (result["safe_to_proceed"] if args.qa_active else result["safe_to_finalize"]) else 1
     except (FileNotFoundError, OSError, RuntimeError, ValueError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2

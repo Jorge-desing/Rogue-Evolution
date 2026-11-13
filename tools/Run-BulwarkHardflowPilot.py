@@ -434,7 +434,7 @@ def main() -> None:
         raise RuntimeError("Hardflow did not activate in the isolated Blender profile")
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    output_root = ROOT / "artifacts" / f"bulwark-hardflow-service-hatch-pilot-{timestamp}"
+    output_root = ROOT / "artifacts" / f"bulwark-hardflow-contact-alignment-pilot-{timestamp}"
     if output_root.exists():
         raise FileExistsError(output_root)
     output_root.mkdir(parents=True)
@@ -460,7 +460,7 @@ def main() -> None:
         "schemaVersion": 1,
         "geometryPresets": [SERVICE_HATCH_PRESET_ID, ERA_BRICK_PRESET_ID],
         "geometryLayout": SIDE_ERA_LAYOUT_ID,
-        "recipeId": "bulwark-visible-supports-v14-side-only-era",
+        "recipeId": "bulwark-visible-supports-v15-suspension-and-turret-contacts",
         "hardflow": {"version": "1.23.0", "blenderVersion": bpy.app.version_string,
                      "enabledInProjectProfile": True,
                      "operations": ["Exact access-hatch rebate Boolean", "two face-seam Booleans per ERA cassette",

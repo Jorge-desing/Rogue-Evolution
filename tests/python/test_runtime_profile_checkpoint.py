@@ -17,9 +17,11 @@ class RuntimeProfileCheckpointTests(unittest.TestCase):
         profiles.mkdir()
         (profiles / "Profile1").mkdir()
         (profiles / "Profile2").mkdir()
+        (profiles / "Profile3").mkdir()
         (profiles / "Profile1" / "metaSavegame.dat").write_bytes(b"profile-1")
         (profiles / "Profile2" / "savegame.dat").write_bytes(b"profile-2-save")
         (profiles / "Profile2" / "metaSavegame.dat").write_bytes(b"profile-2-meta")
+        (profiles / "Profile3" / "metaSavegame.dat").write_bytes(b"profile-3-meta")
         selector = profiles / "currentProfile.txt"
         selector.write_bytes(b"2\n")
         return root, profiles, selector
@@ -46,6 +48,7 @@ class RuntimeProfileCheckpointTests(unittest.TestCase):
                 "Profile1/metaSavegame.dat",
                 "Profile2/metaSavegame.dat",
                 "Profile2/savegame.dat",
+                "Profile3/metaSavegame.dat",
                 "currentProfile.txt",
             ],
         )
@@ -200,6 +203,78 @@ class RuntimeProfileCheckpointTests(unittest.TestCase):
                 selector,
                 allowed_relative_paths={"Profile2/savegame.dat"},
             )
+
+    def test_verify_allows_distinct_save_free_qa_profile_before_runtime(self):
+        root, profiles, selector = self._make_layout()
+        manifest_path = root / "checkpoint.json"
+        runtime_profile_checkpoint.create_checkpoint(profiles, selector, manifest_path)
+        selector.write_text("3\n", encoding="utf-8")
+
+        result = runtime_profile_checkpoint.verify_checkpoint(
+            manifest_path, profiles, selector, qa_profile="Profile3", qa_active=True
+        )
+
+        self.assertTrue(result["safe_to_proceed"])
+        self.assertTrue(result["qaSelectorMatch"])
+        self.assertFalse(result["qaProfileHasSavedRun"])
+        self.assertEqual(result["unexpectedChanged"], [])
+
+    def test_verify_rejects_non_qa_profile_change_during_qa_preflight(self):
+        root, profiles, selector = self._make_layout()
+        manifest_path = root / "checkpoint.json"
+        runtime_profile_checkpoint.create_checkpoint(profiles, selector, manifest_path)
+        selector.write_text("3\n", encoding="utf-8")
+        (profiles / "Profile2" / "metaSavegame.dat").write_bytes(b"modified-active-profile")
+
+        result = runtime_profile_checkpoint.verify_checkpoint(
+            manifest_path, profiles, selector, qa_profile="Profile3", qa_active=True
+        )
+
+        self.assertFalse(result["safe_to_proceed"])
+        self.assertEqual(result["unexpectedChanged"], ["Profile2/metaSavegame.dat"])
+
+    def test_verify_rejects_qa_profile_that_already_has_a_run(self):
+        root, profiles, selector = self._make_layout()
+        manifest_path = root / "checkpoint.json"
+        runtime_profile_checkpoint.create_checkpoint(profiles, selector, manifest_path)
+        selector.write_text("2\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "saved run in the checkpoint baseline"):
+            runtime_profile_checkpoint.verify_checkpoint(
+                manifest_path, profiles, selector, qa_profile="Profile2", qa_active=True
+            )
+
+    def test_verify_rejects_qa_save_created_before_preflight(self):
+        root, profiles, selector = self._make_layout()
+        manifest_path = root / "checkpoint.json"
+        runtime_profile_checkpoint.create_checkpoint(profiles, selector, manifest_path)
+        selector.write_text("3\n", encoding="utf-8")
+        (profiles / "Profile3" / "savegame.dat").write_bytes(b"unexpected-run-save")
+
+        result = runtime_profile_checkpoint.verify_checkpoint(
+            manifest_path, profiles, selector, qa_profile="Profile3", qa_active=True
+        )
+
+        self.assertFalse(result["safe_to_proceed"])
+        self.assertTrue(result["qaProfileHasSavedRun"])
+        self.assertEqual(result["qaProfileAdded"], ["Profile3/savegame.dat"])
+
+    def test_verify_finalization_allows_only_qa_profile_changes(self):
+        root, profiles, selector = self._make_layout()
+        manifest_path = root / "checkpoint.json"
+        runtime_profile_checkpoint.create_checkpoint(profiles, selector, manifest_path)
+        (profiles / "Profile3" / "metaSavegame.dat").write_bytes(b"qa-progress")
+        (profiles / "Profile3" / "new-qa-file.bin").write_bytes(b"qa-only")
+
+        result = runtime_profile_checkpoint.verify_checkpoint(
+            manifest_path, profiles, selector, qa_profile="Profile3"
+        )
+
+        self.assertTrue(result["safe_to_finalize"])
+        self.assertEqual(result["qaProfileChanged"], ["Profile3/metaSavegame.dat"])
+        self.assertEqual(result["qaProfileAdded"], ["Profile3/new-qa-file.bin"])
+        self.assertEqual(result["unexpectedChanged"], [])
+        self.assertEqual(result["unexpectedAdded"], [])
 
 
 if __name__ == "__main__":

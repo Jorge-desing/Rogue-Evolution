@@ -5,13 +5,20 @@ $unityExe = Join-Path $env:ProgramFiles "Unity/Hub/Editor/2021.3.45f2/Editor/Uni
 $blenderExe = Join-Path $repoRoot ".tools/Blender-4.5.14/blender-4.5.14-windows-x64/blender.exe"
 $geometryScript = Join-Path $repoRoot "tools/Build-CanonicalVisualModules.py"
 $textureScript = Join-Path $repoRoot "tools/Build-CanonicalVisualModuleTextures.ps1"
-$logDirectory = Join-Path $repoRoot "artifacts/canonical-two-level"
+$buildStamp = [DateTime]::UtcNow.ToString("yyyyMMddTHHmmssZ")
+$artifactRoot = Join-Path $repoRoot "artifacts/canonical-level2-$buildStamp"
+$logDirectory = Join-Path $artifactRoot "logs"
 $geometryLogPath = Join-Path $logDirectory "blender-builder.log"
 $levelOneLogPath = Join-Path $logDirectory "level-one-unity-builder.log"
 $logPath = Join-Path $logDirectory "unity-builder.log"
 $lockPath = Join-Path $projectPath "Temp/UnityLockfile"
 $provenanceScript = Join-Path $PSScriptRoot "CanonicalVisualBuildProvenance.ps1"
 . $provenanceScript
+
+if (Test-Path -LiteralPath $artifactRoot) {
+    throw "Canonical Level 2 build output already exists; refusing to overwrite it: $artifactRoot"
+}
+$env:RCL_CANONICAL_VISUAL_ARTIFACT_ROOT = $artifactRoot
 
 if (-not (Test-Path -LiteralPath $unityExe -PathType Leaf)) {
     throw "Pinned Unity 2021.3.45f2 editor was not found: $unityExe"
@@ -188,7 +195,6 @@ if (-not $unityCompletion.Success -or
     throw "Unity exited without the expected Level 1/Level 2 canonical module build record. Log: $logPath"
 }
 
-$artifactRoot = Join-Path $repoRoot "artifacts/canonical-two-level"
 $builtPackRoot = Join-Path $artifactRoot "content-packs"
 $validatedPackRoot = Join-Path $artifactRoot "validation-packs"
 $pythonExe = Join-Path $repoRoot ".venv/Scripts/python.exe"

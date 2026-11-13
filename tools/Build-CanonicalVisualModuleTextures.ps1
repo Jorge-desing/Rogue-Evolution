@@ -25,7 +25,17 @@ if ($runningMaterialMaker) {
 for ($index = 0; $index -lt $presets.Count; $index++) {
     $preset = $presets[$index]
     $unitName = "RCLModule_$preset"
-    $outputDirectory = "artifacts/canonical-two-level/texture-work/$preset"
+    $artifactRoot = $env:RCL_CANONICAL_VISUAL_ARTIFACT_ROOT
+    if ([string]::IsNullOrWhiteSpace($artifactRoot)) {
+        $artifactRoot = Join-Path $repoRoot "artifacts/canonical-two-level"
+    }
+    $artifactRoot = [System.IO.Path]::GetFullPath($artifactRoot)
+    $artifactPrefix = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts")).TrimEnd('\') + '\'
+    if (-not $artifactRoot.StartsWith($artifactPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Canonical texture bake output must remain under repository artifacts: $artifactRoot"
+    }
+    $artifactRelative = $artifactRoot.Substring($repoRoot.Length + 1).Replace('\', '/')
+    $outputDirectory = "$artifactRelative/texture-work/$preset"
     Write-Host "[$($index + 1)/$($presets.Count)] Material Maker 1.7 procedural bake: $preset"
 
     & $bakeScript `
@@ -49,7 +59,17 @@ for ($index = 0; $index -lt $presets.Count; $index++) {
         }
         if (-not $SkipPromote) {
             $target = Join-Path $unityTextureDir "${unitName}_$suffix.png"
-            Copy-Item -LiteralPath $source -Destination $target -Force
+            $sourceHash = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash
+            if (Test-Path -LiteralPath $target -PathType Leaf) {
+                $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+                if (-not [String]::Equals($sourceHash, $targetHash, [StringComparison]::OrdinalIgnoreCase)) {
+                    Copy-Item -LiteralPath $source -Destination $target -Force
+                } else {
+                    Write-Host "Kept identical existing PBR map without rewriting: $target"
+                }
+            } else {
+                Copy-Item -LiteralPath $source -Destination $target -Force
+            }
         }
     }
 }

@@ -42,6 +42,7 @@ Use this skill as the single workflow for controlling or inspecting the live Rog
 - Unity state, Animator values, renderer visibility, frustum tests, and `BakeMesh` samples are telemetry. They can support runtime-state claims but do not prove pixel appearance or animation quality. Use `diagnostics_wait_for_renderer_frame_evidence` for bounded, screenshot-free renderer telemetry when needed; preserve the returned token and confirm cleanup.
 - On timeouts or truncated responses, inspect the live postcondition and observer census before retrying. Report cleanup that could not be confirmed.
 - Close Rogue Command only when the requested workflow calls for it. Use the MCP graceful-exit path, then verify actual process closure and the required profile/save checkpoint.
+- For geometry calibration, record GetBattlefieldCensusJson immediately before and after every capture and bind both counts to its hashed schema-v3 report. A probe-ready flag does not prove the scene population stayed controlled. If player, AI, or building counts change, retain the raw report but exclude it from the matched capacity fit; require at least three stable reports across two geometry loads before updating the calibrated profile or opening builders.
 
 ## Related project guidance
 

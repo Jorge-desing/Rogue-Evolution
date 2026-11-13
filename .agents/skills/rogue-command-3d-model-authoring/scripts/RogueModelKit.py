@@ -7695,6 +7695,7 @@ def batch_and_join_by_material(
     asset_id: str | None = None,
     profile_path: Path | None = None,
     scene_id: str | None = None,
+    allow_uncalibrated_geometry: bool = False,
 ) -> list[bpy.types.Object]:
     """Combines modular kitbashed objects by material into unified meshes.
 
@@ -7708,7 +7709,8 @@ def batch_and_join_by_material(
     """
     if max_faces is not None:
         raise ValueError("fixed max_faces overrides are retired; use the calibrated scene allocation")
-    enforce_face_budget_before_export(objects, prefix, asset_id=asset_id, profile_path=profile_path, scene_id=scene_id)
+    if not allow_uncalibrated_geometry:
+        enforce_face_budget_before_export(objects, prefix, asset_id=asset_id, profile_path=profile_path, scene_id=scene_id)
     material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
     preserved_objects: list[bpy.types.Object] = []
     # Rigged sample overlays are consumed as material batches under the
@@ -7993,8 +7995,9 @@ def generate_lod_chain(
     smooth_by_angle: bool = True,
     smooth_angle_deg: float = 38.0,
     weighted_normals: bool = True,
+    lod_name_first: bool = False,
 ) -> Dict[str, list[bpy.types.Object]]:
-    """Generate geometry at ratios derived from a calibrated per-asset scene profile."""
+    """Generate LOD geometry at ratios from a calibrated allocation or explicit scoped policy."""
     if not lod_levels:
         raise ValueError(f"{prefix}: pass LOD ratios derived from its calibrated geometry profile")
     lod_names = [name for name, _ in lod_levels]
@@ -8013,8 +8016,12 @@ def generate_lod_chain(
             dup = obj.copy()
             dup.data = obj.data.copy()
             mat_suffix = obj.name.replace(f"{prefix}_", "")
-            dup.name = f"{prefix}_{lod_name}_{mat_suffix}"
-            dup.data.name = f"{prefix}_{lod_name}_{mat_suffix}_Mesh"
+            object_name = (
+                f"{lod_name}_{prefix}_{mat_suffix}"
+                if lod_name_first else f"{prefix}_{lod_name}_{mat_suffix}"
+            )
+            dup.name = object_name
+            dup.data.name = f"{object_name}_Mesh"
             bpy.context.collection.objects.link(dup)
 
             if ratio < 0.99:
@@ -8524,8 +8531,11 @@ def export_unity_fbx(
     profile_path: Path | None = None,
     scene_id: str | None = None,
     prevalidated_budget: Dict[str, Any] | None = None,
+    allow_uncalibrated_export: bool = False,
 ) -> None:
-    """Exports model objects to FBX after a calibrated budget has been resolved."""
+    """Export FBX under a calibrated budget or an explicit scoped override."""
+    if allow_uncalibrated_export and (generate_profiled_lods or prevalidated_budget is not None):
+        raise ValueError("uncalibrated export override cannot be combined with a calibrated budget")
     asset_budget = None
     mesh_objects: list[bpy.types.Object] = []
     ratios: list[Tuple[str, float]] = []
@@ -8550,14 +8560,16 @@ def export_unity_fbx(
         ratios = lod_ratios_from_budget(asset_budget, source_triangles)
     else:
         if prevalidated_budget is None:
-            raise ValueError(
-                "FBX export requires generate_profiled_lods=True or a prevalidated calibrated geometry budget"
-            )
+            if not allow_uncalibrated_export or not asset_id:
+                raise ValueError(
+                    "FBX export requires a calibrated budget or an explicit uncalibrated export override with asset_id"
+                )
         asset_budget = prevalidated_budget
 
     if asset_id is None and isinstance(asset_budget, dict):
         asset_id = str(asset_budget.get("assetId", "")) or None
-    _validate_export_budget_token(asset_budget, expected_asset_id=asset_id)
+    if not allow_uncalibrated_export:
+        _validate_export_budget_token(asset_budget, expected_asset_id=asset_id)
     if not model_objects:
         raise ValueError("FBX export requires at least one object")
 
@@ -11763,11 +11775,19 @@ def assign_rigid_mesh_weights(
                 target_bone = "Bone_Pelvis"
 
         if target_bone is None:
-            if any(k in clean_name for k in ("Barrel", "Muzzle", "Bore", "Recoil", "Nozzle")):
+            if "TurretRingGuard" in clean_name:
+                # The ring guard is seated on the fixed hull deck around the
+                # turret bearing; its name describes what it protects, not its rig parent.
+                target_bone = "Bone_Hull"
+            elif "CoaxialPort" in clean_name:
+                # Coaxial weapons are fixed to the turret's azimuth assembly;
+                # do not send their muzzle to the main cannon recoil bone.
+                target_bone = "Bone_TurretYaw"
+            elif any(k in clean_name for k in ("Barrel", "Muzzle", "Bore", "Recoil", "Nozzle")):
                 target_bone = "Bone_BarrelRecoil"
             elif any(k in clean_name for k in ("Mantlet", "Cradle", "Howitzer", "Rail", "Flak", "Mortar", "Gatling", "Pod", "Emitter", "Flamer", "EMP", "TurretPitch")):
                 target_bone = "Bone_TurretPitch"
-            elif any(k in clean_name for k in ("Turret", "Bustle", "Visor", "Radar", "Rotodome", "TurretPivot")):
+            elif any(k in clean_name for k in ("Turret", "Bustle", "Visor", "Radar", "Rotodome", "TurretPivot", "Trunnion")):
                 target_bone = "Bone_TurretYaw"
             elif leg_type == "biped":
                 target_bone = "Bone_Pelvis"
@@ -16421,9 +16441,6 @@ class RogueVehicleBuilder:
         unity_batch_names: bool = False,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
-        blend_path.parent.mkdir(parents=True, exist_ok=True)
-        fbx_path.parent.mkdir(parents=True, exist_ok=True)
-
         if target_budget is not None:
             raise ValueError("fixed target_budget overrides are retired; provide a calibrated scene profile")
         if not generate_lods:
@@ -16472,6 +16489,11 @@ class RogueVehicleBuilder:
                 f"Blender faces and {source_triangle_count}/{triangle_budget_limit} Unity triangles after "
                 "safe reduction; revise the asset for the calibrated camera and scene role."
             )
+
+        # Do not touch output paths until the calibrated demand and this asset's
+        # actual LOD0 geometry have both passed their gates.
+        blend_path.parent.mkdir(parents=True, exist_ok=True)
+        fbx_path.parent.mkdir(parents=True, exist_ok=True)
 
         # 2. Smart UV Projection for lightmapping
         generate_lightmap_uvs(self.objects)
@@ -17528,9 +17550,6 @@ class RogueStructureBuilder:
         budget_profile_path: Path | None = None,
         budget_scene_id: str | None = None,
     ) -> dict[str, Any]:
-        blend_path.parent.mkdir(parents=True, exist_ok=True)
-        fbx_path.parent.mkdir(parents=True, exist_ok=True)
-
         if target_budget is not None:
             raise ValueError("fixed target_budget overrides are retired; provide a calibrated scene profile")
         if not generate_lods:
@@ -17576,6 +17595,11 @@ class RogueStructureBuilder:
                 f"Blender faces and {source_triangle_count}/{triangle_budget_limit} Unity triangles after "
                 "safe reduction; revise the asset for the calibrated camera and scene role."
             )
+
+        # The source and FBX destinations remain untouched until both the
+        # calibrated demand and measured asset geometry have passed.
+        blend_path.parent.mkdir(parents=True, exist_ok=True)
+        fbx_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Procedural multi-channel vertex shading & cavity AO for structures
         if bake_vertex_shading and wear_level and wear_level != "none":

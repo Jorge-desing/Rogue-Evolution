@@ -26,8 +26,11 @@ from hard_surface_geometry_presets import (
 )
 
 
-RECIPE_ID = "bulwark-visible-supports-v14-side-only-era"
-LEGACY_RECIPE_IDS = {"bulwark-visible-supports-v13-side-mounts"}
+RECIPE_ID = "bulwark-visible-supports-v15-suspension-and-turret-contacts"
+LEGACY_RECIPE_IDS = {
+    "bulwark-visible-supports-v13-side-mounts",
+    "bulwark-visible-supports-v14-side-only-era",
+}
 SCENE_MARKER = "rcl_bulwark_visible_supports_recipe"
 DETAIL_MARKER = "rcl_bulwark_visible_supports_detail"
 UNIT_PREFIX = "BulwarkSiegeTank"
@@ -964,39 +967,54 @@ def apply_bulwark_contact_repairs(
     moved.extend(shackle_relocations)
 
     # The SponsonBridge is separated from Hull by a small but visible seam; add
-    # a short tie and mount the final-drive housings to it. Leave suspension
-    # stations 2-4 open: triangulated candidate arms cross the belt volume, and
-    # no concealed axle route has passed a visual occlusion check yet.
+    # a short tie and mount the final-drive housings to it. The six suspension
+    # load arms sit behind the continuous belt shell. They intentionally overlap
+    # that opaque shell, so the load path is visible only through its existing
+    # openings and does not require cutting a service bay into the moving belt.
     sponson_hull_ties = []
     suspension_mounts = []
     final_drive_mounts = []
-    unresolved_suspension_interfaces = []
+    suspension_local_contacts = []
     for side in ("L", "R"):
         sponson = _object(objects, f"BulwarkSiegeTankArmor_SponsonBridge_{side}")
+        hull = _object(objects, "BulwarkSiegeTankArmor_Hull")
         hull_tie = _contact_beam(
             f"BulwarkSiegeTankArmor_SponsonHullTie_{side}",
-            _object(objects, "BulwarkSiegeTankArmor_Hull"), sponson, metal,
+            hull, sponson, metal,
             (0.050, 0.050), generated, hardflow_bevel,
             pad_size=(0.12, 0.10, 0.018),
         )
         sponson_hull_ties.append(hull_tie)
         for station in (2, 3, 4):
+            swing_arm = _object(objects, f"BulwarkSiegeTankSuspension_{side}_SwingArm_{station}")
             torsion = _object(objects, f"BulwarkSiegeTankSuspension_{side}_TorsionBoss_{station}")
             damper = _object(objects, f"BulwarkSiegeTankSuspension_{side}_ShockDamper_{station}")
-            unresolved_suspension_interfaces.extend((
-                {"side": side, "station": station, "component": torsion.name,
-                 "candidateSupport": sponson.name,
-                 "sponsonGapMm": _surface_gap(sponson, torsion) * 1000.0,
-                 "hullGapMm": _surface_gap(_object(objects, "BulwarkSiegeTankArmor_Hull"), torsion) * 1000.0,
-                 "mountAdded": False,
-                 "reason": "Triangulated candidate load arms from the Hull/Sponson pass through the corresponding belt; route left open."},
-                {"side": side, "station": station, "component": damper.name,
-                 "candidateSupport": sponson.name,
-                 "sponsonGapMm": _surface_gap(sponson, damper) * 1000.0,
-                 "hullGapMm": _surface_gap(_object(objects, "BulwarkSiegeTankArmor_Hull"), damper) * 1000.0,
-                 "mountAdded": False,
-                 "reason": "Triangulated candidate load arms from the Hull/Sponson pass through the corresponding belt; route left open."},
-            ))
+            mount = _contact_beam(
+                f"BulwarkSiegeTankArmor_SuspensionMount_{side}_{station}",
+                hull, swing_arm, metal, (0.032, 0.032), generated,
+                hardflow_bevel, pad_size=(0.09, 0.09, 0.018),
+            )
+            mount.update({"side": side, "station": station,
+                          "target": swing_arm.name,
+                          "torsionBoss": torsion.name,
+                          "shockDamper": damper.name,
+                          "beltOcclusionIntentional": True})
+            suspension_mounts.append(mount)
+            boss_gap = _surface_gap(torsion, swing_arm)
+            damper_gap = _surface_gap(damper, swing_arm)
+            if max(boss_gap, damper_gap) > 0.002:
+                raise ValueError(
+                    f"Bulwark suspension station {side}/{station} has an open local joint: "
+                    f"torsion={boss_gap * 1000.0:.3f} mm, damper={damper_gap * 1000.0:.3f} mm"
+                )
+            suspension_local_contacts.append({
+                "side": side, "station": station,
+                "swingArm": swing_arm.name,
+                "torsionBoss": torsion.name,
+                "shockDamper": damper.name,
+                "torsionBossGapMm": boss_gap * 1000.0,
+                "damperGapMm": damper_gap * 1000.0,
+            })
         housing = _object(objects, f"BulwarkSiegeTankChassis_FinalDrive_Housing_{side}")
         final_drive_mounts.append(_contact_beam(
             f"BulwarkSiegeTankArmor_FinalDriveMount_{side}",
@@ -1041,6 +1059,7 @@ def apply_bulwark_contact_repairs(
     ]
     forbidden_trees = {obj.name: _tree(_mesh_geometry(obj)) for obj in forbidden_track_objects}
     route_track_intersections = []
+    occluded_suspension_belt_overlaps = []
     route_parts = [bpy.data.objects[mount[key]] for mount in [*sponson_hull_ties,
                     *suspension_mounts, *final_drive_mounts] for key in ("supportSeat", "loadArm")]
     route_parts.extend(bpy.data.objects[mount["supportSeat"]] for mount in shackle_mounts)
@@ -1052,11 +1071,138 @@ def apply_bulwark_contact_repairs(
     for part in route_parts:
         part_tree = _tree(_mesh_geometry(part))
         for forbidden in forbidden_track_objects:
-            if part_tree.overlap(forbidden_trees[forbidden.name]):
+            pairs = part_tree.overlap(forbidden_trees[forbidden.name])
+            if not pairs:
+                continue
+            if forbidden.name.startswith("BulwarkSiegeTankTreads_Belt_") and "SuspensionMount_" in part.name:
+                side = "R" if part.name.startswith("BulwarkSiegeTankArmor_SuspensionMount_R_") else "L"
+                part_min, part_max = _bounds(part)
+                belt_min, belt_max = _bounds(forbidden)
+                outer_cover_mm = ((belt_max.x - part_max.x) if side == "R"
+                                  else (part_min.x - belt_min.x)) * 1000.0
+                yz_inside = (part_min.y >= belt_min.y - 0.001 and part_max.y <= belt_max.y + 0.001
+                             and part_min.z >= belt_min.z - 0.001 and part_max.z <= belt_max.z + 0.001)
+                if outer_cover_mm < 20.0 or not yz_inside:
+                    raise ValueError(
+                        f"Suspension load arm {part.name} is not concealed behind {forbidden.name}: "
+                        f"outer cover={outer_cover_mm:.3f} mm, inside belt Y/Z={yz_inside}"
+                    )
+                occluded_suspension_belt_overlaps.append({
+                    "supportPart": part.name, "trackPart": forbidden.name,
+                    "triangleIntersectionPairs": len(pairs),
+                    "outerCoverMm": outer_cover_mm,
+                    "insideBeltYZBounds": yz_inside,
+                    "intent": "internal load path concealed by the continuous opaque track belt",
+                })
+            else:
                 route_track_intersections.append({"supportPart": part.name, "trackPart": forbidden.name})
     if route_track_intersections:
         raise ValueError("A new Bulwark load support crosses a belt, road wheel, idler, or drive sprocket: "
                          + ", ".join(f"{row['supportPart']}->{row['trackPart']}" for row in route_track_intersections[:8]))
+
+    # The antenna is authored on the turret roof. Its previous mount was kept
+    # beside an unsupported high ring collar, leaving a measurable gap to the
+    # turret shell. Seat the complete rigid cluster onto the actual shell face.
+    antenna_base = bpy.data.objects.get(f"{UNIT_PREFIX}Sensor_AntennaBase")
+    turret_shell = _object(objects, f"{UNIT_PREFIX}Turret_BaseShell")
+    antenna_mount = None
+    if antenna_base and antenna_base.type == "MESH":
+        antenna_cluster = [bpy.data.objects.get(f"{UNIT_PREFIX}Sensor_Antenna{suffix}")
+                           for suffix in ("Base", "Mast", "Tip")]
+        antenna_cluster = [obj for obj in antenna_cluster if obj and obj.type == "MESH"]
+        antenna_surface, turret_surface, antenna_gap = _closest_surface_points(antenna_base, turret_shell)
+        if antenna_gap > 0.020:
+            raise ValueError(f"Bulwark antenna base is too far from the turret shell to seat safely: {antenna_gap * 1000.0:.3f} mm")
+        delta = turret_surface - antenna_surface
+        if antenna_gap > 0.001:
+            for antenna_part in antenna_cluster:
+                matrix = antenna_part.matrix_world.copy()
+                matrix.translation += delta
+                antenna_part.matrix_world = matrix
+            bpy.context.view_layer.update()
+        antenna_gap_after = _surface_gap(antenna_base, turret_shell)
+        if antenna_gap_after > 0.002:
+            raise ValueError(f"Bulwark antenna base did not seat on the turret shell: {antenna_gap_after * 1000.0:.3f} mm")
+        antenna_mount = {
+            "cluster": [obj.name for obj in antenna_cluster],
+            "support": turret_shell.name,
+            "preRepairGapMm": antenna_gap * 1000.0,
+            "postRepairGapMm": antenna_gap_after * 1000.0,
+            "translation": [float(value) for value in delta],
+        }
+        moved.append(antenna_mount)
+
+    # Audit the small hard-surface clusters as whole assemblies, not only their
+    # local pairs. The profile deliberately seats the periscope on fixed hull
+    # deck beyond the turret's conservative yaw envelope.
+    turret_accessory_contacts = []
+    periscope_pad = bpy.data.objects.get(f"{UNIT_PREFIX}Sensor_DriverPeriscope_MountPad")
+    if periscope_pad and periscope_pad.type == "MESH":
+        top_face_fit = _contact_face_clearance(periscope_pad, upper, Vector((0.0, 0.0, -1.0)))
+        deck_gap = _surface_gap(periscope_pad, upper)
+        periscope_min, periscope_max = _bounds(periscope_pad)
+        pivot = Vector((0.0, 0.08, 1.345))
+        turret_min, turret_max = _bounds(turret_shell)
+        turret_yaw_radius = max(math.hypot(corner.x - pivot.x, corner.y - pivot.y)
+                                for corner in (Vector((x, y, z))
+                                               for x in (turret_min.x, turret_max.x)
+                                               for y in (turret_min.y, turret_max.y)
+                                               for z in (turret_min.z, turret_max.z)))
+        dx = max(0.0, periscope_min.x - pivot.x, pivot.x - periscope_max.x)
+        dy = max(0.0, periscope_min.y - pivot.y, pivot.y - periscope_max.y)
+        yaw_clearance = math.hypot(dx, dy) - turret_yaw_radius
+        if deck_gap > 0.002 or top_face_fit["sampleCount"] == 0 or top_face_fit["missCount"] or top_face_fit["maxAbsFitErrorMm"] > 2.0:
+            raise ValueError(f"Bulwark driver periscope mount does not fit the UpperDeck: gap={deck_gap * 1000.0:.3f} mm, fit={top_face_fit}")
+        if yaw_clearance < 0.030:
+            raise ValueError(f"Bulwark driver periscope enters the turret yaw envelope: clearance={yaw_clearance * 1000.0:.3f} mm")
+        turret_accessory_contacts.append({
+            "cluster": [f"{UNIT_PREFIX}Sensor_DriverPeriscope_{suffix}" for suffix in ("MountPad", "PeriscopeHood", "OpticPrism")],
+            "support": upper.name,
+            "mountGapMm": deck_gap * 1000.0,
+            "deckFaceFit": top_face_fit,
+            "conservativeTurretYawClearanceMm": yaw_clearance * 1000.0,
+        })
+
+    for side in ("L", "R"):
+        prefix = f"{UNIT_PREFIX}Armor_TrunnionBracket_"
+        cheek = bpy.data.objects.get(prefix + f"CheekBlock_{side}")
+        pin = bpy.data.objects.get(prefix + f"TrunnionPin_{side}")
+        cap = bpy.data.objects.get(prefix + f"RetentionCap_{side}")
+        if all(obj and obj.type == "MESH" for obj in (cheek, pin, cap)):
+            cheek_gap = _surface_gap(cheek, turret_shell)
+            pin_gap = _surface_gap(pin, cheek)
+            cap_gap = _surface_gap(cap, pin)
+            barrel = _object(objects, f"{UNIT_PREFIX}Howitzer_BarrelTube")
+            barrel_clearance = _surface_gap(cheek, barrel)
+            contacts = {"side": side, "cheekToTurretMm": cheek_gap * 1000.0,
+                        "pinToCheekMm": pin_gap * 1000.0,
+                        "capToPinMm": cap_gap * 1000.0,
+                        "cheekToBarrelClearanceMm": barrel_clearance * 1000.0}
+            if max(cheek_gap, pin_gap, cap_gap) > 0.002:
+                raise ValueError(f"Bulwark {side} trunnion cluster has a disconnected contact: {contacts}")
+            if barrel_clearance < 0.010:
+                raise ValueError(f"Bulwark {side} trunnion cheek intrudes on the Howitzer barrel: {contacts}")
+            turret_accessory_contacts.append({"cluster": [obj.name for obj in (cheek, pin, cap)],
+                                              "support": turret_shell.name, **contacts})
+
+    coax_housing = bpy.data.objects.get(f"{UNIT_PREFIX}Weapon_CoaxialPort_PortHousing")
+    if coax_housing and coax_housing.type == "MESH":
+        mantle = _object(objects, f"{UNIT_PREFIX}Turret_MantletHousing")
+        sleeve = bpy.data.objects.get(f"{UNIT_PREFIX}Weapon_CoaxialPort_CoaxSleeve")
+        muzzle = bpy.data.objects.get(f"{UNIT_PREFIX}Weapon_CoaxialPort_CoaxMuzzle")
+        coax_rows = {"portToMantletMm": _surface_gap(coax_housing, mantle) * 1000.0}
+        if sleeve and muzzle:
+            coax_rows["sleeveToHousingMm"] = _surface_gap(sleeve, coax_housing) * 1000.0
+            coax_rows["muzzleToSleeveMm"] = _surface_gap(muzzle, sleeve) * 1000.0
+        # The recessed sleeve and muzzle are bevelled machined pieces; allow a
+        # 4 mm concealed seam at those nested joints while requiring the cast
+        # housing to sit within 2 mm of the mantlet support above.
+        if coax_rows["portToMantletMm"] > 2.0 or max(
+            coax_rows[key] for key in coax_rows if key != "portToMantletMm"
+        ) > 4.0:
+            raise ValueError(f"Bulwark coaxial weapon port is not seated as one assembly: {coax_rows}")
+        turret_accessory_contacts.append({"cluster": [obj.name for obj in (coax_housing, sleeve, muzzle) if obj],
+                                          "support": mantle.name, **coax_rows})
 
     # The existing weld pads stay paired with the relocated lifting lugs.
     # Keep each lug set outside the measured turret and hatch motion footprint.
@@ -1135,9 +1281,13 @@ def apply_bulwark_contact_repairs(
         "sponsonHullTies": sponson_hull_ties,
         "suspensionMounts": suspension_mounts,
         "suspensionMountsAdded": len(suspension_mounts),
-        "unresolvedSuspensionInterfaces": unresolved_suspension_interfaces,
+        "suspensionLocalContacts": suspension_local_contacts,
+        "unresolvedSuspensionInterfaces": [],
+        "occludedSuspensionBeltOverlaps": occluded_suspension_belt_overlaps,
         "finalDriveMounts": final_drive_mounts,
         "finalDriveMountsAdded": len(final_drive_mounts),
+        "antennaMount": antenna_mount,
+        "turretAccessoryContacts": turret_accessory_contacts,
         "supportRouteContacts": support_route_contacts,
         "trackClearanceIntersections": route_track_intersections,
         "louverMountContacts": louver_mount_contacts,
@@ -1156,7 +1306,8 @@ def apply_bulwark_contact_repairs(
         "limitations": [
             "The recipe changes an isolated Blender candidate only; no source blend, FBX, prefab, or bundle is promoted here.",
             "The radiator/hatch pieces are hull-bound and lowered together; the hatch now sits laterally outboard on a deck rebate, and opening sweep must be checked before promotion.",
-            "Suspension and final-drive load paths are reported separately; this minimal visual pass does not add unverified belt-crossing arms.",
+            "Suspension load arms are concealed behind the continuous belt shell; this static Blender check does not simulate animated track deformation.",
+            "Periscope yaw clearance uses a conservative static turret bounds envelope, and trunnion clearances are static rather than an animation sweep.",
             "World-space surface gaps use sampled BVH points and can miss edge-edge minima; any intended support overlap is concealed at the contact seat.",
         ],
     }

@@ -11,6 +11,7 @@ namespace RogueCommandExpansion.Authoring
     public static class ModelGeometryBudgetProfile
     {
         private const string ProfileRelativePath = "content/source-art/model-budget-profile.json";
+        private const string CanonicalBuildPolicyRelativePath = "content/source-art/canonical-visual-module-build-policy.json";
         private const string RequiredVerdict = "CALIBRATED_FOR_RECORDED_PC_AND_SCENE";
 
         [Serializable]
@@ -20,6 +21,15 @@ namespace RogueCommandExpansion.Authoring
             public string calibrationStatus;
             public float targetFps;
             public BudgetReport budgetReport;
+        }
+
+        [Serializable]
+        private sealed class CanonicalBuildPolicy
+        {
+            public int schemaVersion;
+            public bool allowUncalibratedCanonicalLevel2;
+            public string authorizationStatus;
+            public float[] lodScreenRelativeTransitionHeights;
         }
 
         [Serializable]
@@ -157,6 +167,67 @@ namespace RogueCommandExpansion.Authoring
                 throw new InvalidDataException(assetId + " is missing from the calibrated geometry profile.");
             }
             return transitions;
+        }
+
+        public static bool IsUncalibratedCanonicalLevel2BuildAuthorized(string repositoryRoot)
+        {
+            string fullRoot = Path.GetFullPath(repositoryRoot);
+            string profilePath = Path.GetFullPath(Path.Combine(fullRoot,
+                ProfileRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+            string policyPath = Path.GetFullPath(Path.Combine(fullRoot,
+                CanonicalBuildPolicyRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+            if (!File.Exists(policyPath)) return false;
+
+            CanonicalBuildPolicy policy;
+            try
+            {
+                policy = JsonUtility.FromJson<CanonicalBuildPolicy>(File.ReadAllText(policyPath));
+            }
+            catch
+            {
+                return false;
+            }
+            if (policy == null || policy.schemaVersion != 1 || !policy.allowUncalibratedCanonicalLevel2 ||
+                !String.Equals(policy.authorizationStatus, "user-authorized-until-revoked", StringComparison.Ordinal) ||
+                !IsValidUncalibratedLodPolicy(policy.lodScreenRelativeTransitionHeights))
+            {
+                return false;
+            }
+
+            if (!File.Exists(profilePath)) return true;
+            Profile profile;
+            try
+            {
+                profile = JsonUtility.FromJson<Profile>(File.ReadAllText(profilePath));
+            }
+            catch
+            {
+                return true;
+            }
+            return profile == null || !String.Equals(profile.calibrationStatus, "calibrated", StringComparison.Ordinal);
+        }
+
+        public static float[] GetLodTransitions(
+            string repositoryRoot,
+            string assetId,
+            bool allowUncalibratedCanonicalLevel2)
+        {
+            if (allowUncalibratedCanonicalLevel2 &&
+                IsUncalibratedCanonicalLevel2BuildAuthorized(repositoryRoot))
+            {
+                string policyPath = Path.Combine(Path.GetFullPath(repositoryRoot),
+                    CanonicalBuildPolicyRelativePath.Replace('/', Path.DirectorySeparatorChar));
+                CanonicalBuildPolicy policy = JsonUtility.FromJson<CanonicalBuildPolicy>(File.ReadAllText(policyPath));
+                return (float[])policy.lodScreenRelativeTransitionHeights.Clone();
+            }
+            return GetLodTransitions(repositoryRoot, assetId);
+        }
+
+        private static bool IsValidUncalibratedLodPolicy(float[] transitions)
+        {
+            return transitions != null && transitions.Length == 3 &&
+                transitions[0] > transitions[1] && transitions[1] > transitions[2] &&
+                transitions[0] <= 1.0f && transitions[2] > 0.0f;
         }
 
         private static bool ApproximatelyEqual(float[] left, float[] right)

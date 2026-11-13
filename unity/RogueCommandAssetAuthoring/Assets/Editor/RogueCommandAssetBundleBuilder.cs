@@ -162,9 +162,16 @@ namespace RogueCommandExpansion.Authoring
 
             string projectRoot = Directory.GetParent(Application.dataPath).FullName;
             string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
-            ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
-            string artifactRoot = Path.GetFullPath(Path.Combine(repositoryRoot,
-                "artifacts", "canonical-two-level", "content-packs"));
+            bool canonicalLevel2Pair = packNames.Length == 2 &&
+                Array.IndexOf(packNames, "sample-native-expansion") >= 0 &&
+                Array.IndexOf(packNames, "tactical-operations") >= 0;
+            bool uncalibratedOverride = canonicalLevel2Pair &&
+                ModelGeometryBudgetProfile.IsUncalibratedCanonicalLevel2BuildAuthorized(repositoryRoot);
+            if (!uncalibratedOverride)
+            {
+                ModelGeometryBudgetProfile.RequireCalibrated(repositoryRoot);
+            }
+            string artifactRoot = Path.Combine(ResolveCanonicalVisualArtifactRoot(repositoryRoot), "content-packs");
             Directory.CreateDirectory(artifactRoot);
             string artifactDiagnostic;
             if (!HasNoReparsePoints(artifactRoot, out artifactDiagnostic))
@@ -258,6 +265,22 @@ namespace RogueCommandExpansion.Authoring
             }
 
             AssetDatabase.Refresh();
+        }
+
+        public static string ResolveCanonicalVisualArtifactRoot(string repositoryRoot)
+        {
+            string artifactsRoot = Path.GetFullPath(Path.Combine(repositoryRoot, "artifacts"));
+            string configured = Environment.GetEnvironmentVariable("RCL_CANONICAL_VISUAL_ARTIFACT_ROOT");
+            string candidate = String.IsNullOrWhiteSpace(configured)
+                ? Path.Combine(artifactsRoot, "canonical-two-level")
+                : Path.GetFullPath(configured);
+            candidate = Path.GetFullPath(candidate);
+            string artifactsPrefix = artifactsRoot.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            if (!candidate.StartsWith(artifactsPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("Canonical visual build output must stay under the repository artifacts directory: " + candidate);
+            }
+            return candidate;
         }
 
         private static bool TryValidatePackageDirectory(

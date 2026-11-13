@@ -27,7 +27,7 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.5.0"
+SERVER_VERSION = "1.6.0"
 GAME_PROCESS_NAME = "Rogue Command.exe"
 GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
@@ -1055,6 +1055,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                         "runInBackgroundConfigured": True,
                         "features": [
                             "uiAccessibilityCensus",
+                            "runtimeControlSurface",
                             "uiTextClickWithAmbiguityGuard",
                             "waitForUiText",
                             "orderedDiagnosticsSequences",
@@ -2909,6 +2910,25 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 },
             }
             return _tool_response(json.dumps(result, indent=2))
+
+        elif name == "diagnostics_get_runtime_control_surface":
+            query = str(arguments.get("query", "") or "")
+            include_inactive = arguments.get("includeInactive", False)
+            if not isinstance(include_inactive, bool):
+                return _tool_response(json.dumps({"error": "includeInactive must be a boolean"}), is_error=True)
+            raw_max_results = arguments.get("maxUiResults", 64)
+            if isinstance(raw_max_results, bool):
+                return _tool_response(json.dumps({"error": "maxUiResults must be an integer"}), is_error=True)
+            try:
+                max_ui_results = int(raw_max_results)
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "maxUiResults must be an integer"}), is_error=True)
+            max_ui_results = max(1, min(100, max_ui_results))
+            res = _call_diagnostics_method(
+                "GetRuntimeControlSurfaceJson",
+                [query, include_inactive, max_ui_results],
+            )
+            return _tool_response(res)
 
         elif name == "diagnostics_fast_snapshot":
             preset = str(arguments.get("preset", "match")).lower().strip() or "match"

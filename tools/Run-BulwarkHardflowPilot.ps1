@@ -79,5 +79,5 @@ finally {
 }
 
 if ($blenderExitCode -ne 0) {
-    throw "Bulwark Hardflow pilot failed with exit code $blenderExitCode. See its latest artifacts/bulwark-hardflow-service-hatch-pilot-* report."
+    throw "Bulwark Hardflow pilot failed with exit code $blenderExitCode. See its latest artifacts/bulwark-hardflow-contact-alignment-pilot-* report."
 }

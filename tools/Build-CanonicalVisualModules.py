@@ -23,8 +23,17 @@ from mathutils import Euler, Vector
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 import RogueModelKit as rmk  # noqa: E402
+import inspect_fbx_geometry as fbx_inspector  # noqa: E402
+from canonical_module_inventory_staging import (  # noqa: E402
+    InventoryCapacityGate,
+    stage_candidate_inventory,
+    validate_candidate_export_path,
+    validate_candidate_triangle_count,
+    verify_gate_unchanged,
+)
 from UnitPbrPresetRegistry import UNIT_PBR_REGISTRY  # noqa: E402
 from hard_surface_geometry_presets import (  # noqa: E402
     COAXIAL_SERVICE_CONNECTOR_PRESET_ID,
@@ -45,6 +54,8 @@ MODULE_FBX_ROOT = MODULE_ASSET_ROOT + "/Source"
 MODULE_PREFAB_ROOT = MODULE_ASSET_ROOT + "/Prefabs"
 MANIFEST_PATH = ROOT / "content" / "source-art" / "canonical-visual-modules.json"
 ROLE_REGISTRY_PATH = ROOT / "content" / "source-art" / "canonical-visual-module-roles.json"
+BUDGET_PROFILE_PATH = ROOT / "content" / "source-art" / "model-budget-profile.json"
+GEOMETRY_BUILD_POLICY_PATH = ROOT / "content" / "source-art" / "canonical-visual-module-build-policy.json"
 ACTIVE_PACKS = (
     "sample-native-expansion",
     "tactical-operations",
@@ -180,7 +191,22 @@ def load_visual_engineering_roles() -> tuple[
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--force", action="store_true", help="Allow rebuilding only the generated canonical module outputs.")
-    return parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
+    parser.add_argument(
+        "--inventory-staging",
+        type=Path,
+        help="Write candidate Level 2 source FBXs and inventory only under a new artifacts/ directory.",
+    )
+    parser.add_argument(
+        "--capacity-evidence",
+        type=Path,
+        help="Hashed runtime evidence bundle required by --inventory-staging.",
+    )
+    args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
+    if bool(args.inventory_staging) != bool(args.capacity_evidence):
+        parser.error("--inventory-staging and --capacity-evidence must be supplied together")
+    if args.inventory_staging and args.force:
+        parser.error("--force is not available for staging-only candidate inventory")
+    return args
 
 
 def read_module_entries() -> list[dict[str, Any]]:
@@ -313,9 +339,11 @@ def build_armor_module(
         raise ValueError(f"ERA role requires {ERA_BRICK_PRESET_ID}: {entry['variantId']}")
     spacing = 0.025
     if entry.get("geometryLayout") == "bulwark_side_skirt_array_v1":
-        # The side skirts are hull-fixed. Their contact recipe seats each
-        # backing plane at x=+/-1.311 m and leaves a 22 mm moving-belt gap.
-        positions = [(x_sign * 1.311, y, 0.40)
+        # Anchor to the flat support face in the current Level 1 Unity FBX.
+        # The source blend has a newer, wider skirt, but that Level 1 FBX is
+        # still the host Unity loads. Its outward face is x=+/-1.287 m and
+        # its moving tread reaches x=+/-1.250 m, leaving 37 mm of clearance.
+        positions = [(x_sign * 1.287, y, 0.40)
                      for x_sign in (-1.0, 1.0) for y in (-0.92, 0.92)]
         dimensions = (0.24, 0.12, 0.045)
         normals = [(x_sign, 0.0, 0.0) for x_sign in (-1.0, 1.0) for _ in (-0.92, 0.92)]
@@ -666,7 +694,127 @@ def place_in_collection(objects: list[bpy.types.Object], collection: bpy.types.C
         collection.objects.link(obj)
 
 
+def prepare_module_export_geometry(
+    entry: dict[str, Any],
+    created: list[bpy.types.Object],
+    armor_materials: list[bpy.types.Material],
+    *,
+    allow_uncalibrated_geometry: bool = False,
+) -> list[bpy.types.Object]:
+    """Apply the shared in-memory export preparation for production and staging."""
+    for obj in created:
+        ensure_uv(obj)
+        rmk.apply_weighted_normals(obj, weight=60, keep_sharp=True, apply_modifier=True)
+    rmk.bake_advanced_vertex_shading(
+        created,
+        wear_level="field_tested",
+        soot_intensity=0.0,
+        team_mask_materials=armor_materials,
+        structural_wear_mask=True,
+    )
+    combined = rmk.batch_and_join_by_material(
+        created,
+        prefix=entry["moduleName"],
+        smooth_by_angle=True,
+        weighted_normals=True,
+        unity_batch_names=True,
+        asset_id=entry["moduleName"],
+        allow_uncalibrated_geometry=allow_uncalibrated_geometry,
+    )
+    if not combined:
+        raise RuntimeError(f"Material batching produced no meshes for {entry['variantId']}")
+    return combined
+
+
+def export_inventory_candidate_fbx(
+    fbx_path: Path,
+    model_objects: list[bpy.types.Object],
+    gate: InventoryCapacityGate,
+    *,
+    asset_id: str,
+) -> None:
+    """Export one LOD0 candidate only to the measured-capacity staging area."""
+    verify_gate_unchanged(gate)
+    output = validate_candidate_export_path(fbx_path, gate)
+    if not model_objects:
+        raise ValueError(f"{asset_id}: candidate FBX export requires mesh objects")
+    if any(obj is None or obj.type != "MESH" or "_COLLIDER_" in obj.name for obj in model_objects):
+        raise ValueError(f"{asset_id}: candidate inventory export accepts renderable meshes only")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output = validate_candidate_export_path(output, gate)
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in model_objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = model_objects[0]
+    bpy.ops.export_scene.fbx(
+        filepath=str(output),
+        use_selection=True,
+        object_types={"MESH"},
+        apply_unit_scale=True,
+        apply_scale_options="FBX_SCALE_NONE",
+        use_mesh_modifiers=True,
+        mesh_smooth_type="FACE",
+        path_mode="AUTO",
+        axis_forward="-Z",
+        axis_up="Y",
+        bake_space_transform=False,
+        add_leaf_bones=False,
+        use_custom_props=False,
+        bake_anim=False,
+        bake_anim_use_all_actions=False,
+        bake_anim_use_nla_strips=False,
+        bake_anim_step=1.0,
+    )
+    if not output.is_file() or output.stat().st_size <= 0:
+        raise RuntimeError(f"Blender did not export a non-empty candidate FBX: {output}")
+
+
+def build_candidate_module_fbx(
+    entry: dict[str, Any],
+    fbx_path: Path,
+    gate: InventoryCapacityGate,
+) -> dict[str, Any]:
+    """Replay one module in memory, export to staging, then inspect its actual FBX."""
+    rmk.clear_scene()
+    collection = bpy.data.collections.new(entry["moduleName"])
+    bpy.context.scene.collection.children.link(collection)
+    seed = int(hashlib.sha256(entry["variantId"].encode("utf-8")).hexdigest()[:8], 16)
+    created, armor_materials = build_module_geometry(entry, seed)
+    if not created:
+        raise RuntimeError(f"No geometry generated for {entry['variantId']}")
+    combined = prepare_module_export_geometry(entry, created, armor_materials)
+    place_in_collection(combined, collection)
+    in_memory_triangles = rmk.count_mesh_triangles(combined)
+    validate_candidate_triangle_count(in_memory_triangles, gate, entry["moduleName"])
+    export_inventory_candidate_fbx(fbx_path, combined, gate, asset_id=entry["moduleName"])
+    return fbx_inspector.inspect_fbx(fbx_path)
+
+
 def build_all(entries: list[dict[str, Any]], force: bool) -> None:
+    build_policy = json.loads(GEOMETRY_BUILD_POLICY_PATH.read_text(encoding="utf-8"))
+    if build_policy.get("schemaVersion") != 1:
+        raise ValueError(f"Unsupported canonical visual module build policy: {GEOMETRY_BUILD_POLICY_PATH}")
+    retention_ratios = build_policy.get("lodTriangleRetentionRatios")
+    transition_heights = build_policy.get("lodScreenRelativeTransitionHeights")
+    if (not isinstance(retention_ratios, list) or len(retention_ratios) != 3 or
+            not isinstance(transition_heights, list) or len(transition_heights) != 3):
+        raise ValueError("Canonical Level 2 build policy must declare three LOD retention ratios and screen thresholds")
+    retention_ratios = [float(value) for value in retention_ratios]
+    transition_heights = [float(value) for value in transition_heights]
+    if (retention_ratios[0] != 1.0 or not 0.0 < retention_ratios[2] < retention_ratios[1] < 1.0 or
+            not 0.0 < transition_heights[2] < transition_heights[1] < transition_heights[0] <= 1.0):
+        raise ValueError("Canonical Level 2 LOD ratios and thresholds must descend from LOD0 to LOD2")
+    profile = json.loads(BUDGET_PROFILE_PATH.read_text(encoding="utf-8"))
+    profile_is_calibrated = profile.get("calibrationStatus") == "calibrated"
+    uncalibrated_authorized = (
+        build_policy.get("allowUncalibratedCanonicalLevel2") is True and
+        build_policy.get("authorizationStatus") == "user-authorized-until-revoked"
+    )
+    uncalibrated_build = not profile_is_calibrated and uncalibrated_authorized
+    if not profile_is_calibrated and not uncalibrated_build:
+        # Fail before inspecting or creating any production output path.
+        rmk.resolve_geometry_budget(entries[0]["moduleName"])
+
     outputs = [SOURCE_BLEND]
     outputs.extend(ROOT / entry["fbxFilePath"] for entry in entries)
     outputs.extend(ROOT / entry["lodFbxFilePath"] for entry in entries)
@@ -677,7 +825,7 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
 
     rmk.clear_scene()
     root_collection = bpy.context.scene.collection
-    module_rows: list[tuple[dict[str, Any], list[bpy.types.Object], dict[str, list[bpy.types.Object]], dict[str, Any]]] = []
+    module_rows: list[tuple[dict[str, Any], list[bpy.types.Object], dict[str, list[bpy.types.Object]], dict[str, Any] | None]] = []
     for index, entry in enumerate(entries):
         seed = int(hashlib.sha256(entry["variantId"].encode("utf-8")).hexdigest()[:8], 16)
         module_collection = bpy.data.collections.new(entry["moduleName"])
@@ -685,41 +833,30 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         created, armor_materials = build_module_geometry(entry, seed)
         if not created:
             raise RuntimeError(f"No geometry generated for {entry['variantId']}")
-        # Module demand is charged as its own visible asset demand in the
-        # calibrated scene profile, separate from its owning chassis.
-        asset_budget = rmk.resolve_geometry_budget(entry["moduleName"])
-        rmk.enforce_face_budget_before_export(
-            created,
-            entry["moduleName"],
-            asset_id=entry["moduleName"],
+        asset_budget = None
+        if not uncalibrated_build:
+            # Module demand is charged as its own visible asset demand in the
+            # calibrated scene profile, separate from its owning chassis.
+            asset_budget = rmk.resolve_geometry_budget(entry["moduleName"])
+            rmk.enforce_face_budget_before_export(
+                created,
+                entry["moduleName"],
+                asset_id=entry["moduleName"],
+            )
+        combined = prepare_module_export_geometry(
+            entry, created, armor_materials, allow_uncalibrated_geometry=uncalibrated_build
         )
-        for obj in created:
-            ensure_uv(obj)
-            rmk.apply_weighted_normals(obj, weight=60, keep_sharp=True, apply_modifier=True)
-        rmk.bake_advanced_vertex_shading(
-            created,
-            wear_level="field_tested",
-            soot_intensity=0.0,
-            team_mask_materials=armor_materials,
-            structural_wear_mask=True,
-        )
-        combined = rmk.batch_and_join_by_material(
-            created,
-            prefix=entry["moduleName"],
-            smooth_by_angle=True,
-            weighted_normals=True,
-            unity_batch_names=True,
-            asset_id=entry["moduleName"],
-        )
-        if not combined:
-            raise RuntimeError(f"Material batching produced no meshes for {entry['variantId']}")
         place_in_collection(combined, module_collection)
         source_triangles = rmk.count_mesh_triangles(combined)
-        lod_ratios = rmk.lod_ratios_from_budget(asset_budget, source_triangles)
+        lod_ratios = (
+            [("LOD0", retention_ratios[0]), ("LOD1", retention_ratios[1]), ("LOD2", retention_ratios[2])]
+            if asset_budget is None else rmk.lod_ratios_from_budget(asset_budget, source_triangles)
+        )
         lod_dict = rmk.generate_lod_chain(
             combined,
             prefix=entry["moduleName"],
             lod_levels=lod_ratios,
+            lod_name_first=True,
         )
         lod_stats = {}
         for lod_name, lod_objects in lod_dict.items():
@@ -729,7 +866,13 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
             faces = sum(len(obj.data.polygons) for obj in lod_objects if obj.type == "MESH")
             triangles = rmk.count_mesh_triangles(lod_objects)
             lod_stats[lod_name] = {"blenderFaces": faces, "unityTriangles": triangles}
-        entry["lodScreenHeights"] = [row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]]
+        entry["lodScreenHeights"] = (
+            transition_heights if asset_budget is None else
+            [row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]]
+        )
+        entry["geometryBudgetStatus"] = (
+            "UNCALIBRATED_USER_AUTHORIZED" if uncalibrated_build else "CALIBRATED"
+        )
         entry["geometryStats"] = lod_stats
         module_rows.append((entry, combined, lod_dict, asset_budget))
         print(f"[{index + 1:02d}/{len(entries):02d}] {entry['variantId']} -> {entry['slotId']} ({len(combined)} material batch(es))", flush=True)
@@ -748,6 +891,7 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
             bake_anim=False,
             asset_id=entry["moduleName"],
             prevalidated_budget=asset_budget,
+            allow_uncalibrated_export=asset_budget is None,
         )
         if not fbx_path.is_file() or fbx_path.stat().st_size <= 0:
             raise RuntimeError(f"Blender did not export a non-empty FBX: {fbx_path}")
@@ -763,6 +907,7 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
             bake_anim=False,
             asset_id=entry["moduleName"],
             prevalidated_budget=asset_budget,
+            allow_uncalibrated_export=asset_budget is None,
         )
         if not lod_fbx_path.is_file() or lod_fbx_path.stat().st_size <= 0:
             raise RuntimeError(f"Blender did not export a non-empty LOD FBX: {lod_fbx_path}")
@@ -772,8 +917,23 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         "schemaVersion": 3,
         "sourceBlend": SOURCE_BLEND.relative_to(ROOT).as_posix(),
         "level1Authority": "Existing unit chassis geometry, functional hierarchy, rig, pivots, canonical sockets, LOD and PBR atlas.",
-        "geometryBudgetPolicy": "scene-calibrated-per-asset-lod",
+        "geometryBudgetPolicy": (
+            "uncalibrated-relative-lod-no-face-or-triangle-cap" if uncalibrated_build else
+            "scene-calibrated-per-asset-lod"
+        ),
         "geometryBudgetProfile": "content/source-art/model-budget-profile.json",
+        "geometryBudgetStatus": (
+            "UNCALIBRATED_USER_AUTHORIZED" if uncalibrated_build else "CALIBRATED"
+        ),
+        "geometryLodPolicy": (
+            (
+                "relative triangle retention " + "/".join(f"{value:g}" for value in retention_ratios) +
+                "; screen transitions " + "/".join(f"{value:g}" for value in transition_heights) +
+                "; no face or triangle ceiling"
+            ) if uncalibrated_build else "scene-calibrated per-asset LOD allocation"
+        ),
+        "geometryBuildPolicy": GEOMETRY_BUILD_POLICY_PATH.relative_to(ROOT).as_posix(),
+        "geometryBuildPolicySha256": hashlib.sha256(GEOMETRY_BUILD_POLICY_PATH.read_bytes()).hexdigest(),
         "level2Contract": "Each listed GameObject is visual-only geometry attached to exactly one canonical hardpoint group; no gameplay components or balance changes.",
         "visualEngineeringRoleContract": role_registry.get("scope", ""),
         "geometryPresetRegistrySha256": hashlib.sha256(ROLE_REGISTRY_PATH.read_bytes()).hexdigest(),
@@ -783,11 +943,34 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"Saved {len(entries)} modules, source blend, and manifest: {MANIFEST_PATH}", flush=True)
+    if uncalibrated_build:
+        print(
+            "WARNING: Level 2 geometry was exported without a calibrated face/triangle ceiling under explicit user authorization; "
+            "the model-budget profile remains uncalibrated.", flush=True
+        )
 
 
 def main() -> None:
     args = parse_args()
     entries = read_module_entries()
+    if args.inventory_staging:
+        manifest = stage_candidate_inventory(
+            repo_root=ROOT,
+            staging_root=args.inventory_staging,
+            profile_path=BUDGET_PROFILE_PATH,
+            evidence_bundle_path=args.capacity_evidence,
+            entries=entries,
+            build_candidate=build_candidate_module_fbx,
+        )
+        output = Path(args.inventory_staging)
+        if not output.is_absolute():
+            output = ROOT / output
+        print(
+            f"Staged {manifest['assetInventory']['fileCount']} candidate Level 2 FBXs under "
+            f"{output.resolve()} (candidate inventory only; normal build/promotion remains gated).",
+            flush=True,
+        )
+        return
     build_all(entries, args.force)
 
 

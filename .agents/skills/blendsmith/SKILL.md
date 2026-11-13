@@ -27,6 +27,7 @@ This active entrypoint adapts the public blendsmith workflow to Rogue Command. T
 5. Deliver `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png`. MetallicGloss packs metallic into RGB and smoothness (`1 - roughness`) into A. Do not deliver the upstream default of separate metallic and roughness maps as though they were the Rogue Command texture set; do not pack AO into MetallicGloss.
 6. Preserve the mesh `Color` attribute as RGBA vertex wear (R cavity AO, G edge wear, B thermal soot, A team mask). Texture AO and a painter's vertex-color export do not replace it.
 7. Reopen the saved `.blend` when model changes are in scope. For image-only edits, keep the `.blend` and authoritative FBX unchanged. Validate the final maps and effective Unity importer settings separately; a successful bake does not prove in-game appearance.
+8. For detachable Level 2 geometry, compose the current source `.blend` with the exact generated module FBX at the prefab's socket transform and inspect orthographic plus RTS/isometric views. A stale imported Level 1 socket may differ from the aligned Blender source; correct it through the scoped host-prefab builder when authorized, preserve the Level 1 FBX, and do not promote the combined review scene into the source asset.
 
 ## Scope boundaries
 

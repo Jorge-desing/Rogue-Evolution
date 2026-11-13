@@ -21,6 +21,16 @@ public sealed class RuntimeModelBudgetProbeV3 : MonoBehaviour
         public long signature;
     }
 
+    private struct GeometryStabilityCheckpoint
+    {
+        public int sampleNumber;
+        public int frameId;
+        public GeometryCensus census;
+        public bool matchesInitial;
+        public bool cameraMatches;
+        public bool timeScalePositive;
+    }
+
     private static RuntimeModelBudgetProbeV3 _controller;
     private static Camera _targetCamera;
     private static bool _captureActive;
@@ -35,6 +45,7 @@ public sealed class RuntimeModelBudgetProbeV3 : MonoBehaviour
     private static long _lastGeometrySignature;
     private static readonly List<double> _frameIntervalsMs = new List<double>();
     private static readonly List<int> _frameIds = new List<int>();
+    private static readonly List<GeometryStabilityCheckpoint> _geometryStabilityTrace = new List<GeometryStabilityCheckpoint>();
     private static string _lastError;
     private static string _sceneName;
     private static string _cameraName;
@@ -80,6 +91,7 @@ public sealed class RuntimeModelBudgetProbeV3 : MonoBehaviour
         _lastGeometrySignature = 0;
         _frameIntervalsMs.Clear();
         _frameIds.Clear();
+        _geometryStabilityTrace.Clear();
         _lastError = null;
         _sceneName = camera.gameObject.scene.name;
         _cameraName = camera.name;
@@ -108,6 +120,15 @@ public sealed class RuntimeModelBudgetProbeV3 : MonoBehaviour
         }
 
         _captureActive = true;
+        _geometryStabilityTrace.Add(new GeometryStabilityCheckpoint
+        {
+            sampleNumber = 0,
+            frameId = Time.frameCount,
+            census = _initialGeometryCensus,
+            matchesInitial = true,
+            cameraMatches = CameraMatchesCapture(camera),
+            timeScalePositive = Time.timeScale > 0.0f
+        });
         RenderPipelineManager.endContextRendering += OnEndContextRendering;
         _eventSubscribed = true;
 
@@ -178,6 +199,8 @@ public sealed class RuntimeModelBudgetProbeV3 : MonoBehaviour
         AppendDoubleArray(json, _frameIntervalsMs);
         json.Append(",\"frameIds\":");
         AppendIntArray(json, _frameIds);
+        json.Append(",\"geometryStabilityTrace\":");
+        AppendGeometryStabilityTrace(json);
         json.Append(",\"limitations\":[\"Geometry is an enabled camera-frustum estimate; occlusion, GPU-instanced draws, terrain-specific paths, particles, shadows, and draw amplification are not counted.\",\"The enabled renderer set is rechecked every 30 rendered frames to reject camera, visibility, or LOD-set changes; brief changes between checks can still be missed.\",\"Unscaled frame interval is realized frame pacing, not a CPU/GPU time breakdown.\",\"Each report is one stable geometry-load sample from a Game camera without a render texture.\"]");
         if (!String.IsNullOrEmpty(_lastError))
             json.Append(",\"error\":\"").Append(Escape(_lastError)).Append('"');
@@ -311,9 +334,11 @@ public sealed class RuntimeModelBudgetProbeV3 : MonoBehaviour
 
     private static void CheckCaptureStability(Camera camera, int sampleNumber)
     {
-        if (!CameraMatchesCapture(camera))
+        bool cameraMatches = CameraMatchesCapture(camera);
+        bool timeScalePositive = Time.timeScale > 0.0f;
+        if (!cameraMatches)
             _cameraStable = false;
-        if (Time.timeScale <= 0.0f)
+        if (!timeScalePositive)
             _timeScaleStayedPositive = false;
 
         if (sampleNumber % 30 != 0 && sampleNumber != _requestedFrames)
@@ -322,8 +347,46 @@ public sealed class RuntimeModelBudgetProbeV3 : MonoBehaviour
         GeometryCensus current = CountCameraFrustumTriangles(camera);
         _geometryStabilityChecks++;
         _lastGeometrySignature = current.signature;
-        if (!SameGeometryCensus(_initialGeometryCensus, current))
+        bool matchesInitial = SameGeometryCensus(_initialGeometryCensus, current);
+        _geometryStabilityTrace.Add(new GeometryStabilityCheckpoint
+        {
+            sampleNumber = sampleNumber,
+            frameId = Time.frameCount,
+            census = current,
+            matchesInitial = matchesInitial,
+            cameraMatches = cameraMatches,
+            timeScalePositive = timeScalePositive
+        });
+        if (!matchesInitial)
             _geometryLoadStable = false;
+    }
+
+    private static void AppendGeometryStabilityTrace(StringBuilder json)
+    {
+        json.Append('[');
+        for (int i = 0; i < _geometryStabilityTrace.Count; i++)
+        {
+            if (i > 0)
+                json.Append(',');
+            GeometryStabilityCheckpoint checkpoint = _geometryStabilityTrace[i];
+            GeometryCensus census = checkpoint.census;
+            json.Append('{');
+            json.Append("\"sampleNumber\":").Append(checkpoint.sampleNumber.ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"frameId\":").Append(checkpoint.frameId.ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"triangles\":").Append(census.triangles.ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"triangleDeltaFromInitial\":").Append((census.triangles - _initialGeometryCensus.triangles).ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"rendererCount\":").Append(census.rendererCount.ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"rendererCountDeltaFromInitial\":").Append((census.rendererCount - _initialGeometryCensus.rendererCount).ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"candidateRendererCount\":").Append(census.candidateRendererCount.ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"candidateRendererCountDeltaFromInitial\":").Append((census.candidateRendererCount - _initialGeometryCensus.candidateRendererCount).ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"unsupportedRendererCount\":").Append(census.unsupportedRendererCount.ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"signature\":").Append(census.signature.ToString(CultureInfo.InvariantCulture)).Append(',');
+            json.Append("\"matchesInitial\":").Append(checkpoint.matchesInitial ? "true" : "false").Append(',');
+            json.Append("\"cameraMatches\":").Append(checkpoint.cameraMatches ? "true" : "false").Append(',');
+            json.Append("\"timeScalePositive\":").Append(checkpoint.timeScalePositive ? "true" : "false");
+            json.Append('}');
+        }
+        json.Append(']');
     }
 
     private static bool IsSupportedRenderer(Renderer renderer)

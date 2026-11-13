@@ -1,13 +1,29 @@
 [CmdletBinding()]
 param(
     [string]$GameRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Rogue Command',
-    [string]$BepInExCorePath = ''
+    [string]$BepInExCorePath = '',
+    [string]$CanonicalVisualArtifactRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$canonicalArtifactRoot = Join-Path $repositoryRoot 'artifacts\canonical-two-level'
+if ([string]::IsNullOrWhiteSpace($CanonicalVisualArtifactRoot)) {
+    $buildCandidates = @(Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'artifacts') -Directory -Filter 'canonical-level2-*' -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'build-manifest.json') } |
+        Sort-Object -Property LastWriteTimeUtc -Descending)
+    if ($buildCandidates.Count -gt 0) {
+        $canonicalArtifactRoot = $buildCandidates[0].FullName
+    } else {
+        $canonicalArtifactRoot = Join-Path $repositoryRoot 'artifacts\canonical-two-level'
+    }
+} else {
+    $canonicalArtifactRoot = [System.IO.Path]::GetFullPath($CanonicalVisualArtifactRoot)
+}
+$artifactsPrefix = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts')).TrimEnd('\') + '\'
+if (-not $canonicalArtifactRoot.StartsWith($artifactsPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Canonical visual artifact root must remain under repository artifacts: $canonicalArtifactRoot"
+}
 $canonicalValidatedPackRoot = Join-Path $canonicalArtifactRoot 'validation-packs'
 . (Join-Path $PSScriptRoot 'CanonicalVisualBuildProvenance.ps1')
 $projectPath = Join-Path $repositoryRoot 'src\RogueCommandExpansionLoader\RogueCommandExpansionLoader.csproj'

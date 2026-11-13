@@ -21,7 +21,8 @@ Before reviewing, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `unity/Rog
 - Confirm all maps use the same atlas dimensions and match the finalized mesh UV layout. Inspect island padding, seams, empty borders, flipped or missing regions, and legibility at RTS camera scale.
 - Inspect `MetallicGloss` as linear data: R contains metallic, A contains smoothness (`1 - roughness`), G/B match R for consistency with the repository bake. Verify that the alpha channel exists and contains the intended data; a PNG preview that ignores alpha is insufficient.
 - Confirm Albedo and Emission are authored as color data and the Normal map is a tangent-space normal map in the expected convention. Do not assume an external tool's defaults match Blender or Unity.
-- Check emissive regions separately from base color. AO, roughness, height, and auxiliary maps from external tools must not be mistaken for channels consumed by the Rogue Command shader.
+- Check emissive regions separately from base color and compare them with the model's functional light sources. Reject broad procedural outlines or emissive coverage that competes with the vehicle silhouette. AO, roughness, height, and auxiliary maps from external tools must not be mistaken for channels consumed by the Rogue Command shader.
+- Compare MetallicGloss.R and .A across the actual UV layout: intact coatings, exposed metal, flexible parts, and optics should use material-specific response. A map may pass packing and range checks while still using one implausible response across unrelated materials.
 
 ### 2. Mesh preservation
 

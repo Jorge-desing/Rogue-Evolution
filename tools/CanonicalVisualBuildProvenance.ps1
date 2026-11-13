@@ -13,6 +13,7 @@ function Get-CanonicalVisualBuildInputState {
         'content/source-art/canonical-visual-modules.blend',
         'content/source-art/canonical-visual-modules.json',
         'content/source-art/canonical-visual-module-roles.json',
+        'content/source-art/canonical-visual-module-build-policy.json',
         'tools/Build-CanonicalVisualModules.ps1',
         'tools/Build-CanonicalVisualModules.py',
         'tools/Build-CanonicalVisualModuleTextures.ps1',
@@ -27,6 +28,9 @@ function Get-CanonicalVisualBuildInputState {
         'tools/CanonicalUnitHardpoints.py',
         'tools/VisualModelAuthoringSupport.py',
         'tools/hard_surface_geometry_presets.py',
+        'tools/hard_surface_geometry_presets_v2.py',
+        'tools/hard_surface_geometry_presets_functional.py',
+        'tools/hard_surface_geometry_presets_detailing.py',
         'tools/CanonicalVisualBuildProvenance.ps1',
         'tools/Run-MaterialMakerBake.ps1',
         'tools/Prepare-MaterialMakerTacticalTemplate.py',
@@ -63,22 +67,35 @@ function Get-CanonicalVisualBuildInputState {
         }
     }
 
+    # Use an ordinally sorted map instead of culture-sensitive Sort-Object.
+    # Unity asset paths can compare equal under culture rules while differing
+    # ordinally, making a valid manifest fingerprint depend on process/order.
+    $filesByPath = [System.Collections.Generic.SortedDictionary[string, string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    foreach ($fullPath in $inputPaths) {
+        if (-not $fullPath.StartsWith($root + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Canonical visual build input escaped the repository: $fullPath"
+        }
+        $item = Get-Item -LiteralPath $fullPath -Force
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "Canonical visual build input cannot be a reparse point: $fullPath"
+        }
+        $relativePath = $fullPath.Substring($root.Length + 1).Replace('\', '/')
+        $filesByPath.Add(
+            $relativePath,
+            (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        )
+    }
+
     $files = @(
-        foreach ($fullPath in $inputPaths) {
-            if (-not $fullPath.StartsWith($root + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
-                throw "Canonical visual build input escaped the repository: $fullPath"
-            }
-            $item = Get-Item -LiteralPath $fullPath -Force
-            if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
-                throw "Canonical visual build input cannot be a reparse point: $fullPath"
-            }
-            $relativePath = $fullPath.Substring($root.Length + 1).Replace('\', '/')
+        foreach ($relativePath in $filesByPath.Keys) {
             [pscustomobject]@{
                 path = $relativePath
-                sha256 = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                sha256 = $filesByPath[$relativePath]
             }
         }
-    ) | Sort-Object -Property path
+    )
 
     $fingerprintText = [string]::Join("`n", @($files | ForEach-Object { "$($_.path)`t$($_.sha256)" }))
     $hasher = [System.Security.Cryptography.SHA256]::Create()

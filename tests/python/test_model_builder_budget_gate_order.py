@@ -82,7 +82,7 @@ def _build_function(module: ast.Module, path: Path) -> ast.FunctionDef:
 class ModelBuilderBudgetGateOrderTests(unittest.TestCase):
     def test_every_fbx_export_requires_a_profile_or_prevalidated_budget(self) -> None:
         for path in sorted((REPO_ROOT / "tools").glob("*.py")):
-            module = ast.parse(path.read_text(encoding="utf-8"))
+            module = ast.parse(path.read_text(encoding="utf-8-sig"))
             for call in _calls(module):
                 if not _dotted_name(call.func).endswith("export_unity_fbx"):
                     continue
