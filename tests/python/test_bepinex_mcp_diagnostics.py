@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from tests.python.helpers import load_tool_module
@@ -949,6 +950,28 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             tool["inputSchema"]["properties"]["preset"]["enum"],
         )
         self.assertIn("best-effort", tool["description"])
+
+    def test_accessible_ui_tool_catalog_documents_native_pointer_controls(self) -> None:
+        tools = {tool["name"]: tool for tool in SERVER.TOOLS}
+        for name in (
+            "diagnostics_get_ui_accessibility_census",
+            "diagnostics_ui_click_text",
+            "diagnostics_wait_for_ui_text",
+            "diagnostics_get_runtime_control_surface",
+        ):
+            with self.subTest(tool=name):
+                self.assertIn("IPointerClickHandler", tools[name]["description"])
+
+        self.assertIn("scene-qualified", tools["diagnostics_get_ui_accessibility_census"]["description"])
+        self.assertIn("EventSystem", tools["diagnostics_ui_click_text"]["description"])
+
+    def test_ui_census_source_limits_native_pointer_controls_to_canvas_ui(self) -> None:
+        repository = Path(__file__).resolve().parents[2]
+        source = (repository / "src/RogueCommandExpansionLoader/Runtime/RuntimeUiAccessibility.cs").read_text(encoding="utf-8")
+        self.assertIn("behaviour is IPointerClickHandler && IsCanvasUiControl(behaviour)", source)
+        self.assertIn("behaviour.GetComponent<RectTransform>() == null", source)
+        self.assertIn("current.GetComponent<Canvas>() != null", source)
+        self.assertIn("RuntimeUiClickDirector.TryClickGameObject(target)", source)
 
     def test_runtime_control_surface_dispatch_is_bounded_read_only_and_typed(self) -> None:
         calls: list[tuple[str, list[object]]] = []

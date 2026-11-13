@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
@@ -190,9 +191,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
-            // Rogue Command's Michsky ButtonManager implements pointer handlers
-            // directly instead of exposing a Unity Selectable. Include it so
-            // labels, bounds, and real EventSystem clicks work without focus.
+            // Some native controls implement pointer handlers without exposing
+            // a Unity Selectable. Include canvas-backed click handlers so
+            // agents can discover them and use the same EventSystem route.
             MonoBehaviour[] behaviours = UnityEngine.Object.FindObjectsOfType<MonoBehaviour>(includeInactive);
             if (behaviours != null)
             {
@@ -201,16 +202,28 @@ namespace RogueCommandExpansionLoader.Runtime
                     MonoBehaviour behaviour = behaviours[i];
                     if (behaviour == null || behaviour.gameObject == null) continue;
                     Type type = behaviour.GetType();
-                    if (!string.Equals(type.FullName, MichskyButtonManagerTypeName, StringComparison.Ordinal)) continue;
+                    bool isMichskyButton = string.Equals(type.FullName, MichskyButtonManagerTypeName, StringComparison.Ordinal);
+                    bool isNativePointerControl = behaviour is IPointerClickHandler && IsCanvasUiControl(behaviour);
+                    if (!isMichskyButton && !isNativePointerControl) continue;
 
                     bool enabled = false;
                     try { enabled = behaviour.enabled; } catch { }
-                    bool interactable = ReadBooleanMember(behaviour, "isInteractable");
-                    Selectable targetButton = ReadInstanceMember(behaviour, "targetButton") as Selectable;
-                    if (targetButton != null)
+                    bool interactable;
+                    if (isMichskyButton)
                     {
-                        try { interactable = interactable && targetButton.IsInteractable(); }
-                        catch { interactable = false; }
+                        interactable = ReadBooleanMember(behaviour, "isInteractable");
+                        Selectable targetButton = ReadInstanceMember(behaviour, "targetButton") as Selectable;
+                        if (targetButton != null)
+                        {
+                            try { interactable = interactable && targetButton.IsInteractable(); }
+                            catch { interactable = false; }
+                        }
+                    }
+                    else
+                    {
+                        object nativeInteractable = ReadInstanceMember(behaviour, "isInteractable") ??
+                            ReadInstanceMember(behaviour, "interactable");
+                        interactable = nativeInteractable is bool nativeState ? nativeState : enabled;
                     }
 
                     AddCandidate(rows, seenGameObjects, behaviour, behaviour.gameObject, query, includeInactive,
@@ -219,6 +232,16 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             return rows;
+        }
+
+        private static bool IsCanvasUiControl(MonoBehaviour behaviour)
+        {
+            if (behaviour == null || behaviour.GetComponent<RectTransform>() == null) return false;
+            for (Transform current = behaviour.transform; current != null; current = current.parent)
+            {
+                if (current.GetComponent<Canvas>() != null) return true;
+            }
+            return false;
         }
 
         private static void AddCandidate(
@@ -261,7 +284,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 return;
             }
 
-            RectTransform rect = gameObject.transform as RectTransform;
+            RectTransform rect = gameObject.GetComponent<RectTransform>();
             Dictionary<string, object> screenRect = ReadScreenRect(rect, out bool onScreen);
             bool interactable = active && enabled && canInteract;
             bool visible = active && onScreen && IsCanvasVisible(control);

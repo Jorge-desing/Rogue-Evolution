@@ -162,6 +162,23 @@ namespace UnityEngine
         public static Object LastDestroyedObject { get; private set; }
         public int GetInstanceID() => _instanceId;
         public static T FindObjectOfType<T>() where T : class => null;
+#if RCL_UI_ACCESSIBILITY_TEST
+        public static T[] FindObjectsOfType<T>(bool includeInactive = false) where T : class
+        {
+            var found = new System.Collections.Generic.List<T>();
+            foreach (GameObject gameObject in GameObject.RegisteredObjects)
+            {
+                if (gameObject == null || (!includeInactive && !gameObject.activeInHierarchy)) continue;
+                if (gameObject is T gameObjectMatch) found.Add(gameObjectMatch);
+                Component[] components = gameObject.GetComponents<Component>();
+                for (int i = 0; i < components.Length; i++)
+                {
+                    if (components[i] is T componentMatch) found.Add(componentMatch);
+                }
+            }
+            return found.ToArray();
+        }
+#endif
         public static void Destroy(Object obj)
         {
             DestroyCallCount++;
@@ -233,6 +250,17 @@ namespace UnityEngine
         public T[] GetComponents<T>() where T : Component => gameObject?.GetComponents<T>() ?? System.Array.Empty<T>();
         public T GetComponentInChildren<T>(bool includeInactive = false) where T : Component => gameObject?.GetComponentInChildren<T>(includeInactive);
         public T[] GetComponentsInChildren<T>(bool includeInactive = false) where T : Component => gameObject?.GetComponentsInChildren<T>(includeInactive) ?? System.Array.Empty<T>();
+#if RCL_UI_ACCESSIBILITY_TEST
+        public T GetComponentInParent<T>() where T : Component
+        {
+            for (Transform current = transform; current != null; current = current.parent)
+            {
+                T component = current.gameObject.GetComponent<T>();
+                if (component != null) return component;
+            }
+            return null;
+        }
+#endif
     }
 
     public class Behaviour : Component
@@ -541,6 +569,10 @@ namespace UnityEngine
 
     public sealed class GameObject : Object
     {
+#if RCL_UI_ACCESSIBILITY_TEST
+        private static readonly System.Collections.Generic.List<GameObject> _registeredObjects = new();
+        internal static System.Collections.Generic.IReadOnlyList<GameObject> RegisteredObjects => _registeredObjects;
+#endif
         private readonly System.Collections.Generic.List<Component> _components = new();
         public string name { get; set; } = string.Empty;
         public string tag { get; set; } = "Enemy";
@@ -552,6 +584,9 @@ namespace UnityEngine
         public GameObject(string name = "")
         {
             this.name = name;
+#if RCL_UI_ACCESSIBILITY_TEST
+            _registeredObjects.Add(this);
+#endif
             transform = new Transform { gameObject = this };
             _components.Add(transform);
             scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
@@ -707,6 +742,10 @@ namespace UnityEngine
     {
         public static string unityVersion { get; set; } = "2021.3.45f2";
         public static int targetFrameRate { get; set; } = -1;
+#if RCL_UI_ACCESSIBILITY_TEST
+        public static bool isFocused { get; set; } = true;
+        public static bool runInBackground { get; set; }
+#endif
     }
 }
 
@@ -987,6 +1026,14 @@ namespace UnityEngine
         public RenderMode renderMode;
     }
 
+#if RCL_UI_ACCESSIBILITY_TEST
+    public class CanvasGroup : Behaviour
+    {
+        public float alpha { get; set; } = 1f;
+        public bool ignoreParentGroups { get; set; }
+    }
+#endif
+
     public struct Ray
     {
         public Vector3 origin;
@@ -1026,3 +1073,19 @@ namespace UnityEngine
         public static int height = 1080;
     }
 }
+
+#if RCL_UI_ACCESSIBILITY_TEST
+namespace UnityEngine.UI
+{
+    public class Selectable : UnityEngine.MonoBehaviour
+    {
+        public bool interactable { get; set; } = true;
+        public bool IsInteractable() => enabled && interactable;
+    }
+
+    public class Text : UnityEngine.MonoBehaviour
+    {
+        public string text { get; set; } = string.Empty;
+    }
+}
+#endif
