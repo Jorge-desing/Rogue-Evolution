@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Codex BepInEx MCP catalog
+
+- **Repair:** The project MCP server remains `bepinex_mcp` and launches through `.agents/skills/rogue-command-bepinex-mcp/scripts/start-server.ps1`. Its project config now sets `BEPINEX_MCP_TOOL_FILTER=includeAliases=false`, removing only 20 duplicate aliases while retaining all 228 canonical tools and native intermission controls.
+- **Catalog evidence:** A direct `tools/list` request through the project virtual environment returned 228 tools and an 87,458-byte UTF-8 schema with the filter; the native intermission panel state tool remains present. The full 248-tool catalog is 94,867 bytes, above the previous 91,000-byte handoff bound. The local server handshake is available; the current Codex task's injected namespace remains absent, so discovery must be confirmed in a newly opened task after the app reload. No game was launched and no in-game runtime behavior was tested.
+
 ## 2026-11-13 Global removal of calibration build limits
 
 - **User decision:** Calibration and measured geometry allocations no longer limit vehicle, structure, module, inventory, prefab, FBX or bundle builds. Preserve the measured profile and evidence checks for honest diagnostics; no measurement or performance calibration has been fabricated. Authoring settings supply LOD ratios/thresholds only. New outputs report `UNCALIBRATED_USER_AUTHORIZED` and `geometryLimitsApplied=false`.
