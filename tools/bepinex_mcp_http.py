@@ -88,29 +88,57 @@ def make_server(port=PORT, token=None):
                 if not 0 <= length <= 16 * 1024 * 1024:
                     self.reply(413)
                     return
-                self.connection.settimeout(150)
                 raw = self.rfile.read(length)
                 if len(raw) != length:
                     raise ValueError('incomplete body')
                 message = json.loads(raw.decode('utf-8'))
-            except (ValueError, UnicodeError):
+            except (ValueError, UnicodeError, TimeoutError):
                 self.reply(400)
                 return
-            try:
-                with gate:
-                    ensure_worker(worker_state)
-                    with connect(worker_state) as conn:
-                        conn.send_bytes(json.dumps({'message': message}).encode())
-                        result = json.loads(conn.recv_bytes(32 * 1024 * 1024))
-                response = result['response']
-                self.reply(202 if response is None else 200, response)
-            except Exception:
-                # A lost response never triggers automatic replay.
+            if not gate.acquire(timeout=120):
                 self.reply(200, {'jsonrpc': '2.0', 'id': message.get('id') if isinstance(message, dict) else None,
-                                 'error': {'code': -32603, 'message': 'Shared backend unavailable; inspect postconditions before retrying'}})
+                                 'error': {'code': -32000, 'message': 'Backend busy; request not started'}})
+                return
+            try:
+                ensure_worker(worker_state)
+                with connect(worker_state) as conn:
+                    conn.send_bytes(json.dumps({'message': message}).encode())
+                    result = json.loads(conn.recv_bytes(32 * 1024 * 1024))
+            except Exception:
+                result = {'response': {'jsonrpc': '2.0', 'id': message.get('id') if isinstance(message, dict) else None,
+                                       'error': {'code': -32603, 'message': 'Shared backend unavailable; inspect postconditions before retrying'}}}
+            finally:
+                gate.release()
+            # A disconnect while writing must not invoke the backend again or
+            # attempt to write a second HTTP response.
+            response = result['response']
+            try:
+                self.reply(202 if response is None else 200, response)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass
 
     class Server(ThreadingHTTPServer):
         allow_reuse_address = False
+
+        def __init__(self, *args, **kwargs):
+            self.slots = threading.BoundedSemaphore(32)
+            super().__init__(*args, **kwargs)
+
+        def process_request(self, request, client_address):
+            if not self.slots.acquire(blocking=False):
+                request.close()
+                return
+            try:
+                super().process_request(request, client_address)
+            except Exception:
+                self.slots.release()
+                raise
+
+        def process_request_thread(self, request, client_address):
+            try:
+                super().process_request_thread(request, client_address)
+            finally:
+                self.slots.release()
 
     server = Server(('127.0.0.1', port), Handler)
     server.daemon_threads = True

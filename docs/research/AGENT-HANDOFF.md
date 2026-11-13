@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 MCP endpoint concurrency bounds
+
+- The HTTP frontend bounds concurrent connections at 32, request-body inactivity at 10 seconds, and gate waits at 120 seconds. Gate timeout reports that the request was not started. A dropped client during response delivery cannot trigger a second response or a backend replay. The active HTTP process must restart to adopt frontend source changes; no in-game validation was performed.
+- Local focused transport tests pass. The full suite report `artifacts/mcp-concurrency/full.json` recorded 732 passes and one skip against the then-current tree, including concurrent unrelated test changes. Antigravity skill was synchronized.
+
 ## 2026-11-13 Shared MCP connection resilience
 
 - The shared worker rejects malformed envelopes and survives failed named-pipe authentication or invalid JSON without exiting. The HTTP endpoint rejects non-ASCII invalid credentials without a `compare_digest` exception. Local process tests verify the same worker PID responds after these failures; no game run was started. Worker and frontend process source changes require their respective processes to restart to take effect.
