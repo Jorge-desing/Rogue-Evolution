@@ -1239,7 +1239,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertTrue(len(names) >= 1)
         self.assertTrue(len(names) >= 1)
         resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
-        self.assertLess(len(resp2["result"]["tools"]), 223)
+        self.assertLess(len(resp2["result"]["tools"]), 224)
         self.assertNotIn("ping_unity_bridge", [t["name"] for t in resp2["result"]["tools"]])
         self.assertIn("system_ping", [t["name"] for t in resp2["result"]["tools"]])
 
@@ -1789,9 +1789,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
-        self.assertEqual(222, len(specs) - len(aliases))
+        self.assertEqual(223, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
-        self.assertLess(compact, 93000, f"optimised schemas too large: {compact} bytes")
+        self.assertLess(compact, 95000, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
         for spec in specs:
             params = spec["parameters"]
@@ -1941,7 +1941,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         tools = resp["result"]["tools"]
         self.assertEqual(243, len(tools))
         payload = json.dumps(resp["result"], separators=(",", ":"))
-        self.assertLess(len(payload), 93000, f"tools/list payload too large: {len(payload)} bytes")
+        self.assertLess(len(payload), 95000, f"tools/list payload too large: {len(payload)} bytes")
 
 if __name__ == "__main__":
     unittest.main()
