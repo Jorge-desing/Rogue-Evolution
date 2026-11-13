@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +28,25 @@ def inventory(root: Path = ROOT) -> dict[str, list[str]]:
         name = '.'.join(path.relative_to(root).with_suffix('').parts)
         groups['blender' if needs_blender(path) else 'unit'].append(name)
     return groups
+
+
+def partition_unit(modules: list[str], jobs: int, root: Path = ROOT) -> tuple[list[list[str]], list[str]]:
+    """Keep Blender subprocess tests exclusive; never split module fixtures."""
+    shards = [[] for _ in range(jobs)]
+    exclusive = []
+    for module in modules:
+        path = (root / Path(*module.split('.'))).with_suffix('.py')
+        source = path.read_text(encoding='utf-8-sig')
+        tree = ast.parse(source, filename=str(path))
+        blender_binding = any(
+            (isinstance(node, ast.Name) and 'blender' in node.id.lower())
+            or (isinstance(node, ast.Attribute) and 'blender' in node.attr.lower())
+            for node in ast.walk(tree))
+        if '.blender.' in module or blender_binding or ('blender' in source.lower() and 'subprocess' in source):
+            exclusive.append(module)
+        else:
+            min(shards, key=len).append(module)
+    return [shard for shard in shards if shard], exclusive
 
 
 class ReportResult(unittest.TextTestResult):
@@ -158,12 +178,15 @@ def main(argv=None) -> int:
     parser.add_argument('--output', type=Path, default=ROOT / 'artifacts/python-tests/report.json')
     parser.add_argument('--blender', type=Path, default=ROOT / '.tools/Blender-4.5.14/blender-4.5.14-windows-x64/blender.exe')
     parser.add_argument('--timeout', type=float, default=600)
+    parser.add_argument('--jobs', type=int, default=2, help='Unit workers (1-4), plus one serial Blender-integration worker. 1 selects the fully serial reference.')
     parser.add_argument('--worker', nargs='+', help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.worker:
         return worker(args.worker, args.output)
     if args.timeout <= 0:
         parser.error('--timeout must be positive')
+    if not 1 <= args.jobs <= 4:
+        parser.error('--jobs must be in [1, 4]')
     args.output = args.output.resolve()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     started = time.perf_counter()
@@ -175,9 +198,22 @@ def main(argv=None) -> int:
     reports = []
     script = str(Path(__file__).resolve())
     if args.mode in ('all', 'unit'):
-        destination = args.output.with_name(args.output.stem + '-unit.json')
-        destination.unlink(missing_ok=True)
-        reports.append({'group': 'unit', 'modules': groups['unit'], **run_process([sys.executable, script, '--output', str(destination), '--worker', *groups['unit']], destination, args.timeout)})
+        if args.jobs == 1:
+            shards, exclusive = [groups['unit']], []
+        else:
+            shards, exclusive = partition_unit(groups['unit'], args.jobs)
+        def execute_unit(item):
+            index, modules = item
+            destination = args.output.with_name(args.output.stem + f'-unit-{index}.json')
+            return {'group': 'unit', 'modules': modules, **run_process([sys.executable, script, '--output', str(destination), '--worker', *modules], destination, args.timeout)}
+        # A single integration worker owns every Blender subprocess launch;
+        # pure unit shards can progress while it runs. Never overlap two
+        # Blender integration modules, nor split a class/module fixture.
+        tasks = list(enumerate(shards))
+        if exclusive:
+            tasks.append((len(shards), exclusive))
+        with ThreadPoolExecutor(max_workers=args.jobs + bool(exclusive)) as executor:
+            reports.extend(executor.map(execute_unit, tasks))
     if args.mode in ('all', 'blender'):
         for index, module in enumerate(groups['blender']):
             destination = args.output.with_name(args.output.stem + f'-blender-{index}.json')
@@ -187,7 +223,7 @@ def main(argv=None) -> int:
                 continue
             command = [str(args.blender), '--background', '--factory-startup', '--python-exit-code', '1', '--python', script, '--', '--output', str(destination), '--worker', module]
             reports.append({'group': 'blender', 'modules': [module], **run_process(command, destination, args.timeout)})
-    report = {'mode': args.mode, 'moduleInventory': groups, 'groups': reports,
+    report = {'mode': args.mode, 'jobs': args.jobs, 'moduleInventory': groups, 'groups': reports,
               'wallSeconds': time.perf_counter() - started, 'successful': all(r['successful'] for r in reports)}
     args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding='utf-8')
     print(json.dumps({'successful': report['successful'], 'wallSeconds': report['wallSeconds'], 'report': str(args.output)}))

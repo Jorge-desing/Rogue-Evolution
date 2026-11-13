@@ -21,7 +21,7 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 | Test Suite / Tool | Command | Scope & Success Baseline |
 |---|---|---|
 | **C# Loader Harness** | `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` | **556 passed / 1 skipped** (symlink). Compiles against minimal `UnityEngine` stub; keep pure logic separate from Unity `MonoBehaviour` |
-| **Complete Python suite** | `python -m tools.run_python_tests --output artifacts/python-tests/report.json` | Runs CPython tests and Blender-only modules serially with the pinned Blender; reports every selected module, discovered case, failure, skip and timing. A missing required runtime or failed group returns nonzero. |
+| **Complete Python suite** | `python -m tools.run_python_tests --output artifacts/python-tests/report.json` | Runs two isolated unit workers alongside one serial Blender-integration worker, then bpy modules serially with pinned Blender; reports every selected module, discovered case, failure, skip and timing. A missing required runtime or failed group returns nonzero. |
 | **AssetBundle Audit** | `python tools/audit_unity_bundle.py <bundle>` | Inspects object counts, texture formats, shaders, dependencies, and byte size |
 | **Pack Manifest Validator** | `python tools/validate_content_pack.py <pack_dir>` | Validates `content.json` against schema, checks referenced assets & duplicate IDs |
 | **Packaging Runner** | `powershell -File tools/Package-Loader.ps1` | Creates release ZIP without test assemblies, PDBs, or editor caches |
@@ -29,6 +29,8 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 ---
 
 ## 2. Manifest Schema & Parameter Rules
+
+Default `--jobs 2` partitions CPython modules without splitting their fixtures. Modules in the Blender test directory, with Blender bindings, or explicit Blender subprocess usage are placed together in one serial integration worker. Blender-only modules run serially after all CPython workers finish. Use `--jobs 1` for serial comparison or diagnosis, and `--jobs 2..4` to bound unit concurrency. Compare case inventories and outcomes before accepting scheduling changes.
 
 For directed Python iteration use `--mode unit` or `--mode blender`; only the default `all` mode covers both. `unit` also includes existing CPython tests that launch Blender subprocesses. Override `--blender` for an explicitly chosen binary and `--timeout` for the per-worker limit. Reports retain existing asset/contract failures; do not interpret partial-mode success as full-suite acceptance. Shared test fixtures must stay class-scoped and read-only, or return independent copies to mutating cases; dynamic tool modules and mutable temporary files must remain uncached.
 

@@ -11,6 +11,23 @@ from tools import run_python_tests as runner
 
 
 class RunnerTests(unittest.TestCase):
+    def test_parallel_partition_preserves_modules_and_isolates_blender(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            folder = root / 'tests/python'
+            folder.mkdir(parents=True)
+            for name, source in [('test_a', 'import unittest'), ('test_b', 'import unittest'), ('test_blender', 'import subprocess\nBLENDER = "pinned"')]:
+                (folder / (name + '.py')).write_text(source)
+            modules = ['tests.python.' + name for name in ('test_a', 'test_b', 'test_blender')]
+            (folder / 'blender').mkdir()
+            (folder / 'blender/test_indirect.py').write_text('TOOL.apply_textures()')
+            modules.append('tests.python.blender.test_indirect')
+            shards, exclusive = runner.partition_unit(modules, 2, root)
+            self.assertEqual(modules[2:], exclusive)
+            flattened = [module for shard in shards for module in shard] + exclusive
+            self.assertCountEqual(modules, flattened)
+            self.assertEqual(len(modules), len(set(flattened)))
+
     def test_dynamic_modules_and_changed_json_remain_isolated(self):
         from tests.python import helpers
         with tempfile.TemporaryDirectory() as temp:

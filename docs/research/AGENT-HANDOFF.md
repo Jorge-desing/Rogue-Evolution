@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Python timing regression correction
+
+- The default runner now schedules two isolated CPython unit workers alongside one exclusive worker for tests that launch Blender. No module/class fixture is split. Blender test-directory modules, Blender variable/member bindings and explicit Blender subprocess sources route to the exclusive worker; bpy-only modules run serially after those workers finish. `--jobs 1` retains the fully serial reference; `--jobs 2..4` bounds unit workers. Each worker writes a distinct report and retains nonzero failures.
+- Six runner tests pass, including partition coverage and indirect Blender invocation routing. Three full final runs took 46.076/45.517/45.054 s (median 45.517 s), 31.0% below the previous 65.991 s median and 42.0% below a fresh serial reference (78.541 s). Every run and the reference discovered the same 719 IDs without duplicates and produced identical outcomes: 705 passed, seven failed cases, one fixture error, one skip; six discovered cases remain prevented by that fixture error. All 26 bpy-side cases executed. Evidence: `artifacts/python-optimization/timing-repair-comparison.json`, `serial-reference.json`, and `fix-2/3/4.json`. The existing asset/contract failures remain visible; overall exit is still nonzero.
+
 ## 2026-11-13 Complete Python runner and fixture reuse
 
 - `python -m tools.run_python_tests` defaults to `all`: CPython modules plus five bpy/mathutils modules under pinned Blender, serially. `unit` and `blender` are partial modes. JSON reports list selected modules, case IDs/outcomes, skips, failures and timing; missing binaries, malformed discovery, worker failures and timeouts return nonzero. Per-test setUp timing is separated; class/module fixtures remain in execution. Timeout cleanup targets the worker process tree. No global dynamic-module cache was introduced.
