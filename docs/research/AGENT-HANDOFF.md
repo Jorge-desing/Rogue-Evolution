@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Persistent MCP handler reload
+
+- Stdio keeps a persistent process and reloads server/schema handlers between requests on source-content changes. Code is compiled from the fingerprinted bytes without stale pycache; failed reloads reject the current request and can recover after source repair. Diagnostics instance IDs reset per request, not during an in-flight sequence. Schema changes notify the client through tools/list_changed; client schema refresh remains client-dependent.
+- 71 local tests pass, including a real stdio process that observes an edited server version through the same pipes/PID, cache invalidation, invalid-source rejection and repair. No game was started. Existing pre-host processes need one initial reload; launcher/reload-host edits and C# DLL edits are outside handler hot reload.
+
 ## 2026-11-13 Typed UI values
 
 - Live transport correction: installed bridge `ParseStringArray` splits on commas and strips quotes without JSON decoding. MCP typed values now carry Base64 UTF-8 JSON; the loader decodes it before validation, with compatibility for ordinary JSON. 25 simulated director assertions and 68 Python tests pass. Live MainMenu/Options TMP master-volume end-edit returned success, invoked=true and observed=true with text `0` unchanged. Earlier live switch and dropdown changed/restored successfully; slider same-value and stale-ID rejection passed. No saved run was entered.

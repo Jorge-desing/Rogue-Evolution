@@ -3824,13 +3824,20 @@ def main() -> int:
                 print(content)
             return 0 if not res.get("isError") else 1
 
-    # Standard MCP JSON-RPC loop over stdio
+    # This loop owns stdio for its lifetime. Reload only the handler, never
+    # replace the process or replay a request after an uncertain result.
+    from bepinex_mcp_reload import ReloadingHandler
+    live_handler = ReloadingHandler(Path(__file__))
     while True:
+        message = None
         try:
             message = _read_framed_message()
             if message is None:
                 break
-            response = handle_request(message)
+            response, catalog_changed = live_handler.dispatch(message)
+            if catalog_changed:
+                sys.stdout.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}) + "\n")
+                sys.stdout.flush()
         except json.JSONDecodeError:
             response = {
                 "jsonrpc": "2.0",
@@ -3840,7 +3847,7 @@ def main() -> int:
         except Exception as exc:
             response = {
                 "jsonrpc": "2.0",
-                "id": None,
+                "id": message.get("id") if isinstance(message, dict) else None,
                 "error": {"code": -32603, "message": f"Internal error: {exc}"},
             }
 
