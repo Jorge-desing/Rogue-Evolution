@@ -14,6 +14,7 @@ Use this skill as the single workflow for controlling or inspecting the live Rog
 - Use BepInEx MCP tools for runtime interaction. Do not use screenshots, screen recording, capture tools, Computer Use, or direct mouse/keyboard automation. If telemetry cannot establish a visual claim, report that boundary instead of switching to capture.
 - Prefer purpose-built `diagnostics_*` tools. Use the scene/component/type tools and `component_call_method` only when the diagnostics surface lacks the required operation. Resolve current GameObject IDs and exact scene-qualified selectors immediately before use; IDs expire across scenes and sessions.
 - For UI, use `diagnostics_ui_invoke_native_button` for `Michsky.UI.Reach.ButtonManager` controls and `diagnostics_ui_click_text` with the exact path from `diagnostics_get_ui_accessibility_census` for Unity `Selectable` controls. Require an unambiguous active target and its native interactability checks.
+- For accessible menus and the run director, follow [Native UI and intermission](references/ui-intermission.md). `diagnostics_fast_snapshot` presets `gui` and `intermission` provide bounded discovery reads; they are best-effort multi-read snapshots, so refresh the target census immediately before an action.
 - For multi-step operations, use `automation_run_sequence` only with exact typed references to earlier successful steps. A timed-out in-flight action has an unknown result; query its postcondition before retrying.
 
 ## Live runtime workflow
@@ -48,3 +49,4 @@ Use this skill as the single workflow for controlling or inspecting the live Rog
 - [Clean-Room Diagnostics](../rogue-command-clean-room-diagnostics/SKILL.md) — telemetry and probe contracts.
 - [Harmony Policy](../rogue-command-harmony-policy/SKILL.md) — BepInEx 5, Harmony 2, compatibility tuple, and source patch rules.
 - `tools/bepinex_mcp_server.py` and `tools/build_bepinex_mcp.py` — project bridge handlers and schemas. Keep them synchronized when changing the tool contract.
+- [Native UI and intermission](references/ui-intermission.md) — screenshot-free control selection, reward screens, run-map actions, and transition checks.

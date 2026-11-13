@@ -27,7 +27,7 @@ from typing import Any
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "bepinex_mcp"
-SERVER_VERSION = "1.4.9"
+SERVER_VERSION = "1.5.0"
 GAME_PROCESS_NAME = "Rogue Command.exe"
 GAME_STEAM_APP_ID = 1461910
 BASE_URL = os.environ.get("BEPINEX_MCP_URL", "http://127.0.0.1:8080/mcp/")
@@ -294,6 +294,9 @@ _RUNTIME_SNAPSHOT_GETTER_ARGS: dict[str, list[object]] = {
     "GetVisualMaterialCensusJson": [64],
     "GetSocketAuditCensusJson": [64],
     "GetIntermissionCensusJson": [64],
+    "GetIntermissionGraphJson": ["", 8, 64],
+    "GetIntermissionRewardStateJson": [32],
+    "GetUiAccessibilityCensusJson": ["", False, 100],
     "GetRelicCensusJson": [64],
     "GetUpgradeCensusJson": [64],
     "GetVisualVariantCensusJson": [64],
@@ -2910,10 +2913,11 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         elif name == "diagnostics_fast_snapshot":
             preset = str(arguments.get("preset", "match")).lower().strip() or "match"
             presets = {
-                "gui": ["GetGuiStateJson", "GetGameTimeScaleJson", "GetCameraCensusJson", "GetRuntimeHooksStateJson"],
+                "gui": ["GetGuiStateJson", "GetGameTimeScaleJson", "GetCameraCensusJson", "GetRuntimeHooksStateJson", "GetUiAccessibilityCensusJson"],
                 "match": ["GetSystemHealthJson", "GetMatchSummaryJson", "GetBattlefieldCensusJson", "GetRunProgressionCensusJson", "GetActiveStageAiAssociationJson", "GetGameTimeScaleJson"],
                 "combat": ["GetBattlefieldCensusJson", "GetPlayerRosterJson", "GetAiRosterJson", "GetCombatStatusCensusJson", "GetUnitThreatAssessmentJson"],
                 "health": ["GetSystemHealthJson", "GetBaseIntegrityCensusJson", "GetProductionCensusJson", "GetAiDirectorCensusJson"],
+                "intermission": ["GetRunProgressionCensusJson", "GetIntermissionCensusJson", "GetIntermissionGraphJson", "GetIntermissionRewardStateJson", "GetNavigatorStateJson", "GetUiAccessibilityCensusJson"],
             }
             getters = presets.get(preset, presets["match"])
             results = {}
@@ -2929,7 +2933,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             with ThreadPoolExecutor(max_workers=min(8, len(getters))) as pool:
                 for getter, value in pool.map(_fetch_fast, getters):
                     results[getter] = value
-            results["_meta"] = {"preset": preset, "count": len(getters)}
+            results["_meta"] = {"preset": preset, "count": len(getters), "consistency": "bestEffort"}
             return _tool_response(json.dumps(results, indent=2))
 
         elif name == "diagnostics_gui_control":

@@ -905,6 +905,51 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("GetVisualSurfaceCensusJson", [method for method, _ in calls])
         self.assertIn("GetGameTimeScaleJson", [method for method, _ in calls])
 
+    def test_fast_snapshot_gui_and_intermission_presets_include_accessible_ui(self) -> None:
+        expected_calls = {
+            "gui": {
+                "GetGuiStateJson": [],
+                "GetGameTimeScaleJson": [],
+                "GetCameraCensusJson": [],
+                "GetRuntimeHooksStateJson": [],
+                "GetUiAccessibilityCensusJson": ["", False, 100],
+            },
+            "intermission": {
+                "GetRunProgressionCensusJson": [],
+                "GetIntermissionCensusJson": [64],
+                "GetIntermissionGraphJson": ["", 8, 64],
+                "GetIntermissionRewardStateJson": [32],
+                "GetNavigatorStateJson": [],
+                "GetUiAccessibilityCensusJson": ["", False, 100],
+            },
+        }
+
+        for preset, expected in expected_calls.items():
+            with self.subTest(preset=preset):
+                calls: list[tuple[str, list[object]]] = []
+
+                def fake_diagnostics_method(method: str, args: list[object] | None = None) -> str:
+                    calls.append((method, list(args or [])))
+                    return json.dumps({"kind": method})
+
+                with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=fake_diagnostics_method):
+                    response = SERVER.execute_tool("diagnostics_fast_snapshot", {"preset": preset})
+
+                snapshot = json.loads(response["content"][0]["text"])
+                self.assertFalse(response["isError"])
+                self.assertEqual(expected, dict(calls))
+                self.assertEqual("bestEffort", snapshot["_meta"]["consistency"])
+                self.assertEqual(len(expected), snapshot["_meta"]["count"])
+                self.assertNotIn("OrderEnterLevelNodeJson", dict(calls))
+                self.assertNotIn("OrderChooseIntermissionRewardJson", dict(calls))
+
+        tool = next(tool for tool in SERVER.TOOLS if tool["name"] == "diagnostics_fast_snapshot")
+        self.assertEqual(
+            ["gui", "match", "combat", "health", "intermission"],
+            tool["inputSchema"]["properties"]["preset"]["enum"],
+        )
+        self.assertIn("best-effort", tool["description"])
+
     def test_call_getters_passes_safe_args_to_optional_param_getters(self) -> None:
         calls: list[tuple[str, list[object]]] = []
 
@@ -1142,7 +1187,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "method": "initialize",
             "params": {"protocolVersion": "2024-11-05"},
         })
-        self.assertEqual("1.4.9", response["result"]["serverInfo"]["version"])
+        self.assertEqual("1.5.0", response["result"]["serverInfo"]["version"])
 
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
