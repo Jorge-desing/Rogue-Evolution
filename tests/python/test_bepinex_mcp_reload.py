@@ -35,6 +35,17 @@ class ReloadTests(unittest.TestCase):
                 self.assertNotEqual(first["result"]["serverInfo"]["version"], second["result"]["serverInfo"]["version"])
                 self.assertEqual(pid, process.pid)
                 self.assertIsNone(process.poll())
+                # The currently blocked reader may finish one message using
+                # old code; after dispatch the next read must use new code.
+                code = server.read_text(encoding="utf-8")
+                code = code.replace('return json.loads(line.decode("utf-8"))',
+                                    'return {**json.loads(line.decode("utf-8")), "id": 99}')
+                server.write_text(code, encoding="utf-8")
+                initialize(3)
+                reader_response = initialize(4)
+                self.assertEqual(99, reader_response["id"])
+                self.assertEqual(pid, process.pid)
+                self.assertIsNone(process.poll())
             finally:
                 process.stdin.close()
                 process.wait(timeout=15)
@@ -70,6 +81,11 @@ def handle_request(message):
             self.assertTrue(changed)
             self.assertEqual((2, os.getpid(), 1), (third["version"], third["pid"], third["calls"]))
             self.assertEqual(first["pid"], third["pid"])
+            server.write_text(template.replace("VERSION", "4") + '\ndef _read_framed_message(): return {}\n')
+            self.assertEqual({}, handler.read_message())
+            pending, changed = handler.dispatch({})
+            self.assertTrue(changed)
+            self.assertEqual(4, pending["version"])
             server.write_text("this is invalid python !!!!")
             with self.assertRaises(SyntaxError):
                 handler.dispatch({})

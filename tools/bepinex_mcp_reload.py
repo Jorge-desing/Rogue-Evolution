@@ -15,8 +15,9 @@ class ReloadingHandler:
         self.module = None
         self.fingerprint = None
         self.catalog = None
+        self.catalog_changed = False
 
-    def dispatch(self, message: dict) -> tuple[dict | None, bool]:
+    def refresh(self) -> bool:
         # Read and compile the same bytes that were fingerprinted. A failed
         # reload never falls back to executing a mutation on stale code.
         server = self.server_path.read_bytes()
@@ -47,6 +48,25 @@ class ReloadingHandler:
                     sys.modules["build_bepinex_mcp"] = old_builder
                 raise
 
+        self.catalog_changed = self.catalog_changed or changed
+        return changed
+
+    def read_message(self):
+        # A reader already blocked on stdin finishes its current frame. The
+        # next read uses the newest reader without replacing pipes or PID.
+        try:
+            self.refresh()
+        except Exception:
+            if self.module is None:
+                raise
+            # Consume one request with the last valid framing, then dispatch
+            # rejects it if the broken source still cannot be compiled.
+        return self.module._read_framed_message()
+
+    def dispatch(self, message: dict) -> tuple[dict | None, bool]:
+        self.refresh()
+        changed = self.catalog_changed
+        self.catalog_changed = False
         # Unity instance IDs are not persistent across game/scene reloads.
         # Keep the cache only within this request (including its sequence).
         self.module._DIAGNOSTICS_GO_ID = None

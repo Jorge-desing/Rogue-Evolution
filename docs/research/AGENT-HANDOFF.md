@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Reloadable MCP reader
+
+- Server reader code and transport limits now reload before each read, alongside handlers and schema definitions. A blocked read completes on its previous reader; the next read adopts the new implementation. Catalog changes discovered during reader refresh remain pending until dispatch emits the notification. Framing errors are recognized across reloaded class identities and close damaged streams.
+- Local tests edit reader behavior in a real stdio process and verify adoption through the same pipes and PID. Existing processes with the old fixed loop need one bootstrap reload to install this mechanism; subsequent server-reader edits do not. Reload host/launcher and game DLL changes remain outside this mechanism. No game was started.
+
 ## 2026-11-13 MCP request boundary hardening
 
 - Invalid RPC envelopes and non-object params/arguments are rejected before dispatch. Tool notifications cannot execute operations without a result channel. Zero-valued IDs remain valid. Reload dispatch handles invalid non-object input without crashing its response path.

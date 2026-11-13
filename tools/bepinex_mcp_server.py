@@ -3740,6 +3740,8 @@ MAX_MESSAGE_BYTES = 16 * 1024 * 1024
 class MessageFramingError(ValueError):
     """Unrecoverable framing error; the stream must not be reused."""
 
+    fatal_framing = True
+
 
 def _read_framed_message() -> dict[str, Any] | None:
     stream = sys.stdin.buffer
@@ -3863,7 +3865,7 @@ def main() -> int:
     while True:
         message = None
         try:
-            message = _read_framed_message()
+            message = live_handler.read_message()
             if message is None:
                 break
             response, catalog_changed = live_handler.dispatch(message)
@@ -3881,6 +3883,10 @@ def main() -> int:
                 "error": {"code": -32700, "message": "Parse error"},
             }
         except Exception as exc:
+            if getattr(exc, "fatal_framing", False):
+                sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": str(exc)}}) + "\n")
+                sys.stdout.flush()
+                break
             response = {
                 "jsonrpc": "2.0",
                 "id": message.get("id") if isinstance(message, dict) else None,
