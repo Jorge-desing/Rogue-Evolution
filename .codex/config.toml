@@ -3,8 +3,8 @@ url = "https://mcp.mem0.ai/mcp"
 bearer_token_env_var = "MEM0_API_KEY"
 
 [mcp_servers.bepinex_mcp]
-command = "powershell.exe"
-args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "C:/Users/Alex/Documents/Mod Rogue Command/.agents/skills/rogue-command-bepinex-mcp/scripts/start-server.ps1"]
+command = "C:/Program Files/nodejs/node.exe"
+args = ["C:/Users/Alex/Documents/Mod Rogue Command/tools/bepinex_mcp_client.cjs"]
 cwd = "C:/Users/Alex/Documents/Mod Rogue Command"
 
 [mcp_servers.bepinex_mcp.env]

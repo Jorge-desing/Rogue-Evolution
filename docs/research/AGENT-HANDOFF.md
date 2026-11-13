@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Hidden MCP client startup
+
+- Global/project Codex and Antigravity configuration now launch `tools/bepinex_mcp_client.cjs` with Node. It pipes stdio to the Python shared adapter with `windowsHide=true`; the authenticated singleton backend stays alive across chats. Two real adapter connections reused worker PID 6104 and closed successfully. Its pre-existing console was hidden without stopping it. Configuration backups: `artifacts/mcp-hidden-start/20261113T203922Z/`.
+- Old connections keep their startup command until reconnected. This removes visible Python startup windows for new adapters; it does not remove the per-client stdio connection required by the host.
+
 ## 2026-11-13 Suite-wide Python test audit
 
 - Screened all 103 current-checkout unittest modules / 738 cases by AST inventory, assertion and duplicate checks, then manually inspected candidate source sections and retained predicates. No identical top-level test bodies were found. `artifacts/python-test-audit-all/source-inventory.json` and `audit-decisions.json` record the per-module/case inventory, source hashes and decisions. Non-test support files and the active Blender smoke script are retained; nested worktrees and third-party applications are separate scopes.

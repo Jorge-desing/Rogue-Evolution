@@ -4,11 +4,22 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import shutil
 
 from tools.bepinex_mcp_shared import ensure_worker, connect, _STARTED
 
 
 class SharedTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('node') and sys.platform == 'win32', 'Windows Node adapter')
+    def test_hidden_node_adapter_roundtrip_and_clean_exit(self):
+        script = Path(__file__).resolve().parents[2] / 'tools/bepinex_mcp_client.cjs'
+        result = subprocess.run([shutil.which('node'), str(script)],
+                                input='{"jsonrpc":"2.0","id":9,"method":"ping"}\n',
+                                capture_output=True, text=True, timeout=15,
+                                creationflags=subprocess.CREATE_NO_WINDOW)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['id'], 9)
+
     def test_two_clients_share_worker_and_keep_it_after_disconnect(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
