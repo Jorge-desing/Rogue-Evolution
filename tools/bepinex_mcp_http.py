@@ -59,7 +59,12 @@ def make_server(port=PORT, token=None):
             if origin and origin not in ('http://localhost', f'http://localhost:{port}', f'http://127.0.0.1:{port}'):
                 self.reply(403)
                 return False
-            if not secrets.compare_digest(self.headers.get('Authorization', ''), 'Bearer ' + token):
+            supplied = self.headers.get('Authorization', '')
+            try:
+                authenticated = secrets.compare_digest(supplied.encode('utf-8'), ('Bearer ' + token).encode('utf-8'))
+            except (UnicodeError, TypeError):
+                authenticated = False
+            if not authenticated:
                 length = self.headers.get('Content-Length', '0')
                 if length.isdigit() and int(length) <= 16 * 1024 * 1024:
                     self.rfile.read(int(length))

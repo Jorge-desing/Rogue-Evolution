@@ -5,6 +5,10 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Shared MCP connection resilience
+
+- The shared worker rejects malformed envelopes and survives failed named-pipe authentication or invalid JSON without exiting. The HTTP endpoint rejects non-ASCII invalid credentials without a `compare_digest` exception. Local process tests verify the same worker PID responds after these failures; no game run was started. Worker and frontend process source changes require their respective processes to restart to take effect.
+
 ## 2026-11-13 Stateless HTTP MCP transport
 
 - Supersedes per-chat stdio adapters: global/project Codex now use `http://127.0.0.1:18764/mcp`; Antigravity uses the same serverUrl. The loopback frontend authenticates bearer credentials, closes HTTP connections after each response, keeps no per-chat session, and forwards serialized calls to the existing shared worker without replay. HTTP chunk framing is explicit because the local network layer rewrote Content-Length responses incorrectly.

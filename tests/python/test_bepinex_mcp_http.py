@@ -3,6 +3,7 @@ import threading
 import unittest
 import urllib.request
 import urllib.error
+import http.client
 from unittest import mock
 from tools import bepinex_mcp_http as endpoint
 
@@ -21,6 +22,10 @@ class HttpTests(unittest.TestCase):
                 with self.assertRaises(urllib.error.HTTPError) as denied:
                     urllib.request.urlopen(request)
                 self.assertEqual(denied.exception.code, 401)
+                client = http.client.HTTPConnection('127.0.0.1', server.server_port, timeout=5)
+                client.request('POST', '/mcp', body=b'{}', headers={'Authorization': 'Bearer caf\u00e9'})
+                self.assertEqual(client.getresponse().status, 401)
+                client.close()
                 for _ in range(3):
                     request = urllib.request.Request(url, data=b'{"jsonrpc":"2.0","id":1,"method":"ping"}',
                                                      headers={'Authorization': 'Bearer test-token'})

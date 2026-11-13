@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 from multiprocessing.connection import Client, Listener
+from multiprocessing import AuthenticationError
 
 ROOT = Path(__file__).resolve().parents[1]
 _STARTED = []
@@ -86,12 +87,18 @@ def worker(state):
             try:
                 with listener.accept() as conn:
                     request = json.loads(conn.recv_bytes(16 * 1024 * 1024))
+                    if not isinstance(request, dict):
+                        conn.send_bytes(b'{"error":"Invalid worker request"}')
+                        continue
                     if request.get("control") == "ping":
                         conn.send_bytes(json.dumps({"pid": os.getpid()}).encode())
                         continue
                     if request.get("control") == "stop":
                         conn.send_bytes(b'{}')
                         return
+                    if "message" not in request:
+                        conn.send_bytes(b'{"error":"Missing worker message"}')
+                        continue
                     message = request["message"]
                     try:
                         response, _ = handler.dispatch(message)
@@ -100,7 +107,7 @@ def worker(state):
                         result = {"response": {"jsonrpc": "2.0", "id": message.get("id") if isinstance(message, dict) else None,
                                                "error": {"code": -32603, "message": str(exc)}}}
                     conn.send_bytes(json.dumps(result).encode())
-            except (OSError, EOFError, ValueError):
+            except (OSError, EOFError, ValueError, UnicodeError, AuthenticationError):
                 # A disconnected adapter never causes a replay of its request.
                 continue
 

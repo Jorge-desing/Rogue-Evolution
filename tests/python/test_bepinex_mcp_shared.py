@@ -6,10 +6,34 @@ import tempfile
 import unittest
 import shutil
 
-from tools.bepinex_mcp_shared import ensure_worker, connect, _STARTED
+from tools.bepinex_mcp_shared import ensure_worker, connect, identity, _STARTED
+from multiprocessing.connection import Client
+from multiprocessing import AuthenticationError
 
 
 class SharedTests(unittest.TestCase):
+    def test_worker_survives_rejected_auth_and_malformed_requests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            pid = ensure_worker(state)
+            try:
+                address, family = identity(state)
+                with self.assertRaises((AuthenticationError, EOFError, OSError)):
+                    Client(address, family=family, authkey=b'wrong-key')
+                for data in (b'[]', b'{}', b'not-json'):
+                    with connect(state) as conn:
+                        conn.send_bytes(data)
+                        if data != b'not-json':
+                            self.assertIn('error', json.loads(conn.recv_bytes()))
+                self.assertEqual(pid, ensure_worker(state))
+            finally:
+                with connect(state) as conn:
+                    conn.send_bytes(b'{"control":"stop"}')
+                    conn.recv_bytes()
+                for process in _STARTED:
+                    if process.pid == pid:
+                        process.wait(timeout=10)
+
     @unittest.skipUnless(shutil.which('node') and sys.platform == 'win32', 'Windows Node adapter')
     def test_hidden_node_adapter_roundtrip_and_clean_exit(self):
         script = Path(__file__).resolve().parents[2] / 'tools/bepinex_mcp_client.cjs'
