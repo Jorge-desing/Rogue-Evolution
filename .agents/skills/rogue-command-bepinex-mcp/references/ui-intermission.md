@@ -1,5 +1,7 @@
 # Native UI and intermission workflow
 
+For multi-step UI flows, read [Automation](automation.md). Wait on `diagnostics_get_runtime_control_surface` fields or use `diagnostics_wait_for_ui_text` for a unique interactable control. A successful wait is an observation; refresh native targets and let the action validate them. An uncertain effect requires a fresh read before deciding whether another mutation is appropriate.
+
 Use this reference for screenshot-free control discovery and the run director between combat stages. It does not cover the combat AI Director.
 
 `diagnostics_ui_set_value` targets an exact current census `hierarchyPath` and `gameObjectId`. Its `kind` selects slider (number), toggle/switch (boolean), dropdown (integer index), or TMP text (string); `submit=true` dispatches TMP end-edit. Inspect `nativeCallInvoked` and `effectObserved` separately. Use only for an authorized UI change; local simulated validation does not prove in-game operation. A switch already at the requested value reports the observed state without invoking its event again.

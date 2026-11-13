@@ -34,6 +34,9 @@ class AntigravitySyncTests(unittest.TestCase):
             seq = next(value for path, value in files.items() if path.name == "automation_run_sequence.json")
             schema = json.loads(seq)
             self.assertIn("expect", schema["parameters"]["properties"]["steps"]["items"]["properties"])
+            self.assertTrue(any(path.name == "automation_wait_for_state.json" for path in files))
+            self.assertEqual(next(value for path, value in files.items() if path.name == "automation.md"),
+                             (sync.SOURCE / "references/automation.md").read_bytes())
             self.assertEqual(sum(path.suffix == ".json" for path in files), len(sync.TOOL_SPECS))
             for name in ("rogue-command-steam-runtime-validation", "rogue-command-clean-room-diagnostics", "rogue-command-harmony-policy"):
                 self.assertTrue((sync.SOURCE.parent / name / "SKILL.md").is_file())

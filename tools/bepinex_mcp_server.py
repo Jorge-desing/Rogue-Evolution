@@ -856,12 +856,127 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
         return json.dumps({"error": f"Failed calling diagnostics method '{method_name}': {exc}"})
 
 
+WAIT_STATE_TOOLS = frozenset({
+    "diagnostics_get_runtime_control_surface", "diagnostics_get_ui_accessibility_census",
+    "diagnostics_get_intermission_native_panel_state", "diagnostics_get_intermission_census",
+    "diagnostics_get_navigator_state", "diagnostics_get_game_time_scale",
+})
+
+
+def _validate_state_wait(arguments, partial=False):
+    try:
+        json.dumps(arguments, allow_nan=False)
+    except (TypeError, ValueError):
+        return {"error": "Wait arguments must be finite JSON values"}
+    target = arguments.get("tool")
+    if not isinstance(target, str) or target not in WAIT_STATE_TOOLS:
+        return {"error": "State waits require an explicitly allowed read-only tool"}
+    invalid = _validate_tool_arguments(target, arguments.get("arguments", {}), partial=partial)
+    if invalid:
+        return invalid
+    for check in arguments.get("expect", []):
+        if not isinstance(check, dict) or not isinstance(check.get("path"), str) or re.search(r"~(?![01])", check["path"]):
+            return {"error": "expect paths must use valid JSON Pointer escaping"}
+    return None
+
+
+def _state_failure(value):
+    return isinstance(value, dict) and (
+        "error" in value or value.get("success") is False
+        or value.get("completionStatus") == "unknown"
+    )
+
+
+def _failed_state_subtree(value):
+    if _state_failure(value):
+        return True
+    if isinstance(value, dict):
+        return any(_failed_state_subtree(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_failed_state_subtree(child) for child in value)
+    return False
+
+
+def _state_checks(observation, expected):
+    checks = []
+    for check in expected:
+        value = observation
+        missing = False
+        for part in check["path"].split("/")[1:]:
+            if _state_failure(value):
+                raise ValueError("queried section failed: " + check["path"])
+            key = part.replace("~1", "/").replace("~0", "~")
+            if isinstance(value, dict) and key in value:
+                value = value[key]
+            elif isinstance(value, list) and re.fullmatch(r"0|[1-9][0-9]*", key) and int(key) < len(value):
+                value = value[int(key)]
+            else:
+                missing = True
+                break
+        if not missing and _failed_state_subtree(value):
+            raise ValueError("queried section failed: " + check["path"])
+        matched = not missing and json.dumps(value, sort_keys=True, allow_nan=False) == json.dumps(check["equals"], sort_keys=True, allow_nan=False)
+        row = {"path": check["path"], "matched": matched, "expected": check["equals"], "missing": missing}
+        if not missing:
+            row["actual"] = value
+        checks.append(row)
+    return checks
+
+
+def _wait_for_state(arguments):
+    invalid = _validate_state_wait(arguments)
+    if invalid:
+        return _tool_response(json.dumps(invalid), is_error=True)
+    started = time.monotonic()
+    own_deadline = started + arguments.get("timeoutSeconds", 10)
+    outer_deadline = _AUTOMATION_DEADLINE.get()
+    deadline = min(own_deadline, outer_deadline) if outer_deadline is not None else own_deadline
+    attempts, observation, checks = 0, None, []
+    reason, error = "timeout", None
+    while time.monotonic() < deadline:
+        token = _AUTOMATION_DEADLINE.set(deadline)
+        try:
+            response = execute_tool(arguments["tool"], arguments.get("arguments", {}))
+        finally:
+            _AUTOMATION_DEADLINE.reset(token)
+        attempts += 1
+        observation, checks = None, []
+        try:
+            observation = json.loads("\n".join(block["text"] for block in response.get("content", []) if block.get("type") == "text"),
+                                     parse_constant=lambda value: (_ for _ in ()).throw(ValueError("non-finite JSON")))
+            if not isinstance(observation, dict):
+                raise ValueError("state query must return a JSON object")
+            if response.get("isError") or _state_failure(observation):
+                reason, error = "query_failed", "Read-only query failed; inspect lastObservation"
+                break
+            checks = _state_checks(observation, arguments["expect"])
+        except (ValueError, TypeError, KeyError) as exc:
+            reason, error = "invalid_observation", str(exc)
+            break
+        if time.monotonic() >= deadline:
+            break
+        if all(check["matched"] for check in checks):
+            reason = "matched"
+            break
+        time.sleep(min(arguments.get("pollIntervalMs", 250) / 1000, max(0, deadline - time.monotonic())))
+    if reason == "timeout" and outer_deadline is not None and outer_deadline <= own_deadline:
+        reason = "sequence_budget_exhausted"
+    payload = {"success": reason == "matched", "reason": reason, "tool": arguments["tool"],
+               "attempts": attempts, "elapsedSeconds": round(time.monotonic() - started, 3),
+               "checks": checks, "lastObservation": observation}
+    if error:
+        payload["error"] = error
+    return _tool_response(json.dumps(payload), is_error=reason != "matched")
+
+
 def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     try:
         invalid = _validate_tool_arguments(name, arguments)
         if invalid:
             return _tool_response(json.dumps(invalid), is_error=True)
         # ---- Discovery (lazy, lightweight) ----
+        if name == "automation_wait_for_state":
+            return _wait_for_state(arguments)
         if name == "diagnostics_ui_set_value":
             path = arguments.get("hierarchyPath")
             object_id = arguments.get("gameObjectId")
@@ -918,7 +1033,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 if not isinstance(step, dict):
                     return _tool_response(json.dumps({"error": f"steps[{index}] must be an object"}), is_error=True)
                 step_tool = str(step.get("tool", "")).strip()
-                if step_tool not in known_tools or not step_tool.startswith("diagnostics_") or step_tool in forbidden:
+                if step_tool not in known_tools or (not step_tool.startswith("diagnostics_") and step_tool != "automation_wait_for_state") or step_tool in forbidden:
                     return _tool_response(json.dumps({"error": f"steps[{index}].tool is not an allowed diagnostics tool", "tool": step_tool}), is_error=True)
                 if not isinstance(step.get("arguments", {}), dict):
                     return _tool_response(json.dumps({"error": f"steps[{index}].arguments must be an object"}), is_error=True)
@@ -927,6 +1042,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     invalid = _validate_tool_arguments(step_tool, step.get("arguments", {}), partial=True)
                     if invalid:
                         return _tool_response(json.dumps({**invalid, "step": index}), is_error=True)
+                    if step_tool == "automation_wait_for_state":
+                        invalid = _validate_state_wait(step.get("arguments", {}), partial=True)
+                        if invalid:
+                            return _tool_response(json.dumps({**invalid, "step": index}), is_error=True)
                 except ValueError as exc:
                     return _tool_response(json.dumps({"error": f"steps[{index}].arguments: {exc}"}), is_error=True)
                 checks = step.get("expect", [])
@@ -1030,7 +1149,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 })
                 if step_failed:
                     failed = True
-                    if stop_on_failure or step.get("expect") or uncertain or budget_exceeded:
+                    if stop_on_failure or step.get("expect") or uncertain or budget_exceeded or step_tool == "automation_wait_for_state":
                         break
                 if delay_after_ms:
                     remaining = max_duration - (time.monotonic() - started)
@@ -1040,8 +1159,17 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     time.sleep(min(delay_after_ms / 1000.0, remaining))
 
             sequence_success = not failed and len(sequence_results) == len(steps)
+            stop_reason = None
+            if not sequence_success:
+                row = next((row for row in sequence_results if not row["success"]), sequence_results[-1] if sequence_results else {})
+                code = ("sequence_budget_exhausted" if row.get("budgetExceeded") or time.monotonic() >= deadline else
+                        "uncertain_effect" if row.get("postconditionInspectionRequired") else
+                        "wait_failed" if row.get("tool") == "automation_wait_for_state" else
+                        "expectation_failed" if any(not check["matched"] for check in row.get("checks", [])) else "step_failed")
+                stop_reason = {"code": code, "step": row.get("index")}
             return _tool_response(json.dumps({
                 "success": sequence_success,
+                "stopReason": stop_reason,
                 "completedSteps": len(sequence_results),
                 "requestedSteps": len(steps),
                 "elapsedSeconds": round(time.monotonic() - started, 3),

@@ -5,6 +5,12 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Bounded agent state waits
+
+- `automation_wait_for_state` polls six explicitly allowed read-only queries with 1-8 strict JSON Pointer equality checks, a 0.1-30s timeout and 100-2000ms poll interval (defaults 10s/250ms). Missing values remain pending; invalid/failed queried sections and transport errors stop. Only the latest observation is retained. Waits inherit the sequence deadline and never repeat mutations; failed waits halt even with `stopOnFailure=false`. Sequence responses add structured `stopReason`.
+- The runtime skill requires `references/automation.md` for sequences, waits and recovery; executable recipes cover native UI typed references, verification and read-only recovery. Antigravity sync now includes this reference. Catalog: 230 canonical tools, 88,606 bytes, preserving aliases and existing tools. The connected chat server adopted the new schema through handler reload; a read-only wait with the game closed stopped the next sequence step. This is transport/handler evidence, not in-game acceptance.
+- Local acceptance: 739 discovered IDs; 725 passed, seven failed cases, one fixture error and one skip, with six discovered cases prevented by the fixture error. All 13 new tests pass; no removed IDs or changed existing outcomes versus `artifacts/mcp-hardening/final.json`. All 26 bpy cases ran. Reports: `artifacts/bepinex-automation/full.json` and `comparison.json`. Release rebuild succeeds with zero warnings/errors; final deployment manifest is under `artifacts/bepinex-automation/deployment/`. Game remained closed; deployed SHA-256 `E9B10A885B844BC166389BBACEF6AA615DEF08D70D389F3244F3B34F6A03BFB3` matches the verified Release artifact, with the prior DLL backed up.
+
 ## 2026-11-13 HTTP bounds and schema validation
 
 - HTTP replies are bounded to 16 MiB, strictly UTF-8 decoded and checked against valid Content-Length. Post-send errors report unknown completion outside sequences as well as inside them. No automatic replay was added.

@@ -36,6 +36,7 @@ def payloads(home: Path) -> dict[Path, bytes]:
     text += f"\n## Antigravity installation\n\nSource checkout: `{ROOT.as_posix()}`. Run `python -m tools.sync_antigravity_bepinex` from that checkout to resync this skill and its tool schemas; use `--check` to detect drift. Use the project's `bepinex_mcp` server and its live inventory.\n"
     result[skill_dir / "SKILL.md"] = text.encode("utf-8")
     result[skill_dir / "references/ui-intermission.md"] = (SOURCE / "references/ui-intermission.md").read_bytes()
+    result[skill_dir / "references/automation.md"] = (SOURCE / "references/automation.md").read_bytes()
     return result
 
 

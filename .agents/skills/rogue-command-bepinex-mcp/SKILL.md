@@ -22,7 +22,7 @@ The `bepinex_mcp` namespace is the authoritative current inventory. Before decid
 | Economy and gameplay | Search `economy`, `resource`, `card`, `upgrade`, `relic`, `hazard` and `veterancy` |
 | Scene, components and reflection | Search `scene`, `gameobject`, `component` and `type`; inspect the exact current selector and overload |
 | Harmony and observation | Search `patch`, `inject`, `watch`, `renderer`, `camera`, `visual` and `frame`; follow the Harmony policy before patching |
-| Coordination and sequences | Search `agent`, `lock`, `batch` and `sequence`; inspect per-step results and postconditions |
+| Coordination and sequences | Search `automation`, `wait`, `sequence`, `batch`, `agent` and `lock`; read [Automation](references/automation.md) before sequences, waits or recovery |
 
 Use the live index rather than treating this table as exhaustive. `diagnostics_get_catalog` and `diagnostics_list_runtime_getters` enumerate loader diagnostics, while `discover_tools` indexes MCP tools; they answer different questions. An empty filtered search is not evidence that the capability is absent.
 
@@ -48,6 +48,10 @@ Use the live index rather than treating this table as exhaustive. `diagnostics_g
 - The UI census reports values for Unity UI sliders/toggles/dropdowns, Michsky switches/dropdowns and TMP fields. Use `diagnostics_ui_set_value` with the current exact path, ID and typed value; see the UI reference for native event semantics and limits.
 - Native Shop purchases/rerolls and RemoveCardView actions use the dedicated `diagnostics_get_intermission_native_panel_state` census and typed native actions. Treat `nativeCallInvoked` and `effectObserved` separately; if a native call was issued without an observed postcondition, refresh state before taking another action. No Harmony patch is used for these controls.
 - For multi-step operations, `automation_run_sequence` checks all steps and the shape and ordering of nested references before execution; referenced values still resolve at runtime and must come from successful earlier steps. Add `expect: [{"path":"/field","equals":true}]` to a census or action step to require exact JSON equality before proceeding. A missing path, mismatch, failed guarded call, unknown completion, unobserved native effect, or exhausted budget stops the sequence even with `stopOnFailure=false`. Inspect `checks`, `postconditionInspectionRequired`, and the original result; after an uncertain action query its postcondition before retrying. Checks are snapshots, not locks or proof of future state.
+
+## Agent automation
+
+Discover → observe → act → wait/verify → decide the next step. **Required:** Read [Automation](references/automation.md) before using sequences, state waits or recovery. Use `automation_wait_for_state` for bounded read-only conditions instead of fixed delays; use native action validation for every mutation. Session/lock tools coordinate cooperating agents only; advisory locks do not enforce exclusion.
 
 ## Live runtime workflow
 
