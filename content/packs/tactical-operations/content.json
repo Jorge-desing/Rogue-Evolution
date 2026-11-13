@@ -792,6 +792,9 @@
       "productionBuilding": {
         "id": "tactical-operations:bulwark-siege-tank-factory",
         "nativeTemplateId": "PCXBaseTankFactory",
+        "assetBundleId": "tactical-operations:assets",
+        "visualAssetName": "assets/tacticaloperations/prefabs/bulwarkfoundryvisual.prefab",
+        "visualRootPath": "PCXBaseTankFactory",
         "isAllowedAsStartingBlueprint": true,
         "balanceOverrides": [
           {

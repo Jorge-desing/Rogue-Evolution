@@ -154,3 +154,7 @@ Run [Rogue Command PBR Texture Validation](../rogue-command-pbr-texture-validati
 - Successful strict reports establish map-generation evidence. `CanonicalVisualModuleBuilder` must still confirm imported maps, shader/material bindings, mesh vertex colors, and AssetBundle contents in Unity.
 - When promoting a generated map, compare its SHA-256 with the existing Unity texture first and leave byte-identical files untouched; this avoids unnecessary writes and preserves stable asset imports. Replace only maps whose validated bytes differ.
 - `tools/Build-CanonicalVisualModules.ps1` runs Blender generation, this strict 28-preset bake, Unity import/build, and bundle validation in order. Each run records its source fingerprint and output hashes in `artifacts/canonical-level2-<UTC>/build-manifest.json`; packaging rejects artifacts after their inputs or staged bundles change. The current build was authorized with an uncalibrated status; its reports must not be presented as performance validation.
+
+## Bulwark foundry material
+
+`content/source-art/bulwarkfoundry-material.ptex` reproduces the four 2048px maps. Its compact amber emission mask is reserved for warning-light UVs; the ordinary surfaces use a non-emissive atlas region. The output passed technical checks, but the Blender preview is not evidence of in-game lighting.

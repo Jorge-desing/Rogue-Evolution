@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "assetId": "BulwarkFoundry",
+  "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
+  "policySha256": "956b52433e5864439f72c7bdb7bb9f54c0bbc4e916b541671a05636eca218249",
+  "sourceSha256": "5dd8478bb4b8ea23844a5a2ec8e042dbd005f8742c1a95302e91a633368a8fad",
+  "fbxSha256": "f9dcd665b097db5be36ea527e82099a3d935f16e410986627bbbfef9ee290211",
+  "lodScreenRelativeTransitionHeights": [
+    0.6,
+    0.3,
+    0.1
+  ],
+  "lods": {
+    "LOD0": {
+      "objects": 67,
+      "blenderFaces": 1747,
+      "triangles": 2970
+    },
+    "LOD1": {
+      "objects": 51,
+      "blenderFaces": 1331,
+      "triangles": 2266
+    },
+    "LOD2": {
+      "objects": 35,
+      "blenderFaces": 915,
+      "triangles": 1562
+    }
+  },
+  "limitations": [
+    "Native bounds and runtime appearance unverified.",
+    "Not performance-calibrated."
+  ],
+  "sourceBlend": {
+    "path": "content/source-art/bulwarkfoundry.blend",
+    "sha256": "5dd8478bb4b8ea23844a5a2ec8e042dbd005f8742c1a95302e91a633368a8fad",
+    "bytes": 1051461
+  },
+  "fbx": {
+    "path": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BulwarkFoundry_LODs.fbx",
+    "sha256": "f9dcd665b097db5be36ea527e82099a3d935f16e410986627bbbfef9ee290211",
+    "bytes": 685308
+  },
+  "prefab": {
+    "path": "unity/RogueCommandAssetAuthoring/Assets/TacticalOperations/Prefabs/BulwarkFoundryVisual.prefab",
+    "sha256": "5f6bbd8f9331367e8ef0814da822ec5fbb4774f33eb7269bc887dff99c32f06c",
+    "bytes": 87158
+  },
+  "materialMakerGraph": {
+    "path": "content/source-art/bulwarkfoundry-material.ptex",
+    "sha256": "0d4b1df0121ffc934d081dacae9064d47d81c41407149b7017dac72de13b1078",
+    "bytes": 28005
+  },
+  "textures": [
+    {
+      "path": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/Textures/BulwarkFoundry_Albedo.png",
+      "sha256": "183587decdb39a0b5b9d37267398e23fe8525a81679cb30dd3ccf1b38c4822a2",
+      "bytes": 1408491
+    },
+    {
+      "path": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/Textures/BulwarkFoundry_MetallicGloss.png",
+      "sha256": "cb28c7f477521d5aee9df8eec94335fe6b020e75474f07000d9c5a418d1306c7",
+      "bytes": 2086079
+    },
+    {
+      "path": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/Textures/BulwarkFoundry_Normal.png",
+      "sha256": "657ada2120dad43d83907f2b4a3d642f9c33529ff2fc9b5d449f5d9940daab46",
+      "bytes": 7558449
+    },
+    {
+      "path": "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/Textures/BulwarkFoundry_Emission.png",
+      "sha256": "b2737b863ec1e41ab8bcfb6621292af649583042b30d8f5b37cb531811653923",
+      "bytes": 13139
+    }
+  ],
+  "bundle": {
+    "path": "content/packs/tactical-operations/bundles/tactical-operations.bundle",
+    "sha256": "2c6d3ff36fd1428b2b8c1167b0c18d742bc3d93562d40dea390f520431a2ee0c",
+    "bytes": 181535503
+  },
+  "bundleManifest": {
+    "path": "content/packs/tactical-operations/bundles/assetbundle-manifest.bundle",
+    "sha256": "332f93d925fc69e39da1dc931479c6ec963c30e814ab927154f4bba1184641e7",
+    "bytes": 1584
+  },
+  "evidence": {
+    "local": "Blender 4.5.14; Material Maker 1.7; Unity 2021.3.45f2; pack and bundle reference validation",
+    "runtime": "NOT_TESTED",
+    "gameplayBalance": "unchanged",
+    "lodTriangleCounts": "Blender triangulated mesh counts; Unity runtime draw calls not measured"
+  }
+}

@@ -49,6 +49,12 @@ namespace RogueCommandExpansion.Authoring
 
         public const string BundleName = "tactical-operations.bundle";
 
+        [MenuItem("Rogue Command/Tactical Operations/Build Bulwark Foundry Visual and Bundle")]
+        public static void BuildBulwarkFoundry()
+        {
+            BulwarkFoundryBuilder.Build();
+        }
+
         /// <summary>
         /// Declarative specification for one Tactical Operations visual.
         /// Unifies the previous per-unit hardcoded creation methods (Atlas for
