@@ -55,6 +55,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
             }
 
+            var sortedIds = new List<string>(_unitIds);
+            sortedIds.Sort(StringComparer.Ordinal);
+            FactoryIds = sortedIds.AsReadOnly();
             _unitIdsBySourcePool = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
             if (!String.IsNullOrEmpty(sourcePoolId))
             {
@@ -71,6 +74,10 @@ namespace RogueCommandExpansionLoader.Runtime
         public object Pool { get; private set; }
 
         public bool BlueprintsAreExclusive { get; private set; }
+
+        public IReadOnlyList<string> UnitIds { get; private set; }
+
+        public IReadOnlyList<string> FactoryIds { get; private set; }
 
         public bool ContainsUnit(string unitId)
         {

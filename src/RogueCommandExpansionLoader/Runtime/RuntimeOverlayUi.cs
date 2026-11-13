@@ -386,6 +386,12 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 GUILayout.Label("Prefab Resource Key: " + unit.PrefabKey, _styleLabelMuted);
                 GUILayout.Label("Sprite Card Key: " + unit.ImageKey, _styleLabelMuted);
+                UnitLocalizationDiagnosticReport localization =
+                    LoaderUnitDiagnosticsBuilder.FindLocalizationReport(snapshot.UnitLocalizations, unit.UnitId);
+                GUILayout.Label(localization == null
+                    ? "Localizacion declarada: sin informe"
+                    : "Localizacion declarada: " + LoaderDiagnosticsFormatter.FormatUnitLocalization(localization),
+                    _styleLabelMuted);
 
                 EndCard();
                 GUILayout.Space(6);

@@ -214,6 +214,7 @@ var tests = new (string Name, Action Run)[]
             .GetProperty("value").GetProperty("pattern").GetString()!;
 
         if (!Regex.IsMatch("0", pattern) || !Regex.IsMatch("16777216", pattern) ||
+            !Regex.IsMatch("00016777216", pattern) || Regex.IsMatch("16777216\n", pattern) ||
             Regex.IsMatch("16777217", pattern))
         {
             throw new InvalidOperationException(
@@ -467,6 +468,18 @@ var tests = new (string Name, Action Run)[]
             registry.AllowsModUnitInPool(firstPool, "sample:beta") ||
             !registry.AllowsModUnitInPool(siblingPool, "sample:beta"))
             throw new InvalidOperationException("A stage's pool-specific unit allowlist leaked to a sibling pool.");
+    }),
+    ("blueprint scope diagnostic factory IDs are sorted immutable copies", () =>
+    {
+        string[] declaredFactoryIds = ["sample:zeta", "sample:alpha", "sample:alpha"];
+        var registration = new BlueprintPoolScopeRegistration(
+            "RCL_POOL_DIAGNOSTIC", "sample:stage", new object(), declaredFactoryIds, false);
+        declaredFactoryIds[0] = "sample:mutated";
+        if (!registration.FactoryIds.SequenceEqual(["sample:alpha", "sample:zeta"]) ||
+            registration.FactoryIds is not System.Collections.ObjectModel.ReadOnlyCollection<string>)
+        {
+            throw new InvalidOperationException("Pool diagnostic factory IDs must be sorted, de-duplicated, and immutable copies.");
+        }
     }),
     ("stage-scoped blueprint pools use object identity and isolate mod eligibility", () =>
     {
@@ -2809,6 +2822,37 @@ var tests = new (string Name, Action Run)[]
             ];
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit-upgrade.target-unknown");
+        });
+    }),
+    ("unit upgrade resolves a later declared unit", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].upgrades =
+            [
+                new ContentUnitUpgradeDefinition { targetUnitId = pack.units[1].id }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit upgrade rejects a production building target", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[1].upgrades =
+            [
+                new ContentUnitUpgradeDefinition { targetUnitId = pack.units[0].productionBuilding.id }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-upgrade.target-unknown");
+        });
+    }),
+    ("unit upgrade accepts a registered native unit target", () =>
+    {
+        WithPackage(sample, (pack, root) =>
+        {
+            pack.units[0].upgrades = [new ContentUnitUpgradeDefinition { targetUnitId = "PCXBaseTank" }];
+            ExpectValid(pack, root, new SnapshotWithUnits(["PCXBaseTank"]), new KnownModuleValidator());
         });
     }),
     ("unit upgrade rejects negative cost", () =>
@@ -6092,9 +6136,119 @@ var tests = new (string Name, Action Run)[]
             Array.Empty<AiProfileStageRangeDiagnosticReport>(),
             Array.Empty<string>());
 
-        if (snapshot.UnitEligibilities.Count != 0 || snapshot.UnitAssetResolutions.Count != 0)
+        if (snapshot.UnitEligibilities.Count != 0 || snapshot.UnitAssetResolutions.Count != 0 ||
+            snapshot.UnitLocalizations.Count != 0)
         {
             throw new InvalidOperationException("The legacy snapshot constructor must initialize new diagnostic lists as empty.");
+        }
+    }),
+    ("loader diagnostics snapshot preserves its 16-argument constructor", () =>
+    {
+        var snapshot = new LoaderDiagnosticsSnapshot(
+            "1.0.9", true, true, 0, 0, 0,
+            Array.Empty<PackDiagnosticReport>(),
+            Array.Empty<UnitDiagnosticReport>(),
+            Array.Empty<StageDiagnosticReport>(),
+            Array.Empty<AiProfileDiagnosticReport>(),
+            Array.Empty<UnitFactoryDiagnosticReport>(),
+            Array.Empty<StagePoolScopeDiagnosticReport>(),
+            Array.Empty<AiProfileStageRangeDiagnosticReport>(),
+            Array.Empty<UnitEligibilityDiagnosticReport>(),
+            Array.Empty<UnitAssetResolutionDiagnosticReport>(),
+            Array.Empty<string>());
+        if (snapshot.UnitLocalizations == null || snapshot.UnitLocalizations.Count != 0)
+        {
+            throw new InvalidOperationException("The 16-argument constructor must initialize an empty localization list.");
+        }
+    }),
+    ("loader localization diagnostics report declared fields for products and factories", () =>
+    {
+        var product = new ContentUnitDefinition
+        {
+            id = "sample:unit",
+            nativeTemplateId = "PCXBaseTank",
+            localizations =
+            [
+                new ContentUnitLocalizationDefinition { language = "es-XL", name = "Unidad", description = "Texto" },
+                new ContentUnitLocalizationDefinition { language = "en-US", name = "Unit", skillDescription = "Skill" }
+            ]
+        };
+        var factory = new ContentUnitDefinition
+        {
+            id = "sample:unit-factory",
+            nativeTemplateId = "VehicleFactory",
+            localizations =
+            [
+                new ContentUnitLocalizationDefinition { language = "en-US", name = "Factory" }
+            ]
+        };
+        IReadOnlyList<UnitLocalizationDiagnosticReport> reports =
+            LoaderUnitDiagnosticsBuilder.CreateLocalizationReports([product, factory, null!]);
+        if (reports.Count != 2 || reports[0].UnitId != product.id || reports[1].UnitId != factory.id ||
+            !reports[0].Languages.SequenceEqual(["en-US", "es-XL"]) ||
+            !reports[0].DescriptionLanguages.SequenceEqual(["es-XL"]) ||
+            !reports[0].SkillDescriptionLanguages.SequenceEqual(["en-US"]) ||
+            !reports[0].HasEnglish || !reports[0].HasNativeTemplate ||
+            reports[1].DescriptionLanguages.Count != 0 ||
+            reports[1].SkillDescriptionLanguages.Count != 0 ||
+            !LoaderDiagnosticsFormatter.FormatUnitLocalization(reports[0]).Contains("Description=es-XL", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Declared localization coverage was confused with a native or English fallback.");
+        }
+        product.localizations[0].language = "mutated";
+        if (!reports[0].Languages.SequenceEqual(["en-US", "es-XL"]))
+        {
+            throw new InvalidOperationException("Localization diagnostics must copy declared languages.");
+        }
+    }),
+    ("loader localization diagnostics leave absent translations empty", () =>
+    {
+        IReadOnlyList<UnitLocalizationDiagnosticReport> reports =
+            LoaderUnitDiagnosticsBuilder.CreateLocalizationReports(
+                [new ContentUnitDefinition { id = "sample:native", nativeTemplateId = "PCXBaseTank" }]);
+        if (reports.Count != 1 || reports[0].Languages.Count != 0 || reports[0].HasEnglish ||
+            !reports[0].HasNativeTemplate || reports[0].DescriptionLanguages.Count != 0 ||
+            LoaderDiagnosticsFormatter.FormatUnitLocalization(reports[0]).Contains("fallback resolved", StringComparison.OrdinalIgnoreCase) ||
+            LoaderUnitDiagnosticsBuilder.CreateLocalizationReports(null).Count != 0)
+        {
+            throw new InvalidOperationException("Native inheritance may be possible but is not declared translation coverage.");
+        }
+    }),
+    ("loader localization lookup matches the unit ID without borrowing a sibling report", () =>
+    {
+        IReadOnlyList<UnitLocalizationDiagnosticReport> reports =
+            LoaderUnitDiagnosticsBuilder.CreateLocalizationReports(
+            [
+                new ContentUnitDefinition { id = "sample:alpha" },
+                new ContentUnitDefinition { id = "sample:beta",
+                    localizations = [new ContentUnitLocalizationDefinition { language = "en-US", name = "Beta" }] }
+            ]);
+        UnitLocalizationDiagnosticReport? beta = LoaderUnitDiagnosticsBuilder.FindLocalizationReport(
+            reports, "sample:beta");
+        if (beta == null || beta.UnitId != "sample:beta" || !beta.HasEnglish ||
+            LoaderUnitDiagnosticsBuilder.FindLocalizationReport(reports, "sample:missing") != null ||
+            LoaderUnitDiagnosticsBuilder.FindLocalizationReport(null, "sample:beta") != null)
+        {
+            throw new InvalidOperationException("Unit localization lookup must match the exact loaded unit ID.");
+        }
+    }),
+    ("loader diagnostics snapshot copies localization reports", () =>
+    {
+        var sources = new List<UnitLocalizationDiagnosticReport>
+        {
+            new UnitLocalizationDiagnosticReport("sample:unit", ["en-US"], ["en-US"], Array.Empty<string>(), false)
+        };
+        var snapshot = new LoaderDiagnosticsSnapshot(
+            "1.0.9", true, true, 0, 0, 0,
+            Array.Empty<PackDiagnosticReport>(), Array.Empty<UnitDiagnosticReport>(),
+            Array.Empty<StageDiagnosticReport>(), Array.Empty<AiProfileDiagnosticReport>(),
+            Array.Empty<UnitFactoryDiagnosticReport>(), Array.Empty<StagePoolScopeDiagnosticReport>(),
+            Array.Empty<AiProfileStageRangeDiagnosticReport>(), Array.Empty<UnitEligibilityDiagnosticReport>(),
+            Array.Empty<UnitAssetResolutionDiagnosticReport>(), sources, Array.Empty<string>());
+        sources.Clear();
+        if (snapshot.UnitLocalizations.Count != 1 || !snapshot.UnitLocalizations[0].HasEnglish)
+        {
+            throw new InvalidOperationException("The snapshot must copy localization diagnostics, not retain the caller's list.");
         }
     }),
     ("loader unit diagnostic builder reports eligibility and asset resolution", () =>
@@ -6156,6 +6310,60 @@ var tests = new (string Name, Action Run)[]
             };
             ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
                 "unit-synergy.radius-invalid");
+        });
+    }),
+    ("unit synergy resolves a later declared unit", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].synergies =
+            [
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample-native:valid-synergy", statName = "Damage1",
+                    targetUnitIds = [pack.units[1].id]
+                }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
+        });
+    }),
+    ("unit synergy rejects a production building target", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[1].synergies =
+            [
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample-native:invalid-synergy", statName = "Damage1",
+                    targetUnitIds = [pack.units[0].productionBuilding.id]
+                }
+            ];
+            ExpectDiagnostic(pack, root, new EmptySnapshot(), new KnownModuleValidator(),
+                "unit-synergy.target-unknown");
+        });
+    }),
+    ("reciprocal unit synergies remain descriptive and valid", () =>
+    {
+        WithPackage(nativeSample, (pack, root) =>
+        {
+            pack.units[0].synergies =
+            [
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample-native:synergy-a", statName = "Damage1",
+                    targetUnitIds = [pack.units[1].id]
+                }
+            ];
+            pack.units[1].synergies =
+            [
+                new ContentUnitSynergyDefinition
+                {
+                    id = "sample-native:synergy-b", statName = "Damage1",
+                    targetUnitIds = [pack.units[0].id]
+                }
+            ];
+            ExpectValid(pack, root, new EmptySnapshot(), new KnownModuleValidator());
         });
     }),
     ("unit visual variant rejects non-finite scale", () =>

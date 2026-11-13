@@ -211,6 +211,13 @@ namespace RogueCommandExpansionLoader.Content
             var allIds = new HashSet<string>(IdComparer);
             var bundleIds = new HashSet<string>(IdComparer);
             var unitIds = new HashSet<string>(IdComparer);
+            foreach (ContentUnitDefinition declaredUnit in units)
+            {
+                if (declaredUnit != null && IsNamespacedId(declaredUnit.id))
+                {
+                    unitIds.Add(declaredUnit.id);
+                }
+            }
             var productionBuildingIds = new HashSet<string>(IdComparer);
             var aiProfileIds = new HashSet<string>(IdComparer);
             var aiResourceNames = new HashSet<string>(StringComparer.Ordinal);
@@ -371,9 +378,9 @@ namespace RogueCommandExpansionLoader.Content
                 ValidateAiOverrides(unit.aiOverrides, itemPath + ".aiOverrides", diagnostics);
                 ValidateActiveSkills(unit.activeSkills, itemPath + ".activeSkills", diagnostics);
                 ValidateCombatBoosts(unit.combatBoosts, itemPath + ".combatBoosts", diagnostics);
-                ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", allIds, diagnostics);
+                ValidateUnitUpgrades(unit.upgrades, itemPath + ".upgrades", unitIds, registrySnapshot, diagnostics);
                 ValidateUnitExperience(unit.experience, itemPath + ".experience", diagnostics);
-                ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", allIds, diagnostics);
+                ValidateUnitSynergies(unit.synergies, itemPath + ".synergies", unitIds, registrySnapshot, diagnostics);
                 ValidateUnitVisualVariants(unit.visualVariants, itemPath + ".visualVariants", bundleIds, diagnostics);
                 ValidateUnitSpawn(unit.spawn, itemPath + ".spawn", diagnostics);
                 ValidateUnitStatusEffects(unit.statusEffects, itemPath + ".statusEffects", diagnostics);
@@ -1641,7 +1648,8 @@ namespace RogueCommandExpansionLoader.Content
         private static void ValidateUnitUpgrades(
             ContentUnitUpgradeDefinition[] upgrades,
             string path,
-            HashSet<string> allIds,
+            HashSet<string> unitIds,
+            IContentRegistrySnapshot registrySnapshot,
             List<ContentDiagnostic> diagnostics)
         {
             if (upgrades == null) return;
@@ -1659,10 +1667,11 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-upgrade.target-required", itemPath + ".targetUnitId",
                         "Upgrade target unit ID must be non-empty.");
                 }
-                else if (!allIds.Contains(upgrade.targetUnitId))
+                else if (!IsKnownUnitId(upgrade.targetUnitId, itemPath + ".targetUnitId",
+                    unitIds, registrySnapshot, diagnostics))
                 {
                     Add(diagnostics, "unit-upgrade.target-unknown", itemPath + ".targetUnitId",
-                        "Upgrade target unit must be a declared or native unit ID.");
+                        "Upgrade target unit must be a declared or registered unit ID.");
                 }
                 if (upgrade.requiredExperienceLevel < 0)
                 {
@@ -1674,6 +1683,27 @@ namespace RogueCommandExpansionLoader.Content
                     Add(diagnostics, "unit-upgrade.cost-invalid", itemPath + ".cost",
                         "Upgrade cost must be finite and non-negative.");
                 }
+            }
+        }
+
+        private static bool IsKnownUnitId(
+            string id,
+            string path,
+            HashSet<string> unitIds,
+            IContentRegistrySnapshot registrySnapshot,
+            List<ContentDiagnostic> diagnostics)
+        {
+            if (unitIds.Contains(id)) return true;
+            if (registrySnapshot == null) return false;
+            try
+            {
+                return registrySnapshot.ContainsUnit(id);
+            }
+            catch (Exception exception)
+            {
+                Add(diagnostics, "registry.snapshot-failed", path,
+                    "Could not resolve the unit in the registry snapshot: " + exception.Message);
+                return false;
             }
         }
 
@@ -1709,7 +1739,8 @@ namespace RogueCommandExpansionLoader.Content
         private static void ValidateUnitSynergies(
             ContentUnitSynergyDefinition[] synergies,
             string path,
-            HashSet<string> allIds,
+            HashSet<string> unitIds,
+            IContentRegistrySnapshot registrySnapshot,
             List<ContentDiagnostic> diagnostics)
         {
             if (synergies == null) return;
@@ -1739,10 +1770,12 @@ namespace RogueCommandExpansionLoader.Content
                     for (int j = 0; j < synergy.targetUnitIds.Length; j++)
                     {
                         if (String.IsNullOrWhiteSpace(synergy.targetUnitIds[j]) ||
-                            !allIds.Contains(synergy.targetUnitIds[j]))
+                            !IsKnownUnitId(synergy.targetUnitIds[j],
+                                itemPath + ".targetUnitIds[" + j + "]",
+                                unitIds, registrySnapshot, diagnostics))
                         {
                             Add(diagnostics, "unit-synergy.target-unknown", itemPath + ".targetUnitIds[" + j + "]",
-                                "Synergy target unit must be a declared or native unit ID.");
+                                "Synergy target unit must be a declared or registered unit ID.");
                         }
                     }
                 }

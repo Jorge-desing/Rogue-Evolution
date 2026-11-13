@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RogueCommandExpansionLoader.Content;
 
 namespace RogueCommandExpansionLoader.Runtime
 {
@@ -230,6 +231,54 @@ namespace RogueCommandExpansionLoader.Runtime
         public string StatusMessage { get; private set; }
     }
 
+    /// <summary>Translations declared in a loaded product or factory; not resolved fallback text.</summary>
+    public sealed class UnitLocalizationDiagnosticReport
+    {
+        public UnitLocalizationDiagnosticReport(
+            string unitId,
+            IReadOnlyList<string> languages,
+            IReadOnlyList<string> descriptionLanguages,
+            IReadOnlyList<string> skillDescriptionLanguages,
+            bool hasNativeTemplate)
+        {
+            UnitId = unitId ?? string.Empty;
+            Languages = CopyLanguages(languages);
+            DescriptionLanguages = CopyLanguages(descriptionLanguages);
+            SkillDescriptionLanguages = CopyLanguages(skillDescriptionLanguages);
+            HasEnglish = ContainsEnglish(Languages);
+            HasNativeTemplate = hasNativeTemplate;
+        }
+
+        public string UnitId { get; private set; }
+        public IReadOnlyList<string> Languages { get; private set; }
+        public IReadOnlyList<string> DescriptionLanguages { get; private set; }
+        public IReadOnlyList<string> SkillDescriptionLanguages { get; private set; }
+        public bool HasEnglish { get; private set; }
+        public bool HasNativeTemplate { get; private set; }
+
+        private static bool ContainsEnglish(IReadOnlyList<string> languages)
+        {
+            for (int i = 0; i < languages.Count; i++)
+            {
+                if (String.Equals(languages[i], "en-US", StringComparison.Ordinal)) return true;
+            }
+            return false;
+        }
+
+        private static IReadOnlyList<string> CopyLanguages(IReadOnlyList<string> source)
+        {
+            var result = new SortedSet<string>(StringComparer.Ordinal);
+            if (source != null)
+            {
+                for (int i = 0; i < source.Count; i++)
+                {
+                    if (!String.IsNullOrWhiteSpace(source[i])) result.Add(source[i]);
+                }
+            }
+            return new List<string>(result).AsReadOnly();
+        }
+    }
+
     public sealed class LoaderDiagnosticsSnapshot
     {
         public LoaderDiagnosticsSnapshot(
@@ -263,6 +312,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 aiProfileStageRanges,
                 null,
                 null,
+                null,
                 recentLogs)
         {
         }
@@ -284,6 +334,31 @@ namespace RogueCommandExpansionLoader.Runtime
             IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities,
             IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions,
             IReadOnlyList<string> recentLogs)
+            : this(targetGameVersion, isNativeRegistryReady, isLoaded, activePackCount,
+                failedPackCount, totalBundleBytes, packs, units, stages, aiProfiles,
+                unitFactories, stagePoolScopes, aiProfileStageRanges,
+                unitEligibilities, unitAssetResolutions, null, recentLogs)
+        {
+        }
+
+        public LoaderDiagnosticsSnapshot(
+            string targetGameVersion,
+            bool isNativeRegistryReady,
+            bool isLoaded,
+            int activePackCount,
+            int failedPackCount,
+            long totalBundleBytes,
+            IReadOnlyList<PackDiagnosticReport> packs,
+            IReadOnlyList<UnitDiagnosticReport> units,
+            IReadOnlyList<StageDiagnosticReport> stages,
+            IReadOnlyList<AiProfileDiagnosticReport> aiProfiles,
+            IReadOnlyList<UnitFactoryDiagnosticReport> unitFactories,
+            IReadOnlyList<StagePoolScopeDiagnosticReport> stagePoolScopes,
+            IReadOnlyList<AiProfileStageRangeDiagnosticReport> aiProfileStageRanges,
+            IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities,
+            IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions,
+            IReadOnlyList<UnitLocalizationDiagnosticReport> unitLocalizations,
+            IReadOnlyList<string> recentLogs)
         {
             TargetGameVersion = targetGameVersion ?? string.Empty;
             IsNativeRegistryReady = isNativeRegistryReady;
@@ -300,6 +375,7 @@ namespace RogueCommandExpansionLoader.Runtime
             AiProfileStageRanges = CopyReadOnly(aiProfileStageRanges);
             UnitEligibilities = CopyReadOnly(unitEligibilities);
             UnitAssetResolutions = CopyReadOnly(unitAssetResolutions);
+            UnitLocalizations = CopyReadOnly(unitLocalizations);
             RecentLogs = CopyReadOnly(recentLogs);
         }
 
@@ -318,6 +394,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public IReadOnlyList<AiProfileStageRangeDiagnosticReport> AiProfileStageRanges { get; private set; }
         public IReadOnlyList<UnitEligibilityDiagnosticReport> UnitEligibilities { get; private set; }
         public IReadOnlyList<UnitAssetResolutionDiagnosticReport> UnitAssetResolutions { get; private set; }
+        public IReadOnlyList<UnitLocalizationDiagnosticReport> UnitLocalizations { get; private set; }
         public IReadOnlyList<string> RecentLogs { get; private set; }
 
         private static IReadOnlyList<T> CopyReadOnly<T>(IReadOnlyList<T> source)
@@ -339,6 +416,53 @@ namespace RogueCommandExpansionLoader.Runtime
 
     public static class LoaderUnitDiagnosticsBuilder
     {
+        public static UnitLocalizationDiagnosticReport FindLocalizationReport(
+            IReadOnlyList<UnitLocalizationDiagnosticReport> reports,
+            string unitId)
+        {
+            if (reports == null || String.IsNullOrWhiteSpace(unitId)) return null;
+            for (int i = 0; i < reports.Count; i++)
+            {
+                UnitLocalizationDiagnosticReport report = reports[i];
+                if (report != null && String.Equals(report.UnitId, unitId, StringComparison.Ordinal))
+                {
+                    return report;
+                }
+            }
+            return null;
+        }
+
+        public static IReadOnlyList<UnitLocalizationDiagnosticReport> CreateLocalizationReports(
+            IReadOnlyList<ContentUnitDefinition> units)
+        {
+            var reports = new List<UnitLocalizationDiagnosticReport>();
+            if (units == null) return reports.AsReadOnly();
+
+            for (int i = 0; i < units.Count; i++)
+            {
+                ContentUnitDefinition unit = units[i];
+                if (unit == null || String.IsNullOrWhiteSpace(unit.id)) continue;
+
+                var names = new List<string>();
+                var descriptions = new List<string>();
+                var skills = new List<string>();
+                foreach (ContentUnitLocalizationDefinition localization in
+                    unit.localizations ?? new ContentUnitLocalizationDefinition[0])
+                {
+                    if (localization == null || String.IsNullOrWhiteSpace(localization.language)) continue;
+                    if (!String.IsNullOrWhiteSpace(localization.name)) names.Add(localization.language);
+                    if (!String.IsNullOrWhiteSpace(localization.description)) descriptions.Add(localization.language);
+                    if (!String.IsNullOrWhiteSpace(localization.skillDescription)) skills.Add(localization.language);
+                }
+
+                reports.Add(new UnitLocalizationDiagnosticReport(unit.id, names, descriptions, skills,
+                    !String.IsNullOrWhiteSpace(unit.nativeTemplateId)));
+            }
+
+            reports.Sort((left, right) => StringComparer.Ordinal.Compare(left.UnitId, right.UnitId));
+            return reports.AsReadOnly();
+        }
+
         public static IReadOnlyList<UnitEligibilityDiagnosticReport> CreateEligibilityReports(
             IReadOnlyList<UnitDiagnosticReport> units)
         {
@@ -493,6 +617,25 @@ namespace RogueCommandExpansionLoader.Runtime
             return report.UnitId + " [Prefab=" + report.PrefabResolved +
                 ", Card=" + report.CardImageResolved + ", Visual=" + report.VisualResolved +
                 "] " + report.StatusMessage;
+        }
+
+        public static string FormatUnitLocalization(UnitLocalizationDiagnosticReport report)
+        {
+            if (report == null)
+            {
+                throw new ArgumentNullException(nameof(report));
+            }
+
+            return report.UnitId + " [Names=" + FormatLanguages(report.Languages) +
+                ", Description=" + FormatLanguages(report.DescriptionLanguages) +
+                ", SkillDescription=" + FormatLanguages(report.SkillDescriptionLanguages) +
+                ", EnglishName=" + report.HasEnglish +
+                ", NativeTemplate=" + report.HasNativeTemplate + "]";
+        }
+
+        private static string FormatLanguages(IReadOnlyList<string> languages)
+        {
+            return languages.Count > 0 ? String.Join(", ", languages) : "none";
         }
     }
 }

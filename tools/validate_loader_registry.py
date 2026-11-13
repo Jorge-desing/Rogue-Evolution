@@ -134,6 +134,41 @@ def _collect_ai_profile_stage_ranges(pack):
     return sorted(ranges, key=lambda item: item["profileId"])
 
 
+def _localization_report(entity):
+    names = set()
+    descriptions = set()
+    skills = set()
+    for item in _iter_dicts(entity.get("localizations")):
+        language = item.get("language")
+        if not _nonempty_string(language):
+            continue
+        if _nonempty_string(item.get("name")):
+            names.add(language)
+        if _nonempty_string(item.get("description")):
+            descriptions.add(language)
+        if _nonempty_string(item.get("skillDescription")):
+            skills.add(language)
+    return {
+        "unitId": entity["id"],
+        "nameLanguages": sorted(names),
+        "descriptionLanguages": sorted(descriptions),
+        "skillDescriptionLanguages": sorted(skills),
+        "hasEnglishName": "en-US" in names,
+        "hasNativeTemplate": _nonempty_string(entity.get("nativeTemplateId")),
+    }
+
+
+def _collect_unit_localizations(pack):
+    reports = []
+    for unit in _iter_dicts(pack.get("units")):
+        if _nonempty_string(unit.get("id")):
+            reports.append(_localization_report(unit))
+        factory = _as_dict(unit.get("productionBuilding"))
+        if _nonempty_string(factory.get("id")):
+            reports.append(_localization_report(factory))
+    return sorted(reports, key=lambda report: report["unitId"])
+
+
 def build_pack_report(pack, pack_path: Path):
     pack = _as_dict(pack)
     factory_by_product = _unit_factory_map(pack)
@@ -166,6 +201,7 @@ def build_pack_report(pack, pack_path: Path):
         "packId": pack_id,
         "packFolder": pack_path.parent.name,
         "unitFactories": unit_factories,
+        "unitLocalizations": _collect_unit_localizations(pack),
         "stages": stages,
         "aiProfileStageRanges": _collect_ai_profile_stage_ranges(pack),
         "diagnostics": diagnostics,
@@ -238,6 +274,7 @@ def main(argv=None):
                 "packId": pack_path.parent.name,
                 "packFolder": pack_path.parent.name,
                 "unitFactories": [],
+                "unitLocalizations": [],
                 "stages": [],
                 "aiProfileStageRanges": [],
                 "diagnostics": [
@@ -260,6 +297,7 @@ def main(argv=None):
         "limitations": [
             "AI stageMin/stageMax are pack-local array indices, not runtime progression indices.",
             "Unlisted pools derive eligibility only from stage.unitIds; blueprintPoolEntries do not broaden them.",
+            "Unit localization lists show declared text only; native and en-US fallback resolution is not verified by this offline report.",
         ],
         "packs": pack_reports,
         "issues": issues,
@@ -272,6 +310,16 @@ def main(argv=None):
     for report in pack_reports:
         for item in report["unitFactories"]:
             print(f"INFO {report['packId']} unit {item['unitId']} -> {item['factoryId']}")
+        for localization in report["unitLocalizations"]:
+            names = ", ".join(localization["nameLanguages"]) or "none"
+            descriptions = ", ".join(localization["descriptionLanguages"]) or "none"
+            skills = ", ".join(localization["skillDescriptionLanguages"]) or "none"
+            native = "yes" if localization["hasNativeTemplate"] else "no"
+            english = "yes" if localization["hasEnglishName"] else "no"
+            print(f"INFO {report['packId']} localization {localization['unitId']} "
+                  f"declared names [{names}], descriptions [{descriptions}], "
+                  f"skill descriptions [{skills}], en-US name={english}, "
+                  f"native template declared={native}")
         for stage in report["stages"]:
             fallback = ", ".join(stage["unlistedPoolFactoryIds"]) or "none"
             print(f"INFO {report['packId']} stage {stage['stageId']} unlisted pools -> [{fallback}]")

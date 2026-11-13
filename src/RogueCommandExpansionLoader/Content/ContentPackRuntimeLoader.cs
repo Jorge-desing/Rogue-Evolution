@@ -1673,6 +1673,13 @@ namespace RogueCommandExpansionLoader.Content
 
                 IReadOnlyList<UnitEligibilityDiagnosticReport> unitEligibilities =
                     LoaderUnitDiagnosticsBuilder.CreateEligibilityReports(units);
+                var localizationDefinitions = new List<ContentUnitDefinition>(_units.Count);
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    localizationDefinitions.Add(unit.Definition);
+                }
+                IReadOnlyList<UnitLocalizationDiagnosticReport> unitLocalizations =
+                    LoaderUnitDiagnosticsBuilder.CreateLocalizationReports(localizationDefinitions);
                 IReadOnlyList<UnitAssetResolutionDiagnosticReport> unitAssetResolutions = null;
 
                 var stages = new List<StageDiagnosticReport>(_stages.Count);
@@ -1787,6 +1794,7 @@ namespace RogueCommandExpansionLoader.Content
                     aiProfileStageRanges,
                     unitEligibilities,
                     unitAssetResolutions,
+                    unitLocalizations,
                     recentLogs);
             }
         }
