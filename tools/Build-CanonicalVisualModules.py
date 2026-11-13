@@ -338,15 +338,18 @@ def build_armor_module(
     if entry.get("geometryPreset") != ERA_BRICK_PRESET_ID:
         raise ValueError(f"ERA role requires {ERA_BRICK_PRESET_ID}: {entry['variantId']}")
     spacing = 0.025
-    if entry.get("geometryLayout") == "bulwark_side_skirt_array_v1":
+    if entry.get("geometryLayout") == "bulwark_side_skirt_array_v2":
         # Anchor to the flat support face in the current Level 1 Unity FBX.
-        # The source blend has a newer, wider skirt, but that Level 1 FBX is
-        # still the host Unity loads. Its outward face is x=+/-1.287 m and
-        # its moving tread reaches x=+/-1.250 m, leaving 37 mm of clearance.
-        positions = [(x_sign * 1.287, y, 0.40)
-                     for x_sign in (-1.0, 1.0) for y in (-0.92, 0.92)]
+        # Five cassettes per side span the supported skirt from front to rear.
+        # The current Level 1 FBX support face is x=+/-1.312 m; the moving
+        # tread reaches x=+/-1.250 m. The full cassette stack is separately
+        # regression-checked for at least 35 mm of belt clearance.
+        side_positions_y = (-1.10, -0.55, 0.0, 0.55, 1.10)
+        positions = [(x_sign * 1.312, y, 0.40)
+                     for x_sign in (-1.0, 1.0) for y in side_positions_y]
         dimensions = (0.24, 0.12, 0.045)
-        normals = [(x_sign, 0.0, 0.0) for x_sign in (-1.0, 1.0) for _ in (-0.92, 0.92)]
+        normals = [(x_sign, 0.0, 0.0)
+                   for x_sign in (-1.0, 1.0) for _ in side_positions_y]
     else:
         rows = 2 + seed % 2
         columns = 2 + (seed // 3) % 2

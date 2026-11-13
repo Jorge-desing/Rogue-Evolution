@@ -129,7 +129,7 @@
     {"geometryPresetId": "cable_conduit_junction_manifold_v1", "slotId": "Sponsons", "geometryEngineeringRole": "power_containment", "visualEngineeringRoles": ["power_containment"]}
   ],
   "geometryLayouts": [
-    {"geometryLayoutId": "bulwark_side_skirt_array_v1", "variantId": "tactical-operations:bulwark-siege-tank-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "requiredGeometryPresetId": "era_brick_cassette_v1"}
+    {"geometryLayoutId": "bulwark_side_skirt_array_v2", "variantId": "tactical-operations:bulwark-siege-tank-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "requiredGeometryPresetId": "era_brick_cassette_v1"}
   ],
   "variantRoles": [
     {"variantId": "sample-native-expansion:scout-tank-gunmetal-chassis", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1"},
@@ -157,7 +157,7 @@
     {"variantId": "tactical-operations:salvage-hauler-minefield-ordnance-carrier", "slotId": "FuelDrums", "visualEngineeringRole": "ordnance_carrier", "geometryPreset": "ordnance_mine_dispenser_rack_v1"},
     {"variantId": "tactical-operations:skyguard-sam-solar-flare-radiation-shield", "slotId": "APS", "visualEngineeringRole": "aps_phase_shield", "geometryPreset": "aps_phase_shield_emitter_v2"},
     {"variantId": "tactical-operations:skyguard-sam-longshot-sniper-camo", "slotId": "APS", "visualEngineeringRole": "aps_sensor_suite", "geometryPreset": "aps_hardkill_radar_v2"},
-    {"variantId": "tactical-operations:bulwark-siege-tank-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1", "geometryLayout": "bulwark_side_skirt_array_v1"},
+    {"variantId": "tactical-operations:bulwark-siege-tank-battleship-tungsten", "slotId": "ERA", "visualEngineeringRole": "armor_cassette", "geometryPreset": "era_brick_cassette_v1", "geometryLayout": "bulwark_side_skirt_array_v2"},
     {"variantId": "tactical-operations:bulwark-siege-tank-minefield-ordnance-carrier", "slotId": "FuelDrums", "visualEngineeringRole": "ordnance_carrier", "geometryPreset": "ordnance_mine_dispenser_rack_v2"},
     {"variantId": "tactical-operations:arc-lance-walker-plasma-arc-containment", "slotId": "Sponsons", "visualEngineeringRole": "plasma_containment", "geometryPreset": "plasma_containment_cell_v1"},
     {"variantId": "tactical-operations:field-medic-rover-nanite-repair-chitin", "slotId": "Sponsons", "visualEngineeringRole": "repair_dispenser", "geometryPreset": "nanofabrication_repair_projector_sponson_v1"},

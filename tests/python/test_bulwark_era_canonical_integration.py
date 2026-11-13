@@ -21,12 +21,12 @@ EXPECTED_MODULE_ASSET = (
     "assets/roguecommandexpansionsample/visualmodules/prefabs/"
     "rclmodule_bulwark_siege_tank_battleship_tungsten.prefab"
 )
-EXPECTED_LAYOUT = "bulwark_side_skirt_array_v1"
+EXPECTED_LAYOUT = "bulwark_side_skirt_array_v2"
 CURRENT_BULWARK_FBX = (
     REPO_ROOT
     / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx"
 )
-CURRENT_BULWARK_FBX_SHA256 = "40bd754c4e8197ddbced3d175299516f2f3d98854adea3e652da7afa524b4d36"
+CURRENT_BULWARK_FBX_SHA256 = "4a930f26cf0141a8f254e19b1d184c6c77be5ba4bf493ece035b0f9eb0d9f8f3"
 
 
 class BulwarkEraCanonicalIntegrationTests(unittest.TestCase):
@@ -109,7 +109,13 @@ backing_plates = sorted(
     (obj for obj in module_objects if obj.name.endswith("_BackingPlate")),
     key=lambda obj: obj.name,
 )
-assert len(backing_plates) == 4, f"expected four side cassette backing plates, got {{len(backing_plates)}}"
+assert len(backing_plates) == 10, f"expected ten side cassette backing plates, got {{len(backing_plates)}}"
+expected_y = (-1.10, -0.55, 0.0, 0.55, 1.10)
+for side in (-1.0, 1.0):
+    side_backing_plates = [obj for obj in backing_plates if (1.0 if obj.location.x > 0.0 else -1.0) == side]
+    assert len(side_backing_plates) == 5, f"expected five ERA backing plates on side {{side}}, got {{len(side_backing_plates)}}"
+    actual_y = sorted(round(float(obj.location.y), 3) for obj in side_backing_plates)
+    assert actual_y == list(expected_y), f"unexpected Bulwark side cassette positions on {{side}}: {{actual_y}}"
 max_fit_error_mm = 0.0
 min_belt_clearance_mm = float("inf")
 support_samples = 0
@@ -152,6 +158,8 @@ for obj in module_objects:
 
 result = {{
     "backingPlateCount": len(backing_plates),
+    "backingPlatesPerSide": [sum(1 for obj in backing_plates if obj.location.x < 0.0),
+                              sum(1 for obj in backing_plates if obj.location.x > 0.0)],
     "supportSamples": support_samples,
     "maxFitErrorMm": max_fit_error_mm,
     "minBeltClearanceMm": min_belt_clearance_mm,
@@ -186,8 +194,9 @@ print("__BULWARK_FIT_START__" + json.dumps(result) + "__BULWARK_FIT_END__")
             f"Blender did not return fit evidence:\nSTDERR:\n{proc.stderr}\nSTDOUT:\n{proc.stdout}",
         )
         report = json.loads(proc.stdout.split("__BULWARK_FIT_START__", 1)[1].split("__BULWARK_FIT_END__", 1)[0])
-        self.assertEqual(report["backingPlateCount"], 4)
-        self.assertEqual(report["supportSamples"], 36)
+        self.assertEqual(report["backingPlateCount"], 10)
+        self.assertEqual(report["backingPlatesPerSide"], [5, 5])
+        self.assertEqual(report["supportSamples"], 90)
         self.assertLessEqual(report["maxFitErrorMm"], 1.0)
         self.assertGreaterEqual(report["minBeltClearanceMm"], 35.0)
         self.assertEqual(report["beltOverlapPairs"], 0)

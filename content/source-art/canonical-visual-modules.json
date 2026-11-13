@@ -10,7 +10,7 @@
   "geometryBuildPolicySha256": "11400a7d9b2eca43f809178b5f5524384f616ff7e4e2a0f241806b636265f2f9",
   "level2Contract": "Each listed GameObject is visual-only geometry attached to exactly one canonical hardpoint group; no gameplay components or balance changes.",
   "visualEngineeringRoleContract": "Authoring-only visual engineering roles. These descriptions define visible mechanical form, not gameplay behavior.",
-  "geometryPresetRegistrySha256": "ac721370d062f353efa72f20df0f3461db1fff9121301e183698a8344cf60763",
+  "geometryPresetRegistrySha256": "b11146e22a88173d0937f113254fdb8a827348ee18f0345990859c3da29e3770",
   "geometryPresetPolicy": "Every Level 2 module resolves one validated hard-surface factory from the complete preset catalog; geometry presets remain separate from Material Maker PBR presets.",
   "modules": [
     {
@@ -1828,7 +1828,7 @@
       "level": 2,
       "preset": "battleship_tungsten",
       "geometryPreset": "era_brick_cassette_v1",
-      "geometryLayout": "bulwark_side_skirt_array_v1",
+      "geometryLayout": "bulwark_side_skirt_array_v2",
       "slotId": "ERA",
       "visualEngineeringRole": "armor_cassette",
       "assetBundleId": "tactical-operations:assets",
@@ -1848,16 +1848,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1292,
-          "unityTriangles": 2384
+          "blenderFaces": 3230,
+          "unityTriangles": 5960
         },
         "LOD1": {
-          "blenderFaces": 600,
-          "unityTriangles": 1184
+          "blenderFaces": 1500,
+          "unityTriangles": 2960
         },
         "LOD2": {
-          "blenderFaces": 262,
-          "unityTriangles": 580
+          "blenderFaces": 654,
+          "unityTriangles": 1450
         }
       }
     },
@@ -2230,11 +2230,11 @@
           "unityTriangles": 2288
         },
         "LOD1": {
-          "blenderFaces": 672,
+          "blenderFaces": 670,
           "unityTriangles": 1144
         },
         "LOD2": {
-          "blenderFaces": 414,
+          "blenderFaces": 412,
           "unityTriangles": 570
         }
       }

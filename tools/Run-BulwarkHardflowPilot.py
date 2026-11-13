@@ -43,7 +43,7 @@ BACKUP_MANIFEST = Path(os.environ.get(
     "RCL_BULWARK_BACKUP_MANIFEST",
     str(ROOT / "artifacts/bulwark-source-backups/20261111T181840Z/manifest.json"),
 ))
-SIDE_ERA_LAYOUT_ID = "bulwark_side_skirt_array_v1"
+SIDE_ERA_LAYOUT_ID = "bulwark_side_skirt_array_v2"
 
 
 def _load_canonical_module_builder():
@@ -331,8 +331,8 @@ def _surface_comparison(native_blend: Path, hardflow_blend: Path) -> dict[str, o
         and obj.name.endswith("_CassetteShell")
         and obj.name.startswith("ERABrick_a2e0f471_B")
     )
-    if len(side_era_shell_names) != 4:
-        raise RuntimeError(f"Expected four Level 2 side ERA cassette shells; found {side_era_shell_names!r}")
+    if len(side_era_shell_names) != 10:
+        raise RuntimeError(f"Expected ten Level 2 side ERA cassette shells; found {side_era_shell_names!r}")
     era_shell_names = sorted((*front_era_shell_names, *side_era_shell_names))
     focus_names = (*fixed_focus_names, *era_shell_names)
     native = {name: _evaluated_geometry(bpy.data.objects[name]) for name in focus_names}
