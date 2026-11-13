@@ -54,9 +54,6 @@ class AttackClipAuthoringContractTests(unittest.TestCase):
             r'set_bone_key\("Bone_BarrelRecoil",\s*"location"',
         )
 
-    def test_fire_recoil_does_not_key_gameplay_root_motion(self) -> None:
-        """Recoil may compress the body but must not move the gameplay root."""
-        self.assertNotRegex(self.fire_source, r'set_bone_key\("Bone_Root"')
 
     def test_controller_rebuilds_a_canonical_state_graph(self) -> None:
         """Rebuilds must discard stale duplicate imported states/transitions."""

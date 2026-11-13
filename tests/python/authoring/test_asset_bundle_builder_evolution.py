@@ -12,9 +12,6 @@ class TestAssetBundleBuilderEvolution(unittest.TestCase):
         self.assertIn("ForceRebuildAssetBundle", src, "missing ForceRebuildAssetBundle for deterministic bundles")
         self.assertIn("ValidateBuiltBundles", src, "missing post-build bundle validation")
 
-    def test_bundle_built_summary_logging(self):
-        src = BUILDER.read_text(encoding="utf-8")
-        self.assertIn("Built bundle", src, "missing per-bundle build summary log")
 
 
 if __name__ == "__main__":

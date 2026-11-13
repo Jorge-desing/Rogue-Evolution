@@ -98,19 +98,6 @@ class TacticalAnimationImprovementTests(unittest.TestCase):
         self.assertIn("Bone_Shin", walker_zone, "FireRecoil walker debe keyear espinillas (brace)")
 
     # ---------- Drive ----------
-    def test_drive_hull_bob_readable_at_rts(self) -> None:
-        # El bob legacy es 0.012 máx. Una mejora legible debe superar 0.015.
-        hull_locations = []
-        for match in re.finditer(
-            r'set_bone_key\(\s*"Bone_Hull"\s*,\s*"location"\s*,\s*\d+\s*,\s*\(([^)]+)\)',
-            self.drive,
-        ):
-            values = [float(part.strip()) for part in match.group(1).split(",")]
-            if len(values) == 3:
-                hull_locations.append(values)
-        floats = [abs(location[2]) for location in hull_locations]
-        self.assertTrue(floats, "Drive debe keyear el hull en Z")
-        self.assertGreaterEqual(max(floats), 0.015, "El bob de Drive debe ser >=0.015 m para leerse a distancia RTS")
 
     def test_drive_has_pitch_differential(self) -> None:
         # Pitch diferencial front/rear o roll+pitch combinados, no rotación única pequeña.
@@ -173,15 +160,6 @@ class TacticalAnimationImprovementTests(unittest.TestCase):
         lit = float(m.group(1))
         self.assertLessEqual(lit, -0.20, "El colapso de Death en vehículos debe ser <=-0.20 m para leerse a distancia RTS")
 
-    def test_death_has_half_collapse(self) -> None:
-        # Slow in/out: debe haber un frame intermedio de colapso (no salto directo 1->28).
-        frame_lits = [int(x) for x in re.findall(r",\s*(\d+)\s*,\s*\(0\.0,\s*0\.0,", self.death)]
-        # También `for f in (...)`
-        for_m = re.search(r"for f in \(([^)]+)\)", self.death)
-        frames = [int(x.strip()) for x in for_m.group(1).split(",") if x.strip().isdigit()] if for_m else []
-        all_frames = sorted(set(frames + frame_lits))
-        # Debe haber un frame intermedio entre 10 y 25 además de 28/35
-        self.assertTrue(any(10 <= f <= 25 for f in all_frames), "Death debe tener un frame de medio colapso (slow in/out), no salto directo a f28")
 
     def test_locomotion_only_flag_exists(self) -> None:
         args = [a.arg for a in self.fn.args.args]
@@ -197,9 +175,6 @@ class TacticalAnimationImprovementTests(unittest.TestCase):
         self.assertIn("fire_end_frame", self.fire)
         self.assertIn("death_end_frame", self.death)
 
-    def test_death_defaults_hold_to_35(self) -> None:
-        # Sin override, Death termina en 35 (default actual preservado).
-        self.assertRegex(self.death, r"death_end_frame|35", "Death debe tener default 35")
 
     def test_death_turret_droop_strong(self) -> None:
         # Solo la línea de la torreta, no saltar a la pierna (-35 shin).

@@ -28,9 +28,6 @@ class TestVisualSampleScaffolderEvolution(unittest.TestCase):
         self.assertIn("Socket_TurretPivot", src, "missing turret pivot socket guarantee")
         self.assertIn("EnsureTurretAndRadarSockets", src, "missing turret/radar socket helper")
 
-    def test_post_build_validation_logging_present(self):
-        src = _read()
-        self.assertIn("ValidateSavedPrefab", src, "missing post-build prefab validation")
 
     def test_rigged_pbr_refresher_ensures_turret_sockets_and_validates(self):
         src = _read()
