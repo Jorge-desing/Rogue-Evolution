@@ -9,12 +9,13 @@ Use this skill as the single workflow for controlling or inspecting the live Rog
 
 ## MCP configuration and tool selection
 
-- The trusted project configuration in `.codex/config.toml` maps the existing `bepinex_mcp` server name to `tools/bepinex_mcp_server.py`. Its project-level entry overrides the global upstream server for this repository. Keep the tool namespace stable so existing workflows continue to address `bepinex_mcp`.
-- The server launcher is `scripts/start-server.ps1`. It starts the project bridge with the repository's `.tools/BepInExMCP/.venv`; do not replace the project config with the original `ModdersHelperApp.py` entry.
+- The trusted project configuration in `.codex/config.toml` maps the existing `bepinex_mcp` server name to this skill's `scripts/start-server.ps1`. It starts `tools/bepinex_mcp_server.py` with the repository's `.tools/BepInExMCP/.venv`; do not replace it with the upstream `ModdersHelperApp.py` entry.
+- Check host registration with `codex mcp list` and `codex mcp get bepinex_mcp`. If the server is configured but its `bepinex_mcp` tools are absent in the current Codex session, restart/reload Codex to load the project config, then call `discover_tools` to confirm the live tool catalog. Do not remove the project entry or fall back to the original server.
 - Use BepInEx MCP tools for runtime interaction. Do not use screenshots, screen recording, capture tools, Computer Use, or direct mouse/keyboard automation. If telemetry cannot establish a visual claim, report that boundary instead of switching to capture.
 - Prefer purpose-built `diagnostics_*` tools. Use the scene/component/type tools and `component_call_method` only when the diagnostics surface lacks the required operation. Resolve current GameObject IDs and exact scene-qualified selectors immediately before use; IDs expire across scenes and sessions.
 - For UI, use `diagnostics_ui_invoke_native_button` for `Michsky.UI.Reach.ButtonManager` controls and `diagnostics_ui_click_text` with the exact path from `diagnostics_get_ui_accessibility_census` for Unity `Selectable` controls. Require an unambiguous active target and its native interactability checks.
-- For accessible menus and the run director, follow [Native UI and intermission](references/ui-intermission.md). `diagnostics_fast_snapshot` presets `gui` and `intermission` provide bounded discovery reads; they are best-effort multi-read snapshots, so refresh the target census immediately before an action.
+- Start UI discovery with `diagnostics_get_runtime_control_surface` when available. It reads the active scene, Unity frame, and accessible UI on one Unity-thread call, and adds bounded run, route, reward/deck, and navigator sections only on an active intermission scene. Section failures remain isolated in the returned payload. `diagnostics_fast_snapshot` presets `gui` and `intermission` remain useful broader best-effort multi-read views; refresh the target census immediately before an action.
+- For accessible menus and the run director, follow [Native UI and intermission](references/ui-intermission.md).
 - For multi-step operations, use `automation_run_sequence` only with exact typed references to earlier successful steps. A timed-out in-flight action has an unknown result; query its postcondition before retrying.
 
 ## Live runtime workflow

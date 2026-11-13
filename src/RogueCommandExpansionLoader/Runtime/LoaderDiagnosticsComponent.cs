@@ -949,6 +949,123 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Captures the accessible UI and, on an active intermission scene, the
+        /// run director and reward/deck state in one synchronous Unity-thread call.
+        /// Every section is bounded and failures are reported per section.
+        /// </summary>
+        public string GetRuntimeControlSurfaceJson(string query = "", bool includeInactive = false, int maxUiResults = 64)
+        {
+            int uiLimit = Math.Max(1, Math.Min(100, maxUiResults));
+            string activeSceneName = string.Empty;
+            int frameCount = -1;
+            try { activeSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name ?? string.Empty; }
+            catch { }
+            try { frameCount = Time.frameCount; }
+            catch { }
+
+            Dictionary<string, object> uiCensus = CaptureControlSurfaceSection(
+                "uiCensus",
+                () => GetUiAccessibilityCensusJson(query ?? string.Empty, includeInactive, uiLimit));
+
+            Dictionary<string, object> runProgression = null;
+            Dictionary<string, object> intermissionCensus = null;
+            Dictionary<string, object> intermissionGraph = null;
+            Dictionary<string, object> rewardState = null;
+            Dictionary<string, object> navigatorState = null;
+            if (activeSceneName.IndexOf("Intermission", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                runProgression = CaptureControlSurfaceSection("runProgression", GetRunProgressionCensusJson);
+                intermissionCensus = CaptureControlSurfaceSection("nodeCensus", () => GetIntermissionCensusJson(64));
+                intermissionGraph = CaptureControlSurfaceSection("graphAndRoutes", () => GetIntermissionGraphJson(string.Empty, 8, 64));
+                rewardState = CaptureControlSurfaceSection("rewardAndDeckState", () => GetIntermissionRewardStateJson(32));
+                navigatorState = CaptureControlSurfaceSection("navigator", GetNavigatorStateJson);
+            }
+
+            return AgentDiagnosticsFormatter.SerializeRuntimeControlSurface(
+                activeSceneName,
+                frameCount,
+                uiLimit,
+                uiCensus,
+                runProgression,
+                intermissionCensus,
+                intermissionGraph,
+                rewardState,
+                navigatorState);
+        }
+
+        private static Dictionary<string, object> CaptureControlSurfaceSection(string sectionName, Func<string> capture)
+        {
+            try
+            {
+                JToken token = JToken.Parse(capture());
+                object value = ConvertControlSurfaceToken(token);
+                if (value is Dictionary<string, object> section)
+                {
+                    return section;
+                }
+
+                return new Dictionary<string, object> { ["value"] = value };
+            }
+            catch (Exception ex)
+            {
+                string message = ex.Message ?? ex.GetType().Name;
+                if (message.Length > 256)
+                {
+                    message = message.Substring(0, 256);
+                }
+                return new Dictionary<string, object>
+                {
+                    ["error"] = "section_capture_failed",
+                    ["section"] = sectionName ?? string.Empty,
+                    ["exception"] = ex.GetType().Name,
+                    ["message"] = message,
+                };
+            }
+        }
+
+        private static object ConvertControlSurfaceToken(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
+            {
+                return null;
+            }
+
+            if (token is JObject objectToken)
+            {
+                var values = new Dictionary<string, object>();
+                foreach (JProperty property in objectToken.Properties())
+                {
+                    values[property.Name] = ConvertControlSurfaceToken(property.Value);
+                }
+                return values;
+            }
+
+            if (token is JArray arrayToken)
+            {
+                var values = new List<object>();
+                foreach (JToken item in arrayToken)
+                {
+                    values.Add(ConvertControlSurfaceToken(item));
+                }
+                return values;
+            }
+
+            switch (token.Type)
+            {
+                case JTokenType.Integer:
+                    return token.Value<long>();
+                case JTokenType.Float:
+                    return token.Value<double>();
+                case JTokenType.Boolean:
+                    return token.Value<bool>();
+                case JTokenType.String:
+                    return token.Value<string>() ?? string.Empty;
+                default:
+                    return token.ToString(Formatting.None);
+            }
+        }
+
+        /// <summary>
         /// Finds a unique active UI control by exact label (or substring when
         /// requested) and delivers a real EventSystem click. Ambiguous labels
         /// fail closed; hierarchyPath disambiguates using a census result.

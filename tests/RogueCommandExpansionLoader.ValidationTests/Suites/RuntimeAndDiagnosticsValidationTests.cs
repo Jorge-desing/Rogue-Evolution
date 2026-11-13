@@ -4370,6 +4370,7 @@ internal static partial class ValidationTestRunner
             string[] required =
             {
                 "GetRunProgressionCensusJson",
+                "GetRuntimeControlSurfaceJson",
                 "GrantPlayerCreditsJson",
                 "ApplyInGameCardChangeJson",
                 "OrderUnitMoveJson",
@@ -4388,6 +4389,66 @@ internal static partial class ValidationTestRunner
                 {
                     throw new InvalidOperationException("Diagnostic catalog must include " + req + ".");
                 }
+            }
+        }
+    }),
+    ("runtime control surface serializer captures scene, frame, UI, conditional intermission, bounds, and section errors", () =>
+    {
+        var ui = new Dictionary<string, object>
+        {
+            ["kind"] = "uiAccessibilityCensus",
+            ["controls"] = new List<object>
+            {
+                new Dictionary<string, object> { ["label"] = "Continue Run", ["interactable"] = true }
+            }
+        };
+
+        string menuJson = AgentDiagnosticsFormatter.SerializeRuntimeControlSurface(
+            "MainMenu", 812, 1000, ui, null, null, null, null, null);
+        using (JsonDocument doc = JsonDocument.Parse(menuJson))
+        {
+            JsonElement root = doc.RootElement;
+            if (root.GetProperty("kind").GetString() != "runtimeControlSurface"
+                || root.GetProperty("activeSceneName").GetString() != "MainMenu"
+                || root.GetProperty("frameCount").GetInt32() != 812
+                || root.GetProperty("maxUiResults").GetInt32() != 100
+                || root.GetProperty("uiCensus").GetProperty("controls")[0].GetProperty("label").GetString() != "Continue Run"
+                || root.GetProperty("isIntermissionActive").GetBoolean()
+                || root.GetProperty("intermission").GetProperty("included").GetBoolean()
+                || root.GetProperty("intermission").TryGetProperty("nodeCensus", out _))
+            {
+                throw new InvalidOperationException("Menu control-surface snapshot must retain scene/frame/UI and omit intermission reads.");
+            }
+        }
+
+        var rewardError = new Dictionary<string, object>
+        {
+            ["error"] = "section_capture_failed",
+            ["section"] = "rewardAndDeckState"
+        };
+        string intermissionJson = AgentDiagnosticsFormatter.SerializeRuntimeControlSurface(
+            "IntermissionScreen", 913, 0,
+            new Dictionary<string, object> { ["error"] = "section_capture_failed", ["section"] = "uiCensus" },
+            new Dictionary<string, object> { ["kind"] = "runProgressionCensus", ["currentLevel"] = 3 },
+            new Dictionary<string, object> { ["kind"] = "intermissionCensus", ["nodeCount"] = 4 },
+            new Dictionary<string, object> { ["kind"] = "intermissionGraph", ["routeCount"] = 2 },
+            rewardError,
+            new Dictionary<string, object> { ["kind"] = "navigatorState", ["isPaused"] = false });
+        using (JsonDocument doc = JsonDocument.Parse(intermissionJson))
+        {
+            JsonElement root = doc.RootElement;
+            JsonElement intermission = root.GetProperty("intermission");
+            if (root.GetProperty("frameCount").GetInt32() != 913
+                || root.GetProperty("maxUiResults").GetInt32() != 1
+                || !root.GetProperty("isIntermissionActive").GetBoolean()
+                || !intermission.GetProperty("included").GetBoolean()
+                || intermission.GetProperty("runProgression").GetProperty("currentLevel").GetInt32() != 3
+                || intermission.GetProperty("nodeCensus").GetProperty("nodeCount").GetInt32() != 4
+                || intermission.GetProperty("graphAndRoutes").GetProperty("routeCount").GetInt32() != 2
+                || intermission.GetProperty("rewardAndDeckState").GetProperty("error").GetString() != "section_capture_failed"
+                || intermission.GetProperty("navigator").GetProperty("isPaused").GetBoolean())
+            {
+                throw new InvalidOperationException("Intermission control-surface snapshot must retain bounded sections and independent errors.");
             }
         }
     }),

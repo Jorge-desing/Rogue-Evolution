@@ -1432,6 +1432,55 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Serializes a same-thread control-surface snapshot. Intermission detail is
+        /// included only when the active scene is an intermission scene; each captured
+        /// section is a plain bounded JSON object and may independently carry an error.
+        /// </summary>
+        public static string SerializeRuntimeControlSurface(
+            string activeSceneName,
+            int frameCount,
+            int maxUiResults,
+            Dictionary<string, object> uiCensus,
+            Dictionary<string, object> runProgression,
+            Dictionary<string, object> intermissionCensus,
+            Dictionary<string, object> intermissionGraph,
+            Dictionary<string, object> intermissionRewardState,
+            Dictionary<string, object> navigatorState)
+        {
+            string sceneName = activeSceneName ?? string.Empty;
+            bool intermissionActive = sceneName.IndexOf("Intermission", StringComparison.OrdinalIgnoreCase) >= 0;
+            var intermission = new Dictionary<string, object>
+            {
+                ["included"] = intermissionActive,
+            };
+            if (intermissionActive)
+            {
+                intermission["runProgression"] = runProgression ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
+                intermission["nodeCensus"] = intermissionCensus ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
+                intermission["graphAndRoutes"] = intermissionGraph ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
+                intermission["rewardAndDeckState"] = intermissionRewardState ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
+                intermission["navigator"] = navigatorState ?? new Dictionary<string, object> { ["error"] = "section_not_captured" };
+            }
+            else
+            {
+                intermission["reason"] = "active_scene_is_not_intermission";
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "runtimeControlSurface",
+                ["consistency"] = "singleUnityThread",
+                ["activeSceneName"] = sceneName,
+                ["frameCount"] = frameCount,
+                ["maxUiResults"] = Math.Max(1, Math.Min(100, maxUiResults)),
+                ["uiCensus"] = uiCensus ?? new Dictionary<string, object> { ["error"] = "section_not_captured" },
+                ["isIntermissionActive"] = intermissionActive,
+                ["intermission"] = intermission,
+            };
+            return Serialize(view);
+        }
+
+        /// <summary>
         /// Serializes the intermission node-selection result. Status fields come
         /// before the reason detail so bounded truncation never hides the outcome.
         /// </summary>
@@ -4162,6 +4211,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 new Dictionary<string, object> { ["name"] = "GetBaseIntegrityCensusJson", ["description"] = "Player command HQ and enemy base structure integrity telemetry." },
                 new Dictionary<string, object> { ["name"] = "OrderFactoryProduceJson", ["description"] = "Trigger in-game unit production order on a player factory." },
                 new Dictionary<string, object> { ["name"] = "GetRunProgressionCensusJson", ["description"] = "Run progression parameters, active relics, offered blueprints, and scene telemetry." },
+                new Dictionary<string, object> { ["name"] = "GetRuntimeControlSurfaceJson", ["description"] = "Single-Unity-thread accessible UI snapshot with conditional intermission, route, reward/deck, and navigator state." },
                 new Dictionary<string, object> { ["name"] = "GrantPlayerCreditsJson", ["description"] = "Grant economy credits to player bank balance." },
                 new Dictionary<string, object> { ["name"] = "ApplyInGameCardChangeJson", ["description"] = "Apply a data-driven card change to an entity via native EntityBalancingStore." },
                 new Dictionary<string, object> { ["name"] = "OrderUnitMoveJson", ["description"] = "Dispatch an in-game move command to a unit by entity key id." },
