@@ -5,6 +5,11 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Agent sequence uncertainty handling
+
+- Diagnostics method calls only retry explicit stale-ID errors, not generic response text, HTTP errors, or transport uncertainty. Sequences stop on unknown completion or native calls whose effect was not observed even with `stopOnFailure=false`; `postconditionInspectionRequired` marks the affected step. Budget exhaustion also halts. Agents must refresh state before retrying uncertain actions.
+- Local simulated tests cover retries, uncertainty and continuation; no live game was started.
+
 ## 2026-11-13 Antigravity MCP integration
 
 - The MCP stdio reader handles UTF-8 `Content-Length` as bytes and supports consecutive frames and newline-delimited requests. The configuration-generation test uses an isolated temporary repository and LOCALAPPDATA.

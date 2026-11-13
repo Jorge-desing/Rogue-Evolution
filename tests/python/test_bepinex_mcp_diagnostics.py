@@ -16,6 +16,36 @@ SERVER = load_tool_module("bepinex_mcp_server")
 
 
 class RuntimeDiagnosticsTests(unittest.TestCase):
+    def test_uncertain_sequence_outcomes_stop_even_if_continuation_requested(self) -> None:
+        for result in ({"error": "timeout", "completionStatus": "unknown"},
+                       {"nativeCallInvoked": True, "effectObserved": False}):
+            with self.subTest(result=result), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(result)) as call:
+                response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
+                    {"tool": "diagnostics_get_game_time_scale"},
+                    {"tool": "diagnostics_get_game_time_scale"},
+                ]})
+                payload = json.loads(response["content"][0]["text"])
+                self.assertTrue(response["isError"])
+                self.assertTrue(payload["results"][0]["postconditionInspectionRequired"])
+                self.assertEqual(call.call_count, 1)
+
+    def test_diagnostics_calls_never_replay_ambiguous_response_text(self) -> None:
+        for result in ({"error": "HTTP Error 500"}, {"success": False, "message": "entity not found"},
+                       {"error": "connection failed", "completionStatus": "unknown"},
+                       {"status": "ok", "message": "ReturnValue: {\"count\":500}"}):
+            with self.subTest(result=result), mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73), \
+                    mock.patch.object(SERVER, "_call_http", return_value=json.dumps(result)) as call:
+                SERVER._call_diagnostics_method("OrderUnitMoveJson", [])
+                self.assertEqual(call.call_count, 1)
+
+    def test_diagnostics_call_retries_only_explicit_invalid_id(self) -> None:
+        with mock.patch.object(SERVER, "_DIAGNOSTICS_GO_ID", 73), \
+                mock.patch.object(SERVER, "_get_diagnostics_go_id", side_effect=[73, 74]), \
+                mock.patch.object(SERVER, "_call_http", side_effect=[json.dumps({"error": "Missing or invalid 'id'"}), json.dumps({"status": "ok"})]) as call:
+            result = SERVER._call_diagnostics_method("GetValueJson")
+        self.assertEqual(call.call_count, 2)
+        self.assertEqual(json.loads(result)["status"], "ok")
+
     def test_stdio_reads_utf8_frames_and_lines_without_losing_boundaries(self) -> None:
         one = json.dumps({"id": 1, "label": "ñ🚀"}, ensure_ascii=False).encode("utf-8")
         two = b'{"id":2}'

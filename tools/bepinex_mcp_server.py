@@ -786,7 +786,9 @@ def _call_diagnostics_method(method_name: str, args: list | None = None) -> str:
         except (TypeError, ValueError):
             response_metadata = None
         transport_expired = isinstance(response_metadata, dict) and bool(response_metadata.get("completionStatus"))
-        if not transport_expired and ("Missing or invalid 'id'" in raw or "not found" in raw.lower() or "GameObject" in raw or "500" in raw or "HTTP Error" in raw):
+        error_text = response_metadata.get("error", "") if isinstance(response_metadata, dict) else ""
+        stale_id = isinstance(error_text, str) and "missing or invalid 'id'" in error_text.lower()
+        if not transport_expired and stale_id:
             _DIAGNOSTICS_GO_ID = None
             go_id = _get_diagnostics_go_id()
             raw = _call_http("component/call_method", params={
@@ -924,6 +926,12 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 budget_exceeded = time.monotonic() > deadline
                 if budget_exceeded:
                     step_failed = True
+                uncertain = isinstance(parsed_step, dict) and (
+                    parsed_step.get("completionStatus") == "unknown"
+                    or (parsed_step.get("nativeCallInvoked") is True and parsed_step.get("effectObserved") is False)
+                )
+                if uncertain:
+                    step_failed = True
                 check_results = []
                 if not step_failed:
                     for check in step.get("expect", []):
@@ -947,10 +955,11 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     "durationMs": round((time.monotonic() - step_started) * 1000, 1),
                     "result": step_result,
                     "checks": check_results,
+                    "postconditionInspectionRequired": uncertain,
                 })
                 if step_failed:
                     failed = True
-                    if stop_on_failure or step.get("expect"):
+                    if stop_on_failure or step.get("expect") or uncertain or budget_exceeded:
                         break
                 if delay_after_ms:
                     remaining = max_duration - (time.monotonic() - started)
