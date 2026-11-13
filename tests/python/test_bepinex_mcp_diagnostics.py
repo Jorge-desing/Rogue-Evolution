@@ -436,11 +436,21 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         forward_payload = json.loads(forward["content"][0]["text"])
         failed_payload = json.loads(failed_source["content"][0]["text"])
-        self.assertFalse(forward_payload["success"])
-        self.assertIn("earlier step", forward_payload["results"][0]["error"])
+        self.assertTrue(forward["isError"])
+        self.assertIn("earlier step", forward_payload["error"])
         self.assertFalse(failed_payload["results"][1]["success"])
         self.assertIn("did not succeed", failed_payload["results"][1]["error"])
         self.assertEqual(["OrderUnitMoveJson"], calls)
+
+    def test_later_invalid_nested_reference_blocks_all_steps(self) -> None:
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as bridge:
+            response = SERVER.execute_tool("automation_run_sequence", {"steps": [
+                {"tool": "diagnostics_order_unit_move", "arguments": {"entityKeyId": "unit", "destinationX": 1, "destinationZ": 2}},
+                {"tool": "diagnostics_order_unit_move", "arguments": {"nested": [{"$ref": {"step": 1, "path": "/id"}}]}},
+            ]})
+        self.assertTrue(response["isError"])
+        self.assertIn("earlier step", json.loads(response["content"][0]["text"])["error"])
+        bridge.assert_not_called()
 
     def test_native_michsky_button_activation_checks_target_then_invokes_callback(self) -> None:
         calls: list[tuple[str, dict[str, object]]] = []

@@ -5,6 +5,10 @@
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)
 **Mission:** Create a modular, content-first expansion mod for Rogue Command featuring original playable units, base production buildings, stages, tactical AI profiles, and custom 3D visuals. BepInEx and Harmony provide loader infrastructure; playable content and runtime stability are the mod's deliverables.
 
+## 2026-11-13 Sequence reference preflight
+
+- `automation_run_sequence` validates nested reference shape, earlier-step ordering, and JSON Pointer escapes across all steps before any bridge call. It still resolves values and checks prior success at runtime. This prevents a malformed later reference from being discovered only after an earlier mutation. Local mock tests cover the contract; no in-game behavior was tested.
+
 ## 2026-11-13 Agent sequence checks
 
 - `automation_run_sequence` accepts up to eight `expect` checks per step, each `{ "path": "/json/pointer", "equals": <JSON value> }`. Matching is type-sensitive; missing values, mismatches and failure of a guarded call stop the sequence even when `stopOnFailure=false`. Results include each observed value or lookup error. Checks are local snapshots and do not lock Unity state. Static preflight checks their shape; runtime reference and timeout limitations remain.

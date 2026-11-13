@@ -666,6 +666,25 @@ def _matching_renderer_probe_frames(
     return [frames[frame] for frame in sorted(frames)]
 
 
+def _validate_sequence_references(value: Any, step_index: int) -> None:
+    if isinstance(value, dict):
+        if "$ref" in value:
+            ref = value["$ref"]
+            if set(value) != {"$ref"} or not isinstance(ref, dict) or set(ref) != {"step", "path"}:
+                raise ValueError("$ref must contain exactly step and path, without sibling properties")
+            step, path = ref["step"], ref["path"]
+            if isinstance(step, bool) or not isinstance(step, int) or not 0 <= step < step_index:
+                raise ValueError("$ref step must identify an earlier step")
+            if not isinstance(path, str) or not path.startswith("/") or re.search(r"~(?![01])", path):
+                raise ValueError("$ref path must be a valid non-empty JSON Pointer")
+        else:
+            for child in value.values():
+                _validate_sequence_references(child, step_index)
+    elif isinstance(value, list):
+        for child in value:
+            _validate_sequence_references(child, step_index)
+
+
 def _resolve_sequence_references(value: Any, step_index: int, prior_results: list[dict[str, Any]], argument_path: str = "$") -> Any:
     if isinstance(value, dict):
         if "$ref" in value:
@@ -833,6 +852,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     return _tool_response(json.dumps({"error": f"steps[{index}].tool is not an allowed diagnostics tool", "tool": step_tool}), is_error=True)
                 if not isinstance(step.get("arguments", {}), dict):
                     return _tool_response(json.dumps({"error": f"steps[{index}].arguments must be an object"}), is_error=True)
+                try:
+                    _validate_sequence_references(step.get("arguments", {}), index)
+                except ValueError as exc:
+                    return _tool_response(json.dumps({"error": f"steps[{index}].arguments: {exc}"}), is_error=True)
                 checks = step.get("expect", [])
                 if not isinstance(checks, list) or len(checks) > 8:
                     return _tool_response(json.dumps({"error": f"steps[{index}].expect must be an array of at most 8 checks"}), is_error=True)
