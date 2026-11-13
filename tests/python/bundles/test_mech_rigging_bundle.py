@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import unittest
 from pathlib import Path
 
@@ -30,8 +31,21 @@ SAMPLE_NATIVE_BUNDLE = (
 
 @unittest.skipUnless(validator.HAS_UNITYPY, "UnityPy is required for AssetBundle rigging audits")
 class MechRiggingBundleTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._audits = {}
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._audits.clear()
+
+    def _audit(self, path):
+        if path not in self._audits:
+            self._audits[path] = validator.MechRigValidator().validate_asset_bundle(path)
+        return copy.deepcopy(self._audits[path])
+
     def test_tactical_operations_bundle_exposes_rig_animator_and_action_contract(self) -> None:
-        audits = validator.MechRigValidator().validate_asset_bundle(TACTICAL_BUNDLE)
+        audits = self._audit(TACTICAL_BUNDLE)
         audits_by_name = {audit.model_name: audit for audit in audits}
         expected = {
             "TidebreakerHovercraftVisual",
@@ -64,7 +78,7 @@ class MechRiggingBundleTests(unittest.TestCase):
                 self.assertTrue(any("Action_Death" in clip for clip in audit.animation_clips))
 
     def test_sample_native_remaining_vehicle_overlays_expose_rig_animation_contract(self) -> None:
-        audits = validator.MechRigValidator().validate_asset_bundle(SAMPLE_NATIVE_BUNDLE)
+        audits = self._audit(SAMPLE_NATIVE_BUNDLE)
         audits_by_name = {audit.model_name: audit for audit in audits}
         expected = {
             "ScoutTankVisual",
@@ -93,11 +107,8 @@ class MechRiggingBundleTests(unittest.TestCase):
         for bundle_path in (TACTICAL_BUNDLE, SAMPLE_NATIVE_BUNDLE):
             with self.subTest(bundle=bundle_path.name):
                 env = validator.UnityPy.load(str(bundle_path))
-                fire_clips = [
-                    obj.read()
-                    for obj in env.objects
-                    if obj.type.name == "AnimationClip" and "FireRecoil" in obj.read().m_Name
-                ]
+                clips = (obj.read() for obj in env.objects if obj.type.name == "AnimationClip")
+                fire_clips = [clip for clip in clips if "FireRecoil" in clip.m_Name]
                 self.assertEqual(len(fire_clips), 9)
                 for clip in fire_clips:
                     payload = clip.m_MuscleClip.m_Clip.data

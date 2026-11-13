@@ -1,10 +1,10 @@
 ---
 name: rogue-command-pack-validation
 description: "Validate Rogue Command content manifests, AssetBundles, loader builds, and install packages before delivery."
-version: 1.2.0
 license: MIT
-author: Hermes Agent
 metadata:
+  version: 1.2.0
+  author: Hermes Agent
   hermes:
     tags: [Rogue Command, pack validation, schema, AssetBundles, harness, testing, deployment]
     related_skills: [rogue-command-clean-room-diagnostics, rogue-command-harmony-policy, rogue-command-unit-authoring]
@@ -21,7 +21,7 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 | Test Suite / Tool | Command | Scope & Success Baseline |
 |---|---|---|
 | **C# Loader Harness** | `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests -- .` | **556 passed / 1 skipped** (symlink). Compiles against minimal `UnityEngine` stub; keep pure logic separate from Unity `MonoBehaviour` |
-| **Python Registry & Balance** | `python -B -m unittest discover -s tests -v` | **479 passed / 1 skipped** out of 480 checks |
+| **Complete Python suite** | `python -m tools.run_python_tests --output artifacts/python-tests/report.json` | Runs CPython tests and Blender-only modules serially with the pinned Blender; reports every selected module, discovered case, failure, skip and timing. A missing required runtime or failed group returns nonzero. |
 | **AssetBundle Audit** | `python tools/audit_unity_bundle.py <bundle>` | Inspects object counts, texture formats, shaders, dependencies, and byte size |
 | **Pack Manifest Validator** | `python tools/validate_content_pack.py <pack_dir>` | Validates `content.json` against schema, checks referenced assets & duplicate IDs |
 | **Packaging Runner** | `powershell -File tools/Package-Loader.ps1` | Creates release ZIP without test assemblies, PDBs, or editor caches |
@@ -29,6 +29,8 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 ---
 
 ## 2. Manifest Schema & Parameter Rules
+
+For directed Python iteration use `--mode unit` or `--mode blender`; only the default `all` mode covers both. `unit` also includes existing CPython tests that launch Blender subprocesses. Override `--blender` for an explicitly chosen binary and `--timeout` for the per-worker limit. Reports retain existing asset/contract failures; do not interpret partial-mode success as full-suite acceptance. Shared test fixtures must stay class-scoped and read-only, or return independent copies to mutating cases; dynamic tool modules and mutable temporary files must remain uncached.
 
 - **Schema Compliance:** Validate `content.json` against Draft 2020-12 rules in `content/schema/content.schema.json`.
 - **Unit Variants (`units[].variants`):** Up to 8 loadout variants per unit; max 64 `balanceOverrides` per variant. Variant IDs must reject line terminators (`\r`, `\n`, CRLF, U+2028, U+2029).

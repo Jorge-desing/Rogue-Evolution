@@ -6,6 +6,8 @@ El trabajo prioriza contenido original que se pueda jugar: unidades con identida
 
 Para retomar el trabajo en otro chat o con otro agente, comienza por [docs/research/AGENT-HANDOFF.md](docs/research/AGENT-HANDOFF.md). Resume el estado del contenido, el cargador de soporte, comandos, proyecto Unity y límites de la evidencia. La búsqueda de herramientas y sus usos recomendados está en [docs/research/CONTENT-AUTHORING-TOOLS.md](docs/research/CONTENT-AUTHORING-TOOLS.md).
 
+Para ejecutar todas las pruebas Python: `python -m tools.run_python_tests --output artifacts/python-tests/report.json`. El ejecutor usa CPython y el Blender fijado según los imports de cada módulo y devuelve un código distinto de cero ante fallos, timeouts o entornos requeridos ausentes. `--mode unit` y `--mode blender` permiten comprobaciones parciales; el modo predeterminado `all` ejecuta ambos grupos en serie. El JSON registra inventario, resultados y tiempos; `--blender` y `--timeout` permiten fijar el ejecutable y el límite por proceso. La preparación mide `setUp` por caso; los fixtures de clase/módulo quedan incluidos en ejecución.
+
 ## Compatibilidad fijada
 
 El plugin solo instala patches cuando coinciden estas condiciones:

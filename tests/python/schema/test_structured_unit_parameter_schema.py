@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import struct
@@ -50,7 +51,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
 
         for value in probes:
             with self.subTest(value=value):
-                manifest = json.loads(json.dumps(self.sample))
+                manifest = copy.deepcopy(self.sample)
                 manifest["units"][0]["cardModelScalingFactor"] = value
                 schema_accepts = self.validator.is_valid(manifest)
                 runtime_accepts = to_float32(value) > runtime_minimum and to_float32(value) <= 100.0
@@ -62,7 +63,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 )
 
     def test_native_grounding_parameters_valid(self) -> None:
-        manifest = json.loads(json.dumps(self.sample))
+        manifest = copy.deepcopy(self.sample)
         unit = manifest["units"][0]
         unit["copyUpgradesToEntityId"] = "sample:unit-ironclad"
         unit["roles"] = ["Attacker", "Mech"]
@@ -94,12 +95,12 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = json.loads(json.dumps(self.sample))
+                manifest = copy.deepcopy(self.sample)
                 manifest["units"][0][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
     def test_relic_expanded_card_changes_valid(self) -> None:
-        manifest = json.loads(json.dumps(self.sample))
+        manifest = copy.deepcopy(self.sample)
         relic = manifest["relics"][0]
         relic["coinsAmount"] = 150
         relic["inactive"] = False
@@ -138,7 +139,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = json.loads(json.dumps(self.sample))
+                manifest = copy.deepcopy(self.sample)
                 if field == "coinsAmount":
                     manifest["relics"][0]["coinsAmount"] = invalid_val
                 else:
@@ -146,7 +147,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
     def test_production_building_structured_parameters_valid(self) -> None:
-        manifest = json.loads(json.dumps(self.sample))
+        manifest = copy.deepcopy(self.sample)
         pb = manifest["units"][0]["productionBuilding"]
         pb["gridSize"] = 2
         pb["maxCapacity"] = 10
@@ -178,12 +179,12 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = json.loads(json.dumps(self.sample))
+                manifest = copy.deepcopy(self.sample)
                 manifest["units"][0]["productionBuilding"][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject productionBuilding.{field}={invalid_val}")
 
     def test_standalone_buildings_schema_valid(self) -> None:
-        manifest = json.loads(json.dumps(self.sample))
+        manifest = copy.deepcopy(self.sample)
         manifest["buildings"] = [
             {
                 "id": "sample-native:test-defense-turret",
@@ -245,7 +246,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = json.loads(json.dumps(self.sample))
+                manifest = copy.deepcopy(self.sample)
                 manifest["buildings"] = [
                     {
                         "id": "sample-native:test-turret",
@@ -256,7 +257,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject building.{field}={invalid_val}")
 
     def test_unit_behavioral_and_audio_schema_valid(self) -> None:
-        manifest = json.loads(json.dumps(self.sample))
+        manifest = copy.deepcopy(self.sample)
         unit = manifest["units"][0]
         unit["rotationDegreesPerSecond"] = 180.0
         unit["collisionRadius"] = 2.5
@@ -289,12 +290,12 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = json.loads(json.dumps(self.sample))
+                manifest = copy.deepcopy(self.sample)
                 manifest["units"][0][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
     def test_unit_level_ai_module_is_rejected(self) -> None:
-        manifest = json.loads(json.dumps(self.sample))
+        manifest = copy.deepcopy(self.sample)
         manifest["units"][0]["aiModule"] = {
             "moduleId": "sample:skirmish-kiting",
             "parameters": {},

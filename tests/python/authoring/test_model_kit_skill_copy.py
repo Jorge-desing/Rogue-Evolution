@@ -15,6 +15,29 @@ SKILL_GUM = REPO_ROOT / ".agents" / "skills" / "rogue-command-3d-model-authoring
 class TestModelKitSkillCopy(unittest.TestCase):
     """Verifies that the canonical authoring tools match their skill copies exactly."""
 
+    @classmethod
+    def setUpClass(cls):
+        cls._source_snapshots = {}
+        cls._syntax_snapshots = {}
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._source_snapshots.clear()
+        cls._syntax_snapshots.clear()
+
+    def _read_source(self, path):
+        path = Path(path)
+        if path not in self._source_snapshots:
+            self._source_snapshots[path] = path.read_text(encoding="utf-8")
+        return self._source_snapshots[path]
+
+    def _parse_source(self, source, filename):
+        # These contract checks only traverse ASTs; none mutates them.
+        key = (filename, source)
+        if key not in self._syntax_snapshots:
+            self._syntax_snapshots[key] = ast.parse(source, filename=filename)
+        return self._syntax_snapshots[key]
+
     def test_rogue_model_kit_byte_parity(self) -> None:
         """RogueModelKit.py in tools/ and in skill scripts/ must be byte-for-byte identical."""
         self.assertTrue(TOOLS_RMK.is_file(), f"Missing {TOOLS_RMK}")
@@ -43,8 +66,8 @@ class TestModelKitSkillCopy(unittest.TestCase):
 
     def test_wave7_archetypes_and_defaults(self) -> None:
         """generate_unit_model.py must register all 42 mobile vehicle archetypes without duplicates."""
-        gum_text = TOOLS_GUM.read_text(encoding="utf-8")
-        parsed = ast.parse(gum_text, filename=str(TOOLS_GUM))
+        gum_text = self._read_source(TOOLS_GUM)
+        parsed = self._parse_source(gum_text, filename=str(TOOLS_GUM))
 
         all_archetypes = None
         default_weapons = None
@@ -105,8 +128,8 @@ class TestModelKitSkillCopy(unittest.TestCase):
 
     def test_wave7_assemblies_and_builder_methods(self) -> None:
         """RogueModelKit.py must contain all 6 Wave 7 procedural assemblies and builder chaining methods."""
-        rmk_text = TOOLS_RMK.read_text(encoding="utf-8")
-        parsed = ast.parse(rmk_text, filename=str(TOOLS_RMK))
+        rmk_text = self._read_source(TOOLS_RMK)
+        parsed = self._parse_source(rmk_text, filename=str(TOOLS_RMK))
 
         func_names = set()
         vehicle_builder_methods = set()
@@ -174,7 +197,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
 
     def test_nanite_support_rover_wheel_lugs_clear_ground_plane(self) -> None:
         """Wave 7 support-rover wheels leave margin for the generated tread lugs."""
-        generator_source = TOOLS_GUM.read_text(encoding="utf-8")
+        generator_source = self._read_source(TOOLS_GUM)
         self.assertIn(
             "wheel_z = builder.ground_clearance + 0.43 + 0.035",
             generator_source,
@@ -182,8 +205,8 @@ class TestModelKitSkillCopy(unittest.TestCase):
 
     def test_hard_surface_realism_assemblies_and_methods(self) -> None:
         """RogueModelKit.py must contain the anti-primitive hard-surface realism assemblies and builder chaining methods."""
-        rmk_text = TOOLS_RMK.read_text(encoding="utf-8")
-        parsed = ast.parse(rmk_text, filename=str(TOOLS_RMK))
+        rmk_text = self._read_source(TOOLS_RMK)
+        parsed = self._parse_source(rmk_text, filename=str(TOOLS_RMK))
 
         func_names = set()
         vehicle_builder_methods = set()
@@ -259,8 +282,8 @@ class TestModelKitSkillCopy(unittest.TestCase):
 
     def test_industrial_facility_realism_assemblies_and_methods(self) -> None:
         """RogueModelKit.py must contain ASME process piping, dished pressure vessels, gantry crane, and caged ladder assemblies."""
-        rmk_text = TOOLS_RMK.read_text(encoding="utf-8")
-        parsed = ast.parse(rmk_text, filename=str(TOOLS_RMK))
+        rmk_text = self._read_source(TOOLS_RMK)
+        parsed = self._parse_source(rmk_text, filename=str(TOOLS_RMK))
 
         func_names = set()
         structure_builder_methods = set()
@@ -293,7 +316,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
 
     def test_archetypes_use_hard_surface_realism_assemblies(self) -> None:
         """Archetypes must consume the new anti-primitive hard-surface realism assemblies."""
-        generator_source = TOOLS_GUM.read_text(encoding="utf-8")
+        generator_source = self._read_source(TOOLS_GUM)
         self.assertGreaterEqual(generator_source.count("builder.add_cast_pelvis"), 4)
         self.assertGreaterEqual(generator_source.count("builder.add_mech_torso"), 4)
         self.assertGreaterEqual(generator_source.count("builder.add_wheel_fenders"), 3)
@@ -379,7 +402,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
         support = REPO_ROOT / "tools" / "ActiveUnitVisualEnhancements.py"
         self.assertTrue(support.is_file(), f"Missing {support}")
         namespace = {}
-        tree = ast.parse(support.read_text(encoding="utf-8"), filename=str(support))
+        tree = self._parse_source(self._read_source(support), filename=str(support))
         profile_assignment = next(
             node for node in tree.body
             if isinstance(node, ast.Assign)
@@ -414,7 +437,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
     def test_active_units_have_wave34_anchor_profiles(self) -> None:
         """Every active visual unit declares the 55442dd structural-detail profile it consumes."""
         support = REPO_ROOT / "tools" / "ActiveUnitVisualEnhancements.py"
-        tree = ast.parse(support.read_text(encoding="utf-8"), filename=str(support))
+        tree = self._parse_source(self._read_source(support), filename=str(support))
         profile_assignment = next(
             (
                 node for node in tree.body
@@ -462,7 +485,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
     def test_active_units_have_realism_profiles(self) -> None:
         """Every active unit declares its Wave 11-13 hard-surface realism profile."""
         support = REPO_ROOT / "tools" / "ActiveUnitVisualEnhancements.py"
-        tree = ast.parse(support.read_text(encoding="utf-8"), filename=str(support))
+        tree = self._parse_source(self._read_source(support), filename=str(support))
         profile_assignment = next(
             (
                 node for node in tree.body
@@ -520,7 +543,7 @@ class TestModelKitSkillCopy(unittest.TestCase):
 
     def test_generator_batch_help_matches_current_archetype_catalog(self) -> None:
         """The public batch flag must advertise all 42 current mobile archetypes."""
-        source = TOOLS_GUM.read_text(encoding="utf-8")
+        source = self._read_source(TOOLS_GUM)
         self.assertIn(
             'help="Batch generate all 42 archetypes into the output directory"',
             source,
