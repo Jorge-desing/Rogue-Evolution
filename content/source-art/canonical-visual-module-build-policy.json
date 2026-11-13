@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "allowUncalibratedCanonicalLevel2": true,
+  "authorizationStatus": "user-authorized-until-revoked",
+  "lodTriangleRetentionRatios": [
+    1.0,
+    0.5,
+    0.25
+  ],
+  "lodScreenRelativeTransitionHeights": [
+    0.6,
+    0.3,
+    0.1
+  ],
+  "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED"
+}
