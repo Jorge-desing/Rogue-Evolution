@@ -2333,6 +2333,6 @@ The generated unit models, prefab authoring outputs, compiled visual bundle, and
 ## 2026-11-14 Retirada del snapshot versionado de memoria
 
 - Se eliminó el snapshot CSV del repositorio y se quitaron las instrucciones de mantenerlo o consultarlo. Los agentes consultan Mem0 para preferencias y decisiones duraderas, usan la búsqueda MCP del ámbito Hermes cuando corresponde y verifican los datos contra Git, el README, el handoff y las fuentes actuales.
-- También se limpiaron las referencias históricas que apuntaban al snapshot retirado en `MEMORY.md`, este handoff y la nota de reparación de pruebas. La búsqueda de referencias en el checkout no encontró menciones restantes.
-- Validación documental: `git diff --check` y búsqueda con `rg` sin resultados. No se ejecutaron pruebas de producto porque solo cambiaron documentación y datos versionados.
+- También se limpiaron las referencias históricas del handoff y la nota de reparación de pruebas. `MEMORY.md` quedó restaurado a su estado anterior.
+- Validación documental: `git diff --check` pasó. La búsqueda focalizada confirma que las instrucciones operativas ya no requieren ese CSV. No se ejecutaron pruebas de producto porque solo cambiaron documentación y datos versionados.
 - Siguiente acción: publicar únicamente este retiro documental, la eliminación del snapshot y las reglas de agente; conservar los demás cambios staged y sin stage del checkout.
