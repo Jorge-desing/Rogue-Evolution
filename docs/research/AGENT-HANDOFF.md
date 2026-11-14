@@ -2,6 +2,8 @@
 
 ## Combat aura modifiers (2026-11-14)
 
+Deployment completed after the game closed. Release rebuilt without warnings and the installed DLL matched SHA-256 `43F0A13B0E0BFF358DAD77B79D46071D852374CF4A5760ED95DD4421202403DF`. Backup and manifest: `artifacts/general-capability-audit/aura-deployment-20261114144714/manifest.json`. The pending-deployment note below is superseded; gameplay and balance remain unverified.
+
 Buff auras now apply `buffAmount` percentage points to native Damage and ArmorProtection; Debuff reduces MoveSpeed by that percentage, bounded at 100%. Same source unit ID refreshes the 1.5-second modifier; statuses must be applied successfully and recipient cap remains 16. Heal/Shield retain point amounts. Release built without warnings and C# acceptance passed 602 with one symlink privilege skip (`artifacts/general-capability-audit/aura/complete.log`). Steam behavior and balance are unverified. Deployment is pending: a Rogue Command process was active during the pass; after safe game closure back up the installed DLL, deploy the verified Release artifact and check hashes. Next verify combat modifiers and expiry in an authorized run.
 
 
