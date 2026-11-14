@@ -17,6 +17,35 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("native Shop exit rejects stale and disabled controls and preserves uncertain invocation", () =>
+    {
+        try
+        {
+            Shop._instance = null;
+            if (RuntimeIntermissionNativePanels.TryLeaveShop(1).NativeCallInvoked) throw new Exception("closed Shop invoked");
+            Shop._instance = new Shop();
+            var button = new ShopLeaveButton();
+            var ui = new Michsky.UI.Reach.ButtonManager();
+            button.gameObject.AddComponentExisting(ui);
+            ui.gameObject = button.gameObject;
+            UnityEngine.Object.NativeControlTestObjects = new UnityEngine.Object[] { button };
+            int id = button.gameObject.GetInstanceID();
+            if (RuntimeIntermissionNativePanels.TryLeaveShop(id + 1).NativeCallInvoked) throw new Exception("stale target invoked");
+            ui.isInteractable = false;
+            if (RuntimeIntermissionNativePanels.TryLeaveShop(id).NativeCallInvoked) throw new Exception("disabled target invoked");
+            ui.isInteractable = true;
+            button.Close = false;
+            var uncertain = RuntimeIntermissionNativePanels.TryLeaveShop(id);
+            if (!uncertain.NativeCallInvoked || uncertain.EffectObserved || button.Calls != 1) throw new Exception("uncertain result lost");
+            button.Throw = true;
+            var failed = RuntimeIntermissionNativePanels.TryLeaveShop(id);
+            if (!failed.NativeCallInvoked || failed.EffectObserved || button.Calls != 2) throw new Exception("exception result lost");
+            button.Throw = false; button.Close = true;
+            var success = RuntimeIntermissionNativePanels.TryLeaveShop(id);
+            if (!success.Success || !success.EffectObserved || button.Calls != 3) throw new Exception("native exit failed");
+        }
+        finally { Shop._instance = null; UnityEngine.Object.NativeControlTestObjects = Array.Empty<UnityEngine.Object>(); }
+    }),
     ("screen overlay canvases bypass camera projection while camera canvases keep their assigned camera", () =>
     {
         var overlayCamera = new Camera();

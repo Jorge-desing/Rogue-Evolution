@@ -46,3 +46,11 @@ Verify the intended offered ID, queue transition or deck change rather than mere
 `dryRun=true` queries state and returns checks and the observation with `nativeCallInvoked=false`; it does not validate native affordability, click readiness, target identity or authorization. `actionValidationRequired=true` makes that boundary explicit. With no preconditions, a dry run only confirms that the census was read successfully. Dry runs never reserve an offer. A guarded live action performs one fresh read and then calls the existing native action once; this is not atomic across the two Unity calls. Native target checks remain authoritative, and uncertain results require inspection before any retry. Both new controls are optional; existing calls retain their behavior.
 
 A failed guarded action or dry-run preflight stops its sequence even when `stopOnFailure=false`. Inspect the returned checks before any further mutation.
+
+## Native Shop exit
+
+The loader now provides `OrderLeaveIntermissionShopJson(gameObjectId)` backed by `ShopLeaveButton.OnPress()`. It requires an active Shop without removal dialog, an exact active leave component ID and an interactable UI control. The native method finishes the node, writes the save and requests intermission. MCP exposes `diagnostics_order_leave_intermission_shop` with required integer `gameObjectId`; use the current leave-control GameObject ID. Bridge and simulated native branch checks pass. In-game transition remains unverified. An invoked but unobserved transition requires a fresh read before any retry.
+
+Shop exit validation now also rejects disabled Behaviour UI controls; simulated native regression covers a closed shop, stale IDs, non-interactable controls, unobserved transition, native exception and observed closure. These are local simulated checks, not in-game transition evidence.
+
+When validating the native action, build the validation harness to an explicit ignored output directory and execute that exact DLL. A `dotnet run --artifacts-path` invocation here selected the previous executable; an old test count cannot establish current-source acceptance. Shop leave-target discovery uses Resources.FindObjectsOfTypeAll with active and loaded-scene gates to exclude prefab assets.

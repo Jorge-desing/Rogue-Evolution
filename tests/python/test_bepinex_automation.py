@@ -99,6 +99,16 @@ class StateWaitTests(unittest.TestCase):
             self.assertTrue(response["isError"])
             self.assertEqual(1, call.call_count)
 
+    def test_native_shop_exit_dispatches_once_and_rejects_invalid_ids(self):
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":false,"nativeCallInvoked":true,"effectObserved":false}') as call:
+            response = SERVER.execute_tool("diagnostics_order_leave_intermission_shop", {"gameObjectId": 42})
+            call.assert_called_once_with("OrderLeaveIntermissionShopJson", [42])
+            self.assertFalse(json.loads(response["content"][0]["text"])["effectObserved"])
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as call:
+            for args in ({}, {"gameObjectId": True}, {"gameObjectId": "42"}):
+                self.assertTrue(SERVER.execute_tool("diagnostics_order_leave_intermission_shop", args)["isError"])
+            call.assert_not_called()
+
     def test_missing_and_type_mismatch_timeout(self):
         for row in ({}, {"ready": 1}, {"ready": "true"}):
             with self.subTest(row=row), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(row)):
@@ -144,7 +154,7 @@ class StateWaitTests(unittest.TestCase):
         spec = next(tool for tool in SERVER.TOOLS if tool["name"] == "automation_wait_for_state")
         self.assertEqual(set(spec["inputSchema"]["properties"]["tool"]["enum"]), SERVER.WAIT_STATE_TOOLS)
         canonical = [tool for tool in SERVER.TOOLS if not tool["description"].startswith("Alias for")]
-        self.assertEqual(len(canonical), 230)
+        self.assertEqual(len(canonical), 231)
         self.assertLess(len(json.dumps({"tools": canonical}, separators=(",", ":")).encode("utf-8")), 91000)
 
     def test_local_wait_timeout_stops_sequence_before_outer_budget(self):

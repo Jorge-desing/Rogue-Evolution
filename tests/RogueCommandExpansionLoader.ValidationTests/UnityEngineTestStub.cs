@@ -162,6 +162,9 @@ namespace UnityEngine
         public static Object LastDestroyedObject { get; private set; }
         public int GetInstanceID() => _instanceId;
         public static T FindObjectOfType<T>() where T : class => null;
+        public static Object[] NativeControlTestObjects = System.Array.Empty<Object>();
+
+
 #if RCL_UI_ACCESSIBILITY_TEST
         public static T[] FindObjectsOfType<T>(bool includeInactive = false) where T : class
         {
@@ -735,6 +738,7 @@ namespace UnityEngine
 
     public static class Resources
     {
+        public static Object[] FindObjectsOfTypeAll(System.Type type) => System.Array.FindAll(Object.NativeControlTestObjects, item => type.IsInstanceOfType(item));
         public static Object Load(string path, System.Type type) => null;
     }
 

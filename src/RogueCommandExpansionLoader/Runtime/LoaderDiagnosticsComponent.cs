@@ -851,6 +851,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeIntermissionNativePanels.TryRemoveCard(entityId));
         }
 
+        public string OrderLeaveIntermissionShopJson(int gameObjectId)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionNativePanels.TryLeaveShop(gameObjectId));
+        }
+
         /// <summary>Closes the native RemoveCardView through its exact cancel handler.</summary>
         public string OrderCancelIntermissionCardRemovalJson()
         {

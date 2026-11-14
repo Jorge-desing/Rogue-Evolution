@@ -411,6 +411,56 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static IntermissionActionResult TryLeaveShop(int gameObjectId)
+        {
+            bool invoked = false;
+            try
+            {
+                var before = GetState(MaxScanRows);
+                if (!before.IsShopActive || before.IsRemoveCardActive)
+                    return Action(false, "LeaveShop", "Shop", "An active Shop without a removal dialog is required.", false, false);
+                Type type = RuntimeIntermissionCensus.FindGameType("ShopLeaveButton");
+                MethodInfo finder = typeof(Resources).GetMethod("FindObjectsOfTypeAll", new[] { typeof(Type) });
+                Array objects = type == null || finder == null ? null : finder.Invoke(null, new object[] { type }) as Array;
+                Component target = null;
+                int matches = 0;
+                if (objects != null)
+                    foreach (object obj in objects)
+                    {
+                        Component candidate = obj as Component;
+                        if (IsComponentActive(candidate) && candidate.gameObject.scene.isLoaded && candidate.gameObject.GetInstanceID() == gameObjectId)
+                        { target = candidate; matches++; }
+                    }
+                if (matches != 1)
+                    return Action(false, "LeaveShop", "Shop", "Expected one active ShopLeaveButton with the current gameObjectId.", false, false);
+                bool interactable = false;
+                foreach (Component control in target.gameObject.GetComponents<Component>())
+                {
+                    if (control is Behaviour behaviour && !behaviour.enabled) continue;
+                    if (control != null && control.GetType().GetMethod("IsInteractable", Type.EmptyTypes) is MethodInfo canInteract
+                        && control.GetType().GetMethod("IsActive", Type.EmptyTypes) is MethodInfo isActive
+                        && canInteract.ReturnType == typeof(bool) && isActive.ReturnType == typeof(bool))
+                        interactable = (bool)canInteract.Invoke(control, null) && (bool)isActive.Invoke(control, null);
+                    else if (control != null && control.GetType().FullName == "Michsky.UI.Reach.ButtonManager")
+                        interactable = (control.GetType().GetField("isInteractable", InstanceMembers)?.GetValue(control) is bool enabled && enabled) && IsComponentActive(control);
+                    if (interactable) break;
+                }
+                if (!interactable)
+                    return Action(false, "LeaveShop", "Shop", "Native leave control is not interactable.", false, false);
+                MethodInfo press = type.GetMethod("OnPress", InstanceMembers, null, Type.EmptyTypes, null);
+                if (press == null || press.ReturnType != typeof(void))
+                    return Action(false, "LeaveShop", "Shop", "Native OnPress() is unavailable.", false, false);
+                invoked = true;
+                press.Invoke(target, null);
+                bool observed = !GetState(MaxScanRows).IsShopActive;
+                return Action(observed, "LeaveShop", "Shop", observed ? "Native Shop exit invoked and Shop closed." : "Native Shop exit invoked; verify the asynchronous transition before another action.", true, observed);
+            }
+            catch (Exception ex)
+            {
+                return Action(false, "LeaveShop", "Shop", "Native Shop exit failed: " + ex.Message, invoked, false);
+            }
+        }
+
         private static IntermissionActionResult Action(
             bool success, string action, string target, string message, bool invoked, bool observed)
         {

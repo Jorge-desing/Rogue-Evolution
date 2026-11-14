@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Native Shop exit control
+
+- REA verified game 1.0.9 Assembly-CSharp SHA-256/MVID against the compatibility identity; source evidence `artifacts/intermission-native-controls/research-ledger.json` records decompilation hashes and native entry points. `ShopLeaveButton.OnPress()` finishes the node, writes the save and loads intermission. Display-only DropPodPanel/NextLevelButton are not action entry points.
+- Added loader `TryLeaveShop(gameObjectId)` and `OrderLeaveIntermissionShopJson`: active Shop/no-removal gate, exact active target ID, native UI interactability and exact OnPress signature. Invocation and immediate postcondition are reported separately. Release compiles with zero warnings/errors. MCP schema/handler now exposes `diagnostics_order_leave_intermission_shop(gameObjectId)`; 88 Python bridge/catalog checks pass. Added simulated native branch checks (closed shop, stale target, disabled control, uncertain result, exception and closure); the new C# case passes. The explicit C# RuntimeAndDiagnostics harness reports 217/221 with the same four visual failures reproduced on the unchanged base. Full Python passes. Release deployed with a matching SHA-256 and backup under artifacts/intermission-native-controls/deployment. In-game transition remains unverified.
+
 ## 2026-11-13 Guarded intermission controls
 
 - Reward choice and Shop purchase now accept `preconditions` (1–8 JSON Pointer/typed-value pairs) and `dryRun`. A fresh reward/native-panel query must satisfy every guard before the existing native action is called once. Dry runs return checks/observation and explicitly leave native action validation outstanding; no native mutation is invoked. Preconditions are snapshots, not atomic reservations.

@@ -3380,6 +3380,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderBuyIntermissionShopOfferJson", [offer_id])
             return _tool_response(res)
 
+        elif name == "diagnostics_order_leave_intermission_shop":
+            return _tool_response(_call_diagnostics_method("OrderLeaveIntermissionShopJson", [arguments["gameObjectId"]]))
+
         elif name == "diagnostics_order_reroll_intermission_shop":
             res = _call_diagnostics_method("OrderRerollIntermissionShopJson", [])
             return _tool_response(res)
