@@ -20,8 +20,6 @@ class ExportBalanceTableTests(unittest.TestCase):
         row = rows[0]
         self.assertEqual(pack["units"][0]["id"], row["unitId"])
         self.assertEqual("PCXBaseTank", row["nativeTemplateId"])
-        # Cost comes from balanceOverrides (scaffold does not set cost) -> None
-        self.assertIn("unitId", row)
 
     def test_custom_balance_overrides_raw(self) -> None:
         pack = _valid_pack()

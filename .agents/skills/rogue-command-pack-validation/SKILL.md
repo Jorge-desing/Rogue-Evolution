@@ -116,3 +116,5 @@ Material Maker config validation and the explicit four-map/shader assertions sha
 In snapshot tests, an exact-argument lookup using `next` already fails when the method is absent; repeating a separate presence assertion for the same call is redundant. Preserve independent presence checks for methods without argument lookups.
 
 For registry tests, an exact ID-filtered entry lookup used to verify product mapping already fails when the factory is absent; preserve the independent unit-ID check.
+
+An earlier successful `row["unitId"]` value assertion already establishes the key exists in that same row; preserve its value check when removing the redundant membership check.

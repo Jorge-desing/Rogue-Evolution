@@ -1,5 +1,9 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Balance table assertion deduplication
+
+- Removed a duplicate `unitId` membership assertion in `ExportBalanceTableTests.test_valid_pack_rows`: the same immutable row is already indexed by `unitId` and compared to the source ID. The nearby obsolete cost comment was removed. No case or production behavior changed. Full before/after reports: `artifacts/test-dedup-current/after-registry.json` and `after-balance.json`.
+
 ## 2026-11-13 Registry assertion deduplication
 
 - Removed the duplicate factory-ID presence assertion in `ExportRegistryTests.test_registry_collects_units_factories_stages_profiles`; the same result is immediately indexed by exact factory ID and its product and incoming references are checked. The separate product unit-ID assertion remains. Full before/after reports: `artifacts/test-dedup-current/after-snapshot.json` and `after-registry.json`.
