@@ -310,7 +310,15 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                     bool healthGateOk = !lowHealthTrigger ||
                         (entity.MaxHealth > 0f && (entity.CurrentHealth / entity.MaxHealth) <= LowHealthSkillTriggerThreshold);
 
-                    if (healthGateOk)
+                    bool combatGateOk = true;
+                    if (string.Equals(activationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase))
+                    {
+                        EntityController target = entity.CurrentAttackTarget;
+                        combatGateOk = entity.IsTargetInRange && target != null && !target.IsDestroyed &&
+                            !target.DestroyHasBeenStarted && !target.canNotBeTargetedByAi && entity.IsEnemy(target);
+                    }
+
+                    if (healthGateOk && combatGateOk)
                     {
                         hasReadySkill = true;
                         skillTargetsSelf = skillInfo.targetOrigin == TargetOrigin.Self;

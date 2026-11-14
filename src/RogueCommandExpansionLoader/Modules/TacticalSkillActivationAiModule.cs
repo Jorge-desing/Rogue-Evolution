@@ -138,6 +138,12 @@ namespace RogueCommandExpansionLoader.Modules
                     }
 
                     bool lowHealthTrigger = string.Equals(activationTrigger, "LowHealth", StringComparison.OrdinalIgnoreCase);
+                    bool combatEngaged = string.Equals(activationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase);
+                    EntityController engagedTarget = combatEngaged ? unit.CurrentAttackTarget : null;
+                    if (combatEngaged && (!unit.IsTargetInRange || !IsEligibleEnemy(unit, engagedTarget)))
+                    {
+                        continue;
+                    }
                     if (lowHealthTrigger && (unit.MaxHealth <= 0f ||
                         unit.CurrentHealth / unit.MaxHealth > LowHealthActivationThreshold))
                     {
@@ -169,16 +175,15 @@ namespace RogueCommandExpansionLoader.Modules
                     }
 
                     // Self-targeted LowHealth skills do not need a nearby enemy.
-                    EntityController nearestEnemy = null;
-                    if (!lowHealthTrigger || skillInfo.targetOrigin != TargetOrigin.Self)
+                    EntityController nearestEnemy = engagedTarget;
+                    if (!combatEngaged && (!lowHealthTrigger || skillInfo.targetOrigin != TargetOrigin.Self))
                     {
                         float nearestDistSq = float.MaxValue;
                         if (playerEntities != null)
                         {
                             foreach (EntityController enemy in playerEntities)
                             {
-                                if (enemy == null || enemy.DestroyHasBeenStarted || enemy.canNotBeTargetedByAi ||
-                                    !IsHostile(unit, enemy))
+                                if (!IsEligibleEnemy(unit, enemy))
                                 {
                                     continue;
                                 }
@@ -223,6 +228,12 @@ namespace RogueCommandExpansionLoader.Modules
                         unit.ExecuteCommand(command, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
                     }
                 }
+            }
+
+            private static bool IsEligibleEnemy(EntityController unit, EntityController enemy)
+            {
+                return enemy != null && !enemy.IsDestroyed && !enemy.DestroyHasBeenStarted &&
+                    !enemy.canNotBeTargetedByAi && IsHostile(unit, enemy);
             }
         }
     }

@@ -1844,6 +1844,44 @@ internal static partial class ValidationTestRunner
             EntityBalancingStore.Reset();
         }
     }),
+    ("CombatEngaged waits for a native in-range attack target and casts on it", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        UnityEngine.Time.time = 0f;
+        var caster = new EntityController { EntityId = "test:engaged", IsControlledByAi = true, IsUnit = true,
+            SkillInfo = new SkillInfo { targetOrigin = TargetOrigin.ChosenEntity } };
+        var nearby = new EntityController { IsControlledByPlayer = true };
+        var engaged = new EntityController { IsControlledByPlayer = true, Position = new Vector3(5f, 0f, 0f) };
+        var behaviour = new TacticalSkillActivationAiModule().CreateBehaviour(new DefaultAiBehaviour(),
+            [new ContentModuleParameter { name = "cooldownSeconds", value = "1" }]);
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile(caster.EntityId,
+                new UnitRuntimeMechanicsProfile { AiActivationTrigger = "CombatEngaged" });
+            ExistingControllers.Instance.AiUnits().Add(caster);
+            ExistingControllers.Instance.PlayerEntities().UnionWith(new[] { nearby, engaged });
+            behaviour.OnInitialized();
+            UnityEngine.Time.time = 1f;
+            behaviour.Tick();
+            caster.CurrentAttackTarget = engaged;
+            UnityEngine.Time.time = 2f;
+            behaviour.Tick();
+            if (caster.LastExecutedCommand.HasValue)
+                throw new InvalidOperationException("Proximity or an out-of-range attack target triggered a combat skill.");
+            caster.IsTargetInRange = true;
+            UnityEngine.Time.time = 3f;
+            behaviour.Tick();
+            if (caster.LastExecutedCommand?.target != engaged)
+                throw new InvalidOperationException("The combat skill did not use the engaged target.");
+        }
+        finally
+        {
+            behaviour.OnDestroyed();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
     ("wave-escalation AI module parses defaults and validates limits", () =>
     {
         if (!WaveEscalationParameterParser.TryParse(null, out WaveEscalationSettings settings, out string diagnostic) || diagnostic != null)

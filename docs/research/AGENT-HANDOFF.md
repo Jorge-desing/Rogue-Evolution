@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Tactical skills — CombatEngaged
+
+- Standalone tactical casts require a native in-range hostile attack target and use that target. Coordinated skill readiness requires the same engagement. Release builds cleanly and the tactical AI suite passes 70/70. Steam behavior remains unverified.
+
 ## General capability audit — native gathering search radius
 
 - Positive crystal resourceGathering.gatherRange now filters the native Harvest candidate list by Euclidean grid-cell radius around `_givenHarvestPosition ?? _self.Position`. Boundary cells remain; zero preserves native unrestricted search. Native claim exclusion, nearest/path selection, movement, refinery delivery and Stop on empty candidates remain intact. The global grid crystal list is never changed.
