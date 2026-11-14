@@ -64,6 +64,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private bool _isDamagedStateActive;
         private bool _isCriticalStateActive;
         private bool _isTurretJammed;
+        private Quaternion _turretRotationBeforeDamage;
         private bool _isStunnedVisualActive;
         private bool _isOnFireVisualActive;
         private bool _isBoostedVisualActive;
@@ -307,6 +308,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 _nativeRigRetargetProfile.ResetForReuse();
             }
+            _isStunnedVisualActive = false;
             bool wasOnFire = _isOnFireVisualActive;
             _isOnFireVisualActive = false;
             UpdateHealthAndDamageTransitions(false, 1f);
@@ -1060,6 +1062,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     if (_socketTurretPivot != null && !_isTurretJammed)
                     {
                         _isTurretJammed = true;
+                        _turretRotationBeforeDamage = _socketTurretPivot.localRotation;
                         _socketTurretPivot.localRotation *= Quaternion.Euler(4.5f, 0f, 3.8f);
                     }
 
@@ -1079,7 +1082,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 if (_socketTurretPivot != null && _isTurretJammed)
                 {
                     _isTurretJammed = false;
-                    _socketTurretPivot.localRotation = Quaternion.identity;
+                    _socketTurretPivot.localRotation = _turretRotationBeforeDamage;
                 }
 
                 Transform apsSocket;
@@ -1408,7 +1411,6 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             if (hasStun)
             {
-                _isTurretJammed = true;
                 _isMoving = false;
                 _movementAnimationHoldRemainingSeconds = 0f;
                 if (_animator != null && _hasMovementAnimationParameter)
@@ -1448,8 +1450,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_isMoving) return;
             if (string.Equals(_activeTacticalStanceVisual, "HoldFire", StringComparison.OrdinalIgnoreCase)) return;
-            bool effectiveJammed = _turretJammedOverride.HasValue ? _turretJammedOverride.Value : (_isTurretJammed || _isStunnedVisualActive);
-            if (_socketTurretPivot == null || effectiveJammed || IsEntityDead()) return;
+            if (_socketTurretPivot == null || IsTurretJammed || IsEntityDead()) return;
 
             Transform target = ResolveEntityTarget();
             if (target == null) return;
@@ -1533,7 +1534,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         public bool IsDamagedStateActive => _isDamagedStateActive;
         public bool IsCriticalStateActive => _isCriticalStateActive;
-        public bool IsTurretJammed => _turretJammedOverride.HasValue ? _turretJammedOverride.Value : _isTurretJammed;
+        public bool IsTurretJammed => _turretJammedOverride ?? (_isTurretJammed || _isStunnedVisualActive);
         public float CurrentRecoilOffset => _currentRecoilOffset;
         public float DoorOpenProgress => _doorOpenProgress;
         public bool IsStunnedVisualActive => _isStunnedVisualActive;

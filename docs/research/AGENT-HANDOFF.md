@@ -5,6 +5,8 @@ This handoff is for the next agent. Start with the latest relevant entry, then v
 
 ## General capability audit — burning effects
 
+Turret tracking now treats Stun and critical damage independently. Repair restores the pre-damage pivot rotation. Reuse clears Stun presentation. Release build and deployment evidence are local; natural recovery in Steam remains unverified.
+
 - RuntimeVisualDirector now shares one fire effect across critical damage and OnFire, clears it when both causes end or on reuse, and prefers the authored emitter. Release build passed. Steam visual acceptance remains unverified.
 
 ## General capability audit — visual variant lifecycle
