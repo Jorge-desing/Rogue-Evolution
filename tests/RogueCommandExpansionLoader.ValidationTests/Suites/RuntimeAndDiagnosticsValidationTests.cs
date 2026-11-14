@@ -3494,6 +3494,14 @@ internal static partial class ValidationTestRunner
             director.TickMechanics();
             if (target.CurrentHealth != 60f || extraTargets.Count(e => e.CurrentHealth == 55f) != 15)
                 throw new InvalidOperationException("Healing aura must retain its sixteen effective-recipient limit.");
+
+            foreach (EntityController candidate in ExistingControllers.Instance.PlayerUnits())
+                candidate.RejectStatusEffectsForTest = candidate != target;
+            profile.Aura.auraType = "Buff";
+            UnityEngine.Time.time = 14.3f;
+            director.TickMechanics();
+            if (!target.HasActiveStatusEffect(StatusEffect.CombatBoost) || !target.HasActiveStatusEffect(StatusEffect.Robust))
+                throw new InvalidOperationException("Failed status applications must leave room for a later aura recipient.");
         }
         finally
         {

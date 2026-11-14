@@ -2686,15 +2686,15 @@ namespace RogueCommandExpansionLoader.Runtime
                 bool affected = false;
                 if (string.Equals(auraType, "Buff", StringComparison.OrdinalIgnoreCase))
                 {
-                    ApplyTimedStatusEffect(candidate, "CombatBoost", 1.5f);
-                    ApplyTimedStatusEffect(candidate, "Robust", 1.5f);
-                    affected = true;
+                    bool boosted = ApplyTimedStatusEffect(candidate, "CombatBoost", 1.5f);
+                    bool reinforced = ApplyTimedStatusEffect(candidate, "Robust", 1.5f);
+                    affected = boosted || reinforced;
                 }
                 else if (string.Equals(auraType, "Debuff", StringComparison.OrdinalIgnoreCase))
                 {
-                    ApplyTimedStatusEffect(candidate, "SlowedDown", 1.5f);
-                    ApplyTimedStatusEffect(candidate, "Marked", 1.5f);
-                    affected = true;
+                    bool slowed = ApplyTimedStatusEffect(candidate, "SlowedDown", 1.5f);
+                    bool marked = ApplyTimedStatusEffect(candidate, "Marked", 1.5f);
+                    affected = slowed || marked;
                 }
                 else if (string.Equals(auraType, "Heal", StringComparison.OrdinalIgnoreCase) && !isEnemy)
                 {

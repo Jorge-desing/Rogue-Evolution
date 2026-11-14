@@ -187,8 +187,11 @@ public sealed class EntityController : MonoBehaviour
     }
     public void RankUp(int amount) { CurrentRank = System.Math.Min(CurrentRank + amount, MaxRank); }
     public bool IsEnemy(EntityController other) => other != null && (IsControlledByPlayer != other.IsControlledByPlayer || IsControlledByAi != other.IsControlledByAi);
+    public bool RejectStatusEffectsForTest { get; set; }
     public void SetActiveStatusEffect(StatusEffect effect, SetStatusEffect.DurationType durationType, float duration)
     {
+        if (RejectStatusEffectsForTest)
+            throw new System.InvalidOperationException("Status effect rejected by fixture.");
         AppliedStatusEffects.Add((effect, durationType, duration));
         _activeStatusEffects.Add(effect);
     }
