@@ -38,7 +38,6 @@ class ExportRegistryTests(unittest.TestCase):
 
             ids = [e["id"] for e in result["entries"]]
             self.assertIn("ns:alpha", ids)
-            self.assertIn("ns:alpha-factory", ids)
 
             factory_entry = [e for e in result["entries"] if e["id"] == "ns:alpha-factory"][0]
             self.assertEqual("ns:alpha", factory_entry["produces"])

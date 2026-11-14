@@ -1,5 +1,9 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Registry assertion deduplication
+
+- Removed the duplicate factory-ID presence assertion in `ExportRegistryTests.test_registry_collects_units_factories_stages_profiles`; the same result is immediately indexed by exact factory ID and its product and incoming references are checked. The separate product unit-ID assertion remains. Full before/after reports: `artifacts/test-dedup-current/after-snapshot.json` and `after-registry.json`.
+
 ## 2026-11-13 Snapshot assertion deduplication
 
 - Removed two duplicate presence assertions for `GetVisualMaterialCensusJson` and `GetVisualSurfaceCensusJson` in `test_runtime_snapshot_passes_safe_arguments_to_bounded_getters`. The immediately preceding exact argument lookups still require each method to exist and pass `[64]`. The independent `GetGameTimeScaleJson` presence assertion remains; no test case or production behavior was removed.
