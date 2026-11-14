@@ -192,3 +192,5 @@ The Hierarchical Utility-Blackboard Director coordinates macro strategy and micr
 CombatEngaged requires a living, targetable hostile CurrentAttackTarget within native attack range. The standalone skill module casts toward that target. Coordinated directors select the current attack target for targeted skills if it is in the snapshot and skill range. Dispatch rechecks live engagement, including for self skills, and cancels targeted casts when the attack target changes.
 
 Coordinated tactical skill dispatch reads live SkillInfo and checks mana and queued activation. Self uses the native untargeted command. Entity and location casts require a living, targetable hostile and use its controller or current position, respectively. An invalid target cancels dispatch.
+
+Coordinated targeting reads native SqrSkillRange in world units. SkillRangeIsUnlimited and the native immediate-location override bypass the planning radius. The native command handles final cast geometry.

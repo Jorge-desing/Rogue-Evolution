@@ -3524,6 +3524,8 @@ internal static partial class ValidationTestRunner
                 Damage1 = 20f,
                 Attack1Cooldown = 1.0f,
                 WeaponRange = 16f,
+                SqrSkillRange = 9f,
+                SkillInfo = new SkillInfo { targetOrigin = TargetOrigin.ChosenLocation },
                 MoveSpeed = 11f,
                 Role = UnitRole.Scout,
                 Position = new Vector3(12f, 0f, 8f)
@@ -3585,6 +3587,18 @@ internal static partial class ValidationTestRunner
 
             RogueCommandExpansionLoader.Runtime.Ai.AiUnitSnapshot capturedCombat =
                 snapshot.AiUnits.Single(u => u.UniqueEntityId == 701);
+            if (!capturedCombat.HasReadyActiveSkill || capturedCombat.ActiveSkillRange != 3f ||
+                capturedCombat.TrySelectSkillTarget(snapshot.HostileUnits, out _))
+            {
+                throw new InvalidOperationException("A target inside weapon range but outside skill range was eligible.");
+            }
+            aiCombat.activateSkillAtOnceIndependentOfSkillRadius = true;
+            var unrestricted = collector.CollectCurrentSnapshot(forceRefresh: true);
+            if (!unrestricted.AiUnits.Single(u => u.UniqueEntityId == 701)
+                .TrySelectSkillTarget(unrestricted.HostileUnits, out var skillTarget) || skillTarget.UniqueEntityId != 801)
+            {
+                throw new InvalidOperationException("Native unrestricted location casting did not reach the hostile.");
+            }
             if (!capturedCombat.HasQueuedCommands ||
                 Math.Abs(capturedCombat.HealthRatio - 0.75f) > 0.001f ||
                 !aiCombat.IsControlledByAi || aiCombat.IsControlledByPlayer ||

@@ -298,7 +298,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
 
             bool hasReadySkill = false;
             bool skillTargetsSelf = false;
-            float skillRange = 15f;
+            float skillRange = 0f;
             try
             {
                 SkillInfo skillInfo = entity.SkillInfo;
@@ -322,7 +322,10 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                     {
                         hasReadySkill = true;
                         skillTargetsSelf = skillInfo.targetOrigin == TargetOrigin.Self;
-                        skillRange = Math.Max(6f, entity.WeaponRange > 0f ? entity.WeaponRange : 15f);
+                        bool unlimited = entity.SkillRangeIsUnlimited ||
+                            (skillInfo.targetOrigin == TargetOrigin.ChosenLocation &&
+                             entity.activateSkillAtOnceIndependentOfSkillRadius);
+                        skillRange = unlimited ? float.MaxValue : (float)Math.Sqrt(entity.SqrSkillRange);
                     }
                 }
             }

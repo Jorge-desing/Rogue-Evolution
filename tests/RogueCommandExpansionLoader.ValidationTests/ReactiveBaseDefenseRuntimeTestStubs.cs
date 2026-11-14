@@ -210,6 +210,9 @@ public sealed class EntityController : MonoBehaviour
     }
     public float MoveSpeed { get; set; } = 10f;
     public float WeaponRange { get; set; } = 15f;
+    public float SqrSkillRange { get; set; } = 225f;
+    public bool SkillRangeIsUnlimited { get; set; }
+    public bool activateSkillAtOnceIndependentOfSkillRadius;
     public float Damage1 { get; set; } = 10f;
     public float Damage2 { get; set; } = 0f;
     public float Attack1Cooldown { get; set; } = 1f;

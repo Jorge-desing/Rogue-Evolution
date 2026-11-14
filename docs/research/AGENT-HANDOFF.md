@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Coordinated native skill range
+
+The battlefield collector uses native skill range and unrestricted location casting rules. Both coordinated directors consume that range. The tactical suite passes 70/70, including a target beyond skill range but inside weapon range. Steam execution remains unverified.
+
 ## Coordinated tactical skill dispatch
 
 - Dispatch uses live SkillInfo to select self, entity, or location commands and rechecks mana, queued activation, and hostile target availability. Release builds cleanly and the tactical AI suite passes 70/70. Steam execution remains unverified.
