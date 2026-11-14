@@ -31,6 +31,11 @@ if ($MaterialMaker) {
     Expand-SafeArchive -ArchivePath $archive -DestinationPath $destination -RequiredRelativePaths @(
         'material_maker_1_7_windows\material_maker.exe'
     )
+
+    & (Join-Path $PSScriptRoot 'Build-MaterialMakerCli.ps1')
+    if (-not (Test-Path -LiteralPath (Join-Path $toolsRoot 'MaterialMaker-1.7-patched\runtime\material_maker.pck') -PathType Leaf)) {
+        throw 'Material Maker 1.7 was staged, but its patched CLI runtime was not built.'
+    }
 }
 
 if ($ArmorPaintArchivePath) {
@@ -45,4 +50,4 @@ if ($ArmorPaintArchivePath) {
     Expand-SafeArchive -ArchivePath $armorPaintArchive -DestinationPath $destination -RequiredRelativePaths @('ArmorPaint.exe')
 }
 
-Write-Host 'Texture tools are staged under .tools/. The script does not modify the Unity project, game installation, or launch either application.'
+Write-Host 'Texture tools are staged under .tools/. The script does not modify Unity/game files or open their applications. Material Maker setup builds its isolated headless CLI runtime with Godot.'

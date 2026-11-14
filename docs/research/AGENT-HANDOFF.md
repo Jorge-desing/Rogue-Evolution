@@ -1,5 +1,11 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Material Maker CLI warning cleanup
+
+- `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker` now builds an isolated Material Maker 1.7 CLI runtime via `tools/Build-MaterialMakerCli.ps1`. The source patcher pins official Material Maker 1.7 and Godot 4.7 archives by SHA-256, fixes the CLI GPU-resource shutdown order (including joining the render worker), drops the unavailable optional Steam extension from the CLI-only build, and corrects verified upstream packaging issues: three absent demo `.mtl` references, one stale logo UID, and Godot 3 `shader_param/` keys. The official install and Unity/game files remain unchanged.
+- The headless import/pack itself is **not warning-free**: Godot still reports ignored HDR metadata, `Parameter "t"/"shader" is null` from the dummy renderer, one dummy `DummyTexture` RID at editor-import exit, and a `SubViewportContainer` resize warning. No script parse/compile errors or missing GDExtensions were reported. During actual Material Maker CLI export, the former ObjectDB/RID/resource/thread shutdown diagnostics are absent; only two host Vulkan-loader warnings remain (registry layer-manifest lookup and duplicate Medal hook layer).
+- Evidence: patched PCK SHA-256 `28EFFFEA7594A7FCBA21055F8D621000073F43C910081AA350D6E2CEAF6C6DFA`, manifest `artifacts/mm-warning-fix/build-20261114T033221Z/build-manifest.json`. Strict `procedural` export of `olive_armor` from `content/source-art/bulwarkfoundry-material.ptex` passed with `qualityGate.passed=true`, zero pack warnings and four 2048×2048 maps under `artifacts/mm-warning-fix/final-20261114T0335Z/`. Their hashes exactly match the pre-patch baseline. The temporary `.mme` target and `override.cfg` were restored, and no Material Maker process remained. No game was started; this is local authoring/build evidence, not game-runtime validation.
+
 ## 2026-11-13 Exact native reward selection
 
 - Intermission reward choice now accepts an offered card component instanceId, matched on the Unity thread before invoking the existing native card handler. Optional slot and reward ID narrow the same match. The legacy bridge entry point still accepts its original arguments. Local Python acceptance is recorded in artifacts/intermission-native-controls/reward-instance-full.json.

@@ -60,7 +60,8 @@ param(
     [string]$PaintSourceModel = "",
     [string]$BlenderPreviewModel = "",
     [switch]$ForceTemplate,
-    [switch]$Strict
+    [switch]$Strict,
+    [switch]$VerboseMaterialMaker
 )
 
 $ErrorActionPreference = "Stop"
@@ -74,7 +75,17 @@ if ($null -eq $workflowConfig) {
 }
 
 $mmDir = Join-Path $repoRoot ".tools/MaterialMaker-1.7/material_maker_1_7_windows"
-$mmExe = Join-Path $repoRoot $config.tool.installRelativePath
+$officialMmExe = Join-Path $repoRoot $config.tool.installRelativePath
+$patchedRuntimeDir = Join-Path $repoRoot ".tools/MaterialMaker-1.7-patched/runtime"
+$patchedMmPack = Join-Path $patchedRuntimeDir "material_maker.pck"
+$patchedGodotExe = Join-Path $patchedRuntimeDir "Godot_v4.7-stable_win64_console.exe"
+$patchedGodotGuiExe = Join-Path $patchedRuntimeDir "Godot_v4.7-stable_win64.exe"
+$usesPatchedMaterialMaker = (Test-Path $patchedMmPack) -and (Test-Path $patchedGodotExe) -and (Test-Path $patchedGodotGuiExe)
+if (-not $usesPatchedMaterialMaker) {
+    throw "The Material Maker 1.7 shutdown patch is not staged. Run tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker or tools/Build-MaterialMakerCli.ps1."
+}
+$mmExe = $patchedGodotExe
+$runtimeDir = Split-Path -Parent $mmExe
 $prepareScript = Join-Path $repoRoot "tools/Prepare-MaterialMakerTacticalTemplate.py"
 $prepare3dScript = Join-Path $repoRoot "tools/prepare_material_maker_3d_paint.py"
 $applyBlenderScript = Join-Path $repoRoot "tools/apply_material_maker_to_blender.py"
@@ -120,10 +131,16 @@ $rawDir = Join-Path $outDir "raw"
 $waitScript = Join-Path $repoRoot "tools/MaterialMakerWaitDevice.gd"
 $packScript = Join-Path $repoRoot ([string]$config.exportProfile.packer)
 $auditScript = Join-Path $repoRoot "tools/audit_material_maker_output.py"
-$overrideCfg = Join-Path $mmDir "override.cfg"
+$overrideCfg = Join-Path $runtimeDir "override.cfg"
 $userExportDir = Join-Path $env:APPDATA "material_maker_2/export_targets"
 $profileName = [string]$config.exportProfile.name
-$exportTargetFile = Join-Path $userExportDir ("material_export-" + $profileName.ToLowerInvariant() + ".mme")
+$exportMaterialName = [string]$config.exportProfile.material
+$exportTargetName = $profileName.ToLowerInvariant()
+foreach ($invalidFileNameCharacter in @(" ", "/", ".")) {
+    $exportMaterialName = $exportMaterialName.Replace($invalidFileNameCharacter, "_")
+    $exportTargetName = $exportTargetName.Replace($invalidFileNameCharacter, "_")
+}
+$exportTargetFile = Join-Path $userExportDir ("${exportMaterialName}_export_${exportTargetName}.mme")
 $templatePrefix = [System.IO.Path]::GetFileNameWithoutExtension($template)
 
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
@@ -151,7 +168,7 @@ foreach ($staleOutput in $staleOutputs) {
 }
 New-Item -ItemType Directory -Force -Path $userExportDir | Out-Null
 
-foreach ($required in @($configPath, $configValidator, $mmExe, $waitScript, $packScript, $auditScript, $prepareScript, $applyBlenderScript)) {
+foreach ($required in @($configPath, $configValidator, $mmDir, $officialMmExe, $mmExe, $patchedGodotGuiExe, $patchedMmPack, $waitScript, $packScript, $auditScript, $prepareScript, $applyBlenderScript)) {
     if (-not (Test-Path $required)) {
         throw "Required Material Maker bake input is missing: $required"
     }
@@ -220,10 +237,30 @@ $exportJson = $exportTarget | ConvertTo-Json -Depth 8
 try {
     Push-Location $mmDir
     try {
-        $mmArguments = "--export-material --target $profileName -o `"$rawDir`" `"$template`""
+        $exportArguments = "--export-material --target $profileName -o `"$rawDir`" `"$template`""
+        if ($usesPatchedMaterialMaker) {
+            $mmArguments = "--main-pack `"$patchedMmPack`" $exportArguments"
+            Write-Host "Using the local Material Maker 1.7 shutdown patch."
+        } else {
+            $mmArguments = $exportArguments
+        }
+        $hadDiagnosticEnvironment = Test-Path Env:RCL_MM_DIAG
+        $previousDiagnosticEnvironment = $env:RCL_MM_DIAG
+        if ($VerboseMaterialMaker.IsPresent) {
+            $mmArguments = "--verbose $mmArguments"
+            $env:RCL_MM_DIAG = "1"
+        }
         $mmLog = Join-Path $outDir "material-maker.log"
         $mmErrorLog = Join-Path $outDir "material-maker-error.log"
-        $materialMakerProcess = Start-Process -FilePath $mmExe -ArgumentList $mmArguments -WorkingDirectory $mmDir -WindowStyle Hidden -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -Wait -PassThru
+        try {
+            $materialMakerProcess = Start-Process -FilePath $mmExe -ArgumentList $mmArguments -WorkingDirectory $mmDir -WindowStyle Hidden -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -Wait -PassThru
+        } finally {
+            if ($hadDiagnosticEnvironment) {
+                $env:RCL_MM_DIAG = $previousDiagnosticEnvironment
+            } else {
+                Remove-Item Env:RCL_MM_DIAG -ErrorAction SilentlyContinue
+            }
+        }
         $materialMakerExitCode = $materialMakerProcess.ExitCode
         if ($null -ne $materialMakerExitCode -and $materialMakerExitCode -ne 0) {
             throw "Material Maker export failed with exit code $materialMakerExitCode"
