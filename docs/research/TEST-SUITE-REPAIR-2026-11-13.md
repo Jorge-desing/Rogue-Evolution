@@ -6,4 +6,4 @@ Ironclad tests now inspect the current blend in a disposable pinned-Blender proc
 
 Arachnid's current FBX was a static export. Re-exported the existing rigged blend with armature and baked animations, preserving the source blend; backup and export log are under `artifacts/suite-fix/`. The pinned Unity sample-native builder succeeded and refreshed prefabs, controllers and the ignored bundle. Animation payload tests remain enforced. Geometry is UNCALIBRATED_USER_AUTHORIZED; this is local asset/test evidence, not in-game or performance acceptance.
 
-Bundles remain regenerable ignored outputs. Run the sample-native Unity builder after checkout to refresh them. Existing unrelated MCP edits and memory.csv deletion are outside this pass.
+Bundles remain regenerable ignored outputs. Run the sample-native Unity builder after checkout to refresh them. Existing unrelated MCP edits are outside this pass.

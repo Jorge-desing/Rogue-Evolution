@@ -1387,7 +1387,7 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 ## Refresh (2026-11-07 — refinamiento y expansión a 44 presets militar-espacial grounded en source-art)
 
 - Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`.
-- Consultado `memory.csv`, modelos 3D (`content/source-art/`) y unidades de packs (`tactical-operations`, `sample-native-expansion`).
+- Consultados los modelos 3D (`content/source-art/`) y las unidades de packs (`tactical-operations`, `sample-native-expansion`).
 - Refinados los presets existentes (`tungsten_heavy_flak_plating`, `ion_thruster_titanium_grate`, `solar_flare_radiation_shield`, `dreadnought_adamantine_hull`, `orbital_drop_pod_cermet`, `exoskeleton_reactive_scale`, `stealth_radar_absorbent_ferrite`) con `warp_amount` <= 0.0018, micro-perlin scale 118-136 y biseles de tolerancia estricta.
 - Añadidos 8 nuevos presets grounded en arquetipos reales del juego, expandiendo la suite a 44 arquetipos:
   - `subterranean_mole_borer`: Planchas cinéticas de perforación de corteza planetaria y tunelado (`subterranean-mole`).
@@ -1460,7 +1460,7 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 - Profile2 dedicated QA without tutorial; protect saves. Before reflection verify Rogue Command 1.0.9, Unity `2021.3.45f2`, Assembly-CSharp SHA-256 `d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b`, MVID `db0e9462-128d-4296-9900-de18b4bd0c00`.
 - Root MEMORY.md, codex memory, antigravity memory, and mem0 synced to HEAD 29886d8.
 
-- Regla duradera (2026-11-07): todo agente consulta contexto antes de actuar — memoria mem0 primero y git (status/log/HEAD), más handoff, README y memory.csv; nunca confiar solo en el estado recordado.
+- Regla duradera (2026-11-07): todo agente consulta contexto antes de actuar — Mem0 y git (status/log/HEAD), más handoff, README y fuentes actuales; nunca confiar solo en el estado recordado.
 
 
 ## Refresh (2026-11-07, HEAD ddd983f — content mechanics across all units, content-loader upgrades/identity/fingerprint, operations catalog)
@@ -1481,7 +1481,7 @@ This is a compact, durable orientation for agents. For the changing checkout sta
 
 - Repository `C:/Users/Alex/Documents/Mod Rogue Command`, loader `1.19.0`, branch `codex/rogue-unit-balance-20261018`. Local/upstream/origin verified at `b78b3143087954a1253249120576920686ca2912` (`feat(ui): real coordinate click via EventSystem raycast instead of InvokeOnClick`), after `39e6468` (memory sync to ddd983f) and `eaa2b45` (`docs(rules): require mem0+git context consultation before acting`), following `ddd983f`.
 - New committed scope since ddd983f:
-  - `eaa2b45`: codified the standing rule that agents query mem0, inspect git status/log/HEAD, and review handoff/README/memory.csv at the start of every task; mirrored into AGENTS.md and the project-continuity skill (Hermes-level, local only). Root MEMORY.md gained the durable "Regla duradera" line.
+  - `eaa2b45`: codified the standing rule that agents query mem0, inspect git status/log/HEAD, and review the handoff and README at the start of every task; mirrored into AGENTS.md and the project-continuity skill (Hermes-level, local only). Root MEMORY.md gained the durable "Regla duradera" line.
   - `b78b314`: new `Runtime/RuntimeUiClickDirector.cs` — UI path projects RectTransform center to screen pixels via ancestor Canvas `WorldToScreenPoint`, raycasts with `EventSystem.RaycastAll`, gates occlusion (blocked with stop-point naming the occluder), then replays the exact pointer sequence StandaloneInputModule performs (pointerEnter→pointerDown→initializePotentialDrag→pointerUp→pointerClick via ExecuteHierarchy/Execute). 3D path `TryClickWorldObject` projects world position through `Camera.main`, verifies occlusion with `Physics.Raycast`, dispatches `OnMouseEnter`/`OnMouseDown` via `SendMessage`. `RuntimeIntermissionDirector.TrySelectLevelNode` rewired to the world path; census-verification gate unchanged. Wire-up: `TryUiClickJson`/`TryUiClickPointJson` on `LoaderDiagnosticsComponent` + `SerializeUiClickResult` (counters-first). `UnityEngine.UI`/`UIModule` references are engine-module refs with `Private=false` (not shipped in the distributable ZIP). MCP: `diagnostics_ui_click` is canonical (target or x/y point mode); `diagnostics_ui_press_button` now aliases it (params synced by the schema optimizer) and no longer calls `Button.Press`. Stubs + 8 new harness tests (sequence replay, occlusion, off-screen, world path, hierarchy gate, serializer); Python contract tests repointed to `TryUiClickJson`/`TryUiClickPointJson`.
 - Validation (as documented at HEAD b78b314): Release plugin 0 warnings/errors; C# harness 517/518 (1 Windows symlink-privilege skip, 0 failures); Python 419 OK; MCP schemas rebuilt; deployed hash-verified `364bbe8f...`; backup+manifest under `artifacts/deploy-backups/loader-20261107T233109Z/`. No Steam runtime evidence claimed.
 - Working tree: 78 modified files + 1 untracked (`tests/python/rigging/test_tactical_animation_improvements.py`) plus dirty nested worktrees `.worktrees/cargador` (11e9968, dirty) and `.worktrees/task-graph-validation` (d1f9045, dirty) preserved. Do not stage, reset, or clean unrelated work.
