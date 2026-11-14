@@ -248,6 +248,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             CacheReflectionAccess();
             _audioBindingStartedAt = Time.unscaledTime;
+            RestorePrimaryVisualVariant();
         }
 
         private void ResetForReuse(EntityController entity)
@@ -305,6 +306,22 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_nativeRigRetargetProfile != null)
             {
                 _nativeRigRetargetProfile.ResetForReuse();
+            }
+            RestorePrimaryVisualVariant();
+        }
+
+        private void RestorePrimaryVisualVariant()
+        {
+            if (_entity != null &&
+                RuntimeUnitVisualVariantRegistry.TryGetPrimary(_entity.EntityId, out RuntimeUnitVisualVariant primary) &&
+                TryApplyVisualVariant(primary))
+            {
+                return;
+            }
+
+            if (_activeVisualVariantId != null)
+            {
+                ResetVisualVariant();
             }
         }
 

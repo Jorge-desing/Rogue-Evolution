@@ -3,6 +3,10 @@
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
 
+## General capability audit — visual variant lifecycle
+
+- RuntimeVisualDirector initializes the registered primary chassis and restores it when a pooled entity is reused. If the primary cannot mount, an existing tactical variant resets to baseline. Release compiles with zero warnings and errors. Appearance and natural pool reuse remain unverified in Steam.
+
 ## General capability audit — release staging validation
 
 - Package-Loader.ps1 now applies canonical schema/file checks and cross-pack reference auditing to the exact staged packs before writing or replacing the ZIP. Python must have the project jsonschema dependency. The staging checks accepted both release pack copies and rejected a mutated reactive-AI manifest.
