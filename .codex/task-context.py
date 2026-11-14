@@ -37,8 +37,12 @@ def excerpt(relative_path, heading=None):
             return f"{relative_path}: startup section missing. Open the file directly."
     else:
         source = source.lstrip()
+    if relative_path == "AGENTS.md":
+        # The routing table is followed by project rules at the same heading level.
+        routes = [line for line in source.splitlines() if line.startswith("|")]
+        return f"{relative_path} routing table\n" + "\n".join(routes)
     section = re.split(r"\n#{1,3} ", source, maxsplit=1)[0].strip()
-    return f"{relative_path}\n{section if relative_path == "AGENTS.md" else section.split("\n\n", 1)[0][:1000]}"
+    return f"{relative_path}\n{section.split("\n\n", 1)[0][:1000]}"
 
 
 def main():
