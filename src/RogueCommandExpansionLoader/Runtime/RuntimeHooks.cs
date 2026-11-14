@@ -61,6 +61,10 @@ namespace RogueCommandExpansionLoader.Runtime
         private static int _commandNextStepTranspilerCount;
         private static int _commandResetTranspilerCount;
         private static int _commandChainDeletedTranspilerCount;
+        private static int _aiCreateUnitTranspilerCount;
+        private static int _aiCreateBuildingTranspilerCount;
+        private static int _aiConstructableEntitiesTranspilerCount;
+        private static int _entityAttackClosestEntityTranspilerCount;
         private static string _lastExecutedCommandKind = string.Empty;
         private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
         private static FieldInfo _cachedCommandKindField;
@@ -95,6 +99,10 @@ namespace RogueCommandExpansionLoader.Runtime
         public static int CommandNextStepTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandNextStepTranspilerCount, 0, 0);
         public static int CommandResetTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandResetTranspilerCount, 0, 0);
         public static int CommandChainDeletedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _commandChainDeletedTranspilerCount, 0, 0);
+        public static int AiCreateUnitTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _aiCreateUnitTranspilerCount, 0, 0);
+        public static int AiCreateBuildingTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _aiCreateBuildingTranspilerCount, 0, 0);
+        public static int AiConstructableEntitiesTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _aiConstructableEntitiesTranspilerCount, 0, 0);
+        public static int EntityAttackClosestEntityTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityAttackClosestEntityTranspilerCount, 0, 0);
 
         public static string LastExecutedCommandKind
         {
@@ -168,6 +176,10 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Exchange(ref _commandNextStepTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _commandResetTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _commandChainDeletedTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _aiCreateUnitTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _aiCreateBuildingTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _aiConstructableEntitiesTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityAttackClosestEntityTranspilerCount, 0);
             lock (Gate)
             {
                 _lastExecutedCommandKind = string.Empty;
@@ -1994,6 +2006,195 @@ namespace RogueCommandExpansionLoader.Runtime
             });
         }
 
+        public static void OnAiBehaviourCreateUnitTranspiler(object entityObj, string entityId, int aiBaseIndex)
+        {
+            System.Threading.Interlocked.Increment(ref _aiCreateUnitTranspilerCount);
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnAiBehaviourCreateBuildingTranspiler(object entityObj, string entityId, int aiBaseIndex)
+        {
+            System.Threading.Interlocked.Increment(ref _aiCreateBuildingTranspilerCount);
+            if (entityObj == null)
+            {
+                return;
+            }
+
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
+            });
+        }
+
+        public static void OnDefaultAiConstructableEntitiesTranspiler(object listObj, object aiBehaviourObj)
+        {
+            System.Threading.Interlocked.Increment(ref _aiConstructableEntitiesTranspilerCount);
+            if (listObj == null || aiBehaviourObj == null)
+            {
+                return;
+            }
+
+            SafeCall(delegate
+            {
+                RuntimeGameplayCommandDirector.ApplyActiveAiUnitDefaultsToAiUnits();
+            });
+        }
+
+        private static PropertyInfo _cachedTeamProperty;
+        private static PropertyInfo _cachedCanBuildProperty;
+        private static MethodInfo _cachedHasRoleMethod;
+        private static Type _cachedUnitRoleType;
+
+        public static object OnEntityAttackClosestEntityTranspiler(
+            object selectedTargetObj,
+            object attackerEntityControllerObj,
+            object candidateEntitiesObj)
+        {
+            System.Threading.Interlocked.Increment(ref _entityAttackClosestEntityTranspilerCount);
+            if (selectedTargetObj == null || attackerEntityControllerObj == null || candidateEntitiesObj == null)
+            {
+                return selectedTargetObj;
+            }
+
+            try
+            {
+                string doctrine = RuntimeGameplayCommandDirector.GetActiveAiDoctrine();
+                if (string.IsNullOrEmpty(doctrine) ||
+                    string.Equals(doctrine, "Standard", StringComparison.OrdinalIgnoreCase))
+                {
+                    return selectedTargetObj;
+                }
+
+                Type attackerType = attackerEntityControllerObj.GetType();
+                if (_cachedTeamProperty == null || _cachedTeamProperty.DeclaringType != attackerType)
+                {
+                    _cachedTeamProperty = attackerType.GetProperty("Team", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                }
+                if (_cachedTeamProperty == null)
+                {
+                    return selectedTargetObj;
+                }
+
+                object attackerTeam = _cachedTeamProperty.GetValue(attackerEntityControllerObj, null);
+                if (attackerTeam == null || string.Equals(attackerTeam.ToString(), "Player", StringComparison.OrdinalIgnoreCase))
+                {
+                    return selectedTargetObj;
+                }
+
+                if (!(candidateEntitiesObj is System.Collections.IList candidates) || candidates.Count <= 1)
+                {
+                    return selectedTargetObj;
+                }
+
+                if (string.Equals(doctrine, "Siege", StringComparison.OrdinalIgnoreCase))
+                {
+                    return SelectPreferredTargetByDoctrine(attackerType, selectedTargetObj, candidates, preferStructures: true);
+                }
+
+                if (string.Equals(doctrine, "Assault", StringComparison.OrdinalIgnoreCase))
+                {
+                    return SelectPreferredTargetByDoctrine(attackerType, selectedTargetObj, candidates, preferStructures: false);
+                }
+
+                return selectedTargetObj;
+            }
+            catch
+            {
+                return selectedTargetObj;
+            }
+        }
+
+        private static object SelectPreferredTargetByDoctrine(
+            Type entityType,
+            object selectedTargetObj,
+            System.Collections.IList candidates,
+            bool preferStructures)
+        {
+            if (_cachedCanBuildProperty == null || _cachedCanBuildProperty.DeclaringType != entityType)
+            {
+                _cachedCanBuildProperty = entityType.GetProperty("IsBuilding", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            }
+            if (_cachedHasRoleMethod == null || _cachedHasRoleMethod.DeclaringType != entityType)
+            {
+                _cachedHasRoleMethod = entityType.GetMethod("HasRole", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (_cachedHasRoleMethod != null)
+                {
+                    ParameterInfo[] roleParams = _cachedHasRoleMethod.GetParameters();
+                    _cachedUnitRoleType = roleParams.Length == 1 ? roleParams[0].ParameterType : null;
+                }
+            }
+
+            bool currentIsBuilding = IsEntityBuilding(selectedTargetObj);
+            if (preferStructures)
+            {
+                if (currentIsBuilding)
+                {
+                    return selectedTargetObj;
+                }
+
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    object candidate = candidates[i];
+                    if (candidate != null && IsEntityBuilding(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+                return selectedTargetObj;
+            }
+
+            // Assault doctrine: prefer Harvester / non-building high-value mobile targets when selected is a building.
+            if (!currentIsBuilding)
+            {
+                return selectedTargetObj;
+            }
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                object candidate = candidates[i];
+                if (candidate != null && !IsEntityBuilding(candidate))
+                {
+                    return candidate;
+                }
+            }
+            return selectedTargetObj;
+        }
+
+        private static bool IsEntityBuilding(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return false;
+            }
+
+            if (_cachedCanBuildProperty != null && _cachedCanBuildProperty.PropertyType == typeof(bool))
+            {
+                return (bool)_cachedCanBuildProperty.GetValue(entityObj, null);
+            }
+
+            if (_cachedHasRoleMethod != null && _cachedUnitRoleType != null)
+            {
+                try
+                {
+                    object turretRole = Enum.Parse(_cachedUnitRoleType, "Turret");
+                    return (bool)_cachedHasRoleMethod.Invoke(entityObj, new[] { turretRole });
+                }
+                catch
+                {
+                }
+            }
+
+            return false;
+        }
+
         public static void AfterEntityReused(object entityObj)
         {
             if (entityObj == null)
@@ -2688,6 +2889,26 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void OnEntityDeleteCommandChainTranspilerHook(object entity)
         {
             RuntimeHooks.OnEntityDeleteCommandChainTranspiler(entity);
+        }
+
+        public static void OnAiBehaviourCreateUnitTranspilerHook(object entity, string entityId, int aiBaseIndex)
+        {
+            RuntimeHooks.OnAiBehaviourCreateUnitTranspiler(entity, entityId, aiBaseIndex);
+        }
+
+        public static void OnAiBehaviourCreateBuildingTranspilerHook(object entity, string entityId, int aiBaseIndex)
+        {
+            RuntimeHooks.OnAiBehaviourCreateBuildingTranspiler(entity, entityId, aiBaseIndex);
+        }
+
+        public static void OnDefaultAiConstructableEntitiesTranspilerHook(object list, object aiBehaviour)
+        {
+            RuntimeHooks.OnDefaultAiConstructableEntitiesTranspiler(list, aiBehaviour);
+        }
+
+        public static object OnEntityAttackClosestEntityTranspilerHook(object selectedTarget, object attackerEntityController, object candidateEntities)
+        {
+            return RuntimeHooks.OnEntityAttackClosestEntityTranspiler(selectedTarget, attackerEntityController, candidateEntities);
         }
     }
 

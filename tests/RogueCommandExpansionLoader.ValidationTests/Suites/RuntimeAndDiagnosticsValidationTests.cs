@@ -6363,6 +6363,137 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("native AI director transpilers validate signatures inject IL fail closed and expose telemetry", () =>
+    {
+        RuntimeHooks.ResetCoreHookTelemetry();
+        try
+        {
+            MethodInfo createUnit = typeof(AiBehaviour).GetMethod("CreateUnit", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            MethodInfo instantiate = typeof(EntityFactory).GetMethod("InstantiateEntity", BindingFlags.Public | BindingFlags.Static)!;
+            var createUnitStream = new[] { new HarmonyLib.CodeInstruction(OpCodes.Call, instantiate), new HarmonyLib.CodeInstruction(OpCodes.Ret) };
+            var patchedCreateUnit = NativeAiDirectorTranspilers.AiCreateUnitTranspiler(createUnitStream, createUnit).ToList();
+            if (patchedCreateUnit.Count != 6 ||
+                patchedCreateUnit[1].opcode != OpCodes.Dup ||
+                patchedCreateUnit[2].opcode != OpCodes.Ldarg_1 ||
+                patchedCreateUnit[3].opcode != OpCodes.Ldarg_3 ||
+                !Equals(patchedCreateUnit[4].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnAiBehaviourCreateUnitTranspilerHook))))
+            {
+                throw new InvalidOperationException("AiCreateUnitTranspiler did not inject expected hook immediately after InstantiateEntity.");
+            }
+
+            MethodInfo createBuilding = typeof(AiBehaviour).GetMethod("CreateBuilding", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var createBuildingStream = new[] { new HarmonyLib.CodeInstruction(OpCodes.Ldnull), new HarmonyLib.CodeInstruction(OpCodes.Ret) };
+            var patchedCreateBuilding = NativeAiDirectorTranspilers.AiCreateBuildingTranspiler(createBuildingStream, createBuilding).ToList();
+            if (patchedCreateBuilding.Count != 6 ||
+                patchedCreateBuilding[1].opcode != OpCodes.Dup ||
+                !Equals(patchedCreateBuilding[4].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnAiBehaviourCreateBuildingTranspilerHook))))
+            {
+                throw new InvalidOperationException("AiCreateBuildingTranspiler did not inject expected hook before Ret.");
+            }
+
+            MethodInfo constructable = typeof(DefaultAiBehaviour).GetMethod("ConstructableEntities", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var constructableStream = new[] { new HarmonyLib.CodeInstruction(OpCodes.Ldnull), new HarmonyLib.CodeInstruction(OpCodes.Ret) };
+            var patchedConstructable = NativeAiDirectorTranspilers.DefaultAiConstructableEntitiesTranspiler(constructableStream, constructable).ToList();
+            if (patchedConstructable.Count != 5 ||
+                patchedConstructable[1].opcode != OpCodes.Dup ||
+                patchedConstructable[2].opcode != OpCodes.Ldarg_0 ||
+                !Equals(patchedConstructable[3].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnDefaultAiConstructableEntitiesTranspilerHook))))
+            {
+                throw new InvalidOperationException("DefaultAiConstructableEntitiesTranspiler did not inject expected hook before Ret.");
+            }
+
+            MethodInfo closestEntity = typeof(AiTranspilerFixtures.EntityAttack).GetMethod("ClosestEntity", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var closestStream = new[] { new HarmonyLib.CodeInstruction(OpCodes.Ldnull), new HarmonyLib.CodeInstruction(OpCodes.Ret) };
+            var patchedClosest = NativeAiDirectorTranspilers.EntityAttackClosestEntityTranspiler(closestStream, closestEntity).ToList();
+            if (patchedClosest.Count != 7 ||
+                patchedClosest[1].opcode != OpCodes.Ldarg_0 ||
+                patchedClosest[2].opcode != OpCodes.Ldfld ||
+                patchedClosest[3].opcode != OpCodes.Ldarg_1 ||
+                !Equals(patchedClosest[4].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnEntityAttackClosestEntityTranspilerHook))) ||
+                patchedClosest[5].opcode != OpCodes.Castclass)
+            {
+                throw new InvalidOperationException("EntityAttackClosestEntityTranspiler did not inject expected hook and castclass before Ret.");
+            }
+
+            bool unitRejected = false;
+            try { NativeAiDirectorTranspilers.AiCreateUnitTranspiler(new[] { new HarmonyLib.CodeInstruction(OpCodes.Ret) }, createUnit).ToList(); }
+            catch (InvalidOperationException) { unitRejected = true; }
+            bool signatureRejected = false;
+            try { NativeAiDirectorTranspilers.EntityAttackClosestEntityTranspiler(closestStream, constructable).ToList(); }
+            catch (InvalidOperationException) { signatureRejected = true; }
+            if (!unitRejected || !signatureRejected)
+            {
+                throw new InvalidOperationException("AI transpilers must fail closed on drifted streams or signatures.");
+            }
+
+            RuntimeHarmonyPatches.OnAiBehaviourCreateUnitTranspilerHook(null, "unit:test", 0);
+            RuntimeHarmonyPatches.OnAiBehaviourCreateBuildingTranspilerHook(null, "bldg:test", 0);
+            RuntimeHarmonyPatches.OnDefaultAiConstructableEntitiesTranspilerHook(null, null);
+            RuntimeHarmonyPatches.OnEntityAttackClosestEntityTranspilerHook(null, null, null);
+            string hooksJson = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(true, 69, "owner", 0);
+            using (var doc = JsonDocument.Parse(hooksJson))
+            {
+                JsonElement root = doc.RootElement;
+                if (root.GetProperty("aiCreateUnitTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("aiCreateBuildingTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("aiConstructableEntitiesTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("entityAttackClosestEntityTranspilerCount").GetInt32() != 1)
+                {
+                    throw new InvalidOperationException("SerializeRuntimeHooksState missing new AI transpiler counters.");
+                }
+            }
+        }
+        finally
+        {
+            RuntimeHooks.ResetCoreHookTelemetry();
+        }
+    }),
+    ("native AI target selection transpiler respects active doctrine for AI attackers while preserving player targeting", () =>
+    {
+        RuntimeHooks.ResetCoreHookTelemetry();
+        string prevDoctrine = RuntimeGameplayCommandDirector.GetActiveAiDoctrine();
+        float prevAggression = RuntimeGameplayCommandDirector.GetAiAggressionMultiplier();
+        try
+        {
+            var aiAttacker = new AiTranspilerFixtures.DoctrineEntity { Team = "AI", IsBuilding = false };
+            var playerAttacker = new AiTranspilerFixtures.DoctrineEntity { Team = "Player", IsBuilding = false };
+            var mobileUnit = new AiTranspilerFixtures.DoctrineEntity { Team = "Player", IsBuilding = false };
+            var structureTarget = new AiTranspilerFixtures.DoctrineEntity { Team = "Player", IsBuilding = true };
+            var candidates = new ArrayList { mobileUnit, structureTarget };
+
+            RuntimeGameplayCommandDirector.TrySetAiDoctrine("Standard", 1.0f);
+            object stdResult = RuntimeHarmonyPatches.OnEntityAttackClosestEntityTranspilerHook(mobileUnit, aiAttacker, candidates);
+            if (!ReferenceEquals(stdResult, mobileUnit))
+            {
+                throw new InvalidOperationException("Standard doctrine must preserve native target selection.");
+            }
+
+            RuntimeGameplayCommandDirector.TrySetAiDoctrine("Siege", 1.2f);
+            object siegeAiResult = RuntimeHarmonyPatches.OnEntityAttackClosestEntityTranspilerHook(mobileUnit, aiAttacker, candidates);
+            if (!ReferenceEquals(siegeAiResult, structureTarget))
+            {
+                throw new InvalidOperationException("Siege doctrine should prioritize structure candidate for AI attacker.");
+            }
+
+            object playerResult = RuntimeHarmonyPatches.OnEntityAttackClosestEntityTranspilerHook(mobileUnit, playerAttacker, candidates);
+            if (!ReferenceEquals(playerResult, mobileUnit))
+            {
+                throw new InvalidOperationException("AI doctrine must never alter Player unit target selection.");
+            }
+
+            RuntimeGameplayCommandDirector.TrySetAiDoctrine("Assault", 1.2f);
+            object assaultAiResult = RuntimeHarmonyPatches.OnEntityAttackClosestEntityTranspilerHook(structureTarget, aiAttacker, candidates);
+            if (!ReferenceEquals(assaultAiResult, mobileUnit))
+            {
+                throw new InvalidOperationException("Assault doctrine should prioritize mobile candidate for AI attacker.");
+            }
+        }
+        finally
+        {
+            RuntimeGameplayCommandDirector.TrySetAiDoctrine(string.IsNullOrEmpty(prevDoctrine) ? "Standard" : prevDoctrine, prevAggression);
+            RuntimeHooks.ResetCoreHookTelemetry();
+        }
+    }),
     ("model geometry census detects collapsed skinned bounds and serializes", () =>
     {
         ModelGeometryRow healthy = RuntimeModelGeometryCensus.EvaluateGeometryRow(
@@ -12693,4 +12824,22 @@ internal sealed class RuntimeExplorerTestTarget : IRuntimeExplorerTestContract
 
     public static int PatchedProbe(int x) => x + 1;
     public static bool ProbePrefix() => true;
+}
+
+internal static class AiTranspilerFixtures
+{
+    public sealed class EntityAttack
+    {
+        private EntityController? _entityController = null;
+        private EntityController? ClosestEntity(List<EntityController> entities, bool entitiesThatCanAttackFirst = true)
+        {
+            return _entityController != null && entities.Count > 0 ? entities[0] : null;
+        }
+    }
+
+    public sealed class DoctrineEntity
+    {
+        public string Team { get; set; } = "AI";
+        public bool IsBuilding { get; set; }
+    }
 }

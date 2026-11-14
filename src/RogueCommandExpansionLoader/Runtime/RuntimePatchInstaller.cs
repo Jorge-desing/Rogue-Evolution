@@ -279,6 +279,32 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     return method.GetParameters().Length == 0 && method.ReturnType == typeof(void);
                 });
+            MethodInfo aiCreateUnit = RuntimeReflection.FindUniqueMethod(aiBehaviour, "CreateUnit",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) &&
+                        parameters.Length == 3 &&
+                        parameters[0].ParameterType == typeof(string) &&
+                        parameters[1].ParameterType == typeof(UnityEngine.Vector3) &&
+                        parameters[2].ParameterType == typeof(int);
+                });
+            MethodInfo aiCreateBuilding = RuntimeReflection.FindUniqueMethod(aiBehaviour, "CreateBuilding",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == entityController &&
+                        parameters.Length == 3 &&
+                        parameters[0].ParameterType == typeof(string) &&
+                        parameters[1].ParameterType == typeof(UnityEngine.Vector3) &&
+                        parameters[2].ParameterType == typeof(int);
+                });
+            MethodInfo aiConstructableEntities = RuntimeReflection.FindUniqueMethod(defaultAiBehaviour, "ConstructableEntities",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.GetParameters().Length == 0 &&
+                        method.ReturnType != null && method.ReturnType.IsGenericType;
+                });
             MethodInfo blueprintName = RuntimeReflection.FindUniqueMethod(loca, "BlueprintName",
                 HasSingleStringArgumentReturningString);
             MethodInfo blueprintDescription = RuntimeReflection.FindUniqueMethod(loca, "BlueprintDescription",
@@ -373,6 +399,17 @@ namespace RogueCommandExpansionLoader.Runtime
                     return parameters.Length == 1 && parameters[0].ParameterType == entityController && method.ReturnType == typeof(bool);
                 });
             MethodInfo isTargetInRangePostfix = Hook("EntityAttackIsTargetInRangePostfix");
+            MethodInfo entityAttackClosestEntity = RuntimeReflection.FindUniqueMethod(entityAttack, "ClosestEntity",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == entityController &&
+                        parameters.Length == 2 &&
+                        parameters[0].ParameterType.IsGenericType &&
+                        parameters[0].ParameterType.GetGenericTypeDefinition() == typeof(List<>) &&
+                        parameters[0].ParameterType.GetGenericArguments()[0] == entityController &&
+                        parameters[1].ParameterType == typeof(bool);
+                });
             MethodInfo entityDestroy = RuntimeReflection.FindUniqueMethod(entityController, "Destroy",
                 delegate(MethodInfo method)
                 {
@@ -727,6 +764,18 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 plan.Add(new PatchPlan(entityDeleteCommandChain, null, entityDeleteCommandChainPostfix, entityDeleteCommandChainTranspiler, null));
             }
+            MethodInfo aiCreateUnitTranspiler = typeof(NativeAiDirectorTranspilers).GetMethod(
+                nameof(NativeAiDirectorTranspilers.AiCreateUnitTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo aiCreateBuildingTranspiler = typeof(NativeAiDirectorTranspilers).GetMethod(
+                nameof(NativeAiDirectorTranspilers.AiCreateBuildingTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo aiConstructableEntitiesTranspiler = typeof(NativeAiDirectorTranspilers).GetMethod(
+                nameof(NativeAiDirectorTranspilers.DefaultAiConstructableEntitiesTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo entityAttackClosestEntityTranspiler = typeof(NativeAiDirectorTranspilers).GetMethod(
+                nameof(NativeAiDirectorTranspilers.EntityAttackClosestEntityTranspiler), BindingFlags.Public | BindingFlags.Static);
+            plan.Add(new PatchPlan(aiCreateUnit, null, null, aiCreateUnitTranspiler, null));
+            plan.Add(new PatchPlan(aiCreateBuilding, null, null, aiCreateBuildingTranspiler, null));
+            plan.Add(new PatchPlan(aiConstructableEntities, null, null, aiConstructableEntitiesTranspiler, null));
+            plan.Add(new PatchPlan(entityAttackClosestEntity, null, null, entityAttackClosestEntityTranspiler, null));
             return plan;
         }
 

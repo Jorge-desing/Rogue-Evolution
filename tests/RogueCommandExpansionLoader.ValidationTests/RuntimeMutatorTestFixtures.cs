@@ -254,6 +254,9 @@ public sealed class AiBehaviour
 {
     public float tickRate = 1.0f;
     public float detectionRange = 10.0f;
+
+    private void CreateUnit(string entityId, UnityEngine.Vector3 startPosition, int aiBaseIndex) { }
+    private EntityController CreateBuilding(string entityId, UnityEngine.Vector3 startPosition, int aiBaseIndex) => null;
 }
 
 public class AiBehaviourManager : UnityEngine.MonoBehaviour
@@ -331,6 +334,7 @@ public sealed class DefaultAiBehaviour
     public int GetInstanceID() => instanceId;
 
     public static List<EntityInAiDeck> ConstructableEntities_Static() => ActiveConstructableEntities;
+    private List<EntityInAiDeck> ConstructableEntities() => ActiveConstructableEntities;
     public static bool HasTickStarted_Static() => TickHasStarted;
     public static int ActualAiStartBaseCount_Static() => ActualAiStartBaseCount;
     public static EntityController CreateBuilding_Static(string entityId, int baseIndex) =>
