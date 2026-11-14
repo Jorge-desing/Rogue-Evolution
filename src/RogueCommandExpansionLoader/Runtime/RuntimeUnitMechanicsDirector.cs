@@ -153,6 +153,8 @@ namespace RogueCommandExpansionLoader.Runtime
         private static PropertyInfo _positionProperty;
         private static PropertyInfo _currentHealthProperty;
         private static PropertyInfo _maxHealthProperty;
+        private static FieldInfo _cannotBeHealedField;
+        private static PropertyInfo _cannotBeHealedProperty;
         private static PropertyInfo _currentArmorProperty;
         private static PropertyInfo _maxArmorProperty;
         private static PropertyInfo _currentShieldProperty;
@@ -2542,7 +2544,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     continue;
                 }
 
-                if (healing.healAmount > 0f)
+                if (healing.healAmount > 0f && !IsHealthHealingBlocked(candidate))
                 {
                     float curHp = ReadFloatProperty(_currentHealthProperty, candidate, 0f);
                     float maxHp = ReadFloatProperty(_maxHealthProperty, candidate, 0f);
@@ -3751,6 +3753,17 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static bool IsHealthHealingBlocked(object target)
+        {
+            try
+            {
+                if (_cannotBeHealedField != null)
+                    return (bool)_cannotBeHealedField.GetValue(target);
+                return _cannotBeHealedProperty != null && ReadBoolProperty(_cannotBeHealedProperty, target);
+            }
+            catch { return true; }
+        }
+
         private static void InvokeRepairArmor(object target, float amount, object originator)
         {
             if (_repairArmorMethod == null || target == null || amount <= 0f)
@@ -3870,6 +3883,8 @@ namespace RogueCommandExpansionLoader.Runtime
             _positionProperty = entityType.GetProperty("Position", flags);
             _currentHealthProperty = entityType.GetProperty("CurrentHealth", flags);
             _maxHealthProperty = entityType.GetProperty("MaxHealth", flags);
+            _cannotBeHealedField = entityType.GetField("canNotBeHealed", flags);
+            _cannotBeHealedProperty = entityType.GetProperty("canNotBeHealed", flags);
             _currentArmorProperty = entityType.GetProperty("CurrentArmor", flags);
             _maxArmorProperty = entityType.GetProperty("MaxArmor", flags);
             _currentShieldProperty = entityType.GetProperty("CurrentShield", flags);

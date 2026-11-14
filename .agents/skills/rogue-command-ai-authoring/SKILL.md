@@ -31,6 +31,8 @@ Use this skill when implementing an AI profile, adding a compiled module, or con
 
 Support repair considers missing armor even when health is above the configured health threshold. Dispatch excludes the repairer itself and native hostile targets.
 
+The native `canNotBeHealed` flag blocks health healing, not armor repair. Support repair excludes blocked health from dispatch priority but still attends missing armor and never invokes health healing on such a target.
+
 Support repair tracks its own movement destinations. On each repair tick it replaces an owned move when the target drifts at least one meter, preserving pending native orders. Arrival, lost targets and module shutdown cancel only the tagged current move; never clear the command chain to stop a repairer. Unrelated current orders retain ownership.
 
 Factory reinforcement applies `baseIndex` to both live-unit counts and factory queues (`-1` means all AI bases). `maxStandingArmy` reserves slots for pending production before dispatch; destroyed units release slots. Count only observed queue growth as new production. Native `Produce(forFree: true)` replaces/refunds a queued item, so free reinforcement waits for an existing queue to empty instead of restarting it.

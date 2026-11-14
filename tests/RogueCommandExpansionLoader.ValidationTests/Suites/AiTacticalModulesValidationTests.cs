@@ -2920,6 +2920,33 @@ internal static partial class ValidationTestRunner
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("support repair can repair armor when native health healing is blocked", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var engineer = new EntityController { IsControlledByAi = true, IsUnit = true, IsEngineer = true, CanMoveAndMovementIsEnabled = true };
+            var target = new EntityController
+            {
+                IsControlledByAi = true, IsUnit = true, canNotBeHealed = true,
+                CurrentHealth = 10f, MaxHealth = 100f, CurrentArmor = 0f, MaxArmor = 100f
+            };
+            ExistingControllers.Instance.AiUnits().UnionWith(new[] { engineer, target });
+            behaviour = new SupportRepairAiModule().CreateBehaviour(new DefaultAiBehaviour(), null);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            if (target.CurrentHealth != 10f || target.CurrentArmor != 6f)
+                throw new InvalidOperationException("Repair AI must preserve blocked health and restore missing armor independently.");
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("support repair AI module parses parameters and dispatches repairers to damaged priority friendlies", () =>
     {
         if (!SupportRepairParameterParser.TryParse(null, out SupportRepairSettings settings, out string diagnostic) || diagnostic != null)

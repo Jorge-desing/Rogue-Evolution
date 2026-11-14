@@ -242,7 +242,7 @@ namespace RogueCommandExpansionLoader.Modules
                                 }
 
                                 // Apply active field repair / healing
-                                if (bestTarget.DeltaHealth > 0.01f)
+                                if (!bestTarget.canNotBeHealed && bestTarget.DeltaHealth > 0.01f)
                                 {
                                     float healAmount = repairer.HealAmount1 > 0f ? repairer.HealAmount1 : 12f;
                                     bestTarget.Heal(healAmount, repairer);
@@ -282,13 +282,13 @@ namespace RogueCommandExpansionLoader.Modules
             {
                 if (candidate == null || candidate.IsDestroyed || candidate.DestroyHasBeenStarted ||
                     !candidate.IsControlledByAi || (!candidate.IsUnit && !candidate.IsBuilding) ||
-                    candidate.canNotBeHealed || candidate.MaxHealth <= 0.001f)
+                    candidate.MaxHealth <= 0.001f)
                 {
                     return false;
                 }
 
                 float healthRatio = candidate.CurrentHealth / candidate.MaxHealth;
-                return healthRatio < _settings.HealthThresholdRatio || candidate.DeltaArmor > 0.01f;
+                return (!candidate.canNotBeHealed && healthRatio < _settings.HealthThresholdRatio) || candidate.DeltaArmor > 0.01f;
             }
 
             public void OnDestroyed()

@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — independent health and armor support
+
+- Health-pulse selection skips native `canNotBeHealed` candidates so a blocked low-health ally cannot starve healable allies. Armor selection remains independent. Support-repair AI can dispatch to missing armor on a health-blocked ally and never attempts to heal its health.
+- Rechecked game identity: 1.0.9 / Assembly-CSharp SHA-256 d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b / MVID db0e9462-128d-4296-9900-de18b4bd0c00. Native Heal observes the flag; RepairArmor does not.
+- Release and harness builds: zero warnings/errors. AiTacticalModules: 69/69 passed. RuntimeAndDiagnostics: 217/221, including the expanded healing/armor/aura scenario; the same four visual census failures remain. Full suite is not green. Local evidence only; Steam remains unverified.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/healing-deployment/manifest.json`.
+
 ## General capability audit — command follower ownership and range
 
 - Command pulses no longer count or buff a follower owned by another captain. Each director tracks its links and releases followers that leave range or become ineligible; returning followers can rejoin. Profile refresh and runtime cleanup release owned links without taking another captain's followers.

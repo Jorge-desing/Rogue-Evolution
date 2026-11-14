@@ -2968,6 +2968,16 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.PlayerUnits().Add(ally);
             ExistingControllers.Instance.AiUnits().Add(enemy);
 
+            var healingBlocked = new EntityController
+            {
+                entityId = "test:healing-blocked", UniqueEntityId = 103,
+                IsControlledByPlayer = true, IsUnit = true, canNotBeHealed = true,
+                CurrentHealth = 1f, MaxHealth = 100f, CurrentArmor = 0f, MaxArmor = 100f,
+                HasShield = true, CurrentShield = 20f, MaxShield = 60f,
+                Position = new UnityEngine.Vector3(15f, 0f, 0f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(healingBlocked);
+
             RuntimeUnitMechanicsDirector.AttachIfApplicable(self);
             if (!self.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Armored && e.DurationType == SetStatusEffect.DurationType.Unlimited) ||
                 !self.AppliedStatusEffects.Any(e => e.Effect == StatusEffect.Robust && e.DurationType == SetStatusEffect.DurationType.Unlimited))
@@ -2985,10 +2995,11 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 11f;
             director.TickMechanics();
 
-            if (ally.CurrentHealth != 65f || ally.CurrentArmor != 50f || ally.CurrentShield != 32f)
+            if (ally.CurrentHealth != 65f || ally.CurrentArmor != 30f || ally.CurrentShield != 32f ||
+                healingBlocked.CurrentHealth != 1f || healingBlocked.CurrentArmor != 20f)
             {
                 throw new InvalidOperationException(
-                    $"Expected ally HP=65, Armor=50, Shield=32 after healing+shield aura pulse, got HP={ally.CurrentHealth}, Armor={ally.CurrentArmor}, Shield={ally.CurrentShield}");
+                    $"Healing must skip blocked health while independently repairing its armor; ally HP={ally.CurrentHealth}, armor={ally.CurrentArmor}, shield={ally.CurrentShield}; blocked HP={healingBlocked.CurrentHealth}, armor={healingBlocked.CurrentArmor}");
             }
 
             // Trigger OnEntityDealtDamage on a killed target (3 XP >= threshold 3 -> immediate RankUp + CombatBoost + levelUpBonus heal)
