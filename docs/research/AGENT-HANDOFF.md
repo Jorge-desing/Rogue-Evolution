@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Coordinated command alternatives
+
+The arbiter retains same-unit alternatives after a rejected dispatch or lease check. Eligible alternatives compete globally by utility and still observe one successful order per unit and the dispatch budget. Release builds cleanly and 70 tactical checks pass locally. Steam execution remains unverified.
+
 ## Coordinated command lease timing
 
 Runtime arbitration grants a lease and counts an approved order after successful dispatch. A rejected winner leaves the existing lease intact and the slot available to another unit. Release and 70 tactical checks passed locally. Steam execution remains unverified.

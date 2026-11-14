@@ -200,3 +200,5 @@ Coordinated self casts with EnemiesInRange require a hostile within the native s
 Coordinated dispatch checks the live LowHealth threshold and horizontal skill range again before casting. EnemiesInRange self proposals retain a hostile ID for the live sight check. Native unlimited range and immediate location casts bypass the range check.
 
 Runtime arbitration commits leases and spends dispatch slots only after a native command returns successfully. Rejected winners preserve prior leases and leave capacity for other units in the tick.
+
+Arbitration retains alternative intents until a unit receives an order. It checks each intent against the lease and attempts eligible intents in global utility order, with one successful dispatch per unit and the existing tick limit.

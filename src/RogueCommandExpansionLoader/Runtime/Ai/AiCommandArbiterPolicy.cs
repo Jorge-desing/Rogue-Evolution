@@ -174,132 +174,88 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 return new AiArbitrationResult(0, 0, 0, 0, Array.Empty<AiIntentProposal>());
             }
 
-            int conflictsResolved = 0;
-            var bestByUnit = new Dictionary<int, AiIntentProposal>();
-
-            // Step 1: Resolve intra-tick collisions per unit (highest utility wins, category tie-breaker)
+            var ranked = new List<int>(proposals.Count);
             for (int i = 0; i < proposals.Count; i++)
             {
                 AiIntentProposal candidate = proposals[i];
-                if (candidate.UnitId < 0 || candidate.UtilityScore <= 0f)
+                if (candidate.UnitId >= 0 && candidate.UtilityScore > 0f)
                 {
-                    continue;
-                }
-
-                if (bestByUnit.TryGetValue(candidate.UnitId, out AiIntentProposal existing))
-                {
-                    conflictsResolved++;
-                    if (IsBetterProposal(candidate, existing))
-                    {
-                        bestByUnit[candidate.UnitId] = candidate;
-                    }
-                }
-                else
-                {
-                    bestByUnit.Add(candidate.UnitId, candidate);
+                    ranked.Add(i);
                 }
             }
 
-            // Step 2: Filter against active leases (lockout windows and hysteresis)
+            ranked.Sort((left, right) =>
+            {
+                AiIntentProposal a = proposals[left];
+                AiIntentProposal b = proposals[right];
+                int comparison = b.UtilityScore.CompareTo(a.UtilityScore);
+                if (comparison != 0) return comparison;
+                comparison = b.Category.CompareTo(a.Category);
+                if (comparison != 0) return comparison;
+                comparison = a.UnitId.CompareTo(b.UnitId);
+                return comparison != 0 ? comparison : left.CompareTo(right);
+            });
+
+            int conflictsResolved = 0;
             int lockoutBlocked = 0;
             int hysteresisBlocked = 0;
-            var eligibleWinners = new List<AiIntentProposal>(bestByUnit.Count);
+            var seenUnits = new HashSet<int>();
+            var dispatchedUnits = new HashSet<int>();
+            var omittedUnits = new HashSet<int>();
+            var approved = new List<AiIntentProposal>(Math.Min(budget, ranked.Count));
 
-            foreach (KeyValuePair<int, AiIntentProposal> kvp in bestByUnit)
+            foreach (int index in ranked)
             {
-                int unitId = kvp.Key;
-                AiIntentProposal winner = kvp.Value;
+                AiIntentProposal candidate = proposals[index];
+                int unitId = candidate.UnitId;
+                if (!seenUnits.Add(unitId)) conflictsResolved++;
+                if (dispatchedUnits.Contains(unitId) || omittedUnits.Contains(unitId)) continue;
 
                 if (state.TryGetLease(unitId, out AiCommandArbiterState.UnitLease activeLease))
                 {
-                    bool lockoutActive = safeNow < activeLease.LockoutExpiresAt;
-                    if (lockoutActive && winner.Category < activeLease.Category)
+                    if (safeNow < activeLease.LockoutExpiresAt && candidate.Category < activeLease.Category)
                     {
                         lockoutBlocked++;
                         continue;
                     }
 
-                    // Apply retarget hysteresis when in the same or lower priority tier
-                    if (winner.Category <= activeLease.Category &&
-                        winner.TargetEntityId != activeLease.TargetEntityId)
+                    if (candidate.Category <= activeLease.Category &&
+                        candidate.TargetEntityId != activeLease.TargetEntityId &&
+                        candidate.UtilityScore <= activeLease.LastApprovedScore * safeHysteresis)
                     {
-                        float requiredScore = activeLease.LastApprovedScore * safeHysteresis;
-                        if (winner.UtilityScore <= requiredScore)
-                        {
-                            hysteresisBlocked++;
-                            continue;
-                        }
-                    }
-                }
-
-                eligibleWinners.Add(winner);
-            }
-
-            // Step 3: Sort eligible winners by descending utility score (then category, then unitId for determinism)
-            eligibleWinners.Sort((a, b) =>
-            {
-                int scoreCmp = b.UtilityScore.CompareTo(a.UtilityScore);
-                if (scoreCmp != 0)
-                {
-                    return scoreCmp;
-                }
-
-                int catCmp = ((int)b.Category).CompareTo((int)a.Category);
-                if (catCmp != 0)
-                {
-                    return catCmp;
-                }
-
-                return a.UnitId.CompareTo(b.UnitId);
-            });
-
-            // Step 4: Enforce per-tick dispatch budget and commit leases
-            var approved = new List<AiIntentProposal>(Math.Min(budget, eligibleWinners.Count));
-            int budgetOmitted = 0;
-
-            for (int i = 0; i < eligibleWinners.Count; i++)
-            {
-                AiIntentProposal winner = eligibleWinners[i];
-                if (approved.Count < budget)
-                {
-                    if (tryDispatch != null && !tryDispatch(winner))
-                    {
+                        hysteresisBlocked++;
                         continue;
                     }
+                }
 
-                    approved.Add(winner);
-                    state.SetLease(winner.UnitId, new AiCommandArbiterState.UnitLease
-                    {
-                        ModuleId = winner.ModuleId,
-                        CommandTag = winner.CommandTag,
-                        TargetEntityId = winner.TargetEntityId,
-                        Category = winner.Category,
-                        LastApprovedScore = winner.UtilityScore,
-                        LockoutExpiresAt = safeNow + winner.LockoutDurationSeconds
-                    });
-                }
-                else
+                if (approved.Count >= budget)
                 {
-                    budgetOmitted++;
+                    omittedUnits.Add(unitId);
+                    continue;
                 }
+
+                if (tryDispatch != null && !tryDispatch(candidate)) continue;
+
+                approved.Add(candidate);
+                dispatchedUnits.Add(unitId);
+                state.SetLease(unitId, new AiCommandArbiterState.UnitLease
+                {
+                    ModuleId = candidate.ModuleId,
+                    CommandTag = candidate.CommandTag,
+                    TargetEntityId = candidate.TargetEntityId,
+                    Category = candidate.Category,
+                    LastApprovedScore = candidate.UtilityScore,
+                    LockoutExpiresAt = safeNow + candidate.LockoutDurationSeconds
+                });
             }
 
             return new AiArbitrationResult(
-                budgetOmittedCount: budgetOmitted,
+                budgetOmittedCount: omittedUnits.Count,
                 conflictsResolvedCount: conflictsResolved,
                 lockoutBlockedCount: lockoutBlocked,
                 hysteresisBlockedCount: hysteresisBlocked,
                 approvedOrders: approved.AsReadOnly());
         }
 
-        private static bool IsBetterProposal(AiIntentProposal candidate, AiIntentProposal current)
-        {
-            if (Math.Abs(candidate.UtilityScore - current.UtilityScore) > 0.0001f)
-            {
-                return candidate.UtilityScore > current.UtilityScore;
-            }
-
-            return (int)candidate.Category > (int)current.Category;
-        }
     }
 }

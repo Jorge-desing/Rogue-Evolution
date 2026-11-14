@@ -3461,6 +3461,17 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("A rejected dispatch must leave the lease and dispatch slot available.");
         }
 
+        var fallbackResult = RogueCommandExpansionLoader.Runtime.Ai.AiCommandArbiterPolicy.Arbitrate(
+            new RogueCommandExpansionLoader.Runtime.Ai.AiCommandArbiterState(), 10f, 1.2f, 2,
+            new[] { siegeProposal, kiteProposal, secondUnitProposal },
+            tryDispatch: proposal => proposal.CommandTag != kiteProposal.CommandTag);
+        if (fallbackResult.ApprovedOrders.Count != 2 ||
+            fallbackResult.ApprovedOrders[0].UnitId != secondUnitProposal.UnitId ||
+            fallbackResult.ApprovedOrders[1].CommandTag != siegeProposal.CommandTag)
+        {
+            throw new InvalidOperationException("Rejected winners must allow same-unit alternatives in global priority order.");
+        }
+
         var prematureOverrideProposal = new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
             moduleId: "sample:threat-prioritization",
             commandTag: "tag.threat",
