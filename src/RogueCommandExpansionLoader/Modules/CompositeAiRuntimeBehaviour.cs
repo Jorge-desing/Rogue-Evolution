@@ -424,6 +424,11 @@ namespace RogueCommandExpansionLoader.Modules
 
             try
             {
+                if (HasActiveOrderFromAnotherProfile(unit, proposal.UnitId))
+                {
+                    return false;
+                }
+
                 EntityCommand command;
                 if (proposal.Category == AiIntentCategory.SurvivalKite)
                 {
@@ -526,6 +531,29 @@ namespace RogueCommandExpansionLoader.Modules
                 // Guarded: a single native dispatch failure must not abort the composite tick.
                 return false;
             }
+        }
+
+        private bool HasActiveOrderFromAnotherProfile(EntityController unit, int unitId)
+        {
+            if (unit.CurrentPlayerCommandName == EntityCommand.Command.DoNothing)
+            {
+                return false;
+            }
+
+            lock (_activeCompositesLock)
+            {
+                foreach (CompositeAiRuntimeBehaviour profile in _activeComposites)
+                {
+                    if (!ReferenceEquals(profile, this) &&
+                        profile._arbiterState.TryGetLease(unitId, out AiCommandArbiterState.UnitLease lease) &&
+                        unit.CurrentCommandIsTaggedWith(lease.CommandTag))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         public void OnDestroyed()

@@ -206,3 +206,5 @@ Arbitration retains alternative intents until a unit receives an order. It check
 Before arbitration, reconcile leases for sampled units against the live current command. Idle units and units whose native command tag differs release the old lease. An active command with the matching tag keeps its lockout and retarget protection.
 
 Idle-only coordinated proposals require a live DoNothing command and a successfully read empty native command queue at dispatch. Snapshot queue state is for planning.
+
+When coordinated profiles overlap, dispatch preserves an active command whose native tag matches another active profile lease. Idle units and units whose current tag differs can receive a new proposal. Profiles retain their own arbiters and dispatch budgets.

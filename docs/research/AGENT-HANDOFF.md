@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Overlapping coordinated AI profiles
+
+Dispatch preserves an active coordinated order whose native tag matches a lease held by another active profile. Once the order finishes or changes, the guard no longer blocks dispatch. Release and 70 tactical checks passed locally. Steam execution remains unverified.
+
 ## Coordinated idle-only orders
 
 Dispatch reads the live native command queue before issuing an idle-only order. Unavailable queue reads suppress dispatch. Release and 70 tactical checks pass locally, including an order queued after snapshot collection. Steam execution remains unverified.

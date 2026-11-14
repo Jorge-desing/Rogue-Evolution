@@ -3759,6 +3759,20 @@ internal static partial class ValidationTestRunner
 
             proposeKite = false;
             aiUnit.CurrentPlayerCommandName = EntityCommand.Command.Move;
+            var overlappingProfile = new CompositeAiRuntimeBehaviour(
+                "test:overlapping-profile", new[] { "sample:threat-prioritization" },
+                new IRogueCommandAiRuntimeBehaviour[] { combatModule });
+            overlappingProfile.OnInitialized();
+            try
+            {
+                overlappingProfile.Tick();
+                if (aiUnit.ExecuteCommandCallCount != 1)
+                    throw new InvalidOperationException("A second profile replaced an active coordinated order.");
+            }
+            finally
+            {
+                overlappingProfile.OnDestroyed();
+            }
             UnityEngine.Time.time = 30.5f;
             composite.Tick();
             if (aiUnit.ExecuteCommandCallCount != 1)
