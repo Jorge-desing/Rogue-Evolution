@@ -106,6 +106,16 @@ def patch_source(source: Path) -> list[str]:
         raise ValueError("The source is not the pinned Material Maker 1.7 / Godot 4.7 project.")
 
     changed: list[str] = []
+    gut_plugin = source / "addons/gut/gut_plugin.gd"
+    if _replace_once(
+        gut_plugin,
+        "\tawait get_tree().create_timer(1).timeout\n",
+        "\tif DisplayServer.get_name() != \"headless\":\n"
+        "\t\tawait get_tree().create_timer(1).timeout\n",
+        "preserve GUT plugin while skipping its GUI startup delay in headless editor",
+    ):
+        changed.append("preserve GUT plugin and skip its GUI-only startup wait in headless editor")
+
     renderer = source / "addons/material_maker/engine/multi_renderer.gd"
     if _replace_once(
         renderer,
@@ -464,16 +474,43 @@ def patch_source(source: Path) -> list[str]:
 
     presets = source / "export_presets.cfg"
     preset_text = _read(presets)
-    missing_extension_reference = '"res://addons/godotsteam/godotsteam.gdextension", '
-    if missing_extension_reference in preset_text:
-        reference_count = preset_text.count(missing_extension_reference)
-        if reference_count != 3:
-            raise ValueError(f"Expected three optional Steam export references, found {reference_count}.")
-        preset_text = preset_text.replace(missing_extension_reference, "")
-        _write(presets, preset_text)
-        changed.append("exclude unavailable optional Steam extension from CLI pack")
-    elif "godotsteam.gdextension" in preset_text:
-        raise ValueError("The optional GodotSteam reference has an unexpected export-preset layout.")
+    extension_reference = '"res://addons/godotsteam/godotsteam.gdextension"'
+    reference_count = preset_text.count(extension_reference)
+    if reference_count != 3:
+        raise ValueError(f"Expected three bundled GodotSteam export references, found {reference_count}.")
+    extension = source / "addons/godotsteam/godotsteam.gdextension"
+    if not extension.is_file():
+        raise FileNotFoundError(f"Bundled GodotSteam extension manifest is missing: {extension}")
+    steam = source / "material_maker/steam.gd"
+    if _replace_once(
+        steam,
+        "\tvar initialize_response: Dictionary = steam_api.steamInitEx()\n"
+        "\tprint(\"Did Steam initialize?: %s \" % initialize_response)\n"
+        "\tsteam_api.initAuthentication()\n"
+        "\tis_subscribed = steam_api.isSubscribed()\n",
+        "\tvar initialize_response: Dictionary = steam_api.steamInitEx()\n"
+        "\tprint(\"Did Steam initialize?: %s \" % initialize_response)\n"
+        "\tif int(initialize_response.get(\"status\", -1)) != 0:\n"
+        "\t\treturn\n"
+        "\tsteam_api.initAuthentication()\n"
+        "\tis_subscribed = steam_api.isSubscribed()\n",
+        "check Steam initialization result before calling authenticated APIs",
+    ):
+        changed.append("check Steam initialization result before calling authenticated APIs")
+
+    extension_content = _read(extension)
+    debug_library = 'windows.debug.x86_64 = "res://addons/godotsteam/win64/libgodotsteam.windows.template_debug.x86_64.dll"'
+    release_library = 'windows.release.x86_64 = "res://addons/godotsteam/win64/libgodotsteam.windows.template_release.x86_64.dll"'
+    if debug_library not in extension_content or release_library not in extension_content:
+        raise ValueError("GodotSteam manifest does not map both Windows x86_64 debug and release libraries.")
+    for relative_path in (
+        "addons/godotsteam/win64/libgodotsteam.windows.template_debug.x86_64.dll",
+        "addons/godotsteam/win64/libgodotsteam.windows.template_release.x86_64.dll",
+        "addons/godotsteam/win64/steam_api64.dll",
+    ):
+        binary = source / relative_path
+        if not binary.is_file() or binary.stat().st_size <= 0:
+            raise FileNotFoundError(f"Bundled GodotSteam Windows release dependency is missing: {binary}")
 
     start_scene = source / "start.tscn"
     if _replace_once(
@@ -490,24 +527,6 @@ def patch_source(source: Path) -> list[str]:
     changed.extend(f"remove absent optional example MTL reference: {path}" for path in changed_obj_files)
     changed_hdr_files = _remove_ignored_hdr_metadata(source)
     changed.extend(f"remove ignored identity HDR metadata (pixel bytes preserved): {path}" for path in changed_hdr_files)
-
-    extension_list = source / ".godot/extension_list.cfg"
-    if extension_list.is_file():
-        extension_lines = _read(extension_list).splitlines()
-        filtered_extension_lines = [
-            line for line in extension_lines if line.strip() != "res://addons/godotsteam/godotsteam.gdextension"
-        ]
-        if filtered_extension_lines != extension_lines:
-            if filtered_extension_lines:
-                _write(extension_list, "\n".join(filtered_extension_lines) + "\n")
-            else:
-                extension_list.unlink()
-            changed.append("remove optional Steam extension from the cached CLI extension list")
-
-    extension = source / "addons/godotsteam/godotsteam.gdextension"
-    if extension.is_file():
-        extension.unlink()
-        changed.append("omit optional Steam extension from the CLI-only source copy")
 
     return changed
 

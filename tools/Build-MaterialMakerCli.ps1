@@ -161,6 +161,51 @@ try {
         Get-ChildItem -LiteralPath $sourceFolder -Force | Copy-Item -Destination $runtimeFolderPath -Recurse -Force
     }
 
+    $steamExtensionFiles = @(
+        'addons/godotsteam/godotsteam.gdextension',
+        'addons/godotsteam/win64/libgodotsteam.windows.template_debug.x86_64.dll',
+        'addons/godotsteam/win64/libgodotsteam.windows.template_release.x86_64.dll',
+        'addons/godotsteam/win64/steam_api64.dll'
+    )
+    $steamExtensionManifest = @()
+    foreach ($relativePath in $steamExtensionFiles) {
+        $sourceFile = Join-Path $sourceProject $relativePath
+        if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf) -or (Get-Item -LiteralPath $sourceFile).Length -le 0) {
+            throw "The verified Material Maker source archive is missing a GodotSteam runtime file: $sourceFile"
+        }
+        $targetFile = Join-Path $runtimeRoot $relativePath
+        $targetDirectory = Split-Path -Parent $targetFile
+        New-Item -ItemType Directory -Path $targetDirectory -Force | Out-Null
+        $sourceHash = (Get-FileHash -LiteralPath $sourceFile -Algorithm SHA256).Hash
+        $targetHash = if (Test-Path -LiteralPath $targetFile -PathType Leaf) {
+            (Get-FileHash -LiteralPath $targetFile -Algorithm SHA256).Hash
+        } else {
+            ''
+        }
+        if ($targetHash -ne $sourceHash) {
+            $candidateFile = Join-Path $targetDirectory ((Split-Path -Leaf $targetFile) + '.' + [guid]::NewGuid().ToString('N') + '.new')
+            Copy-Item -LiteralPath $sourceFile -Destination $candidateFile
+            if ((Get-FileHash -LiteralPath $candidateFile -Algorithm SHA256).Hash -ne $sourceHash) {
+                throw "The staged GodotSteam file differs from the verified source archive: $relativePath"
+            }
+            if (Test-Path -LiteralPath $targetFile -PathType Leaf) {
+                $backupFile = Join-Path $buildLogRoot ((Split-Path -Leaf $targetFile) + '.before')
+                [System.IO.File]::Replace($candidateFile, $targetFile, $backupFile)
+            } else {
+                Move-Item -LiteralPath $candidateFile -Destination $targetFile
+            }
+        }
+        $runtimeHash = (Get-FileHash -LiteralPath $targetFile -Algorithm SHA256).Hash
+        if ($runtimeHash -ne $sourceHash) {
+            throw "The staged GodotSteam runtime file failed SHA-256 verification: $relativePath"
+        }
+        $steamExtensionManifest += [ordered]@{
+            path = $relativePath
+            length = (Get-Item -LiteralPath $targetFile).Length
+            sha256 = $runtimeHash
+        }
+    }
+
     $runtimePack = Join-Path $runtimeRoot 'material_maker.pck'
     $candidatePack = Join-Path $runtimeRoot ('material_maker.' + [guid]::NewGuid().ToString('N') + '.pck')
     Copy-Item -LiteralPath $stagedPack -Destination $candidatePack
@@ -188,6 +233,7 @@ try {
         runtimeDirectory = $runtimeRoot
         pck = $runtimePack
         previousPckBackup = $previousPackBackup
+        godotSteamRuntimeFiles = $steamExtensionManifest
         importStdout = Join-Path $buildLogRoot 'godot-import.stdout.log'
         importStderr = Join-Path $buildLogRoot 'godot-import.stderr.log'
         packStdout = Join-Path $buildLogRoot 'godot-pack.stdout.log'
