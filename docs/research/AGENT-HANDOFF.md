@@ -3,6 +3,11 @@
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
 
+## General capability audit — release staging validation
+
+- Package-Loader.ps1 now applies canonical schema/file checks and cross-pack reference auditing to the exact staged packs before writing or replacing the ZIP. Python must have the project jsonschema dependency. The staging checks accepted both release pack copies and rejected a mutated reactive-AI manifest.
+- Release DLL built with zero warnings/errors. Full ZIP execution stopped at the existing canonical visual build provenance gate. See `artifacts/general-capability-audit/package.log`. Regenerate the canonical visual artifacts before retrying the complete packaging command.
+
 ## General capability audit — pack file references
 
 - Python pack validation now checks each referenced path component below the pack root without following symlinks or Windows reparse points. Explicit alternate schemas still require file references relative to the pack. This check covers declared file references. The loader separately checks the package root and tree. Full acceptance report: `artifacts/general-capability-audit/pack-path-full.json`.

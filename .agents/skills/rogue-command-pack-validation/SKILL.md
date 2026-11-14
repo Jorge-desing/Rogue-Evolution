@@ -30,6 +30,8 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 
 ## 2. Manifest Schema & Parameter Rules
 
+Packaging uses Python with the project jsonschema dependency. After copying the release packs, Package-Loader.ps1 validates each staged manifest against the staged schema and audits references across the staged set before writing the ZIP. If the canonical build provenance gate fails first, regenerate its artifacts before attempting a full package check.
+
 Referenced files must use pack-relative paths. The Python validator rejects traversal, absolute or drive-relative paths, symlinks and reparse points along the reference below the pack root, even with an alternate schema.
 
 Use `python -m tools.validate_content_pack <pack_dir>` for canonical schema and pack file checks. Schema errors stop file inspection. Use `--schema` for an intentional alternate contract.

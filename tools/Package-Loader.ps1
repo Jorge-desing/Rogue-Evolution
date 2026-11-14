@@ -315,6 +315,22 @@ Unity AssetBundle, and one data-only reactive-AI sample pack.
 It does not include the game, BepInEx, Harmony, or game assemblies.
 "@ | Set-Content -LiteralPath (Join-Path $stagePath 'INSTALL.txt') -Encoding UTF8
 
+    Push-Location -LiteralPath $repositoryRoot
+    try {
+        foreach ($stagedPack in @($samplePackDirectory, $reactiveAiSampleDirectory)) {
+            & python -m tools.validate_content_pack $stagedPack --schema (Join-Path $schemaDirectory 'content.schema.json')
+            if ($LASTEXITCODE -ne 0) {
+                throw "Staged pack validation failed: $stagedPack"
+            }
+        }
+        & python -m tools.audit_content_references --all --packs-root $packsDirectory
+        if ($LASTEXITCODE -ne 0) {
+            throw "Staged pack reference audit failed: $packsDirectory"
+        }
+    } finally {
+        Pop-Location
+    }
+
     New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
     if (Test-Path -LiteralPath $temporaryArchivePath) {
         throw "Temporary archive path already exists; refusing to reuse it: $temporaryArchivePath"
