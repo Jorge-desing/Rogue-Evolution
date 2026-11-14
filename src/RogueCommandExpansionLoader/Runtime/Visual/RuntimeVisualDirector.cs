@@ -255,6 +255,18 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private void ResetForReuse(EntityController entity)
         {
             _entity = entity;
+            _turretJammedOverride = null;
+            _doorOpenOverride = null;
+            _doorOpenProgress = 0f;
+            _currentRecoilOffset = 0f;
+            if (_socketDeployUnit != null)
+            {
+                _socketDeployUnit.localPosition = _doorClosedLocalPos;
+            }
+            if (_socketRecoilPrimary != null)
+            {
+                _socketRecoilPrimary.localPosition = _recoilBaseLocalPos;
+            }
             RefreshAnimatorParameterCacheIfNeeded();
             _deathAnimationTriggered = false;
             _deathAnimationRequestedForDestruction = false;

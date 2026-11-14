@@ -27,6 +27,8 @@ For Unity particle authoring, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`
 
 ## 2. Core Technical Rules & Native Hooks
 
+Temporary turret and deployment door overrides apply to one entity lifetime. Pool reuse clears both overrides and restores the authored closed door and recoil rest positions. Native production drives the door again on the next visual update.
+
 Stun suspends turret tracking while active. Critical damage independently locks and tilts the turret. Repair restores the pre-damage pivot rotation, and reuse clears the stun presentation.
 
 The runtime director shares one fire source across critical damage and OnFire. It uses the authored fire emitter when present and clears the effect after both causes end or the entity is reused. The fallback is created only when the authored emitter is absent.
