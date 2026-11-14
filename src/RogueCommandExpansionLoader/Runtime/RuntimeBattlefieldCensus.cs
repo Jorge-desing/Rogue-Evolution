@@ -21,7 +21,8 @@ namespace RogueCommandExpansionLoader.Runtime
             int currentRank,
             bool isControlledByAi,
             bool isControlledByPlayer,
-            bool isAlive)
+            bool isAlive,
+            int uniqueEntityId = 0)
         {
             EntityKeyId = entityKeyId ?? string.Empty;
             IsBuilding = isBuilding;
@@ -34,9 +35,11 @@ namespace RogueCommandExpansionLoader.Runtime
             IsControlledByAi = isControlledByAi;
             IsControlledByPlayer = isControlledByPlayer;
             IsAlive = isAlive;
+            UniqueEntityId = uniqueEntityId;
         }
 
         public string EntityKeyId { get; }
+        public int UniqueEntityId { get; }
         public bool IsBuilding { get; }
         public float CurrentHealth { get; }
         public float MaxHealth { get; }
@@ -156,7 +159,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         entity.CurrentRank,
                         entity.IsControlledByAi,
                         entity.IsControlledByPlayer,
-                        !entity.DestroyHasBeenStarted && entity.CurrentHealth > 0f));
+                        !entity.DestroyHasBeenStarted && entity.CurrentHealth > 0f,
+                        entity.UniqueEntityId));
                 }
 
                 return new BattlefieldCensus(

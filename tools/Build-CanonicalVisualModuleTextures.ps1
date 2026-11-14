@@ -1,8 +1,10 @@
 param(
     [ValidateSet(9, 10, 11, 12)]
     [int]$SizePower = 11,
+    [ValidateRange(0, 2147483647)]
     [int]$DilatePx = 0,
     [string]$DetailNormalPath = "",
+    [ValidateScript({ $_ -ge 0.0 -and $_ -le 1.0 -and -not [double]::IsNaN($_) -and -not [double]::IsInfinity($_) })]
     [double]$DetailNormalStrength = 0.35,
     [ValidateRange(1, 8)]
     [int]$MaxParallelExports = 4,
@@ -14,6 +16,35 @@ param(
 
 $ErrorActionPreference = "Stop"
 $batchStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+function Stop-MaterialMakerProcess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    $Process.Refresh()
+    if (-not $Process.HasExited) {
+        try {
+            $Process.Kill()
+        } catch {
+            $Process.Refresh()
+            if (-not $Process.HasExited) {
+                throw "Could not stop Material Maker process for ${Context}: $($_.Exception.Message)"
+            }
+        }
+    }
+    if (-not $Process.WaitForExit(10000)) {
+        throw "Material Maker process for $Context did not exit within 10 seconds after termination was requested. PID=$($Process.Id)"
+    }
+    $Process.Refresh()
+    if (-not $Process.HasExited) {
+        throw "Material Maker process for $Context is still running after WaitForExit. PID=$($Process.Id)"
+    }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $manifestPath = Join-Path $repoRoot "content/source-art/canonical-visual-modules.json"
 $batchScript = Join-Path $repoRoot "tools/batch_material_maker_textures.py"
@@ -36,6 +67,13 @@ $artifactRoot = [System.IO.Path]::GetFullPath($artifactRoot)
 $artifactPrefix = [System.IO.Path]::GetFullPath((Join-Path $repoRoot "artifacts")).TrimEnd('\') + '\'
 if (-not $artifactRoot.StartsWith($artifactPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Canonical texture bake output must remain under repository artifacts: $artifactRoot"
+}
+$resolvedDetailNormal = ""
+if (-not [string]::IsNullOrWhiteSpace($DetailNormalPath)) {
+    $resolvedDetailNormal = if ([System.IO.Path]::IsPathRooted($DetailNormalPath)) { $DetailNormalPath } else { Join-Path $repoRoot $DetailNormalPath }
+    if (-not (Test-Path -LiteralPath $resolvedDetailNormal -PathType Leaf)) {
+        throw "Detail normal map does not exist: $resolvedDetailNormal"
+    }
 }
 
 $unityTextureDir = Join-Path $repoRoot "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/VisualModules/Textures"
@@ -60,10 +98,11 @@ foreach ($required in @($configPath, $batchScript, $mmDir, $officialMmExe, $mmEx
 }
 
 $batchEntries = New-Object System.Collections.Generic.List[object]
+$templateRoot = Join-Path $repoRoot "artifacts/mm-templates"
 foreach ($preset in $presets) {
     $unitName = "RCLModule_$preset"
     $templateFile = if ($preset -eq "olive_armor") { "tactical-military-template.ptex" } else { "tactical-$preset-template.ptex" }
-    $templatePath = Join-Path $repoRoot "artifacts/mm-templates/$templateFile"
+    $templatePath = Join-Path $templateRoot $templateFile
     $outputDir = Join-Path $artifactRoot "texture-work/$preset"
     $rawDir = Join-Path $outputDir "raw"
     $batchEntries.Add([ordered]@{
@@ -100,7 +139,7 @@ try {
     [System.IO.File]::WriteAllText($batchManifestPath, ($batchEntries | ConvertTo-Json -Depth 6), $utf8NoBom)
 
     Write-Host "[1/4] Preparing $($batchEntries.Count) Material Maker 1.7 templates (sizePower=$SizePower)..."
-    & $pythonExe $batchScript prepare --config $configPath --batch-manifest $batchManifestPath --size $SizePower --force
+    & $pythonExe $batchScript prepare --config $configPath --batch-manifest $batchManifestPath --artifact-root $artifactRoot --template-root $templateRoot --size $SizePower --force
     if ($LASTEXITCODE -ne 0) {
         throw "Batch Material Maker template preparation failed with exit code $LASTEXITCODE."
     }
@@ -140,6 +179,7 @@ try {
     $active = New-Object System.Collections.Generic.List[object]
     $failedEntries = New-Object System.Collections.Generic.List[object]
     $completedExports = 0
+    $exportFailure = $null
 
     Push-Location $mmDir
     try {
@@ -177,7 +217,7 @@ try {
                         Write-Host ("  Exported [{0}/{1}] {2}" -f $completedExports, $batchEntries.Count, $item.Entry.preset)
                     }
                 } elseif (([DateTime]::UtcNow - $item.StartedAt).TotalSeconds -gt 240) {
-                    try { $proc.Kill() } catch {}
+                    Stop-MaterialMakerProcess -Process $proc -Context "parallel attempt for '$($item.Entry.preset)'"
                     $proc.Dispose()
                     $active.RemoveAt($i)
                     Write-Warning "Material Maker export timed out for '$($item.Entry.preset)'; queuing sequential retry."
@@ -191,24 +231,50 @@ try {
                 Remove-Item -LiteralPath $retryEntry.rawDir -Recurse -Force
             }
             New-Item -ItemType Directory -Force -Path $retryEntry.rawDir | Out-Null
-            $mmLog = Join-Path $retryEntry.outputDir "material-maker.log"
-            $mmErrorLog = Join-Path $retryEntry.outputDir "material-maker-error.log"
+            $mmLog = Join-Path $retryEntry.outputDir "material-maker-retry.log"
+            $mmErrorLog = Join-Path $retryEntry.outputDir "material-maker-retry-error.log"
             $mmArgs = "--main-pack `"$patchedMmPack`" --export-material --target $profileName -o `"$($retryEntry.rawDir)`" `"$($retryEntry.template)`""
-            $retryProc = Start-Process -FilePath $mmExe -ArgumentList $mmArgs -WorkingDirectory $runtimeDir -WindowStyle Hidden -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -Wait -PassThru
-            if ($null -ne $retryProc.ExitCode -and $retryProc.ExitCode -ne 0) {
-                throw "Material Maker export failed for preset '$($retryEntry.preset)' after retry with exit code $($retryProc.ExitCode)."
+            $retryProc = Start-Process -FilePath $mmExe -ArgumentList $mmArgs -WorkingDirectory $runtimeDir -WindowStyle Hidden -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -PassThru
+            try {
+                if (-not $retryProc.WaitForExit(240000)) {
+                    Stop-MaterialMakerProcess -Process $retryProc -Context "sequential retry for '$($retryEntry.preset)'"
+                    throw "Material Maker export timed out for preset '$($retryEntry.preset)' during its bounded retry."
+                }
+                $retryProc.Refresh()
+                if ($null -ne $retryProc.ExitCode -and $retryProc.ExitCode -ne 0) {
+                    throw "Material Maker export failed for preset '$($retryEntry.preset)' after retry with exit code $($retryProc.ExitCode)."
+                }
+            } finally {
+                if (-not $retryProc.HasExited) {
+                    Stop-MaterialMakerProcess -Process $retryProc -Context "final cleanup of '$($retryEntry.preset)' retry"
+                }
+                $retryProc.Dispose()
             }
         }
+    } catch {
+        $exportFailure = $_
+        throw
     } finally {
+        $cleanupFailures = New-Object System.Collections.Generic.List[string]
         foreach ($item in $active) {
             try {
                 if (-not $item.Process.HasExited) {
-                    $item.Process.Kill()
+                    Stop-MaterialMakerProcess -Process $item.Process -Context "cleanup of '$($item.Entry.preset)'"
                 }
+            } catch {
+                $cleanupFailures.Add("$($item.Entry.preset): $($_.Exception.Message)")
+            } finally {
                 $item.Process.Dispose()
-            } catch {}
+            }
         }
         Pop-Location
+        if ($cleanupFailures.Count -gt 0) {
+            $cleanupMessage = "Failed to confirm cleanup of Material Maker processes: $($cleanupFailures -join '; ')"
+            if ($null -ne $exportFailure) {
+                $cleanupMessage += " Primary export error: $($exportFailure.Exception.ToString())"
+            }
+            throw $cleanupMessage
+        }
     }
     Write-Host ("  Material Maker GPU exports completed in {0:F2}s." -f $exportStopwatch.Elapsed.TotalSeconds)
 
@@ -218,6 +284,8 @@ try {
         "pack-audit",
         "--config", $configPath,
         "--batch-manifest", $batchManifestPath,
+        "--artifact-root", $artifactRoot,
+        "--template-root", $templateRoot,
         "--workflow", "procedural",
         "--size", "$SizePower",
         "--dilate-px", "$DilatePx",
@@ -225,9 +293,8 @@ try {
         "--workers", "$PackWorkers",
         "--strict"
     )
-    if (-not [string]::IsNullOrWhiteSpace($DetailNormalPath)) {
-        $resolvedDetail = if ([System.IO.Path]::IsPathRooted($DetailNormalPath)) { $DetailNormalPath } else { Join-Path $repoRoot $DetailNormalPath }
-        $packAuditArgs += @("--detail-normal", $resolvedDetail)
+    if (-not [string]::IsNullOrWhiteSpace($resolvedDetailNormal)) {
+        $packAuditArgs += @("--detail-normal", $resolvedDetailNormal)
     }
     if ($OptimizePng.IsPresent) {
         $packAuditArgs += "--optimize-png"

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import numbers
 from pathlib import Path
 from typing import Iterable
 
@@ -23,6 +25,16 @@ from scipy import ndimage
 
 MIN_ROUGHNESS = 0.04
 MAX_SMOOTHNESS_F = 1.0 - MIN_ROUGHNESS
+
+
+def validate_detail_strength(value: object) -> float:
+    """Return a finite RNM detail weight in the supported [0, 1] range."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, numbers.Real):
+        raise TypeError(f"detail_strength must be a real number from 0 through 1; got {value!r}.")
+    strength = float(value)
+    if not math.isfinite(strength) or not 0.0 <= strength <= 1.0:
+        raise ValueError(f"detail_strength must be finite and from 0 through 1; got {value!r}.")
+    return strength
 
 
 def compute_uv_dilation_map(
@@ -81,12 +93,27 @@ def dilate_uv_islands(
 
 
 def _decode_normal_rgb(rgb: np.ndarray) -> np.ndarray:
-    arr = np.asarray(rgb, dtype=np.float32)
-    if arr.dtype == np.uint8 or arr.max() > 1.001:
-        arr = arr / 127.5 - 1.0
-    else:
-        arr = arr * 2.0 - 1.0
-    return arr
+    raw = np.asarray(rgb)
+    if raw.ndim != 3 or raw.shape[-1] != 3 or raw.shape[0] == 0 or raw.shape[1] == 0:
+        raise ValueError(f"Tangent normal data must have a non-empty HxWx3 shape; got {raw.shape}.")
+    if not np.issubdtype(raw.dtype, np.number) or np.issubdtype(raw.dtype, np.complexfloating):
+        raise TypeError(f"Tangent normal data must be real numeric RGB; got {raw.dtype}.")
+    if not np.all(np.isfinite(raw)):
+        raise ValueError("Tangent normal data contains NaN or infinite values.")
+
+    arr = raw.astype(np.float32, copy=False)
+    minimum = float(np.min(arr))
+    maximum = float(np.max(arr))
+    if minimum < 0.0 or maximum > 255.0:
+        raise ValueError(
+            f"Encoded tangent normal channels must be in [0, 1] or [0, 255]; "
+            f"observed [{minimum:g}, {maximum:g}]."
+        )
+    if np.issubdtype(raw.dtype, np.integer):
+        return arr / 127.5 - 1.0
+    if maximum <= 1.0:
+        return arr * 2.0 - 1.0
+    return arr / 127.5 - 1.0
 
 
 def _encode_normal_rgb(normals: np.ndarray, as_uint8: bool = True) -> np.ndarray:
@@ -110,15 +137,15 @@ def blend_normals_rnm(
     Preserves base macro-curvature orientation while adding micro-detail relief
     without the flattening artifact of linear/overlay normal blending.
     """
-    n1 = _decode_normal_rgb(base_rgb)
-    n2 = _decode_normal_rgb(detail_rgb)
-    if n1 is np.asarray(base_rgb):
-        n1 = n1.copy()
-    if n2 is np.asarray(detail_rgb):
-        n2 = n2.copy()
+    base = np.asarray(base_rgb)
+    detail = np.asarray(detail_rgb)
+    if base.shape != detail.shape:
+        raise ValueError(f"Base/detail normal shapes must match; got {base.shape} and {detail.shape}.")
+    strength_f = validate_detail_strength(detail_strength)
+    n1 = _decode_normal_rgb(base).copy()
+    n2 = _decode_normal_rgb(detail).copy()
 
-    if detail_strength != 1.0:
-        strength_f = float(detail_strength)
+    if strength_f != 1.0:
         n2[..., 0] *= strength_f
         n2[..., 1] *= strength_f
         l2 = np.sqrt(np.sum(n2 * n2, axis=-1, keepdims=True))
@@ -136,7 +163,7 @@ def blend_normals_rnm(
     scale = dot_tu / np.maximum(n1[..., 2:3], 1e-5)
     n1 *= scale
     n1 -= n2
-    return _encode_normal_rgb(n1, as_uint8=(np.asarray(base_rgb).dtype == np.uint8))
+    return _encode_normal_rgb(n1, as_uint8=(base.dtype == np.uint8))
 
 
 def height_to_normal_scharr(

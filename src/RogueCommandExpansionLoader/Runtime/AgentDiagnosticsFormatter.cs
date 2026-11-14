@@ -431,6 +431,9 @@ namespace RogueCommandExpansionLoader.Runtime
                     rows.Add(new Dictionary<string, object>
                     {
                         ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["runtimeEntityKeyId"] = row.UniqueEntityId > 0
+                            ? row.UniqueEntityId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                            : null,
                         ["isBuilding"] = row.IsBuilding,
                         ["currentHealth"] = row.CurrentHealth,
                         ["maxHealth"] = row.MaxHealth,

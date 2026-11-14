@@ -121,7 +121,7 @@ def handle_request(message):
         response, changed = handler.dispatch({"jsonrpc":"2.0", "id":1, "method":"initialize", "params":{}})
         self.assertTrue(response["result"]["capabilities"]["tools"]["listChanged"])
         response, _ = handler.dispatch({"jsonrpc":"2.0", "id":2, "method":"tools/list", "params":{"includeAliases":False}})
-        self.assertEqual(231, len(response["result"]["tools"]))
+        self.assertEqual(232, len(response["result"]["tools"]))
 
 
 if __name__ == "__main__":

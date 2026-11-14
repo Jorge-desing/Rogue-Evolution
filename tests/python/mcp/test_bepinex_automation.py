@@ -178,8 +178,28 @@ class StateWaitTests(unittest.TestCase):
         spec = next(tool for tool in SERVER.TOOLS if tool["name"] == "automation_wait_for_state")
         self.assertEqual(set(spec["inputSchema"]["properties"]["tool"]["enum"]), SERVER.WAIT_STATE_TOOLS)
         canonical = [tool for tool in SERVER.TOOLS if not tool["description"].startswith("Alias for")]
-        self.assertEqual(len(canonical), 231)
+        self.assertEqual(len(canonical), 232)
         self.assertLess(len(json.dumps({"tools": canonical}, separators=(",", ":")).encode("utf-8")), 91000)
+
+    def test_battlefield_sequence_dispatches_once_and_waits_for_arrival(self):
+        steps = [
+            {"tool": "diagnostics_order_unit_move",
+             "arguments": {"entityKeyId": "42", "destinationX": 10, "destinationZ": 20},
+             "expect": [{"path": "/success", "equals": True}]},
+            {"tool": "automation_wait_for_state", "arguments": {
+                "tool": "diagnostics_get_battlefield_unit_state",
+                "arguments": {"entityKeyId": "42", "goal": {"x": 10, "z": 20}},
+                "expect": [{"path": "/withinGoal", "equals": True}],
+                "stableSamples": 2}},
+        ]
+        replies = ['{"success":true}', '{"withinGoal":false}', '{"withinGoal":true}', '{"withinGoal":true}']
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=replies) as call:
+            result = SERVER.execute_tool("automation_run_sequence", {"steps": steps})
+            self.assertFalse(result.get("isError", False))
+            self.assertEqual(call.call_args_list, [
+                mock.call("OrderUnitMoveJson", ["42", 10.0, 20.0]),
+                *[mock.call("GetBattlefieldUnitStateJson", ["42", True, 10.0, 20.0, 1.0])] * 3,
+            ])
 
     def test_local_wait_timeout_stops_sequence_before_outer_budget(self):
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{}') as call:
@@ -221,7 +241,7 @@ class StateWaitTests(unittest.TestCase):
     def test_skill_examples_validate_and_slider_recipe_runs_with_typed_refs(self):
         doc = REPO_ROOT / ".agents/skills/rogue-command-bepinex-mcp/references/automation.md"
         examples = [json.loads(block) for block in re.findall(r"```json\n(.*?)\n```", doc.read_text(encoding="utf-8"), re.S)]
-        self.assertEqual(len(examples), 3)
+        self.assertEqual(len(examples), 4)
         for example in examples:
             self.assertIsNone(SERVER._validate_tool_arguments(example["tool"], example["arguments"]))
         candidate = {"hierarchyPath": "MainMenu::/Canvas/Options/Slider", "gameObjectId": 23, "value": 0.25}

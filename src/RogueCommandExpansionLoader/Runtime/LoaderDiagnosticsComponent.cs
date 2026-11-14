@@ -1262,6 +1262,54 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Observes one live entity and its distance to an optional horizontal goal.
+        /// </summary>
+        public string GetBattlefieldUnitStateJson(string entityKeyId, bool useGoal, float goalX, float goalZ, float tolerance)
+        {
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            if (scene.name != "Game")
+            {
+                return JsonConvert.SerializeObject(new { error = "The active scene is not Game.", scene = scene.name });
+            }
+
+            if (!(tolerance > 0f && tolerance <= 20f) ||
+                (useGoal && (float.IsNaN(goalX) || float.IsInfinity(goalX) ||
+                 float.IsNaN(goalZ) || float.IsInfinity(goalZ))))
+            {
+                return JsonConvert.SerializeObject(new { error = "Use paired finite goal coordinates and a tolerance in (0, 20]." });
+            }
+
+            EntityController unit = RuntimeEntityKeyResolver.FindUniqueEntityByKey(ExistingControllers.Instance, entityKeyId);
+            if (unit == null)
+            {
+                return JsonConvert.SerializeObject(new { error = "Unit not found or ambiguous.", entityKeyId });
+            }
+
+            Vector3 position = unit.Position;
+            EntityController target = unit.CurrentAttackTarget;
+            bool hasTarget = target != null && !target.IsDestroyed && !target.DestroyHasBeenStarted;
+            double deltaX = (double)position.x - goalX;
+            double deltaZ = (double)position.z - goalZ;
+            double? goalDistance = useGoal
+                ? (double?)Math.Sqrt(deltaX * deltaX + deltaZ * deltaZ)
+                : null;
+            return JsonConvert.SerializeObject(new
+            {
+                entityKeyId = unit.UniqueEntityId.ToString(CultureInfo.InvariantCulture),
+                entityId = unit.EntityId,
+                sceneHandle = scene.handle,
+                isControlledByPlayer = unit.IsControlledByPlayer,
+                command = unit.CurrentPlayerCommandName.ToString(),
+                attackTargetKeyId = hasTarget ? target.UniqueEntityId.ToString(CultureInfo.InvariantCulture) : null,
+                attackTargetInRange = hasTarget && unit.IsTargetInRange,
+                x = position.x,
+                z = position.z,
+                goalDistance,
+                withinGoal = goalDistance.HasValue && goalDistance.Value <= tolerance,
+            });
+        }
+
+        /// <summary>
         /// Dispatches a movement command to a living unit by entity key ID.
         /// </summary>
         public string OrderUnitMoveJson(string entityKeyId, float destinationX, float destinationZ)

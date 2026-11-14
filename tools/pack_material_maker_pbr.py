@@ -13,7 +13,10 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
 import math
+import numbers
+import re
 import sys
+import traceback
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -21,18 +24,14 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from PIL import Image, ImageFilter, ImageStat
+import numpy as np
 
 # Roughness floor: a perfectly smooth (roughness 0) surface aliases badly at the
 # game's RTS camera distance, so smoothness is capped at 1 - MIN_ROUGHNESS.
 MIN_ROUGHNESS = 0.04
 MAX_SMOOTHNESS = round(255 * (1.0 - MIN_ROUGHNESS))
 SMOOTHNESS_LUT = [min(255 - i, MAX_SMOOTHNESS) for i in range(256)]
-try:
-    import numpy as _np_lut
-
-    SMOOTHNESS_LUT_U8 = _np_lut.array(SMOOTHNESS_LUT, dtype=_np_lut.uint8)
-except Exception:
-    SMOOTHNESS_LUT_U8 = None
+SMOOTHNESS_LUT_U8 = np.array(SMOOTHNESS_LUT, dtype=np.uint8)
 # Statistics are sampled on a downscaled copy so the report stays cheap on 4K atlases.
 STATS_SAMPLE_SIZE = 64
 # sRGB albedo plausibility window for non-metal surfaces (charcoal .. fresh snow).
@@ -40,6 +39,48 @@ ALBEDO_MIN_MEAN = 30
 ALBEDO_MAX_MEAN = 240
 NORMAL_LENGTH_TOLERANCE = 0.12
 FLAT_STDDEV = 0.75
+SAFE_PREFIX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+
+
+def _raise_task_failures(stage: str, failures: list[tuple[str, Exception]]) -> None:
+    if not failures:
+        return
+    details = []
+    for label, exc in failures:
+        rendered = "".join(traceback.format_exception(exc)).rstrip()
+        details.append(f"--- {label} ---\n{rendered}")
+    message = f"PBR {stage} failed for {len(failures)} task(s):\n" + "\n".join(details)
+    raise RuntimeError(message) from failures[0][1]
+
+
+def _validate_pack_options(
+    prefix: str,
+    dilate_px: int,
+    detail_strength: float,
+    compress_level: int,
+) -> None:
+    if (
+        not isinstance(prefix, str)
+        or not SAFE_PREFIX.fullmatch(prefix)
+        or prefix in {".", ".."}
+    ):
+        raise ValueError(f"PBR output prefix must be a simple file-name component; got {prefix!r}.")
+    if isinstance(dilate_px, bool) or not isinstance(dilate_px, int):
+        raise TypeError(f"UV dilation radius must be an integer >= 0; got {dilate_px!r}.")
+    if dilate_px < 0:
+        raise ValueError(f"UV dilation radius must be >= 0; got {dilate_px}.")
+    if isinstance(detail_strength, bool) or not isinstance(detail_strength, numbers.Real):
+        raise TypeError(
+            f"detail_strength must be a real number from 0 through 1; got {detail_strength!r}."
+        )
+    if not math.isfinite(float(detail_strength)) or not 0.0 <= float(detail_strength) <= 1.0:
+        raise ValueError(f"detail_strength must be finite and from 0 through 1; got {detail_strength!r}.")
+    if isinstance(compress_level, bool) or not isinstance(compress_level, int):
+        raise TypeError(
+            f"PNG compression level must be an integer from 0 through 9; got {compress_level!r}."
+        )
+    if not 0 <= compress_level <= 9:
+        raise ValueError(f"PNG compression level must be from 0 through 9; got {compress_level}.")
 
 
 def parse_args() -> argparse.Namespace:
@@ -98,11 +139,17 @@ def save_png(
     compress_level: int = 1,
     optimize_png: bool = False,
 ) -> None:
+    if isinstance(compress_level, bool) or not isinstance(compress_level, int):
+        raise TypeError(
+            f"PNG compression level must be an integer from 0 through 9; got {compress_level!r}."
+        )
+    if compress_level < 0 or compress_level > 9:
+        raise ValueError(f"PNG compression level must be from 0 through 9; got {compress_level}.")
     destination.parent.mkdir(parents=True, exist_ok=True)
     if optimize_png:
         image.save(destination, format="PNG", optimize=True)
     else:
-        image.save(destination, format="PNG", compress_level=max(0, min(9, int(compress_level))))
+        image.save(destination, format="PNG", compress_level=compress_level)
 
 
 def _build_emission_image(source: Path) -> Image.Image:
@@ -120,15 +167,11 @@ def copy_opaque_rgb(source: Path, destination: Path) -> None:
 def _build_albedo_image(source: Path) -> Image.Image:
     with Image.open(source) as image:
         rgb = image.convert("RGB")
-        try:
-            sharpened = rgb.filter(
-                ImageFilter.UnsharpMask(radius=1.2, percent=35, threshold=2)
-            )
-            sharpened.load()
-            return sharpened
-        except Exception:
-            rgb.load()
-            return rgb
+        sharpened = rgb.filter(
+            ImageFilter.UnsharpMask(radius=1.2, percent=35, threshold=2)
+        )
+        sharpened.load()
+        return sharpened
 
 
 def process_albedo(source: Path, destination: Path) -> None:
@@ -141,28 +184,31 @@ def _build_normal_image(
     detail_rgb: object | None = None,
     detail_strength: float = 0.35,
 ) -> Image.Image:
+    if not isinstance(detail_strength, numbers.Real) or isinstance(detail_strength, bool):
+        raise TypeError(
+            f"detail_strength must be a real number from 0 through 1; got {detail_strength!r}."
+        )
+    if not math.isfinite(float(detail_strength)) or not 0.0 <= float(detail_strength) <= 1.0:
+        raise ValueError(f"detail_strength must be finite and from 0 through 1; got {detail_strength!r}.")
     with Image.open(source) as image:
         rgb = image.convert("RGB")
-        try:
-            import numpy as np
+        arr = np.asarray(rgb, dtype=np.float32) / 127.5 - 1.0
+        arr[..., 2] = np.maximum(arr[..., 2], 0.02)
+        lens = np.sqrt(np.sum(arr * arr, axis=-1, keepdims=True))
+        arr /= np.maximum(lens, 1e-6)
+        encoded = np.clip(np.round((arr + 1.0) * 127.5), 0, 255).astype(np.uint8)
+        if detail_rgb is not None:
+            from tools.functional_engineering_integration import compose_normals_rnm_rgb
 
-            arr = np.asarray(rgb, dtype=np.float32) / 127.5 - 1.0
-            arr[..., 2] = np.maximum(arr[..., 2], 0.02)
-            lens = np.sqrt(np.sum(arr * arr, axis=-1, keepdims=True))
-            arr /= np.maximum(lens, 1e-6)
-            encoded = np.clip(np.round((arr + 1.0) * 127.5), 0, 255).astype(np.uint8)
-            if detail_rgb is not None:
-                from tools.functional_engineering_integration import compose_normals_rnm_rgb
-
-                encoded = compose_normals_rnm_rgb(
-                    encoded,
-                    np.asarray(detail_rgb, dtype=np.uint8),
-                    detail_strength=detail_strength,
-                )
-            return Image.fromarray(encoded, "RGB")
-        except Exception:
-            rgb.load()
-            return rgb
+            detail = np.asarray(detail_rgb)
+            if detail.dtype != np.uint8:
+                raise TypeError(f"detail_rgb must contain uint8 PNG texels; got {detail.dtype}.")
+            encoded = compose_normals_rnm_rgb(
+                encoded,
+                detail,
+                detail_strength=detail_strength,
+            )
+        return Image.fromarray(encoded, "RGB")
 
 
 def normalize_normal(source: Path, destination: Path) -> None:
@@ -181,25 +227,16 @@ def _build_metallic_gloss_images(
             raise ValueError(
                 f"Metallic/Roughness dimensions differ: {metallic.size} vs {roughness.size}"
             )
-        if SMOOTHNESS_LUT_U8 is not None:
-            import numpy as np
-
-            m_arr = np.asarray(metallic, dtype=np.uint8)
-            r_arr = np.asarray(roughness, dtype=np.uint8)
-            out_arr = np.empty((m_arr.shape[0], m_arr.shape[1], 4), dtype=np.uint8)
-            out_arr[..., 0] = m_arr
-            out_arr[..., 1] = m_arr
-            out_arr[..., 2] = m_arr
-            out_arr[..., 3] = SMOOTHNESS_LUT_U8[r_arr]
-            metallic.load()
-            roughness.load()
-            return Image.fromarray(out_arr, "RGBA"), metallic, roughness
-
-        smoothness = roughness.point(SMOOTHNESS_LUT)
-        packed = Image.merge("RGBA", (metallic, metallic, metallic, smoothness))
+        m_arr = np.asarray(metallic, dtype=np.uint8)
+        r_arr = np.asarray(roughness, dtype=np.uint8)
+        out_arr = np.empty((m_arr.shape[0], m_arr.shape[1], 4), dtype=np.uint8)
+        out_arr[..., 0] = m_arr
+        out_arr[..., 1] = m_arr
+        out_arr[..., 2] = m_arr
+        out_arr[..., 3] = SMOOTHNESS_LUT_U8[r_arr]
         metallic.load()
         roughness.load()
-        return packed, metallic, roughness
+        return Image.fromarray(out_arr, "RGBA"), metallic, roughness
 
 
 def pack_metallic_gloss(metallic_path: Path, roughness_path: Path, output_path: Path) -> None:
@@ -236,34 +273,22 @@ def normal_length_error(image: Image.Image) -> float:
     sampled = image.convert("RGB").resize(
         (STATS_SAMPLE_SIZE, STATS_SAMPLE_SIZE), Image.Resampling.NEAREST
     )
-    try:
-        import numpy as np
-
-        arr = np.asarray(sampled, dtype=np.float32) / 127.5 - 1.0
-        lens = np.sqrt(np.sum(arr * arr, axis=-1))
-        return float(np.mean(np.abs(lens - 1.0)))
-    except Exception:
-        pixels = _flat_pixels(sampled)
-        total = 0.0
-        for r, g, b in pixels:
-            x, y, z = r / 127.5 - 1.0, g / 127.5 - 1.0, b / 127.5 - 1.0
-            total += abs(math.sqrt(x * x + y * y + z * z) - 1.0)
-        return total / max(1, len(pixels))
+    arr = np.asarray(sampled, dtype=np.float32) / 127.5 - 1.0
+    lens = np.sqrt(np.sum(arr * arr, axis=-1))
+    return float(np.mean(np.abs(lens - 1.0)))
 
 
 def metallic_midtone_ratio(metallic: Image.Image) -> float:
     """Fraction of pixels that are neither dielectric (<25%) nor metal (>75%)."""
-    sampled = sample(metallic).convert("L")
-    try:
-        import numpy as np
-
-        arr = np.asarray(sampled, dtype=np.uint8)
-        mid = int(np.count_nonzero((arr >= 64) & (arr <= 191)))
-        return float(mid / max(1, arr.size))
-    except Exception:
-        values = _flat_pixels(sampled)
-        mid = sum(1 for v in values if 64 <= v <= 191)
-        return mid / max(1, len(values))
+    # Bilinear resampling manufactures gray texels along binary material-mask
+    # boundaries. Nearest sampling measures authored texels without changing
+    # their metallic class.
+    sampled = metallic.convert("L").resize(
+        (STATS_SAMPLE_SIZE, STATS_SAMPLE_SIZE), Image.Resampling.NEAREST
+    )
+    arr = np.asarray(sampled, dtype=np.uint8)
+    mid = int(np.count_nonzero((arr >= 64) & (arr <= 191)))
+    return float(mid / max(1, arr.size))
 
 
 def _evaluate_report_image(label: str, image: Image.Image, stats: dict[str, object], warnings: list[str]) -> None:
@@ -369,6 +394,7 @@ def pack_maps(
     optimize_png: bool = False,
     detail_rgb: object | None = None,
 ) -> dict[str, object]:
+    _validate_pack_options(prefix, dilate_px, detail_strength, compress_level)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     paths = {
@@ -401,15 +427,27 @@ def pack_maps(
     }
 
     with ThreadPoolExecutor(max_workers=4) as pool:
-        f_alb = pool.submit(_build_albedo_image, paths["Albedo"])
-        f_mg = pool.submit(_build_metallic_gloss_images, paths["Metallic"], paths["Roughness"])
-        f_nrm = pool.submit(_build_normal_image, paths["Normal"], detail_rgb, detail_strength)
-        f_emi = pool.submit(_build_emission_image, paths["Emission"])
+        futures = {
+            "Albedo": pool.submit(_build_albedo_image, paths["Albedo"]),
+            "MetallicGloss": pool.submit(
+                _build_metallic_gloss_images, paths["Metallic"], paths["Roughness"]
+            ),
+            "Normal": pool.submit(_build_normal_image, paths["Normal"], detail_rgb, detail_strength),
+            "Emission": pool.submit(_build_emission_image, paths["Emission"]),
+        }
+        built: dict[str, object] = {}
+        build_failures: list[tuple[str, Exception]] = []
+        for label, future in futures.items():
+            try:
+                built[label] = future.result()
+            except Exception as exc:
+                build_failures.append((label, exc))
+    _raise_task_failures("image processing", build_failures)
 
-        albedo_img = f_alb.result()
-        mg_img, metallic_gray, roughness_gray = f_mg.result()
-        normal_img = f_nrm.result()
-        emission_img = f_emi.result()
+    albedo_img = built["Albedo"]
+    mg_img, metallic_gray, roughness_gray = built["MetallicGloss"]  # type: ignore[misc]
+    normal_img = built["Normal"]
+    emission_img = built["Emission"]
 
     out_images = {
         "Albedo": albedo_img,
@@ -429,8 +467,8 @@ def pack_maps(
     }
 
     with ThreadPoolExecutor(max_workers=4) as pool:
-        save_futures = [
-            pool.submit(
+        save_futures = {
+            key: pool.submit(
                 save_png,
                 out_images[key],
                 output_paths[key],
@@ -438,10 +476,21 @@ def pack_maps(
                 optimize_png=optimize_png,
             )
             for key in ("Albedo", "MetallicGloss", "Normal", "Emission")
-        ]
-        report = build_report(report_sources, dimensions)
-        for fut in save_futures:
-            fut.result()
+        }
+        report: dict[str, object] | None = None
+        save_failures: list[tuple[str, Exception]] = []
+        try:
+            report = build_report(report_sources, dimensions)
+        except Exception as exc:
+            save_failures.append(("quality report", exc))
+        for label, future in save_futures.items():
+            try:
+                future.result()
+            except Exception as exc:
+                save_failures.append((f"{label} PNG write", exc))
+    _raise_task_failures("output generation", save_failures)
+    if report is None:
+        raise RuntimeError("PBR output generation completed without producing a quality report.")
 
     (output_dir / f"{prefix}_pack-report.json").write_text(
         json.dumps(report, indent=2), encoding="utf-8"

@@ -1391,7 +1391,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(251, len(names))
+        self.assertEqual(252, len(names))
 
     def test_initialize_reports_current_bridge_version(self) -> None:
         response = SERVER.handle_request({
@@ -1405,7 +1405,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(251, len(tools))
+        self.assertEqual(252, len(tools))
         payload = json.dumps(full["result"], separators=(",", ":")).encode("utf-8")
         self.assertLess(len(payload), 96000, f"tools/list payload too large: {len(payload)} bytes")
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
@@ -1420,7 +1420,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         names = [t["name"] for t in resp["result"]["tools"]]
         self.assertTrue(len(names) >= 1)
         resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
-        self.assertEqual(len(resp2["result"]["tools"]), 231)
+        self.assertEqual(len(resp2["result"]["tools"]), 232)
         self.assertLess(len(json.dumps(resp2["result"], separators=(",", ":")).encode("utf-8")), 91000)
         self.assertNotIn("ping_unity_bridge", [t["name"] for t in resp2["result"]["tools"]])
         self.assertIn("system_ping", [t["name"] for t in resp2["result"]["tools"]])
@@ -1967,11 +1967,11 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(251, len(names))
+        self.assertEqual(252, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
-        self.assertEqual(231, len(specs) - len(aliases))
+        self.assertEqual(232, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
         self.assertLess(compact, 96000, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
@@ -2024,7 +2024,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(427, total_props)
+        self.assertEqual(429, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()

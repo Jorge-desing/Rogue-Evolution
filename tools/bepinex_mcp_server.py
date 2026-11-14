@@ -860,7 +860,7 @@ WAIT_STATE_TOOLS = frozenset({
     "diagnostics_get_runtime_control_surface", "diagnostics_get_ui_accessibility_census",
     "diagnostics_get_intermission_native_panel_state", "diagnostics_get_intermission_census",
     "diagnostics_get_navigator_state", "diagnostics_get_game_time_scale",
-    "diagnostics_get_intermission_reward_state",
+    "diagnostics_get_intermission_reward_state", "diagnostics_get_battlefield_unit_state",
 })
 
 
@@ -1647,6 +1647,16 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             if target_id is not None:
                 args.append(str(target_id))
             res = _call_diagnostics_method("ApplyInGameCardChangeJson", args)
+            return _tool_response(res)
+
+        elif name == "diagnostics_get_battlefield_unit_state":
+            goal = arguments.get("goal")
+            res = _call_diagnostics_method("GetBattlefieldUnitStateJson", [
+                arguments["entityKeyId"], goal is not None,
+                float(goal["x"]) if goal is not None else 0.0,
+                float(goal["z"]) if goal is not None else 0.0,
+                float(goal.get("tolerance", 1.0)) if goal is not None else 1.0,
+            ])
             return _tool_response(res)
 
         elif name == "diagnostics_order_unit_move":

@@ -41,6 +41,20 @@ The following example requires an authorized UI change and a freshly resolved, u
 
 The census exposes `value` as a number for sliders. Inspect `controlType`, `minValue`, `maxValue`, visibility and interactability before choosing the recipe target.
 
+## Battlefield orders
+
+Find living player units with `diagnostics_get_battlefield_census` and use the row's string `runtimeEntityKeyId`. Refresh keys on scene changes. Confirm the match has started and choose a reachable destination before dispatch. The existing Move, Attack, AttackMove, HoldPosition and Stop tools issue native orders. A successful dispatch records the call. Observe the unit to establish its subsequent state.
+
+`diagnostics_get_battlefield_unit_state` reads one live entity in `Game`. It reports the scene handle, player ownership, native command, current attack target key and range state, and live X/Z position. An optional `goal` object with `x`, `z`, and `tolerance` (default 1 world unit) adds horizontal distance and `withinGoal`. Use this getter in `automation_wait_for_state` for arrival or wait for both `attackTargetKeyId` and `attackTargetInRange` for engagement. Range and target telemetry establish engagement state. Damage requires a separate observation.
+
+For movement, put `diagnostics_order_unit_move` in a sequence with an expectation of `/success == true`, then wait for `/withinGoal == true` using the same unit key and coordinates. Include `/sceneHandle` with its value from a fresh observation when following up across calls. A lost unit or scene exit stops the wait. On timeout, inspect the last sample and replan from current state.
+
+Replace the illustrative unit key `42` and coordinates `(10,20)` below with the live unit and authorized destination. The initial read supplies the scene handle and confirms player ownership.
+
+```json
+{"tool":"automation_run_sequence","arguments":{"steps":[{"tool":"diagnostics_get_battlefield_unit_state","arguments":{"entityKeyId":"42"},"expect":[{"path":"/isControlledByPlayer","equals":true}]},{"tool":"diagnostics_order_unit_move","arguments":{"entityKeyId":{"$ref":{"step":0,"path":"/entityKeyId"}},"destinationX":10,"destinationZ":20},"expect":[{"path":"/success","equals":true}]},{"tool":"automation_wait_for_state","arguments":{"tool":"diagnostics_get_battlefield_unit_state","arguments":{"entityKeyId":{"$ref":{"step":0,"path":"/entityKeyId"}},"goal":{"x":10,"z":20}},"expect":[{"path":"/withinGoal","equals":true},{"path":"/sceneHandle","equals":{"$ref":{"step":0,"path":"/sceneHandle"}}}],"stableSamples":2,"timeoutSeconds":20}}]}}
+```
+
 ## Verify and recover
 
 `stopReason` is null for a successful sequence, otherwise `{code, step}` identifies the first failure (or exhausted budget). A failed wait stops subsequent actions even with `stopOnFailure=false`. An uncertain native effect also stops unconditionally. `stopOnFailure=false` never authorizes automatic recovery or replay.

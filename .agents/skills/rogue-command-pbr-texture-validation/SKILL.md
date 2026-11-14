@@ -15,7 +15,7 @@ Before reviewing, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `unity/Rog
 
 ## Validation Checklist
 
-Use the [compatible texture recipes](../rogue-command-pbr-texture-authoring/references/compatible-texture-recipes.md) to identify the path being reviewed. Record automated graph checks, final-image checks and visual review independently. The current runner's procedural audit still applies without `-Strict`; strict mode additionally checks pack warnings and requested resolution.
+Use the [compatible texture recipes](../rogue-command-pbr-texture-authoring/references/compatible-texture-recipes.md) to identify the path being reviewed. Record automated graph checks, final-image checks and visual review independently. The current runner's procedural audit still applies without `-Strict`; strict mode fails on pack warnings, quality-gate failures, missing maps, or a different requested resolution. Keep the full reports and both Material Maker attempts' logs when diagnosing a failure.
 
 | Technique | Check before acceptance | What existing automation does not prove |
 |---|---|---|

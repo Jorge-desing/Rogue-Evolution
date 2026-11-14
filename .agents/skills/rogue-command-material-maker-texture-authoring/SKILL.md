@@ -168,11 +168,12 @@ Run [Rogue Command PBR Texture Validation](../rogue-command-pbr-texture-validati
 
 ## Canonical Level 2 Module Texture Set
 
-- `tools/Build-CanonicalVisualModuleTextures.ps1` bakes the 28 shared Material Maker 1.7 procedural presets used by the 57 Level 2 modules. Run the pinned `tools/Run-MaterialMakerBake.ps1 -Workflow procedural` path with strict quality checks; each preset produces the four named 2048x2048 maps required by the module builder.
-- These are 28 shared preset material sets, not 57 independent texture families. Keep the generated module FBXs authoritative, export images only, and leave working files/reports under the fresh ignored `artifacts/canonical-level2-<UTC>/` build root until the Unity builder consumes them.
+- `tools/Build-CanonicalVisualModuleTextures.ps1` bakes the 28 shared Material Maker 1.7 procedural presets used by the Level 2 module manifest. It runs the pinned CLI, then `tools/batch_material_maker_textures.py` packing and strict audit. Each preset produces the four named 2048x2048 maps required by the module builder.
+- These are shared preset material sets, not one texture family per module. Keep generated module FBXs authoritative and export images only. `tools/Build-CanonicalVisualModules.ps1` supplies a fresh ignored `artifacts/canonical-level2-<UTC>/` root; a standalone texture-batch run defaults to `artifacts/canonical-two-level/`. Use `-SkipPromote` for isolated validation when Unity textures must not be updated.
 - Successful strict reports establish map-generation evidence. `CanonicalVisualModuleBuilder` must still confirm imported maps, shader/material bindings, mesh vertex colors, and AssetBundle contents in Unity.
 - When promoting a generated map, compare its SHA-256 with the existing Unity texture first and leave byte-identical files untouched; this avoids unnecessary writes and preserves stable asset imports. Replace only maps whose validated bytes differ.
 - `tools/Build-CanonicalVisualModules.ps1` runs Blender generation, this strict 28-preset bake, Unity import/build, and bundle validation in order. Each run records its source fingerprint and output hashes in `artifacts/canonical-level2-<UTC>/build-manifest.json`; packaging rejects artifacts after their inputs or staged bundles change. The current build was authorized with an uncalibrated status; its reports must not be presented as performance validation.
+- Batch preflight validates every preset, template, output, and raw-output path against explicit roots before creating preset output or cleaning `raw/`. It rejects overlapping paths and symlinks/junctions. Strict pack audit fails on pack warnings, quality-gate failures, missing maps, or an unexpected resolution; it reports failures from all parallel presets. Material Maker retries keep separate stdout/stderr files, and a timed-out process must be confirmed exited before retry. Preserve both attempts' complete logs.
 
 ## Bulwark foundry material
 
