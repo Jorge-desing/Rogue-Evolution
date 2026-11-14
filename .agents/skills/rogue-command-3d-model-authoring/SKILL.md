@@ -11,6 +11,8 @@ Authoritative guide for modeling, texturing, rigging, and exporting 3D vehicle a
 
 ## 1. Verified Architecture & Directory Invariants
 
+Pooled visual directors clear health-driven damaged and critical presentation through the normal repair transitions before restoring the primary variant. New-life health is sampled again during the normal visual update.
+
 Author the first visual variant as the spawn and pool-reuse baseline. The runtime visual director now applies it automatically and clears the previous life’s tactical modules, tint and scale on reuse. Confirm the actual result in-game when runtime acceptance is requested.
 
 - **Authoring Tools:** Blender 4.5.14 LTS (`.tools/Blender-4.5.14/.../blender.exe`) + Unity 2021.3.45f2 (Mono x64). Material Maker 1.7 for PBR images. Zero remote dependencies.

@@ -307,6 +307,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 _nativeRigRetargetProfile.ResetForReuse();
             }
+            UpdateHealthAndDamageTransitions(false, 1f);
             RestorePrimaryVisualVariant();
         }
 
@@ -927,8 +928,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void UpdateHealthAndDamageTransitions(bool isDead)
         {
-            float ratio = GetHealthRatio();
+            UpdateHealthAndDamageTransitions(isDead, GetHealthRatio());
+        }
 
+        private void UpdateHealthAndDamageTransitions(bool isDead, float ratio)
+        {
             // 1. Reactive Armor (ERA) Detonation on initial heavy impact (<= 75% HP)
             if (ratio <= 0.75f && !isDead)
             {

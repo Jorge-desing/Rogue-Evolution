@@ -5,6 +5,8 @@ This handoff is for the next agent. Start with the latest relevant entry, then v
 
 ## General capability audit — visual variant lifecycle
 
+Pool reuse also clears health-driven chassis damage, smoke, fire and disabled damage attachments before restoring the primary. It uses the existing repair transitions, without writing gameplay health. Steam appearance and natural reuse still require runtime evidence.
+
 - RuntimeVisualDirector initializes the registered primary chassis and restores it when a pooled entity is reused. If the primary cannot mount, an existing tactical variant resets to baseline. Release compiles with zero warnings and errors. Appearance and natural pool reuse remain unverified in Steam.
 
 ## General capability audit — release staging validation
