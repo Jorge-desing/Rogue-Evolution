@@ -38,6 +38,14 @@ class ExportBalanceTableTests(unittest.TestCase):
         unit["customBalance"]["ProductionDuration"] = 3
         self.assertEqual(3, EXPORT.export_balance_table(pack)[0]["ProductionDuration"])
 
+        unit["weapons"] = [{"damage": 15, "range": 8, "fireRate": 2}]
+        row = EXPORT.export_balance_table(pack)[0]
+        self.assertEqual((15, 8, 0.5), (row["Damage1"], row["WeaponRange"], row["Attack1Cooldown"]))
+        unit["customBalance"]["Damage1"] = 25
+        unit["balanceOverrides"].append({"name": "attackCooldown", "value": "1"})
+        row = EXPORT.export_balance_table(pack)[0]
+        self.assertEqual((25, 1), (row["Damage1"], row["Attack1Cooldown"]))
+
     def test_raw_override_parsed(self) -> None:
         pack = _valid_pack()
         unit = pack["units"][0]

@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+The first weapons entry supplies positive damage, range and fireRate defaults for Damage1, WeaponRange and Attack1Cooldown. Fire rate is attacks per second and maps to 1/rate seconds, bounded to Single.MaxValue. Range uses native balance grid units. Native attack actions, range/cooldown minimums and upgrades remain authoritative. Explicit customBalance and raw row overrides take priority; zero preserves the template. Further weapons entries and weaponType retain their existing descriptive contract.
+
 Positive `productionQueue.buildTime` supplies the product's native ProductionDuration in seconds through the shared balance mapper. An explicit customBalance.ProductionDuration or raw productionDuration override takes priority. Zero retains the template duration. The factory reads its produced unit's duration through the native production pipeline; queueSize, resourceCost and productionPriority retain their existing contracts.
 
 Authoritative guide for creating and reviewing modded units, balance variants, factory pairings, and reward pool bindings.

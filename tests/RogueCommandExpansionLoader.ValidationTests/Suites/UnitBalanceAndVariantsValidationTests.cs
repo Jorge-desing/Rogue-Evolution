@@ -539,6 +539,16 @@ internal static partial class ValidationTestRunner
         unit.customBalance["ProductionDuration"] = 3d;
         if (UnitBalanceOverrideMapper.CreateCustomBalance(unit)["ProductionDuration"] != 3d)
             throw new InvalidOperationException("Custom production duration must remain authoritative.");
+
+        unit.weapons = [new ContentUnitWeaponDefinition { damage = 15f, range = 8f, fireRate = 2f }];
+        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (mapped["Damage1"] != 15d || mapped["WeaponRange"] != 8d || mapped["Attack1Cooldown"] != 0.5d)
+            throw new InvalidOperationException("The primary weapon must supply native damage, range and cooldown.");
+        unit.customBalance["Damage1"] = 25d;
+        unit.balanceOverrides = [new ContentBalanceOverride { name = "attackCooldown", value = "1" }];
+        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (mapped["Damage1"] != 25d || mapped.ContainsKey("Attack1Cooldown"))
+            throw new InvalidOperationException("Explicit weapon balance must override primary weapon defaults.");
     }),
     ("balance overrides exclude units without registered entity rows", () =>
     {

@@ -142,6 +142,14 @@ def export_balance_table(pack: dict) -> list[dict[str, Any]]:
         if build_time is not None and 0 < build_time < float("inf") and "ProductionDuration" not in row:
             row["ProductionDuration"] = build_time
 
+        weapons = _as_list(unit.get("weapons"))
+        if weapons and isinstance(weapons[0], dict):
+            primary = weapons[0]
+            for source, column in (("damage", "Damage1"), ("range", "WeaponRange"), ("fireRate", "Attack1Cooldown")):
+                value = _parse_number(primary.get(source))
+                if value is not None and 0 < value < float("inf") and column not in row:
+                    row[column] = min(3.4028234663852886e38, 1 / value) if source == "fireRate" else value
+
         # 4. movement.moveSpeed si es positivo y no está en customBalance.
         movement = unit.get("movement")
         if isinstance(movement, dict):

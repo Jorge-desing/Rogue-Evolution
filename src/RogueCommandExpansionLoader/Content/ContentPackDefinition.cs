@@ -681,24 +681,40 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
-            if (unit.productionQueue != null && unit.productionQueue.buildTime > 0f &&
-                !Single.IsInfinity(unit.productionQueue.buildTime) &&
-                !parameters.ContainsKey("ProductionDuration") && !HasExplicitRowOverride(unit, "productionDuration"))
+            if (unit.productionQueue != null)
             {
-                parameters.Add("ProductionDuration", unit.productionQueue.buildTime);
+                AddStructuredDefault(parameters, unit, "ProductionDuration", unit.productionQueue.buildTime);
             }
 
-            // Apply only a positive structured speed. A zero in this DTO is
-            // indistinguishable from an omitted value; explicit zero belongs in the
-            // native balanceOverrides list. Explicit raw row overrides take priority.
-            if (unit.movement != null && unit.movement.moveSpeed > 0f &&
-                !Single.IsNaN(unit.movement.moveSpeed) && !Single.IsInfinity(unit.movement.moveSpeed) &&
-                !parameters.ContainsKey("MoveSpeed") && !HasExplicitRowOverride(unit, "moveSpeed"))
+            if (unit.movement != null)
             {
-                parameters.Add("MoveSpeed", unit.movement.moveSpeed);
+                AddStructuredDefault(parameters, unit, "MoveSpeed", unit.movement.moveSpeed);
+            }
+
+            if (unit.weapons != null && unit.weapons.Length > 0 && unit.weapons[0] != null)
+            {
+                ContentUnitWeaponDefinition primary = unit.weapons[0];
+                AddStructuredDefault(parameters, unit, "Damage1", primary.damage);
+                AddStructuredDefault(parameters, unit, "WeaponRange", primary.range);
+                if (primary.fireRate > 0f && !Single.IsInfinity(primary.fireRate))
+                {
+                    AddStructuredDefault(parameters, unit, "Attack1Cooldown",
+                        Math.Min(Single.MaxValue, 1d / primary.fireRate));
+                }
             }
 
             return parameters;
+        }
+
+        private static void AddStructuredDefault(
+            Dictionary<string, double> parameters, ContentUnitDefinition unit, string name, double value)
+        {
+            // Zero also represents an omitted DTO value. Explicit balance can supply zero.
+            if (value > 0d && !Double.IsInfinity(value) &&
+                !parameters.ContainsKey(name) && !HasExplicitRowOverride(unit, BalanceParameters[name].RowFieldName))
+            {
+                parameters.Add(name, value);
+            }
         }
 
         public static List<BalanceOverride> CreateBalanceOverridesForLoadedUnits(
