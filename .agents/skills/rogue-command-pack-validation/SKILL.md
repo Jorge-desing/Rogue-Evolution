@@ -108,3 +108,5 @@ When two cases use identical inputs and call the same function, consolidate thei
 The Surge Arc Tank source check retains the suspension envelope assertion; the former 7,000-polygon guard is obsolete under the global diagnostic-only geometry policy. Do not reinstate geometry build gates as test expectations.
 
 Ironclad asset tests inspect the current source blend with pinned Blender and current bundle with UnityPy; never depend on ignored reports from a previous session. Structural profile expectations must follow reviewed hardware removals (Arachnid, Sentinel and Command Relay), including exact absence checks. Missing rigged bundle clips require repairing the FBX/avatar and rebuilding, not weakening animation assertions.
+
+General offline reviews must inspect auxiliary validator coverage as well as suite status: healthy default values and swallowed decode exceptions can conceal unsupported serialized fields. Audio/modifier audits now have explicit read-error/non-finite regressions; audit JSON is local evidence only.

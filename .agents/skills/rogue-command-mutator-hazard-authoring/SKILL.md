@@ -18,7 +18,7 @@ Reverse engineering of Rogue Command 1.0.9 (`Assembly-CSharp.dll` SHA-256 `d2da3
    - The engine provides [`CardChangeScriptableObject`](references/native-card-change-and-relic-schema.md), applying direct modifications across the 26 canonical attributes in `EntityBalancingStore.ChangeableValue`.
    - Relics are registered through `RelicBalancingStore`; difficulty card changes are evaluated at stage start through `ManageStartCardChanges`.
 2. **Faction & Role Target Filtering:**
-   - Target side is governed by the `Side` enum: `False` (Player), `True` (Enemy/AI), and `Irrelevant` (Global/Symmetric).
+   - Target side is governed by the `Side` enum: `True` (Player), `False` (Enemy/AI), and `Irrelevant` (Global/Symmetric).
    - Precision targeting uses conjunction (`cardMustHaveAllOfTheseRoles`), disjunction (`cardMustHaveOneOfTheseRoles`), and exclusion lists over the 34 native `UnitRole` identifiers.
 3. **Canonical 30-Status-Effect Engine:**
    - Built-in status effects (`Turbo`, `Stun`, `OnFire`, `Vampirism`, `Stealth`, `Armored`, `Overclocked`, etc.) are natively supported and visually handled by `StatusEffectsAndParticles`.
@@ -81,3 +81,5 @@ python tools/validate_mutators_and_hazards.py
 ```
 
 The tool audits enum identities, modifier values, and unverified Heat scaling, then outputs a formatted diagnostic table. It does not validate hazard prefabs or simulate Heat levels; inspect hazard trigger/tick behavior in Unity and run the strict content-pack validator separately.
+
+Modifier audit values must be finite numeric values; malformed values, booleans, NaN and infinity are critical audit failures rather than silently converted valid zero modifiers.

@@ -12,7 +12,7 @@ Enforces engine invariants discovered via REA in Rogue Command 1.0.9:
    EffectRadius1, EffectRadius2, SkillRange, HealAmount1, HealAmount2, GainCreditsAmount,
    SkillManaCost, Duration1, SpawnTtl, ManaRechargePerSecond, MaxArmor, ArmorProtection.
 2. Operations: Add, Multiply.
-3. Target Sides: Player (False), Enemy (True), Irrelevant (Global).
+3. Target Sides: Player (True), Enemy (False), Irrelevant (Global).
 4. Unit Roles (34 canonical enum roles):
    Spawn, Harvester, FrontalAttacker, MassDestruction, Fire, Sniper, Supporter,
    Rock, Robo, Spawner, PCXCard, Building, Factory, Turret, Refinery, Unit, Heal,
@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass, field, asdict
 import json
+import math
 from pathlib import Path
 import sys
 from typing import List, Dict, Any
@@ -110,9 +111,14 @@ class MutatorValidator:
         side_raw = str(entry.get("side") or "Player").strip().lower()
         scales_heat = bool(entry.get("multiplyValueWithCurrentHeatLevel", False))
 
+        raw_value = entry.get("value", 1.0)
+        invalid_value = isinstance(raw_value, bool)
         try:
-            val = float(entry.get("value", 1.0))
-        except (ValueError, TypeError):
+            val = float(raw_value)
+            invalid_value = invalid_value or not math.isfinite(val)
+        except (ValueError, TypeError, OverflowError):
+            invalid_value = True
+        if invalid_value:
             val = 0.0
 
         audit = MutatorAudit(
@@ -123,6 +129,10 @@ class MutatorValidator:
             side=side_raw or "unknown",
             scales_with_heat=scales_heat,
         )
+
+        if invalid_value:
+            audit.score = 0
+            audit.flags.append("INVALID_VALUE: modifier value must be a finite number, not a boolean.")
 
         # 1. Validate Target Stat
         if stat_raw not in CANONICAL_CHANGEABLE_VALUES:

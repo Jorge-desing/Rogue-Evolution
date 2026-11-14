@@ -1,5 +1,12 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 General offline capability audit
+
+- Current loader C# harness: 573/574 checks passed, one symlink privilege skip, exit 0. Python baseline passed. Pack contracts, cross-pack references and AI module audit passed for the four current manifests. This is local/static evidence; pending Steam gameplay acceptance is not an implementation failure by itself.
+- Fixed audio bundle audit reading UnityPy serialized fields and reporting unreadable/invalid objects instead of silently substituting healthy defaults or dropping them. Current native bundle audit read two clips and two sources without read-error entries.
+- Fixed modifier audit accepting invalid/boolean/non-finite values; these now produce score-zero diagnostics with finite JSON output. Corrected the stale player/enemy Side description to match the current card-change contract. Updated canonical tools and their skill copies. Seven directed regression tests pass. Full report: `artifacts/general-audit/python-final.json`.
+- No runtime reflection, Harmony patch, gameplay content, textures or models changed. Remaining acceptance areas include natural production/reward/AI execution, rendered gait/death and calibrated geometry; no new claim of runtime acceptance or calibration is made.
+
 **Updated:** 2026-11-13
 **Repository:** Mod Rogue Command (`c:\Users\Alex\Documents\Mod Rogue Command`)
 **Remote:** `origin` points to `https://github.com/Jorge-desing/Rogue-Evolution.git` (branch `codex/rogue-unit-balance-20261018`)

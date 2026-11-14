@@ -81,3 +81,5 @@ Use `tools/validate_audio_assets.py` (mirrored in `scripts/validate_audio_assets
 3. **Configure AudioSource**: Place `AudioSource` on the model socket (`Socket_MuzzlePrimary` or `Socket_GroundCenter`) with `spatialBlend = 1.0`, `minDistance = 3.0`, `maxDistance = 60.0`, `dopplerLevel = 0.0`.
 4. **Hook to Native Components**: Wire `shotSoundAudioSource` on `ShootProjectile`, `_movementSoundAudioSource` on `EntityFlockingMovement`, or use `ParticleSoundPlayer` for particle impacts.
 5. **Run Validator**: Execute `validate_audio_assets.py` before building AssetBundles.
+
+Bundle audits read UnityPy serialized `MinDistance`, `MaxDistance`, `DopplerLevel` and `panLevelCustomCurve.m_Curve` keys. Missing/invalid fields or object decode errors remain score-zero entries with AUDIO_READ_ERROR; never substitute healthy defaults or omit unreadable sources. Spatial blend reports the minimum authored key value, not a runtime interpolation measurement.

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 import wave
@@ -122,8 +123,8 @@ class AudioAssetValidator:
         clips: List[AudioClipAudit] = []
         sources: List[AudioSourceAudit] = []
 
-        if not bundle_path.exists():
-            return clips, sources
+        if not bundle_path.is_file():
+            raise FileNotFoundError(bundle_path)
 
         env = UnityPy.load(str(bundle_path))
 
@@ -160,17 +161,27 @@ class AudioAssetValidator:
 
                     audit.score = max(0, audit.score)
                     clips.append(audit)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    clips.append(AudioClipAudit(name=f"Clip_{obj.path_id}", source_type="bundle", score=0,
+                                                flags=[f"AUDIO_READ_ERROR: {exc}"]))
 
             elif obj.type.name == "AudioSource":
                 try:
                     data = obj.read()
                     owner_name = getattr(data, "m_Name", "") or f"AudioSource_{obj.path_id}"
-                    spatial_blend = float(getattr(data, "m_SpatialBlend", 1.0))
-                    min_dist = float(getattr(data, "m_MinDistance", 3.0))
-                    max_dist = float(getattr(data, "m_MaxDistance", 60.0))
-                    doppler = float(getattr(data, "m_DopplerLevel", 0.0))
+                    # UnityPy exposes serialized names, not Unity C# properties.
+                    keys = data.panLevelCustomCurve.m_Curve
+                    values = [float(key.value) for key in keys]
+                    if not values or any(not math.isfinite(v) or not 0 <= v <= 1 for v in values):
+                        raise ValueError("missing or invalid spatial-blend curve")
+                    spatial_blend = min(values)
+                    min_dist = float(data.MinDistance)
+                    max_dist = float(data.MaxDistance)
+                    doppler = float(data.DopplerLevel)
+                    if not all(math.isfinite(v) for v in (min_dist, max_dist, doppler)):
+                        raise ValueError("non-finite AudioSource parameters")
+                    if min_dist < 0 or max_dist <= min_dist or doppler < 0:
+                        raise ValueError("invalid AudioSource distance/doppler range")
 
                     src_audit = AudioSourceAudit(
                         owner_name=owner_name,
@@ -196,8 +207,9 @@ class AudioAssetValidator:
 
                     src_audit.score = max(0, src_audit.score)
                     sources.append(src_audit)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    sources.append(AudioSourceAudit(owner_name=f"AudioSource_{obj.path_id}", score=0,
+                                                    flags=[f"AUDIO_READ_ERROR: {exc}"]))
 
         return clips, sources
 
