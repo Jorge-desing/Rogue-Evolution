@@ -14,6 +14,44 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private const float VelocitySquaredThreshold = 1e-6f;
         private const float MovementReleaseGraceSeconds = 0.12f;
 
+        public const string SpeedMultiplierParameter = "RCL_SpeedMultiplier";
+        public const float DefaultReferenceSpeed = 3.5f;
+        public const float MinimumSpeedMultiplier = 0.65f;
+        public const float MaximumSpeedMultiplier = 1.45f;
+
+        public static float EvaluateSpeedMultiplier(
+            float velocitySquared,
+            float referenceSpeed = DefaultReferenceSpeed,
+            float boostFactor = 1.0f)
+        {
+            if (float.IsNaN(velocitySquared) || float.IsInfinity(velocitySquared) || velocitySquared <= VelocitySquaredThreshold)
+            {
+                return 1.0f;
+            }
+
+            if (float.IsNaN(referenceSpeed) || float.IsInfinity(referenceSpeed) || referenceSpeed <= 0.01f)
+            {
+                referenceSpeed = DefaultReferenceSpeed;
+            }
+
+            if (float.IsNaN(boostFactor) || float.IsInfinity(boostFactor) || boostFactor <= 0.1f)
+            {
+                boostFactor = 1.0f;
+            }
+
+            float speed = (float)Math.Sqrt(velocitySquared);
+            float ratio = (speed / referenceSpeed) * boostFactor;
+            if (ratio < MinimumSpeedMultiplier)
+            {
+                return MinimumSpeedMultiplier;
+            }
+            if (ratio > MaximumSpeedMultiplier)
+            {
+                return MaximumSpeedMultiplier;
+            }
+            return ratio;
+        }
+
         public static bool IsMoving(
             float positionDeltaSquared,
             float deltaTime,

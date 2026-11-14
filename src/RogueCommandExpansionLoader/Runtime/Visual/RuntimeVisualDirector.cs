@@ -51,12 +51,27 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private Quaternion _antennaBaseLocalRot = Quaternion.identity;
         private Quaternion _thrusterVectorBaseLocalRotL = Quaternion.identity;
         private Quaternion _thrusterVectorBaseLocalRotR = Quaternion.identity;
+        private Quaternion _turretPitchBaseLocalRot = Quaternion.identity;
+        private bool _hasTurretPitchBaseLocalRot;
+        private Transform _chassisTiltTarget;
+        private Quaternion _chassisTiltBaseLocalRot = Quaternion.identity;
+        private bool _hasChassisTiltBaseLocalRot;
         private Vector2 _antennaWobbleAngle = Vector2.zero;
         private Vector2 _antennaWobbleVelocity = Vector2.zero;
         private Vector3 _lastVelocity = Vector3.zero;
         private Vector3 _lastAcceleration = Vector3.zero;
         private Vector3 _lastPosition = Vector3.zero;
         private bool _hasLastPosition;
+
+        private SecondOrderDynamicsPresets.RoleRigProfile _dynamicsProfile = SecondOrderDynamicsPresets.Medium;
+        private SecondOrderDynamicsFloat _recoilDynamics;
+        private SecondOrderDynamicsVector3 _turretAzimuthDynamics;
+        private SecondOrderDynamicsFloat _turretPitchDynamics;
+        private SecondOrderDynamicsFloat _chassisPitchDynamics;
+        private SecondOrderDynamicsFloat _chassisRollDynamics;
+        private SecondOrderDynamicsFloat _antennaPitchDynamics;
+        private SecondOrderDynamicsFloat _antennaRollDynamics;
+        private SecondOrderDynamicsFloat _thrusterTiltDynamics;
 
         private Vector3 _recoilBaseLocalPos;
         private float _currentRecoilOffset;
@@ -103,6 +118,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private bool _hasMovementAnimationParameter;
         private bool _hasFireAnimationParameter;
         private bool _hasDeathAnimationParameter;
+        private bool _hasSpeedMultiplierAnimationParameter;
         private bool _deathAnimationTriggered;
         private bool _deathAnimationRequestedForDestruction;
         private bool _deathVisualRetirementPending;
@@ -117,6 +133,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private const string MovementAnimationParameter = "RCL_IsMoving";
         private const string FireAnimationParameter = "RCL_Fire";
         private const string DeathAnimationParameter = "RCL_Death";
+        private const string SpeedMultiplierAnimationParameter = LocomotionAnimationPolicy.SpeedMultiplierParameter;
         private const float AnimatorParameterCacheRetryInterval = 0.5f;
         private const float DeathVisualRetirementTransitionPaddingSeconds = 0.15f;
         private const float MaximumDeathVisualRetirementSeconds = 15f;
@@ -239,6 +256,22 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 _intactMeshBaseLocalScale = _intactMeshObject.transform.localScale;
                 _hasIntactMeshBaseLocalScale = true;
+                if (_chassisTiltTarget == null && _intactMeshObject.transform != transform)
+                {
+                    _chassisTiltTarget = _intactMeshObject.transform;
+                }
+            }
+
+            if (_chassisTiltTarget != null)
+            {
+                _chassisTiltBaseLocalRot = _chassisTiltTarget.localRotation;
+                _hasChassisTiltBaseLocalRot = true;
+            }
+
+            if (_socketTurretPitch != null)
+            {
+                _turretPitchBaseLocalRot = _socketTurretPitch.localRotation;
+                _hasTurretPitchBaseLocalRot = true;
             }
 
             CacheTintRenderers();
@@ -252,6 +285,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 _doorClosedLocalPos = _socketDeployUnit.localPosition;
             }
+
+            InitializeSecondOrderDynamics(entity);
 
             CacheReflectionAccess();
             _shotFeedbackTracker.Reset();
@@ -279,6 +314,27 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 _socketRecoilPrimary.localPosition = _recoilBaseLocalPos;
             }
+            if (_socketTurretPitch != null && _hasTurretPitchBaseLocalRot)
+            {
+                _socketTurretPitch.localRotation = _turretPitchBaseLocalRot;
+            }
+            if (_chassisTiltTarget != null && _hasChassisTiltBaseLocalRot)
+            {
+                _chassisTiltTarget.localRotation = _chassisTiltBaseLocalRot;
+            }
+            if (_socketAntenna != null)
+            {
+                _socketAntenna.localRotation = _antennaBaseLocalRot;
+            }
+            if (_socketThrusterVectorL != null)
+            {
+                _socketThrusterVectorL.localRotation = _thrusterVectorBaseLocalRotL;
+            }
+            if (_socketThrusterVectorR != null)
+            {
+                _socketThrusterVectorR.localRotation = _thrusterVectorBaseLocalRotR;
+            }
+            InitializeSecondOrderDynamics(entity);
             RefreshAnimatorParameterCacheIfNeeded();
             _deathAnimationTriggered = false;
             _deathAnimationRequestedForDestruction = false;
@@ -314,6 +370,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     if (_hasMovementAnimationParameter)
                     {
                         _animator.SetBool(MovementAnimationParameter, false);
+                    }
+                    if (_hasSpeedMultiplierAnimationParameter)
+                    {
+                        _animator.SetFloat(SpeedMultiplierAnimationParameter, 1f);
                     }
                     if (_hasFireAnimationParameter)
                     {
@@ -371,6 +431,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _hasMovementAnimationParameter = false;
             _hasFireAnimationParameter = false;
             _hasDeathAnimationParameter = false;
+            _hasSpeedMultiplierAnimationParameter = false;
 
             Animator preferredAnimator = null;
             Transform[] hierarchyTransforms = GetComponentsInChildren<Transform>(true);
@@ -419,6 +480,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     string.Equals(parameter.name, DeathAnimationParameter, StringComparison.Ordinal))
                 {
                     _hasDeathAnimationParameter = true;
+                }
+                else if (parameter.type == AnimatorControllerParameterType.Float &&
+                    string.Equals(parameter.name, SpeedMultiplierAnimationParameter, StringComparison.Ordinal))
+                {
+                    _hasSpeedMultiplierAnimationParameter = true;
                 }
             }
 
@@ -905,6 +971,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             UpdateNativeAudioBindings();
             UpdateMotionSample(Time.deltaTime);
             UpdateLocomotionAnimation();
+            UpdateChassisAccelerationTilt(Time.deltaTime);
             UpdateStatusEffectAndStanceReactions();
             UpdateRadarSweep();
             UpdateTurretAiming();
@@ -935,6 +1002,15 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             _isMoving = isMoving;
             _animator.SetBool(MovementAnimationParameter, isMoving);
+            if (_hasSpeedMultiplierAnimationParameter)
+            {
+                float speedMultiplier = isMoving
+                    ? LocomotionAnimationPolicy.EvaluateSpeedMultiplier(
+                        velocitySquared,
+                        boostFactor: _isBoostedVisualActive ? 1.15f : 1.0f)
+                    : 1.0f;
+                _animator.SetFloat(SpeedMultiplierAnimationParameter, speedMultiplier);
+            }
             _lastAnimationPosition = currentPosition;
             _hasLastAnimationPosition = true;
         }
@@ -1297,6 +1373,20 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             _isMoving = false;
             _movementAnimationHoldRemainingSeconds = 0f;
+            if (_chassisTiltTarget != null && _hasChassisTiltBaseLocalRot)
+            {
+                _chassisTiltTarget.localRotation = _chassisTiltBaseLocalRot;
+            }
+            if (_animator != null && _hasSpeedMultiplierAnimationParameter)
+            {
+                try
+                {
+                    _animator.SetFloat(SpeedMultiplierAnimationParameter, 1f);
+                }
+                catch
+                {
+                }
+            }
 
             if (_deathAnimationTriggered || _animator == null || !_hasDeathAnimationParameter)
             {
@@ -1441,6 +1531,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 {
                     _animator.SetBool(MovementAnimationParameter, false);
                 }
+                if (_animator != null && _hasSpeedMultiplierAnimationParameter)
+                {
+                    _animator.SetFloat(SpeedMultiplierAnimationParameter, 1f);
+                }
             }
 
             if (fireStatusChanged)
@@ -1472,15 +1566,25 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         private void UpdateTurretAiming()
         {
-            if (_isMoving) return;
-            if (string.Equals(_activeTacticalStanceVisual, "HoldFire", StringComparison.OrdinalIgnoreCase)) return;
-            if (_socketTurretPivot == null || IsTurretJammed || IsEntityDead()) return;
+            if (_socketTurretPivot == null) return;
+            if (_isMoving ||
+                string.Equals(_activeTacticalStanceVisual, "HoldFire", StringComparison.OrdinalIgnoreCase) ||
+                IsTurretJammed ||
+                IsEntityDead())
+            {
+                _turretAzimuthDynamics.Reset(_socketTurretPivot.forward);
+                return;
+            }
 
             Transform target = ResolveEntityTarget();
-            if (target == null) return;
+            if (target == null)
+            {
+                _turretAzimuthDynamics.Reset(_socketTurretPivot.forward);
+                return;
+            }
 
-            Vector3 toTarget = target.position - _socketTurretPivot.position;
-            toTarget.y = 0f; // Horizontal planar azimuth
+            Vector3 toTarget3D = target.position - _socketTurretPivot.position;
+            Vector3 toTarget = new Vector3(toTarget3D.x, 0f, toTarget3D.z);
 
             // Turrets only track hostile targets inside the native weapon range.
             // ResolveEntityTarget already verified hostility via IsEnemy; this gate
@@ -1507,17 +1611,47 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             float worldDistance = toTarget.magnitude;
             if (!TurretAimPolicy.IsInWeaponRange(worldDistance, weaponRangeCells, minRangeCells))
             {
+                _turretAzimuthDynamics.Reset(_socketTurretPivot.forward);
                 return;
             }
 
             if (toTarget.sqrMagnitude > 0.01f)
             {
+                float dt = Time.deltaTime;
                 Quaternion targetRot = Quaternion.LookRotation(toTarget, Vector3.up);
                 float effectiveTraverseSpeed = string.Equals(_activeTacticalStanceVisual, "Aggressive", StringComparison.OrdinalIgnoreCase)
                     ? _turretTraverseSpeed * 1.5f
                     : _turretTraverseSpeed;
-                _socketTurretPivot.rotation = Quaternion.RotateTowards(
-                    _socketTurretPivot.rotation, targetRot, effectiveTraverseSpeed * Time.deltaTime);
+                Quaternion rateLimitedRot = Quaternion.RotateTowards(
+                    _socketTurretPivot.rotation, targetRot, effectiveTraverseSpeed * dt);
+                Vector3 boundedForward = rateLimitedRot * Vector3.forward;
+                boundedForward.y = 0f;
+                if (boundedForward.sqrMagnitude > 1e-6f)
+                {
+                    Vector3 dynamicForward = _turretAzimuthDynamics.Update(dt, boundedForward.normalized);
+                    dynamicForward.y = 0f;
+                    if (dynamicForward.sqrMagnitude > 1e-6f)
+                    {
+                        _socketTurretPivot.rotation = Quaternion.LookRotation(dynamicForward.normalized, Vector3.up);
+                    }
+                    else
+                    {
+                        _socketTurretPivot.rotation = rateLimitedRot;
+                    }
+                }
+
+                if (_socketTurretPitch != null)
+                {
+                    Vector3 aimFromPitch = target.position - _socketTurretPitch.position;
+                    float aimLen = aimFromPitch.magnitude;
+                    if (aimLen > 0.05f)
+                    {
+                        float elevDeg = -Mathf.Asin(Mathf.Clamp(aimFromPitch.y / aimLen, -1f, 1f)) * Mathf.Rad2Deg;
+                        float desiredPitchDeg = Mathf.Clamp(elevDeg, -15f, 40f);
+                        float smoothedPitchDeg = _turretPitchDynamics.Update(dt, desiredPitchDeg);
+                        _socketTurretPitch.localRotation = _turretPitchBaseLocalRot * Quaternion.Euler(smoothedPitchDeg, 0f, 0f);
+                    }
+                }
             }
         }
 
@@ -1545,13 +1679,18 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             if (_socketRecoilPrimary == null) return;
 
-            if (_currentRecoilOffset > 0.001f)
+            float dt = Time.deltaTime;
+            if (Mathf.Abs(_currentRecoilOffset) > 0.0005f || Mathf.Abs(_recoilDynamics.Velocity) > 0.002f)
             {
-                _currentRecoilOffset = Mathf.Lerp(_currentRecoilOffset, 0f, Time.deltaTime * 12f);
+                _currentRecoilOffset = _recoilDynamics.Update(dt, 0f);
+                _recoilDynamics.ClampIdleZero(0.0005f, 0.002f);
+                _currentRecoilOffset = Mathf.Clamp(_recoilDynamics.Value, -0.05f, 1.0f);
                 _socketRecoilPrimary.localPosition = _recoilBaseLocalPos - new Vector3(0f, 0f, _currentRecoilOffset);
             }
             else if (_socketRecoilPrimary.localPosition != _recoilBaseLocalPos)
             {
+                _currentRecoilOffset = 0f;
+                _recoilDynamics.Reset(0f);
                 _socketRecoilPrimary.localPosition = _recoilBaseLocalPos;
             }
         }
@@ -1970,6 +2109,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public void TriggerWeaponFeedback(float recoilDistance = 0.22f)
         {
             _currentRecoilOffset = recoilDistance;
+            _recoilDynamics.Reset(recoilDistance);
             if (_socketRecoilPrimary != null)
             {
                 _socketRecoilPrimary.localPosition = _recoilBaseLocalPos - new Vector3(0f, 0f, _currentRecoilOffset);
@@ -2268,6 +2408,44 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _lastVelocity = velocity;
         }
 
+        private void InitializeSecondOrderDynamics(EntityController entity)
+        {
+            string identifier = entity != null && !string.IsNullOrEmpty(entity.EntityId)
+                ? entity.EntityId
+                : (gameObject != null ? gameObject.name : string.Empty);
+            _dynamicsProfile = SecondOrderDynamicsPresets.GetProfileForIdentifier(identifier);
+
+            _recoilDynamics = new SecondOrderDynamicsFloat(_dynamicsProfile.Recoil, 0f);
+            Vector3 initialForward = _socketTurretPivot != null ? _socketTurretPivot.forward : Vector3.forward;
+            _turretAzimuthDynamics = new SecondOrderDynamicsVector3(_dynamicsProfile.TurretAim, initialForward);
+            _turretPitchDynamics = new SecondOrderDynamicsFloat(_dynamicsProfile.TurretAim, 0f);
+            _chassisPitchDynamics = new SecondOrderDynamicsFloat(_dynamicsProfile.ChassisTilt, 0f);
+            _chassisRollDynamics = new SecondOrderDynamicsFloat(_dynamicsProfile.ChassisTilt, 0f);
+            _antennaPitchDynamics = new SecondOrderDynamicsFloat(_dynamicsProfile.Antenna, 0f);
+            _antennaRollDynamics = new SecondOrderDynamicsFloat(_dynamicsProfile.Antenna, 0f);
+            _thrusterTiltDynamics = new SecondOrderDynamicsFloat(_dynamicsProfile.ThrusterVector, 0f);
+            _antennaWobbleAngle = Vector2.zero;
+            _antennaWobbleVelocity = Vector2.zero;
+        }
+
+        private void UpdateChassisAccelerationTilt(float dt)
+        {
+            if (_chassisTiltTarget == null || _chassisTiltTarget == transform || dt <= 0f || _entity == null)
+            {
+                return;
+            }
+
+            Vector3 localAccel = _entity.transform.InverseTransformDirection(_lastAcceleration);
+            // Nose pitches slightly up during forward acceleration and dips under braking;
+            // body rolls slightly outward in turns. Clamp tightly to preserve silhouette & ground plane.
+            float targetPitch = Mathf.Clamp(-localAccel.z * 0.45f, -3.5f, 3.5f);
+            float targetRoll = Mathf.Clamp(localAccel.x * 0.40f, -3.0f, 3.0f);
+
+            float pitchDeg = _chassisPitchDynamics.Update(dt, targetPitch);
+            float rollDeg = _chassisRollDynamics.Update(dt, targetRoll);
+            _chassisTiltTarget.localRotation = _chassisTiltBaseLocalRot * Quaternion.Euler(pitchDeg, 0f, rollDeg);
+        }
+
         private void UpdateAntennaWobble(float dt)
         {
             if (_socketAntenna == null || dt <= 0f || _entity == null) return;
@@ -2275,17 +2453,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             // Transform acceleration into vehicle local coordinates
             Vector3 localAccel = _entity.transform.InverseTransformDirection(_lastAcceleration);
 
-            // 2D spring-damper model on local X (pitch/roll) and Y/Z
-            float springK = 32f;
-            float damping = 4.5f;
-
             float targetPitch = Mathf.Clamp(-localAccel.z * 1.5f, -25f, 25f);
             float targetRoll = Mathf.Clamp(localAccel.x * 1.5f, -25f, 25f);
 
-            _antennaWobbleVelocity.x += (targetPitch - _antennaWobbleAngle.x) * springK * dt - _antennaWobbleVelocity.x * damping * dt;
-            _antennaWobbleVelocity.y += (targetRoll - _antennaWobbleAngle.y) * springK * dt - _antennaWobbleVelocity.y * damping * dt;
-
-            _antennaWobbleAngle += _antennaWobbleVelocity * dt;
+            _antennaWobbleAngle.x = _antennaPitchDynamics.Update(dt, targetPitch);
+            _antennaWobbleAngle.y = _antennaRollDynamics.Update(dt, targetRoll);
+            _antennaWobbleVelocity = new Vector2(_antennaPitchDynamics.Velocity, _antennaRollDynamics.Velocity);
 
             _socketAntenna.localRotation = _antennaBaseLocalRot * Quaternion.Euler(_antennaWobbleAngle.x, 0f, _antennaWobbleAngle.y);
         }
@@ -2295,23 +2468,21 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_socketThrusterVectorL == null && _socketThrusterVectorR == null) return;
             if (dt <= 0f || _entity == null) return;
 
-            Vector3 velocity = _lastVelocity;
-            Vector3 localVel = _entity.transform.InverseTransformDirection(velocity);
+            Vector3 localVel = _entity.transform.InverseTransformDirection(_lastVelocity);
             float forwardSpeed = localVel.z;
 
             // Tilt forward up to 40 degrees when cruising forward, or back when braking
             float targetTilt = Mathf.Clamp(forwardSpeed * 5.0f, -15f, 40f);
-            Quaternion tiltRot = Quaternion.Euler(targetTilt, 0f, 0f);
+            float smoothedTilt = _thrusterTiltDynamics.Update(dt, targetTilt);
+            Quaternion tiltRot = Quaternion.Euler(smoothedTilt, 0f, 0f);
 
             if (_socketThrusterVectorL != null)
             {
-                Quaternion targetRot = _thrusterVectorBaseLocalRotL * tiltRot;
-                _socketThrusterVectorL.localRotation = Quaternion.Slerp(_socketThrusterVectorL.localRotation, targetRot, dt * 6f);
+                _socketThrusterVectorL.localRotation = _thrusterVectorBaseLocalRotL * tiltRot;
             }
             if (_socketThrusterVectorR != null)
             {
-                Quaternion targetRot = _thrusterVectorBaseLocalRotR * tiltRot;
-                _socketThrusterVectorR.localRotation = Quaternion.Slerp(_socketThrusterVectorR.localRotation, targetRot, dt * 6f);
+                _socketThrusterVectorR.localRotation = _thrusterVectorBaseLocalRotR * tiltRot;
             }
         }
     }

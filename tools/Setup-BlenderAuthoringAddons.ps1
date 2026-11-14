@@ -5,7 +5,8 @@
 .DESCRIPTION
     Installs EdgeFlow, DreamUV, and Ucupaint into Blender 4.5's user scripts/addons directory
     and registers them for hard-surface edge flow, trim-sheet UV mapping, and layered PBR painting.
-    With -IncludeExtended, also installs TexTools-Blender (UV layout, texel density, baking).
+    With -IncludeExtended, also installs TexTools-Blender (UV layout, texel density, baking)
+    and Wiggle 2 (secondary bone physics for antennas, cables, and articulated tails).
 #>
 
 [CmdletBinding()]
@@ -32,11 +33,36 @@ $addons = @(
 )
 if ($IncludeExtended) {
     $addons += @(
-        @{ Name = "TexTools"; Uri = "https://github.com/franMarz/TexTools-Blender.git" }
+        @{ Name = "TexTools"; Uri = "https://github.com/franMarz/TexTools-Blender.git" },
+        @{ Name = "wiggle_2"; Uri = "https://github.com/shteeve3d/blender-wiggle-2.git"; SingleFile = "wiggle_2.py" }
     )
 }
 
 foreach ($addon in $addons) {
+    if ($addon.ContainsKey("SingleFile") -and $addon.SingleFile) {
+        $targetFile = Join-Path $addonsDir $addon.SingleFile
+        if (-not (Test-Path -LiteralPath $targetFile -PathType Leaf)) {
+            $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+            $stagingDir = Join-Path $repoRoot ".tools\blender-$($addon.Name)"
+            if (-not (Test-Path -LiteralPath $stagingDir -PathType Container)) {
+                Write-Host "Cloning $($addon.Name) into staging directory..."
+                git -c http.sslBackend=schannel clone --depth 1 $addon.Uri $stagingDir
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Failed to clone $($addon.Name)"
+                }
+            }
+            $sourceFile = Join-Path $stagingDir $addon.SingleFile
+            if (-not (Test-Path -LiteralPath $sourceFile -PathType Leaf)) {
+                throw "Expected single-file addon '$($addon.SingleFile)' not found in $stagingDir"
+            }
+            Copy-Item -LiteralPath $sourceFile -Destination $targetFile -Force
+            Write-Host "Installed $($addon.Name) single-file addon to $targetFile."
+        } else {
+            Write-Host "$($addon.Name) is already installed at $targetFile"
+        }
+        continue
+    }
+
     $addonPath = Join-Path $addonsDir $addon.Name
     if (-not (Test-Path -LiteralPath $addonPath -PathType Container)) {
         Write-Host "Cloning $($addon.Name)..."

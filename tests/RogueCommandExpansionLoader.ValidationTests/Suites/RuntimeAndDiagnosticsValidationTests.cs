@@ -12131,6 +12131,82 @@ internal static partial class ValidationTestRunner
                 ExistingControllers.Instance.Reset();
             }
         }),
+        ("second-order dynamics solvers converge stably across recoil, turret, and role presets", () =>
+        {
+            if (SecondOrderDynamicsPresets.ResolveRoleName("sample:bulwark-siege") != "Heavy" ||
+                SecondOrderDynamicsPresets.ResolveRoleName("sample:arclance-walker") != "Walker" ||
+                SecondOrderDynamicsPresets.ResolveRoleName("sample:tidebreaker-hover") != "Light" ||
+                SecondOrderDynamicsPresets.ResolveRoleName("sample:skyguard-sam") != "Sam" ||
+                SecondOrderDynamicsPresets.ResolveRoleName(null) != "Medium")
+            {
+                throw new InvalidOperationException("SecondOrderDynamicsPresets role resolution mismatch.");
+            }
+
+            var recoil = new SecondOrderDynamicsFloat(SecondOrderDynamicsPresets.Heavy.Recoil, 0f);
+            recoil.Reset(0.30f);
+            float peakOvershoot = 0f;
+            float settled = recoil.Value;
+            for (int step = 0; step < 120; step++)
+            {
+                settled = recoil.Update(1f / 60f, 0f);
+                if (float.IsNaN(settled) || float.IsInfinity(settled))
+                {
+                    throw new InvalidOperationException("SecondOrderDynamicsFloat produced non-finite value.");
+                }
+                if (settled < peakOvershoot)
+                {
+                    peakOvershoot = settled;
+                }
+            }
+            if (peakOvershoot >= 0f || Math.Abs(settled) > 0.005f)
+            {
+                throw new InvalidOperationException(
+                    $"Expected underdamped settle and convergence to 0, got peakOvershoot={peakOvershoot:F4}, settled={settled:F4}.");
+            }
+
+            // Large deltaTime spike safety (frame hitch stability clamping)
+            var spikeSolver = new SecondOrderDynamicsFloat(SecondOrderDynamicsPresets.Light.Antenna, 0f);
+            for (int step = 0; step < 20; step++)
+            {
+                float v = spikeSolver.Update(0.50f, 15f);
+                if (float.IsNaN(v) || float.IsInfinity(v) || Math.Abs(v) > 50f)
+                {
+                    throw new InvalidOperationException("SecondOrderDynamicsFloat diverged under 500ms dt spike.");
+                }
+            }
+
+            // Vector3 solver for turret azimuth
+            var vecSolver = new SecondOrderDynamicsVector3(SecondOrderDynamicsPresets.Medium.TurretAim, new Vector3(0f, 0f, 1f));
+            Vector3 vecOut = vecSolver.Value;
+            for (int step = 0; step < 90; step++)
+            {
+                vecOut = vecSolver.Update(1f / 60f, new Vector3(1f, 0f, 0f));
+            }
+            if (Vector3.Distance(vecOut, new Vector3(1f, 0f, 0f)) > 0.05f)
+            {
+                throw new InvalidOperationException("SecondOrderDynamicsVector3 failed to converge to target direction.");
+            }
+        }),
+        ("locomotion animation policy speed multiplier scales within bounded [0.65, 1.45] range", () =>
+        {
+            if (Math.Abs(LocomotionAnimationPolicy.EvaluateSpeedMultiplier(0f) - 1.0f) > 1e-4f ||
+                Math.Abs(LocomotionAnimationPolicy.EvaluateSpeedMultiplier(float.NaN) - 1.0f) > 1e-4f ||
+                Math.Abs(LocomotionAnimationPolicy.EvaluateSpeedMultiplier(float.PositiveInfinity) - 1.0f) > 1e-4f)
+            {
+                throw new InvalidOperationException("Stationary or invalid velocity must return 1.0x speed multiplier.");
+            }
+
+            float verySlow = LocomotionAnimationPolicy.EvaluateSpeedMultiplier(0.25f); // 0.5 / 3.5 = 0.14 -> clamp 0.65
+            float nominal = LocomotionAnimationPolicy.EvaluateSpeedMultiplier(3.5f * 3.5f); // 1.0
+            float veryFast = LocomotionAnimationPolicy.EvaluateSpeedMultiplier(100f, boostFactor: 1.15f); // clamp 1.45
+            if (Math.Abs(verySlow - 0.65f) > 1e-4f ||
+                Math.Abs(nominal - 1.0f) > 1e-4f ||
+                Math.Abs(veryFast - 1.45f) > 1e-4f)
+            {
+                throw new InvalidOperationException(
+                    $"Bounded speed multiplier mismatch: slow={verySlow:F3}, nominal={nominal:F3}, fast={veryFast:F3}.");
+            }
+        }),
     };
 
     private sealed class TestCardChangeTarget

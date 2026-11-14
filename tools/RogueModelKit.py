@@ -12307,6 +12307,7 @@ def generate_procedural_action_clips(
     # The f8/f22 shoulders form a slow in/out envelope around the central f15
     # breath instead of a single trapezoidal key, so the stance reads as a
     # settled mechanical idle at RTS camera distance.
+    _anim_algo = _import_tools_module("unit_animation_algorithms")
     if hover:
         set_bone_key(base_body, "location", 8, (0.0, 0.0, -0.005))
         set_bone_key(base_body, "location", 15, (0.0, 0.0, -0.014))
@@ -12342,6 +12343,17 @@ def generate_procedural_action_clips(
         set_bone_key("Bone_Pelvis", "rotation_euler", 40, (0.0, 0.0, 0.0))
 
         # Left Leg Schedule: Contact -> Down -> Passing -> Push-Off -> Contact
+    if _anim_algo is not None:
+        _anim_algo.apply_baked_fcurve_micro_vibration_bpy(
+            armature_obj,
+            act_idle,
+            ("Bone_Radar", "Bone_Antenna", "Bone_Sensor"),
+            1,
+            30,
+            amplitude_rad=0.008,
+            frequency_cycles=2.0,
+            anchor_frames=(1, 8, 15, 22, 30),
+        )
         biped_gait_left = {
             1: (18.0, -10.0, -8.0),
             5: (13.0, -16.0, -4.0),
@@ -12375,27 +12387,48 @@ def generate_procedural_action_clips(
             set_bone_key("Bone_Shin_R", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
             set_bone_key("Bone_Foot_R", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
 
-        # Foot lift (contact -> passing -> push-off): the swing foot rises and
-        # returns to the ground plane; stance feet stay at Z=0 so the gait does
-        # not slide or penetrate. Mirrors the thigh passing poses above.
-        set_bone_key("Bone_Foot_L", "location", 1, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Foot_L", "location", 5, (0.0, 0.01, 0.02))
-        set_bone_key("Bone_Foot_L", "location", 10, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Foot_L", "location", 15, (0.0, 0.02, 0.045))
-        set_bone_key("Bone_Foot_L", "location", 20, (0.0, 0.04, 0.09))
-        set_bone_key("Bone_Foot_L", "location", 25, (0.0, 0.03, 0.07))
-        set_bone_key("Bone_Foot_L", "location", 30, (0.0, 0.02, 0.05))
-        set_bone_key("Bone_Foot_L", "location", 35, (0.0, 0.01, 0.025))
-        set_bone_key("Bone_Foot_L", "location", 40, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Foot_R", "location", 1, (0.0, 0.02, 0.05))
-        set_bone_key("Bone_Foot_R", "location", 5, (0.0, 0.03, 0.07))
-        set_bone_key("Bone_Foot_R", "location", 10, (0.0, 0.04, 0.09))
-        set_bone_key("Bone_Foot_R", "location", 15, (0.0, 0.02, 0.045))
-        set_bone_key("Bone_Foot_R", "location", 20, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Foot_R", "location", 25, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Foot_R", "location", 30, (0.0, 0.0, 0.0))
-        set_bone_key("Bone_Foot_R", "location", 35, (0.0, 0.01, 0.025))
-        set_bone_key("Bone_Foot_R", "location", 40, (0.0, 0.02, 0.05))
+        # Foot lift (contact -> passing -> push-off): quadratic Bezier swing arc
+        # over strictly grounded Z=0 stance phases so the gait never slides or penetrates.
+        _biped_foot_frames = (1, 5, 10, 15, 20, 25, 30, 35, 40)
+        if _anim_algo is not None:
+            _foot_arc_l = _anim_algo.sample_foot_step_arc_frames(
+                frames=_biped_foot_frames,
+                cycle_length=40,
+                phase_offset=0.0,
+                duty_factor=0.5,
+                step_height=0.09,
+                stride_forward=0.04,
+            )
+            _foot_arc_r = _anim_algo.sample_foot_step_arc_frames(
+                frames=_biped_foot_frames,
+                cycle_length=40,
+                phase_offset=0.5,
+                duty_factor=0.5,
+                step_height=0.09,
+                stride_forward=0.04,
+            )
+            for _foot_f in _biped_foot_frames:
+                set_bone_key("Bone_Foot_L", "location", _foot_f, _foot_arc_l[_foot_f])
+                set_bone_key("Bone_Foot_R", "location", _foot_f, _foot_arc_r[_foot_f])
+        else:
+            set_bone_key("Bone_Foot_L", "location", 1, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Foot_L", "location", 5, (0.0, 0.01, 0.02))
+            set_bone_key("Bone_Foot_L", "location", 10, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Foot_L", "location", 15, (0.0, 0.02, 0.045))
+            set_bone_key("Bone_Foot_L", "location", 20, (0.0, 0.04, 0.09))
+            set_bone_key("Bone_Foot_L", "location", 25, (0.0, 0.03, 0.07))
+            set_bone_key("Bone_Foot_L", "location", 30, (0.0, 0.02, 0.05))
+            set_bone_key("Bone_Foot_L", "location", 35, (0.0, 0.01, 0.025))
+            set_bone_key("Bone_Foot_L", "location", 40, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Foot_R", "location", 1, (0.0, 0.02, 0.05))
+            set_bone_key("Bone_Foot_R", "location", 5, (0.0, 0.03, 0.07))
+            set_bone_key("Bone_Foot_R", "location", 10, (0.0, 0.04, 0.09))
+            set_bone_key("Bone_Foot_R", "location", 15, (0.0, 0.02, 0.045))
+            set_bone_key("Bone_Foot_R", "location", 20, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Foot_R", "location", 25, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Foot_R", "location", 30, (0.0, 0.0, 0.0))
+            set_bone_key("Bone_Foot_R", "location", 35, (0.0, 0.01, 0.025))
+            set_bone_key("Bone_Foot_R", "location", 40, (0.0, 0.02, 0.05))
 
         act_walk.use_fake_user = True
         actions["Walk"] = act_walk
@@ -12475,6 +12508,22 @@ def generate_procedural_action_clips(
             set_bone_key("Bone_Hull", "location", 30, (-0.010, 0.0, 0.032))
             set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.9), math.radians(0.8), 0.0))
             set_bone_key("Bone_Hull", "location", 40, (0.0, 0.0, 0.0))
+        # Coordinated Bezier swing lift with strict Z=0 stance grounding across quad/hexapod legs.
+        if _anim_algo is not None:
+            _quad_foot_frames = (1, 5, 10, 15, 20, 25, 30, 35, 40)
+            for tag, phase in _anim_algo.get_gait_phase_offsets("quad").items():
+                if armature_obj.pose.bones.get(f"Bone_Foot_{tag}") is not None:
+                    _q_arc = _anim_algo.sample_foot_step_arc_frames(
+                        frames=_quad_foot_frames,
+                        cycle_length=40,
+                        phase_offset=phase,
+                        duty_factor=0.5,
+                        step_height=0.075,
+                        stride_forward=0.03,
+                    )
+                    for _foot_f in _quad_foot_frames:
+                        set_bone_key(f"Bone_Foot_{tag}", "location", _foot_f, _q_arc[_foot_f])
+
             set_bone_key("Bone_Hull", "rotation_euler", 40, (0.0, 0.0, 0.0))
         else:
             for f in (1, 40):
@@ -12608,6 +12657,17 @@ def generate_procedural_action_clips(
         if leg_type == "biped":
             set_bone_key("Bone_Thigh_L", "rotation_euler", f, (math.radians(12.0 * _collapse_factor), 0.0, math.radians(-18.0 * _collapse_factor)))
             set_bone_key("Bone_Thigh_R", "rotation_euler", f, (math.radians(12.0 * _collapse_factor), 0.0, math.radians(18.0 * _collapse_factor)))
+    if _anim_algo is not None:
+        _anim_algo.apply_baked_fcurve_micro_vibration_bpy(
+            armature_obj,
+            act_fire,
+            ("Bone_Antenna", "Bone_Radar"),
+            1,
+            _fire_end_frame,
+            amplitude_rad=0.012,
+            frequency_cycles=2.5,
+            anchor_frames=(1, 3, 5, 7, 11, 15, _fire_end_frame),
+        )
             set_bone_key("Bone_Shin_L", "rotation_euler", f, (math.radians(-35.0 * _collapse_factor), 0.0, 0.0))
             set_bone_key("Bone_Shin_R", "rotation_euler", f, (math.radians(-35.0 * _collapse_factor), 0.0, 0.0))
 

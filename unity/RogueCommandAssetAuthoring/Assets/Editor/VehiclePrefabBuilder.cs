@@ -1517,11 +1517,20 @@ namespace RogueCommandExpansion.Authoring
         }
 
         private static bool HasBodyDrivenFireRecoilClip(AnimationClip clip)
+            bool hasSpeedMultiplierParameter = driveState != null && EnsureAnimatorFloatParameter(
+                controller, "RCL_SpeedMultiplier", 1.0f);
         {
             if (clip == null) return false;
             bool bodyPosition = false;
             bool weaponMotion = false;
             EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(clip);
+            if (hasSpeedMultiplierParameter)
+            {
+                driveState.speed = 1.0f;
+                driveState.speedParameter = "RCL_SpeedMultiplier";
+                driveState.speedParameterActive = true;
+            }
+
             foreach (EditorCurveBinding binding in bindings)
             {
                 string path = binding.path ?? string.Empty;
@@ -1531,6 +1540,8 @@ namespace RogueCommandExpansion.Authoring
                     property.IndexOf("Euler", StringComparison.OrdinalIgnoreCase) >= 0;
                 AnimationCurve curve = AnimationUtility.GetEditorCurve(clip, binding);
                 bool dynamicCurve = HasMeaningfulCurveVariation(curve);
+                EnsureAnyStateTransitionCondition(
+                    stateMachine, fireState, "RCL_IsMoving", AnimatorConditionMode.IfNot, hasMovementParameter);
                 if ((path.IndexOf("Bone_Hull", StringComparison.OrdinalIgnoreCase) >= 0 ||
                      path.IndexOf("Bone_Pelvis", StringComparison.OrdinalIgnoreCase) >= 0) &&
                     positionCurve && dynamicCurve)
@@ -1542,6 +1553,10 @@ namespace RogueCommandExpansion.Authoring
                     dynamicCurve)
                 {
                     weaponMotion = true;
+            ConfigureUpperBodyFireRecoilLayer(
+                controller,
+                hasMovementParameter && hasFireParameter ? fireClip : null);
+
                 }
             }
 
@@ -1830,6 +1845,142 @@ namespace RogueCommandExpansion.Authoring
 
         private static void EnsureExitTransition(AnimatorState source, AnimatorState destination)
         {
+        private static bool EnsureAnimatorFloatParameter(
+            AnimatorController controller,
+            string parameterName,
+            float defaultFloat)
+        {
+            AnimatorControllerParameter[] parameters = controller.parameters;
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                if (string.Equals(parameters[i].name, parameterName, StringComparison.Ordinal))
+                {
+                    if (parameters[i].type == AnimatorControllerParameterType.Float)
+                    {
+                        if (!Mathf.Approximately(parameters[i].defaultFloat, defaultFloat))
+                        {
+                            parameters[i].defaultFloat = defaultFloat;
+                            controller.parameters = parameters;
+                        }
+                        return true;
+                    }
+
+                    Debug.LogWarning("[VehiclePrefabBuilder] Animator parameter " + parameterName +
+                        " on " + controller.name + " has type " + parameters[i].type + "; expected Float.");
+                    return false;
+                }
+            }
+
+            controller.AddParameter(new AnimatorControllerParameter
+            {
+                name = parameterName,
+                type = AnimatorControllerParameterType.Float,
+                defaultFloat = defaultFloat,
+            });
+            return true;
+        }
+
+        private static void EnsureAnyStateTransitionCondition(
+            AnimatorStateMachine stateMachine,
+            AnimatorState destinationState,
+            string parameterName,
+            AnimatorConditionMode mode,
+            bool shouldBePresent)
+        {
+            if (stateMachine == null || destinationState == null)
+            {
+                return;
+            }
+
+            foreach (AnimatorStateTransition transition in stateMachine.anyStateTransitions)
+            {
+                if (transition == null || transition.destinationState != destinationState)
+                {
+                    continue;
+                }
+
+                AnimatorCondition[] existing = transition.conditions;
+                int matchIndex = -1;
+                for (int i = 0; i < existing.Length; i++)
+                {
+                    if (string.Equals(existing[i].parameter, parameterName, StringComparison.Ordinal))
+                    {
+                        matchIndex = i;
+                        break;
+                    }
+                }
+
+                if (shouldBePresent)
+                {
+                    if (matchIndex >= 0)
+                    {
+                        if (existing[matchIndex].mode != mode)
+                        {
+                            existing[matchIndex].mode = mode;
+                            transition.conditions = existing;
+                        }
+                    }
+                    else
+                    {
+                        transition.AddCondition(mode, 0f, parameterName);
+                    }
+                }
+                else if (matchIndex >= 0)
+                {
+                    transition.RemoveCondition(existing[matchIndex]);
+                }
+            }
+        }
+
+        private static void ConfigureUpperBodyFireRecoilLayer(
+            AnimatorController controller,
+            AnimationClip fireClip)
+        {
+            const string layerName = "UpperBodyFireRecoil";
+            for (int i = controller.layers.Length - 1; i >= 1; i--)
+            {
+                if (string.Equals(controller.layers[i].name, layerName, StringComparison.Ordinal))
+                {
+                    controller.RemoveLayer(i);
+                }
+            }
+
+            if (fireClip == null)
+            {
+                return;
+            }
+
+            controller.AddLayer(layerName);
+            AnimatorControllerLayer[] layers = controller.layers;
+            int layerIndex = layers.Length - 1;
+            AnimatorControllerLayer recoilLayer = layers[layerIndex];
+            recoilLayer.blendingMode = AnimatorLayerBlendingMode.Additive;
+            recoilLayer.defaultWeight = 1.0f;
+
+            AnimatorStateMachine recoilStateMachine = recoilLayer.stateMachine;
+            AnimatorState neutralState = recoilStateMachine.AddState("AdditiveNeutral");
+            neutralState.motion = null;
+            recoilStateMachine.defaultState = neutralState;
+
+            AnimatorState recoilState = recoilStateMachine.AddState(layerName);
+            recoilState.motion = fireClip;
+
+            AnimatorStateTransition enterRecoil = recoilStateMachine.AddAnyStateTransition(recoilState);
+            enterRecoil.hasExitTime = false;
+            enterRecoil.duration = 0.04f;
+            enterRecoil.canTransitionToSelf = true;
+            enterRecoil.AddCondition(AnimatorConditionMode.If, 0f, "RCL_Fire");
+            enterRecoil.AddCondition(AnimatorConditionMode.If, 0f, "RCL_IsMoving");
+
+            AnimatorStateTransition exitRecoil = recoilState.AddTransition(neutralState);
+            exitRecoil.hasExitTime = true;
+            exitRecoil.exitTime = 1.0f;
+            exitRecoil.duration = 0.06f;
+
+            layers[layerIndex] = recoilLayer;
+            controller.layers = layers;
+        }
+
             if (source == null || destination == null) return;
             foreach (AnimatorStateTransition existing in source.transitions)
             {
