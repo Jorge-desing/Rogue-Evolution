@@ -9033,6 +9033,7 @@ namespace RogueCommandExpansionLoader.Content
                 ExperienceReward = unit.experienceReward,
                 AiBehavior = unit.aiBehavior,
                 ResourceGathering = unit.resourceGathering,
+                ProductionQueue = unit.productionQueue,
                 MinAttackRange = unit.minAttackRange,
                 CriticalHitChance = unit.criticalHitChance,
                 OnHitStatusEffects = unit.onHitStatusEffects,

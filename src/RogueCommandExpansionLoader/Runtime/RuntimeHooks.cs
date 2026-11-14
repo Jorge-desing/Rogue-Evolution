@@ -2387,7 +2387,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static bool EntityControllerIsProductionPossiblePrefix(object __instance, ref bool __result)
         {
-            if (RuntimeUnitMechanicsDirector.ShouldBlockAiProduction(__instance))
+            if (RuntimeUnitMechanicsDirector.ShouldBlockProduction(__instance))
             {
                 __result = false;
                 return false;

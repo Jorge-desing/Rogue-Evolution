@@ -2757,6 +2757,25 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.RegisterProfile(capUnitId, new UnitRuntimeMechanicsProfile
             {
                 EntityId = capUnitId,
+                ProductionQueue = new ContentUnitProductionQueueDefinition { queueSize = 2 }
+            });
+            producer.IsControlledByAi = false;
+            productionInfo.queuedCount = 2;
+            bool productionPossible = true;
+            if (RuntimeHarmonyPatches.EntityControllerIsProductionPossiblePrefix(producer, ref productionPossible) ||
+                productionPossible)
+                throw new InvalidOperationException("A full player factory queue must reject another product through the native gate.");
+            productionInfo.queuedCount = 1;
+            if (RuntimeUnitMechanicsDirector.ShouldBlockProduction(producer))
+                throw new InvalidOperationException("A released production slot must admit another native production request.");
+            producer.IsControlledByAi = true;
+            productionInfo.queuedCount = 2;
+            if (!RuntimeUnitMechanicsDirector.ShouldBlockProduction(producer))
+                throw new InvalidOperationException("Queue capacity must also apply to AI factories.");
+
+            RuntimeUnitMechanicsDirector.RegisterProfile(capUnitId, new UnitRuntimeMechanicsProfile
+            {
+                EntityId = capUnitId,
                 AiBehavior = new ContentUnitAiBehaviorDefinition { skillActivationCheckInterval = 1.0f }
             });
             var intervalUnit = new EntityController { entityId = capUnitId };

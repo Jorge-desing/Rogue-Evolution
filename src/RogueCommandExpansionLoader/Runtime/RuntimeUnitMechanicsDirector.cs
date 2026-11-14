@@ -23,6 +23,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public ContentUnitExperienceRewardDefinition ExperienceReward { get; set; }
         public ContentUnitAiBehaviorDefinition AiBehavior { get; set; }
         public ContentUnitResourceGatheringDefinition ResourceGathering { get; set; }
+        public ContentUnitProductionQueueDefinition ProductionQueue { get; set; }
         public float? MinAttackRange { get; set; }
         public float? CriticalHitChance { get; set; }
         public ContentOnHitStatusEffectDefinition[] OnHitStatusEffects { get; set; }
@@ -75,6 +76,7 @@ namespace RogueCommandExpansionLoader.Runtime
              (DeathNova.damage > 0f || DeathNova.stunDuration > 0f || DeathNova.slowDuration > 0f));
 
         public bool HasAnyMechanics =>
+            (ProductionQueue != null && ProductionQueue.queueSize > 0) ||
             (ResourceGathering != null && ResourceGathering.gatherRange > 0f) ||
             HasRuntimeComponentMechanics ||
             HasAiBehaviorMechanics ||
@@ -355,6 +357,30 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 return _profiles.TryGetValue(entityId, out profile);
             }
+        }
+
+        public static bool ShouldBlockProduction(object producerObj)
+        {
+            try
+            {
+                if (producerObj != null)
+                {
+                    EnsureReflection(producerObj.GetType());
+                    object productionInfo = ReadProductionInfo(producerObj);
+                    if (TryGetProfile(ReadProductionEntityId(productionInfo), out UnitRuntimeMechanicsProfile profile) &&
+                        profile.ProductionQueue != null && profile.ProductionQueue.queueSize > 0 &&
+                        ReadProductionQueuedCount(productionInfo) >= profile.ProductionQueue.queueSize)
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+                // Keep native production available when optional queue metadata cannot be read.
+            }
+
+            return ShouldBlockAiProduction(producerObj);
         }
 
         /// <summary>

@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Harmony Policy
 
+The existing EntityController.IsProductionPossible gate calls ShouldBlockProduction for per-factory queue capacity before the existing per-product AI population caps. It reads the product profile and native ProductionInfo.queuedCount. Native Produce remains responsible for bank changes, free/instant replacement behavior and the actual queue.
+
 Authoritative policy for creating, reviewing, and auditing BepInEx 5 / Harmony 2 patches in Rogue Command.
 
 ## Compatibility Identity (Verify Before Every Session)

@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Positive productionQueue.queueSize caps the native queuedCount independently per producing factory, including the in-progress product. The existing IsProductionPossible hook applies it to player and AI production before native payment/enqueue. Completion and cancellation free a slot through the native count. Zero preserves native queue behavior. Queue-only profiles register without attaching a per-unit runtime component.
+
 Positive productionQueue.resourceCost supplies the product's native Cost in credits, rounded to the nearest integer (midpoints to even), bounded to 1..16,777,216. Explicit raw cost/customBalance.Cost takes priority, including explicit free products. Zero retains the template. Native factory bank withdrawal/refund and affordability checks consume the registered product cost.
 
 Positive detection.detectionRange supplies native SightRadius in grid cells, rounded to the nearest integer with midpoint-to-even behavior and bounded to 1..16,777,216. Native sight and fog-of-war updates consume this row value. Explicit raw sightRadius and customBalance.SightRadius take precedence; zero retains the template. sensorType and stealthDetection retain their descriptive contract.
