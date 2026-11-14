@@ -2950,7 +2950,7 @@ internal static partial class ValidationTestRunner
                     healAmount = 15f,
                     repairAmount = 20f,
                     healRange = 4.0f,
-                    healRate = 1.0f
+                    healRate = 0.05f
                 },
                 Aura = new ContentUnitAuraDefinition
                 {
@@ -3072,6 +3072,17 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException(
                     $"Healing must skip blocked health while independently repairing its armor; ally HP={ally.CurrentHealth}, armor={ally.CurrentArmor}, shield={ally.CurrentShield}; blocked HP={healingBlocked.CurrentHealth}, armor={healingBlocked.CurrentArmor}");
             }
+
+            UnityEngine.Time.time = 12f;
+            director.TickMechanics();
+            if (ally.CurrentHealth != 65f || healingBlocked.CurrentArmor != 20f)
+                throw new InvalidOperationException("A slow positive healing rate must wait past the one-second default.");
+
+            UnityEngine.Time.time = 16f;
+            director.TickMechanics();
+            if (self.CurrentHealth != 75f || healingBlocked.CurrentArmor != 40f)
+                throw new InvalidOperationException("Healing and repair must resume at the bounded five-second interval.");
+            self.CurrentHealth = 60f;
 
             // Trigger OnEntityDealtDamage on a killed target (3 XP >= threshold 3 -> immediate RankUp + CombatBoost + levelUpBonus heal)
             RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 45f, self);

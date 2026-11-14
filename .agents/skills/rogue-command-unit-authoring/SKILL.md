@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Field healing and armor repair share a pulse interval of one divided by positive healRate, bounded to 0.25–5 seconds. Zero uses a one-second interval.
+
 Shield regeneration credits elapsed scaled time after both the previous sample and the damage cooldown deadline, capped at one second per pulse. A pulse crossing the cooldown boundary starts with the eligible fraction of that interval and applies the configured empty-shield burst once recharge begins.
 
 productionQueue.productionPriority orders product attempts in the factory-reinforcement AI module, highest value first. Equal values preserve the original scan order. Priority-only profiles register without a per-unit runtime component. Native production affordability and population/queue limits remain authoritative.

@@ -2499,7 +2499,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     _profile.Healing.healRange > 0f &&
                     now >= _nextHealCheckTime)
                 {
-                    float rate = _profile.Healing.healRate > 0.05f ? _profile.Healing.healRate : 1f;
+                    float rate = _profile.Healing.healRate > 0f ? _profile.Healing.healRate : 1f;
                     _nextHealCheckTime = now + Mathf.Clamp(1f / rate, 0.25f, 5f);
                     ExecuteHealingPulse(_entityController, _profile.Healing);
                 }
