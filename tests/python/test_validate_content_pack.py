@@ -88,6 +88,22 @@ class ValidateContentPackTests(unittest.TestCase):
         errors = validate_content_pack.validate_pack(d, schema_path=str(schema))
         self.assertEqual(errors, [])
 
+    def test_alternate_schema_cannot_allow_external_references(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pack = root / "pack"
+            pack.mkdir()
+            outside = root / "external.bundle"
+            outside.touch()
+            schema = root / "schema.json"
+            schema.write_text("{}", encoding="utf-8")
+            for path in ("../external.bundle", str(outside), r"C:external.bundle", "data:stream"):
+                with self.subTest(path=path):
+                    manifest = {"assetBundles": [{"path": path}]}
+                    (pack / "content.json").write_text(json.dumps(manifest), encoding="utf-8")
+                    errors = validate_content_pack.validate_pack(str(pack), str(schema))
+                    self.assertIn("ruta no relativa", errors[0])
+
     def test_custom_schema_validation(self):
         content = {
             "packId": "test-pack",

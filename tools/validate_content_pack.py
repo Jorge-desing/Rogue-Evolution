@@ -7,11 +7,37 @@ Uso:
 import argparse
 import json
 import sys
-from pathlib import Path
+import stat
+from pathlib import Path, PureWindowsPath
 
 import jsonschema
 
 SCHEMA_PATH = Path(__file__).resolve().parents[1] / "content/schema/content.schema.json"
+
+
+def _reference_error(root: Path, value: object) -> str | None:
+    if not isinstance(value, str) or not value:
+        return f"ruta inválida: {value!r}"
+    windows = PureWindowsPath(value)
+    if windows.anchor or ".." in windows.parts or ":" in value or "\x00" in value:
+        return f"ruta no relativa al pack: {value}"
+
+    candidate = root
+    try:
+        for part in windows.parts:
+            candidate = candidate / part
+            info = candidate.lstat()
+            if stat.S_ISLNK(info.st_mode) or (
+                getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            ):
+                return f"enlace o punto de reanálisis no permitido: {value}"
+        if windows.parts and stat.S_ISREG(info.st_mode):
+            return None
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
+        return f"no se pudo inspeccionar {value}: {exc}"
+    return f"no existe o no es un archivo: {value}"
 
 
 def validate_pack(pack_dir: str, schema_path: str | None = None) -> list[str]:
@@ -45,36 +71,20 @@ def validate_pack(pack_dir: str, schema_path: str | None = None) -> list[str]:
     if not isinstance(data, dict):
         return ["content.json debe ser un objeto"]
 
-    # Verificar archivos referenciados por unidad (iconPath, prefabPath, bundlePath)
-    for unit in data.get("units", []):
-        for field in ("iconPath", "prefabPath", "bundlePath"):
-            if field in unit and unit[field]:
-                ref = pack_path / unit[field]
-                if not ref.is_file():
-                    uid = unit.get("id") or unit.get("unitId") or "?"
-                    errors.append(f"Unit '{uid}': {field} no existe: {unit[field]}")
+    def check_reference(label, value):
+        if value is not None and value != "":
+            error = _reference_error(pack_path, value)
+            if error:
+                errors.append(f"{label}: {error}")
 
-    for building in data.get("buildings", []):
-        for field in ("iconPath", "prefabPath", "bundlePath"):
-            if field in building and building[field]:
-                ref = pack_path / building[field]
-                if not ref.is_file():
-                    bid = building.get("buildingId") or building.get("id") or "?"
-                    errors.append(f"Building '{bid}': {field} no existe: {building[field]}")
+    for section, label, id_field in (("units", "Unit", "unitId"), ("buildings", "Building", "buildingId")):
+        for entity in data.get(section, []):
+            for field in ("iconPath", "prefabPath", "bundlePath"):
+                check_reference(f"{label} '{entity.get('id') or entity.get(id_field) or '?'}' {field}", entity.get(field))
 
-    # Verificar archivos referenciados (assetBundleManifestPath y assetBundles)
-    manifest_path = data.get("assetBundleManifestPath")
-    if manifest_path:
-        ref = pack_path / manifest_path
-        if not ref.is_file():
-            errors.append(f"assetBundleManifestPath no existe: {manifest_path}")
-
+    check_reference("assetBundleManifestPath", data.get("assetBundleManifestPath"))
     for bundle in data.get("assetBundles", []):
-        bundle_path = bundle.get("path") or bundle.get("bundlePath") or bundle.get("file")
-        if bundle_path:
-            ref = pack_path / bundle_path
-            if not ref.is_file():
-                errors.append(f"AssetBundle no existe: {bundle_path}")
+        check_reference("AssetBundle", bundle.get("path") or bundle.get("bundlePath") or bundle.get("file"))
 
     # Verificar duplicados de unit IDs
     unit_ids = [u.get("id") or u.get("unitId") for u in data.get("units", [])]

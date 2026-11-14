@@ -3,6 +3,10 @@
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
 
+## General capability audit — pack file references
+
+- Python pack validation now checks each referenced path component below the pack root without following symlinks or Windows reparse points. Explicit alternate schemas still require file references relative to the pack. This check covers declared file references. The loader separately checks the package root and tree. Full acceptance report: `artifacts/general-capability-audit/pack-path-full.json`.
+
 ## General capability audit — pack validator integration
 
 - The documented pack validator now loads the canonical schema by default and stops before inspecting files when schema validation fails. An explicit schema remains supported. The scaffold regression uses the default entry point.

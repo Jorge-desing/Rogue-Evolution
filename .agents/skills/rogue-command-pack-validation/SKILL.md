@@ -30,6 +30,8 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 
 ## 2. Manifest Schema & Parameter Rules
 
+Referenced files must use pack-relative paths. The Python validator rejects traversal, absolute or drive-relative paths, symlinks and reparse points along the reference below the pack root, even with an alternate schema.
+
 Use `python -m tools.validate_content_pack <pack_dir>` for canonical schema and pack file checks. Schema errors stop file inspection. Use `--schema` for an intentional alternate contract.
 
 The Python acceptance runner fails and emits an aggregate report when the selected inventory is empty or a worker returns an invalid report. A successful worker must report a positive integer test count. Use a finite positive per-worker timeout.
