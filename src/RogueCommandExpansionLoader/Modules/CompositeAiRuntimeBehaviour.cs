@@ -384,28 +384,23 @@ namespace RogueCommandExpansionLoader.Modules
                 now: Time.time,
                 retargetHysteresisMultiplier: DefaultRetargetHysteresisMultiplier,
                 maxDispatchesPerTick: DefaultMaxArbitratedDispatchesPerTick,
-                proposals: _proposalBuffer);
-
-            IReadOnlyList<AiIntentProposal> approved = _lastArbitrationResult.ApprovedOrders;
-            for (int i = 0; i < approved.Count; i++)
-            {
-                DispatchApprovedProposal(approved[i]);
-            }
+                proposals: _proposalBuffer,
+                tryDispatch: DispatchApprovedProposal);
         }
 
-        private void DispatchApprovedProposal(AiIntentProposal proposal)
+        private bool DispatchApprovedProposal(AiIntentProposal proposal)
         {
             if (!_battlefieldCollector.TryResolveAiEntity(proposal.UnitId, out EntityController unit) ||
-                unit == null)
+                unit == null || unit.IsDestroyed || unit.DestroyHasBeenStarted || !unit.IsControlledByAi)
             {
-                return;
+                return false;
             }
 
             if (proposal.RequiresEmptyQueue)
             {
                 if (unit.CurrentPlayerCommandName != EntityCommand.Command.DoNothing)
                 {
-                    return;
+                    return false;
                 }
 
                 bool hasQueue = false;
@@ -421,7 +416,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                 if (hasQueue)
                 {
-                    return;
+                    return false;
                 }
             }
 
@@ -441,7 +436,7 @@ namespace RogueCommandExpansionLoader.Modules
                     if (skillInfo == null || unit.HasSkillActivationInCommandChain ||
                         unit.CurrentMana < skillInfo.manaCost)
                     {
-                        return;
+                        return false;
                     }
                     RuntimeUnitMechanicsDirector.TryGetProfile(unit.EntityId, out UnitRuntimeMechanicsProfile profile);
                     string trigger = profile?.AiActivationTrigger;
@@ -449,7 +444,7 @@ namespace RogueCommandExpansionLoader.Modules
                     bool combatEngaged = string.Equals(trigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase);
                     if (lowHealth && !(unit.MaxHealth > 0f && unit.CurrentHealth <= unit.MaxHealth * 0.5f))
                     {
-                        return;
+                        return false;
                     }
 
                     if (combatEngaged)
@@ -459,7 +454,7 @@ namespace RogueCommandExpansionLoader.Modules
                             engaged.canNotBeTargetedByAi || !unit.IsEnemy(engaged) ||
                             (skillInfo.targetOrigin != TargetOrigin.Self && engaged.UniqueEntityId != proposal.TargetEntityId))
                         {
-                            return;
+                            return false;
                         }
                     }
 
@@ -469,7 +464,7 @@ namespace RogueCommandExpansionLoader.Modules
                             (!TryResolveSkillHostile(unit, proposal.TargetEntityId, out EntityController nearby) ||
                              !WithinHorizontalRange(unit.Position, nearby.Position, unit.SqrSightRadius)))
                         {
-                            return;
+                            return false;
                         }
 
                         command = EntityCommand.ActiveSkillWithoutTarget();
@@ -481,7 +476,7 @@ namespace RogueCommandExpansionLoader.Modules
                              !(skillInfo.targetOrigin == TargetOrigin.ChosenLocation && unit.activateSkillAtOnceIndependentOfSkillRadius) &&
                              !WithinHorizontalRange(unit.Position, skillTarget.Position, unit.SqrSkillRange)))
                         {
-                            return;
+                            return false;
                         }
 
                         switch (skillInfo.targetOrigin)
@@ -493,7 +488,7 @@ namespace RogueCommandExpansionLoader.Modules
                                 command = EntityCommand.ActiveSkillAtPosition(skillTarget.Position);
                                 break;
                             default:
-                                return;
+                                return false;
                         }
                     }
                 }
@@ -522,10 +517,12 @@ namespace RogueCommandExpansionLoader.Modules
 
                 command.tag = proposal.CommandTag;
                 unit.ExecuteCommand(command, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                return true;
             }
             catch
             {
                 // Guarded: a single native dispatch failure must not abort the composite tick.
+                return false;
             }
         }
 

@@ -3449,6 +3449,18 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("AiCommandArbiterPolicy Tick 1 did not pick highest utility or enforce global dispatch budget.");
         }
 
+        var dispatchState = new RogueCommandExpansionLoader.Runtime.Ai.AiCommandArbiterState();
+        var dispatchResult = RogueCommandExpansionLoader.Runtime.Ai.AiCommandArbiterPolicy.Arbitrate(
+            dispatchState, 10f, 1.2f, 1, new[] { kiteProposal, secondUnitProposal },
+            tryDispatch: proposal => proposal.UnitId != kiteProposal.UnitId);
+        if (dispatchState.TryGetLease(kiteProposal.UnitId, out _) ||
+            dispatchResult.ApprovedOrders.Count != 1 ||
+            dispatchResult.ApprovedOrders[0].UnitId != secondUnitProposal.UnitId ||
+            !dispatchState.TryGetLease(secondUnitProposal.UnitId, out _))
+        {
+            throw new InvalidOperationException("A rejected dispatch must leave the lease and dispatch slot available.");
+        }
+
         var prematureOverrideProposal = new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
             moduleId: "sample:threat-prioritization",
             commandTag: "tag.threat",

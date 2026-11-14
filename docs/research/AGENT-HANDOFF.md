@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Coordinated command lease timing
+
+Runtime arbitration grants a lease and counts an approved order after successful dispatch. A rejected winner leaves the existing lease intact and the slot available to another unit. Release and 70 tactical checks passed locally. Steam execution remains unverified.
+
 ## Coordinated skill dispatch conditions
 
 Dispatch rechecks live health and horizontal range. Self skills triggered by nearby enemies retain the motivating hostile ID for the live sight check. Release builds cleanly and the tactical suite passes 70/70. Steam execution remains unverified.

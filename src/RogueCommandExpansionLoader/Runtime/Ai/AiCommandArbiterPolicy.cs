@@ -155,7 +155,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             float now,
             float retargetHysteresisMultiplier,
             int maxDispatchesPerTick,
-            IReadOnlyList<AiIntentProposal> proposals)
+            IReadOnlyList<AiIntentProposal> proposals,
+            Func<AiIntentProposal, bool> tryDispatch = null)
         {
             if (state == null)
             {
@@ -261,6 +262,11 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 AiIntentProposal winner = eligibleWinners[i];
                 if (approved.Count < budget)
                 {
+                    if (tryDispatch != null && !tryDispatch(winner))
+                    {
+                        continue;
+                    }
+
                     approved.Add(winner);
                     state.SetLease(winner.UnitId, new AiCommandArbiterState.UnitLease
                     {
