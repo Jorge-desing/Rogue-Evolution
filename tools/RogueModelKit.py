@@ -1908,6 +1908,14 @@ def make_bipedal_digitigrade_leg(
         f"{prefix}_FootBase_{side_name}", (0.26, 0.24, 0.12),
         (foot_v.x, foot_v.y - 0.08, 0.06), joint_mat, bevel=0.015
     ))
+    # Carry the ankle clevis down to the foot plate. Both endpoints overlap
+    # their concealed mount, so the joint remains seated in the rest pose.
+    objects.append(make_rod(
+        f"{prefix}_FootAnkleSupport_{side_name}",
+        (foot_v.x, foot_v.y - 0.08, 0.115),
+        ankle_v - Vector((0.0, 0.0, 0.075)),
+        0.045, joint_mat, vertices=8,
+    ))
     objects.append(make_box(
         f"{prefix}_ToeCenter_{side_name}", (0.16, 0.28, 0.09),
         (foot_v.x, foot_v.y + 0.14, 0.045), armor_mat, bevel=0.015
@@ -11885,13 +11893,27 @@ def assign_rigid_mesh_weights(
 
         target_bone = None
         if leg_type == "biped":
-            side_str = "L" if ("_L" in clean_name or "Left" in clean_name) else ("R" if ("_R" in clean_name or "Right" in clean_name) else None)
+            # Ankle dampers carry both the leg side and the strut side: the
+            # first token after AnkleDamper identifies the moving leg.
+            damper_side = re.search(r"AnkleDamper_([LR])(?:_|$)", clean_name)
+            side_token = re.search(r"_([LR])(?:_|$)", clean_name)
+            side_str = (damper_side.group(1) if damper_side else
+                        side_token.group(1) if side_token else
+                        "L" if "Left" in clean_name else "R" if "Right" in clean_name else None)
             if side_str:
-                if any(k in clean_name for k in ("Foot", "Toe", "Ankle")):
-                    target_bone = f"Bone_Foot_{side_str}"
-                elif any(k in clean_name for k in ("Shin", "Knee", "Hydraulic", "Piston")):
+                if "AnkleDamper" in clean_name:
+                    # The long damper body follows the shin; attaching it to the
+                    # foot swings its upper end away from the leg during gait.
                     target_bone = f"Bone_Shin_{side_str}"
-                elif any(k in clean_name for k in ("Thigh", "HipJoint", "Femur")):
+                elif any(k in clean_name for k in ("Foot", "Toe", "Ankle", "HeelClaw")):
+                    target_bone = f"Bone_Foot_{side_str}"
+                elif "ThighPiston" in clean_name:
+                    # This piston shares the thigh cylinder's endpoints and must
+                    # move with it, not detach when the knee bends.
+                    target_bone = f"Bone_Thigh_{side_str}"
+                elif any(k in clean_name for k in ("Shin", "Calf", "Knee", "Hydraulic", "Piston")):
+                    target_bone = f"Bone_Shin_{side_str}"
+                elif any(k in clean_name for k in ("Thigh", "HipJoint", "HipActuator", "Femur")):
                     target_bone = f"Bone_Thigh_{side_str}"
 
             if target_bone is None and any(k in clean_name for k in ("Pelvis", "HipHub")):
@@ -12010,7 +12032,9 @@ def setup_walker_ik_armature(
                 if pole_bone in pb:
                     ik_con.pole_target = armature_obj
                     ik_con.pole_subtarget = pole_bone
-                    ik_con.pole_angle = math.radians(-90.0 if side == "L" else 90.0)
+                    # Both biped chains use matching bone rolls and forward poles.
+                    # Opposite pole angles flip the left knee backward.
+                    ik_con.pole_angle = math.radians(90.0)
                 ik_con.chain_count = 2
     elif leg_type == "quad":
         for tag in ("FL", "FR", "RL", "RR"):
@@ -12283,6 +12307,7 @@ def generate_procedural_action_clips(
             )
 
     actions = {}
+    _anim_algo = _import_tools_module("unit_animation_algorithms")
 
     def set_bone_key(bone_name: str, data_path: str, frame: int, value: Sequence[float]) -> None:
         pbone = armature_obj.pose.bones.get(bone_name)
@@ -12307,7 +12332,6 @@ def generate_procedural_action_clips(
     # The f8/f22 shoulders form a slow in/out envelope around the central f15
     # breath instead of a single trapezoidal key, so the stance reads as a
     # settled mechanical idle at RTS camera distance.
-    _anim_algo = _import_tools_module("unit_animation_algorithms")
     if hover:
         set_bone_key(base_body, "location", 8, (0.0, 0.0, -0.005))
         set_bone_key(base_body, "location", 15, (0.0, 0.0, -0.014))
@@ -12319,6 +12343,17 @@ def generate_procedural_action_clips(
     set_bone_key(base_body, "rotation_euler", 8, (math.radians(0.20), 0.0, 0.0))
     set_bone_key(base_body, "rotation_euler", 15, (math.radians(0.55), 0.0, 0.0))
     set_bone_key(base_body, "rotation_euler", 22, (math.radians(0.20), 0.0, 0.0))
+    if _anim_algo is not None:
+        _anim_algo.apply_baked_fcurve_micro_vibration_bpy(
+            armature_obj,
+            act_idle,
+            ("Bone_TurretYaw", "Bone_TurretPitch", "Bone_Radar", "Bone_Antenna", "Bone_Sensor"),
+            1,
+            30,
+            amplitude_rad=0.005,
+            frequency_cycles=2.0,
+            anchor_frames=(1, 8, 15, 22, 30),
+        )
     act_idle.use_fake_user = True
     actions["Idle"] = act_idle
 
@@ -12343,17 +12378,6 @@ def generate_procedural_action_clips(
         set_bone_key("Bone_Pelvis", "rotation_euler", 40, (0.0, 0.0, 0.0))
 
         # Left Leg Schedule: Contact -> Down -> Passing -> Push-Off -> Contact
-    if _anim_algo is not None:
-        _anim_algo.apply_baked_fcurve_micro_vibration_bpy(
-            armature_obj,
-            act_idle,
-            ("Bone_Radar", "Bone_Antenna", "Bone_Sensor"),
-            1,
-            30,
-            amplitude_rad=0.008,
-            frequency_cycles=2.0,
-            anchor_frames=(1, 8, 15, 22, 30),
-        )
         biped_gait_left = {
             1: (18.0, -10.0, -8.0),
             5: (13.0, -16.0, -4.0),
@@ -12484,6 +12508,22 @@ def generate_procedural_action_clips(
                 set_bone_key(f"Bone_Shin_{tag}", "rotation_euler", f, (math.radians(shin_rot), 0.0, 0.0))
                 set_bone_key(f"Bone_Foot_{tag}", "rotation_euler", f, (math.radians(foot_rot), 0.0, 0.0))
 
+        # Coordinated Bezier swing lift with strict Z=0 stance grounding across quad/hexapod legs.
+        if _anim_algo is not None:
+            _quad_foot_frames = (1, 5, 10, 15, 20, 25, 30, 35, 40)
+            for tag, phase in _anim_algo.get_gait_phase_offsets("quad").items():
+                if armature_obj.pose.bones.get(f"Bone_Foot_{tag}") is not None:
+                    _q_arc = _anim_algo.sample_foot_step_arc_frames(
+                        frames=_quad_foot_frames,
+                        cycle_length=40,
+                        phase_offset=phase,
+                        duty_factor=0.5,
+                        step_height=0.075,
+                        stride_forward=0.03,
+                    )
+                    for _foot_f in _quad_foot_frames:
+                        set_bone_key(f"Bone_Foot_{tag}", "location", _foot_f, _q_arc[_foot_f])
+
         act_walk.use_fake_user = True
         actions["Walk"] = act_walk
         actions["Drive"] = act_walk
@@ -12508,22 +12548,6 @@ def generate_procedural_action_clips(
             set_bone_key("Bone_Hull", "location", 30, (-0.010, 0.0, 0.032))
             set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.9), math.radians(0.8), 0.0))
             set_bone_key("Bone_Hull", "location", 40, (0.0, 0.0, 0.0))
-        # Coordinated Bezier swing lift with strict Z=0 stance grounding across quad/hexapod legs.
-        if _anim_algo is not None:
-            _quad_foot_frames = (1, 5, 10, 15, 20, 25, 30, 35, 40)
-            for tag, phase in _anim_algo.get_gait_phase_offsets("quad").items():
-                if armature_obj.pose.bones.get(f"Bone_Foot_{tag}") is not None:
-                    _q_arc = _anim_algo.sample_foot_step_arc_frames(
-                        frames=_quad_foot_frames,
-                        cycle_length=40,
-                        phase_offset=phase,
-                        duty_factor=0.5,
-                        step_height=0.075,
-                        stride_forward=0.03,
-                    )
-                    for _foot_f in _quad_foot_frames:
-                        set_bone_key(f"Bone_Foot_{tag}", "location", _foot_f, _q_arc[_foot_f])
-
             set_bone_key("Bone_Hull", "rotation_euler", 40, (0.0, 0.0, 0.0))
         else:
             for f in (1, 40):
@@ -12535,6 +12559,17 @@ def generate_procedural_action_clips(
             set_bone_key("Bone_Hull", "rotation_euler", 20, (math.radians(1.1), math.radians(-0.9), 0.0))
             set_bone_key("Bone_Hull", "location", 30, (-0.008, 0.0, 0.022))
             set_bone_key("Bone_Hull", "rotation_euler", 30, (math.radians(-0.9), math.radians(0.7), 0.0))
+        if _anim_algo is not None:
+            _anim_algo.apply_baked_fcurve_micro_vibration_bpy(
+                armature_obj,
+                act_drive,
+                ("Bone_TurretYaw", "Bone_TurretPitch", "Bone_Radar", "Bone_Antenna", "Bone_Sensor"),
+                1,
+                40,
+                amplitude_rad=0.006,
+                frequency_cycles=3.0,
+                anchor_frames=(1, 10, 20, 30, 40),
+            )
         act_drive.use_fake_user = True
         actions["Drive"] = act_drive
         actions["Walk"] = act_drive
@@ -12633,6 +12668,17 @@ def generate_procedural_action_clips(
         set_bone_key("Bone_Thigh_R", "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
         set_bone_key("Bone_Shin_L", "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
         set_bone_key("Bone_Shin_R", "rotation_euler", _fire_end_frame, (0.0, 0.0, 0.0))
+    if _anim_algo is not None:
+        _anim_algo.apply_baked_fcurve_micro_vibration_bpy(
+            armature_obj,
+            act_fire,
+            ("Bone_TurretYaw", "Bone_Antenna", "Bone_Radar", "Bone_Sensor"),
+            1,
+            _fire_end_frame,
+            amplitude_rad=0.010,
+            frequency_cycles=2.5,
+            anchor_frames=(1, 3, 5, 7, 11, 15, _fire_end_frame),
+        )
     act_fire.use_fake_user = True
     actions["FireRecoil"] = act_fire
 
@@ -12657,17 +12703,6 @@ def generate_procedural_action_clips(
         if leg_type == "biped":
             set_bone_key("Bone_Thigh_L", "rotation_euler", f, (math.radians(12.0 * _collapse_factor), 0.0, math.radians(-18.0 * _collapse_factor)))
             set_bone_key("Bone_Thigh_R", "rotation_euler", f, (math.radians(12.0 * _collapse_factor), 0.0, math.radians(18.0 * _collapse_factor)))
-    if _anim_algo is not None:
-        _anim_algo.apply_baked_fcurve_micro_vibration_bpy(
-            armature_obj,
-            act_fire,
-            ("Bone_Antenna", "Bone_Radar"),
-            1,
-            _fire_end_frame,
-            amplitude_rad=0.012,
-            frequency_cycles=2.5,
-            anchor_frames=(1, 3, 5, 7, 11, 15, _fire_end_frame),
-        )
             set_bone_key("Bone_Shin_L", "rotation_euler", f, (math.radians(-35.0 * _collapse_factor), 0.0, 0.0))
             set_bone_key("Bone_Shin_R", "rotation_euler", f, (math.radians(-35.0 * _collapse_factor), 0.0, 0.0))
 
@@ -12723,7 +12758,7 @@ def unwrap_atlas_uvs(
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
     bpy.ops.uv.smart_project(
-        angle_limit=66.0,
+        angle_limit=math.radians(66.0),
         island_margin=island_margin,
         correct_aspect=True,
         scale_to_bounds=True

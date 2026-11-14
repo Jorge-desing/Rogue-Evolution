@@ -423,9 +423,27 @@ namespace RogueCommandExpansion.Authoring
                     {
                         Transform modelTransform = GetUniqueNamedTransform(prefabContents, unitNames[i] + "Model", false);
                         GameObject modelObject = modelTransform != null ? modelTransform.gameObject : prefabContents;
+                        string modelAssetPath = AssetRoot + "/Models/" + unitNames[i] + ".fbx";
+                        GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelAssetPath);
+                        if (modelAsset == null)
+                        {
+                            throw new FileNotFoundException("Level 1 unit FBX could not be loaded: " + modelAssetPath, modelAssetPath);
+                        }
                         int transformCountBefore = prefabContents.GetComponentsInChildren<Transform>(true).Length;
                         bool materialUpdated = EnsureAllRenderersUsePrefabVertexWearMaterial(prefabContents);
+                        bool lodUpdated = VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents);
                         VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, modelObject);
+                        VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                            prefabContents,
+                            modelObject,
+                            modelAsset,
+                            unitNames[i],
+                            preferWalkForMovement: IsWalkerUnitName(unitNames[i]));
+                        Animator unitAnimator = prefabContents.GetComponent<Animator>();
+                        if (unitAnimator != null)
+                        {
+                            unitAnimator.applyRootMotion = false;
+                        }
                         if (String.Equals(unitNames[i], "BulwarkSiegeTank", StringComparison.Ordinal))
                         {
                             Transform eraSocket = GetUniqueNamedTransform(prefabContents, "Socket_Hardpoint_ERA", true);
@@ -434,21 +452,16 @@ namespace RogueCommandExpansion.Authoring
                             eraSocket.localScale = Vector3.one;
                         }
                         int transformCountAfter = prefabContents.GetComponentsInChildren<Transform>(true).Length;
-                        if (materialUpdated ||
-                            transformCountAfter != transformCountBefore ||
-                            String.Equals(unitNames[i], "BulwarkSiegeTank", StringComparison.Ordinal))
+                        bool saved;
+                        PrefabUtility.SaveAsPrefabAsset(prefabContents, unitPrefabPaths[i], out saved);
+                        if (!saved)
                         {
-                            bool saved;
-                            PrefabUtility.SaveAsPrefabAsset(prefabContents, unitPrefabPaths[i], out saved);
-                            if (!saved)
-                            {
-                                throw new InvalidOperationException("Unity could not save canonical hardpoint updates to " + unitPrefabPaths[i] + ".");
-                            }
-                            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, unitPrefabPaths[i])));
+                            throw new InvalidOperationException("Unity could not save canonical hardpoint/animator updates to " + unitPrefabPaths[i] + ".");
                         }
+                        NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, unitPrefabPaths[i])));
 
                         ValidateCanonicalModuleHardpoints(prefabContents, unitPrefabPaths[i]);
-                        ValidateLevelOnePbrAndLodContract(prefabContents, unitPrefabPaths[i], unitNames[i]);
+                        ValidateLevelOnePbrAndLodContract(prefabContents, unitPrefabPaths[i], unitNames[i], requireLayeredAnimator: true);
                     }
                     finally
                     {
@@ -477,6 +490,12 @@ namespace RogueCommandExpansion.Authoring
                     }
                     try
                     {
+                        if (VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents))
+                        {
+                            bool saved;
+                            PrefabUtility.SaveAsPrefabAsset(prefabContents, factoryPrefabPaths[i], out saved);
+                            if (!saved) throw new InvalidOperationException("Could not save LOD ownership: " + factoryPrefabPaths[i]);
+                        }
                         ValidateLevelOnePbrAndLodContract(prefabContents, factoryPrefabPaths[i], factoryNames[i]);
                     }
                     finally
@@ -594,8 +613,61 @@ namespace RogueCommandExpansion.Authoring
             return changed;
         }
 
-        private static void ValidateLevelOnePbrAndLodContract(GameObject prefab, string prefabPath, string assetName)
+        private static bool IsWalkerUnitName(string unitName)
         {
+            return String.Equals(unitName, "IroncladWalker", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(unitName, "AtlasCraneMech", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(unitName, "BastionSiegeMech", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(unitName, "ArachnidHexapod", StringComparison.OrdinalIgnoreCase) ||
+                String.Equals(unitName, "ArcLanceWalker", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void ValidateLevelOnePbrAndLodContract(
+            GameObject prefab,
+            string prefabPath,
+            string assetName,
+            bool requireLayeredAnimator = false)
+        {
+            if (requireLayeredAnimator)
+            {
+                Animator anim = prefab.GetComponent<Animator>();
+                if (anim == null || anim.avatar == null || !anim.avatar.isValid || anim.applyRootMotion)
+                {
+                    throw new InvalidDataException(assetName + " prefab must have a valid Generic Avatar with root motion disabled.");
+                }
+                var controller = anim.runtimeAnimatorController as UnityEditor.Animations.AnimatorController;
+                if (controller == null)
+                {
+                    throw new InvalidDataException(assetName + " prefab is missing an AnimatorController.");
+                }
+                bool hasMoving = false, hasSpeed = false, hasFire = false, hasDeath = false;
+                foreach (AnimatorControllerParameter p in controller.parameters)
+                {
+                    if (p.name == "RCL_IsMoving" && p.type == AnimatorControllerParameterType.Bool) hasMoving = true;
+                    else if (p.name == "RCL_SpeedMultiplier" && p.type == AnimatorControllerParameterType.Float &&
+                        Mathf.Approximately(p.defaultFloat, 1.0f)) hasSpeed = true;
+                    else if (p.name == "RCL_Fire" && p.type == AnimatorControllerParameterType.Trigger) hasFire = true;
+                    else if (p.name == "RCL_Death" && p.type == AnimatorControllerParameterType.Trigger) hasDeath = true;
+                }
+                if (!hasMoving || !hasSpeed || !hasFire || !hasDeath)
+                {
+                    throw new InvalidDataException(assetName + " AnimatorController is missing RCL layered parameters (RCL_IsMoving/RCL_SpeedMultiplier=1.0/RCL_Fire/RCL_Death).");
+                }
+                bool hasAdditiveFireLayer = false;
+                foreach (UnityEditor.Animations.AnimatorControllerLayer layer in controller.layers)
+                {
+                    if (String.Equals(layer.name, "UpperBodyFireRecoil", StringComparison.Ordinal) &&
+                        layer.blendingMode == UnityEditor.Animations.AnimatorLayerBlendingMode.Additive)
+                    {
+                        hasAdditiveFireLayer = true;
+                        break;
+                    }
+                }
+                if (!hasAdditiveFireLayer)
+                {
+                    throw new InvalidDataException(assetName + " AnimatorController is missing Additive layer 'UpperBodyFireRecoil'.");
+                }
+            }
             LODGroup lodGroup = prefab.GetComponent<LODGroup>();
             if (lodGroup == null || lodGroup.lodCount < 3)
             {

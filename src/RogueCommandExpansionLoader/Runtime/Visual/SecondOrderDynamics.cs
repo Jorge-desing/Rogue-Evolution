@@ -115,6 +115,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             if (lower.Contains("bulwark") || lower.Contains("gravitas") ||
                 lower.Contains("colossus") || lower.Contains("overlord") ||
+                lower.Contains("salvage") || lower.Contains("hauler") ||
                 lower.Contains("siege") || lower.Contains("heavy"))
             {
                 return "Heavy";
@@ -129,7 +130,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
 
             if (lower.Contains("tidebreaker") || lower.Contains("hover") ||
-                lower.Contains("fieldmedic") || lower.Contains("sentinel") ||
+                lower.Contains("fieldmedic") || lower.Contains("field-medic") ||
                 lower.Contains("sandlance") || lower.Contains("skirmish") ||
                 lower.Contains("rover") || lower.Contains("bike") ||
                 lower.Contains("scout") || lower.Contains("light"))

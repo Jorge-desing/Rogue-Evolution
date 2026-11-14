@@ -198,6 +198,25 @@ def apply_baked_fcurve_micro_vibration_bpy(
                 continue
 
             pbone.rotation_mode = "XYZ"
+            rot_path = f'pose.bones["{bone_name}"].rotation_euler'
+            existing_fcs = [fc for fc in action.fcurves if fc.data_path == rot_path]
+            existing_frames = {
+                int(round(kp.co[0]))
+                for fc in existing_fcs
+                for kp in fc.keyframe_points
+            }
+            for boundary_frame in (frame_start, frame_end):
+                if boundary_frame not in existing_frames:
+                    if existing_fcs:
+                        vals = [0.0, 0.0, 0.0]
+                        for fc in existing_fcs:
+                            if 0 <= fc.array_index < 3:
+                                vals[fc.array_index] = float(fc.evaluate(boundary_frame))
+                        pbone.rotation_euler = mathutils.Euler(tuple(vals), "XYZ")
+                    else:
+                        pbone.rotation_euler = mathutils.Euler((0.0, 0.0, 0.0), "XYZ")
+                    pbone.keyframe_insert(data_path="rotation_euler", frame=boundary_frame)
+
             phase_shift = bone_idx * 1.15
             for frame in range(frame_start + 1, frame_end):
                 if frame in anchor_set:
@@ -219,3 +238,147 @@ def apply_baked_fcurve_micro_vibration_bpy(
             armature_obj.animation_data.action = prev_action
 
     return inserted
+
+
+def detect_foot_sliding(
+    foot_positions: Sequence[tuple[float, float, float]],
+    height_threshold: float = 0.005,
+    velocity_threshold: float = 0.002,
+) -> dict[str, Any]:
+    """Detects stance-phase foot sliding and ground penetration from (x, y, z) samples.
+
+    A frame exhibits foot sliding when consecutive samples are both planted on or
+    below ``height_threshold`` while moving horizontally further than
+    ``velocity_threshold``. Any sample with ``z < -height_threshold`` is flagged
+    as ground penetration.
+    """
+    if not foot_positions:
+        return {
+            "sliding_frames": [],
+            "penetration_frames": [],
+            "total_slide_distance": 0.0,
+            "max_penetration_depth": 0.0,
+            "slide_percentage": 0.0,
+            "passed": True,
+        }
+
+    sliding_frames: list[int] = []
+    penetration_frames: list[int] = []
+    total_slide = 0.0
+    max_penetration = 0.0
+
+    prev_grounded = False
+    prev_xy = (0.0, 0.0)
+
+    for idx, pos in enumerate(foot_positions):
+        x, y, z = float(pos[0]), float(pos[1]), float(pos[2])
+        if z < -height_threshold:
+            penetration_frames.append(idx)
+            max_penetration = max(max_penetration, -z)
+
+        grounded = z <= height_threshold
+        if idx > 0 and grounded and prev_grounded:
+            dx = x - prev_xy[0]
+            dy = y - prev_xy[1]
+            disp = math.hypot(dx, dy)
+            if disp > velocity_threshold:
+                sliding_frames.append(idx)
+                total_slide += disp
+        prev_grounded = grounded
+        prev_xy = (x, y)
+
+    slide_pct = (len(sliding_frames) / float(len(foot_positions))) * 100.0
+    return {
+        "sliding_frames": sliding_frames,
+        "penetration_frames": penetration_frames,
+        "total_slide_distance": round(total_slide, 6),
+        "max_penetration_depth": round(max_penetration, 6),
+        "slide_percentage": round(slide_pct, 3),
+        "passed": len(sliding_frames) == 0 and len(penetration_frames) == 0,
+    }
+
+
+def _flatten_pose_values(pose: Any) -> dict[str, float]:
+    flat: dict[str, float] = {}
+    if isinstance(pose, dict):
+        for key, val in pose.items():
+            if isinstance(val, (tuple, list)):
+                for i, item in enumerate(val):
+                    flat[f"{key}[{i}]"] = float(item)
+            else:
+                flat[str(key)] = float(val)
+    elif isinstance(pose, (tuple, list)):
+        for i, item in enumerate(pose):
+            flat[f"[{i}]"] = float(item)
+    else:
+        flat["value"] = float(pose)
+    return flat
+
+
+def audit_loop_closure(
+    start_pose: Any,
+    end_pose: Any,
+    tolerance: float = 1e-4,
+) -> dict[str, Any]:
+    """Verifies that a looping clip's start and end poses match within ``tolerance``."""
+    start_flat = _flatten_pose_values(start_pose)
+    end_flat = _flatten_pose_values(end_pose)
+    keys = sorted(set(start_flat.keys()) | set(end_flat.keys()))
+    max_delta = 0.0
+    worst_channel = None
+    for key in keys:
+        if key not in start_flat or key not in end_flat:
+            return {
+                "max_delta": float("inf"),
+                "worst_channel": key,
+                "tolerance": tolerance,
+                "passed": False,
+            }
+        delta = abs(start_flat[key] - end_flat[key])
+        if delta > max_delta:
+            max_delta = delta
+            worst_channel = key
+    return {
+        "max_delta": round(max_delta, 7),
+        "worst_channel": worst_channel,
+        "tolerance": tolerance,
+        "passed": max_delta <= tolerance,
+    }
+
+
+def audit_root_motion_zero(
+    root_positions: Sequence[tuple[float, float, float]],
+    tolerance: float = 1e-5,
+) -> dict[str, Any]:
+    """Verifies the In-Place Locomotion Invariant (zero Bone_Root displacement)."""
+    if not root_positions:
+        return {
+            "max_displacement": 0.0,
+            "violating_frames": [],
+            "tolerance": tolerance,
+            "passed": True,
+        }
+
+    x0, y0, z0 = (
+        float(root_positions[0][0]),
+        float(root_positions[0][1]),
+        float(root_positions[0][2]),
+    )
+    max_disp = 0.0
+    violating: list[int] = []
+    for idx, pos in enumerate(root_positions):
+        dx = float(pos[0]) - x0
+        dy = float(pos[1]) - y0
+        dz = float(pos[2]) - z0
+        disp = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if disp > max_disp:
+            max_disp = disp
+        if disp > tolerance:
+            violating.append(idx)
+
+    return {
+        "max_displacement": round(max_disp, 7),
+        "violating_frames": violating,
+        "tolerance": tolerance,
+        "passed": len(violating) == 0,
+    }

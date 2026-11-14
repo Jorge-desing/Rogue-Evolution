@@ -12207,6 +12207,45 @@ internal static partial class ValidationTestRunner
                     $"Bounded speed multiplier mismatch: slow={verySlow:F3}, nominal={nominal:F3}, fast={veryFast:F3}.");
             }
         }),
+        ("second-order dynamics presets resolve all 18 canonical unit IDs and model names accurately", () =>
+        {
+            var expected = new (string Id, string ExpectedRole)[]
+            {
+                ("sample-native:scout-tank", "Light"),
+                ("sample-native:heavy-artillery", "Heavy"),
+                ("sample-native:assault-walker", "Walker"),
+                ("sample-native:atlas-crane-mech", "Walker"),
+                ("sample-native:bastion-siege-mech", "Walker"),
+                ("sample-native:arachnid-hexapod", "Walker"),
+                ("sample-native:overlord-command-hq", "Heavy"),
+                ("sample-native:skirmish-bike", "Light"),
+                ("sample-native:surge-tank", "Medium"),
+                ("tactical-operations:tidebreaker-skirmisher", "Light"),
+                ("tactical-operations:salvage-hauler", "Heavy"),
+                ("tactical-operations:skyguard-sam", "Sam"),
+                ("tactical-operations:bulwark-siege-tank", "Heavy"),
+                ("tactical-operations:arc-lance-walker", "Walker"),
+                ("tactical-operations:field-medic-rover", "Light"),
+                ("tactical-operations:sentinel-relay", "Medium"),
+                ("tactical-operations:gravitas-breaker", "Heavy"),
+                ("tactical-operations:command-relay", "Medium"),
+                ("IroncladWalker", "Walker"),
+                ("BulwarkSiegeTank", "Heavy"),
+                ("SkyguardSAM", "Sam"),
+                ("TidebreakerHovercraft", "Light"),
+                ("SentinelRelay", "Medium"),
+            };
+
+            foreach (var (id, role) in expected)
+            {
+                string actual = SecondOrderDynamicsPresets.ResolveRoleName(id);
+                if (!string.Equals(actual, role, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Expected role '{role}' for '{id}', got '{actual}'.");
+                }
+            }
+        }),
     };
 
     private sealed class TestCardChangeTarget

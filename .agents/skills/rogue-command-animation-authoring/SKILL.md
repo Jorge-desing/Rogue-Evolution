@@ -9,6 +9,10 @@ metadata:
 
 # Rogue Command Animation Authoring
 
+Symmetric biped chains with matching bone rolls and forward pole targets use the same +90 degree IK pole angle. Check both evaluated knees and exported poses; a reversed sign flips one knee.
+
+For Ironclad and Arc Lance, Blender generates one biped Walk take and aliases Drive in memory. Unity importer metadata maps both named clips to the real Walk take, retaining their IDs; verify imported curves and controller references after rebuilding. This is not a visual gait or runtime test.
+
 Use this skill for Unity Animator/AnimationClip integration and mechanical animation on Rogue Command vehicles and units. Apply animation principles to RTS camera scale, native movement, and the project's verified runtime hooks; do not copy browser/CSS timing rules literally. For walker gait and armature construction, use [Mech Rigging](../rogue-command-mech-rigging-authoring/SKILL.md). For particle effects, use [VFX Authoring](../rogue-command-vfx-authoring/SKILL.md). For mesh, sockets, and FBX work, use [3D Model Authoring](../rogue-command-3d-model-authoring/SKILL.md).
 
 ## When to use
@@ -149,15 +153,30 @@ When a rigged model does not render at all (invisible mesh, zero-extent SMR boun
 6. **Review animation quality.** Inspect representative frames and loops at close and RTS scales. Check anticipation, contact, silhouette, timing, direction, recovery, and whether animation conflicts with native transform updates. Run the rigging, VFX, and bundle-reference checks relevant to the change.
 7. **Prove runtime claims separately.** A valid clip, prefab, or AssetBundle is local authoring evidence. To claim that motion plays correctly, observe the intended state transition and motion in Rogue Command launched through Steam using the runtime-validation procedure.
 
+## Animation Validation Matrix (Integrated 6-Phase Pipeline)
+
+Enforce every phase of the Rogue Command animation validation matrix before claiming completion:
+
+| Phase | Tool / Script | Contract Verified |
+|---|---|---|
+| **1. Authoring (Blender)** | Blender Motion Paths + `tools/unit_animation_algorithms.py` | Quadratic Bézier foot arcs (`Z >= 0` stance grounding), `Bone_Root` stationary, `apply_baked_fcurve_micro_vibration_bpy` skips root & anchors. |
+| **2. Pre-Export Metrics** | `unit_animation_algorithms.py` (`detect_foot_sliding`, `audit_loop_closure`, `audit_root_motion_zero`) + `tests/python/rigging/test_unit_animation_algorithms.py` | Zero stance foot slide / penetration, exact loop closure (`f1 == f_end`), zero `Bone_Root` delta. |
+| **3. Post-Export FBX** | `tools/validate_fbx_animation_pipeline.py` (pinned Blender 4.5.14 headless + optional `animsmith` / `fbx-sanitizer` probe) | Re-imports `.fbx` and audits `Bone_Root == 0`, loop seams, foot sliding, scale hygiene, rigid bone-length preservation, and `Action_FireRecoil` dual-chain motion. |
+| **4. Unity Import / Bundle** | `tools/validate_mech_rigging.py` + `VehiclePrefabBuilder.cs` | Canonical sockets, `Generic` Avatar (`3`), `CreateFromThisModel` (`2`), `RCL_*` parameters, single non-root-motion `Animator`. |
+| **5. Unity Editor QA** | `unity/.../Assets/Editor/AnimationQAValidator.cs` (`AuditAllUnitAnimationsBatch`, `AuditAllUnitAnimationsStrictBatch`, `Rogue Command/QA/Animation Preview Scrubber`) | Automated curve audit (`Bone_Root == 0`, loop seams, `FireRecoil` dual-chain) + zero-dependency SceneView `AnimationMode` scrubbing without Play Mode. |
+| **6. Steam Runtime Smoke** | BepInEx MCP (`diagnostics_wait_for_renderer_frame_evidence`, `diagnostics_inspect_entity_visual`) | Live `Animator` parameter/clip transitions and `BakeMesh` local vertex deformation telemetry (still distinct from pixel quality). |
+
 ## Validation commands
 
 Run from the repository root through `terminal`, using the project Python environment:
 
 ```text
+terminal(command=".venv/Scripts/python.exe -m tools.validate_fbx_animation_pipeline unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/IroncladWalker.fbx unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx")
+terminal(command=".venv/Scripts/python.exe -m tools.run_python_tests --output artifacts/animation-qa/python-tests-report.json")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_mech_rigging.py --pack content/packs/sample-native-expansion --json")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion --json")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/sample-native-expansion")
-terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe -B -m unittest tests.python.rigging.test_tactical_animation_hold_and_easing tests.python.rigging.test_tactical_animation_improvements tests.python.rigging.test_attack_clip_authoring_contract tests.python.bundles.test_mech_rigging_bundle tests.python.rigging.test_tactical_walker_rigging_contract")
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe -B -m unittest tests.python.rigging.test_tactical_animation_hold_and_easing tests.python.rigging.test_tactical_animation_improvements tests.python.rigging.test_attack_clip_authoring_contract tests.python.bundles.test_mech_rigging_bundle tests.python.rigging.test_tactical_walker_rigging_contract tests.python.rigging.test_unit_animation_algorithms")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/tactical-operations")
 ```
 
@@ -253,5 +272,9 @@ List edited source, clips, controllers, prefabs, and bundles; state tool/engine 
   - `ConfigureAnimationController` adds `RCL_SpeedMultiplier` (`AnimatorControllerParameterType.Float`, explicit `defaultFloat = 1.0f` via `EnsureAnimatorFloatParameter`) bound to `driveState.speedParameter`, gates Layer 0 `AnyState -> fireState` on `!RCL_IsMoving` when `hasMovementParameter`, and configures idempotent Additive Layer 1 (`UpperBodyFireRecoil`, `AnimatorLayerBlendingMode.Additive`, `defaultWeight = 1.0f`) triggering on `[RCL_Fire, RCL_IsMoving]` so firing while moving does not override locomotion.
 - **Layer 3 (Runtime C# `SecondOrderDynamics.cs`, `LocomotionAnimationPolicy.cs`, `RuntimeVisualDirector.cs`):**
   - `SecondOrderDynamicsFloat` / `SecondOrderDynamicsVector3` (`(f, z, r)` semi-implicit Euler with stability clamp `k2_stable`) and `SecondOrderDynamicsPresets.ForRole` (`Light`, `Medium`, `Heavy`, `Sam`, `Walker`) drive turret yaw/pitch inertia, weapon recoil & spring recovery, chassis acceleration pitch/roll tilt, and antenna/VTOL secondary wobble without touching movement/`HoldFire`/attack-range gates.
-  - **Prefix pitfall:** `SecondOrderDynamicsPresets.ResolveRoleName` strips any `"pack:"` prefix before checking substrings so `"sample:..."` never false-matches `"sam"`.
+  - **Prefix pitfall:** `SecondOrderDynamicsPresets.ResolveRoleName` strips any `"pack:"` prefix before checking substrings so `"sample:..."` never false-matches `"sam"`, and explicitly covers all 18 canonical unit IDs (`salvage`/`hauler` -> `Heavy`, `field-medic` -> `Light`, `sentinel`/`command-relay`/`surge` -> `Medium`, walkers/mechs/hexapods -> `Walker`).
   - `LocomotionAnimationPolicy.EvaluateSpeedMultiplier` maps speed ratio into `[0.65f, 1.45f]` for optional `RCL_SpeedMultiplier` cache updates; always reset dynamics state on `ResetForReuse` and `TriggerDeathAnimation`.
+- **18-Unit Rollout & Batch Refresh Pitfalls:**
+  - `tools/Refresh-UnitProceduralAnimations.py` refreshes Layer-1 `Action_*` clips across all 18 units while isolating FBX writes in `artifacts/tmp-fbx-refresh/<unit>` before `shutil.move` (avoiding Windows `OSError: [Errno 22]` on existing FBX handles). For `BulwarkSiegeTank`, `ArachnidHexapod`, and `IroncladWalker`, run their dedicated `tools/Build-*Model.py` scripts so material batching (`*_Batch_*`) and NLA-free exports stay exact.
+  - `apply_baked_fcurve_micro_vibration_bpy` anchors `frame_start`/`frame_end` when unkeyed so secondary-bone oscillation never introduces loop-seam drift, and `validate_fbx_animation_pipeline.audit_armature_actions_bpy` disables `armature_obj.animation_data.use_nla` during single-action evaluation so `Track_Death` cannot bleed into `Action_Idle`/`Action_Walk`.
+  - `RogueCommandVisualSampleScaffolder.RefreshCanonicalLevelOneVisuals` invokes `VehiclePrefabBuilder.SetupAnimatorIfAvailable` across all 18 units, and `ValidateLevelOnePbrAndLodContract` asserts `RCL_IsMoving`, `RCL_SpeedMultiplier=1.0`, `RCL_Fire`, `RCL_Death`, and additive `UpperBodyFireRecoil` across all 18 `*Controller.controller` files.

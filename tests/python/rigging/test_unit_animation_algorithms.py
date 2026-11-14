@@ -101,6 +101,66 @@ class UnitAnimationAlgorithmsTests(unittest.TestCase):
         self.assertIn("wiggle_2", addon_script)
         self.assertIn("SingleFile", addon_script)
 
+    def test_all_18_unit_animator_controllers_serialize_layered_contract(self) -> None:
+        assets_dir = ROOT / "unity/RogueCommandAssetAuthoring/Assets"
+        controllers = sorted(assets_dir.rglob("*Controller.controller"))
+        self.assertEqual(len(controllers), 18)
+        for controller_path in controllers:
+            yaml_text = controller_path.read_text(encoding="utf-8")
+            self.assertIn("RCL_IsMoving", yaml_text, msg=str(controller_path))
+            self.assertIn("RCL_SpeedMultiplier", yaml_text, msg=str(controller_path))
+            self.assertIn("m_DefaultFloat: 1", yaml_text, msg=str(controller_path))
+            self.assertIn("RCL_Fire", yaml_text, msg=str(controller_path))
+            self.assertIn("RCL_Death", yaml_text, msg=str(controller_path))
+            self.assertIn("UpperBodyFireRecoil", yaml_text, msg=str(controller_path))
+            self.assertIn("m_BlendingMode: 1", yaml_text, msg=str(controller_path))
+
+    def test_detect_foot_sliding_passes_bezier_walk_and_catches_slide_and_penetration(self) -> None:
+        frames = tuple(range(1, 41))
+        samples = uaa.sample_foot_step_arc_frames(
+            frames=frames,
+            cycle_length=40,
+            phase_offset=0.0,
+            duty_factor=0.5,
+            step_height=0.09,
+            stride_forward=0.04,
+        )
+        clean_track = [samples[f] for f in frames]
+        clean_res = uaa.detect_foot_sliding(clean_track)
+        self.assertTrue(clean_res["passed"])
+        self.assertEqual(clean_res["sliding_frames"], [])
+        self.assertEqual(clean_res["penetration_frames"], [])
+
+        # Introduce horizontal foot slide during grounded stance
+        sliding_track = list(clean_track)
+        sliding_track[2] = (0.0, 0.025, 0.0)
+        slide_res = uaa.detect_foot_sliding(sliding_track)
+        self.assertFalse(slide_res["passed"])
+        self.assertIn(2, slide_res["sliding_frames"])
+        self.assertGreater(slide_res["total_slide_distance"], 0.02)
+
+        # Introduce floor penetration (Z < -0.005)
+        pen_track = list(clean_track)
+        pen_track[4] = (0.0, 0.0, -0.02)
+        pen_res = uaa.detect_foot_sliding(pen_track)
+        self.assertFalse(pen_res["passed"])
+        self.assertIn(4, pen_res["penetration_frames"])
+        self.assertAlmostEqual(pen_res["max_penetration_depth"], 0.02, places=5)
+
+    def test_audit_loop_closure_and_root_motion_zero(self) -> None:
+        p1 = {"Bone_Hull": (0.0, 0.0, 0.5), "Bone_Foot_L": (0.1, 0.0, 0.0)}
+        p2 = {"Bone_Hull": (0.0, 0.0, 0.5), "Bone_Foot_L": (0.1, 0.0, 0.0)}
+        p_bad = {"Bone_Hull": (0.0, 0.0, 0.55), "Bone_Foot_L": (0.1, 0.0, 0.0)}
+        self.assertTrue(uaa.audit_loop_closure(p1, p2)["passed"])
+        bad_loop = uaa.audit_loop_closure(p1, p_bad)
+        self.assertFalse(bad_loop["passed"])
+        self.assertAlmostEqual(bad_loop["max_delta"], 0.05, places=5)
+
+        self.assertTrue(uaa.audit_root_motion_zero([(0.0, 0.0, 0.0)] * 10)["passed"])
+        drift = uaa.audit_root_motion_zero([(0.0, 0.0, 0.0), (0.0, 0.1, 0.0)])
+        self.assertFalse(drift["passed"])
+        self.assertEqual(drift["violating_frames"], [1])
+
 
 if __name__ == "__main__":
     unittest.main()
