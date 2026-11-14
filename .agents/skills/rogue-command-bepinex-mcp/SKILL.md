@@ -93,3 +93,5 @@ Discover → observe → act → wait/verify → decide the next step. **Require
 - [Native UI and intermission](references/ui-intermission.md) — screenshot-free control selection, reward screens, run-map actions, and transition checks.
 
 Snapshot regression tests verify presence and exact bounded arguments together for visual material and surface censuses; the GameTimeScale presence assertion remains independent.
+
+Reward choice and Shop purchase controls support optional fresh-state `preconditions` and read-only `dryRun`; consult the intermission reference before using them. Dry runs do not establish native action validity.

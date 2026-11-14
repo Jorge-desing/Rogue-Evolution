@@ -70,6 +70,35 @@ class StateWaitTests(unittest.TestCase):
             self.assertTrue(self.wait(tool="diagnostics_get_intermission_reward_state", arguments={"maxCards": "16"})[0]["isError"])
             call.assert_not_called()
 
+    def test_intermission_preconditions_and_dry_run_never_replay_actions(self):
+        for action, args, getter, native in [
+            ("diagnostics_order_choose_intermission_reward", {"rewardId": "test:card"}, "GetIntermissionRewardStateJson", "OrderChooseIntermissionRewardJson"),
+            ("diagnostics_order_buy_intermission_shop_offer", {"offerId": "offer-1"}, "GetIntermissionNativePanelStateJson", "OrderBuyIntermissionShopOfferJson"),
+        ]:
+            for dry, value, expected_calls in [(True, True, 1), (False, False, 1), (False, True, 2)]:
+                with self.subTest(action=action, dry=dry, value=value), mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=['{"ready":true}', '{"success":true}']) as call:
+                    response = SERVER.execute_tool(action, dict(args, dryRun=dry, preconditions={"/ready": value}))
+                    self.assertEqual(expected_calls, call.call_count)
+                    self.assertEqual(getter, call.call_args_list[0].args[0])
+                    if expected_calls == 2:
+                        self.assertEqual(native, call.call_args_list[1].args[0])
+                    self.assertEqual(not value, bool(response.get("isError")))
+            for state in ('{"error":"failed"}', '[]', '{"ready":NaN}'):
+                with mock.patch.object(SERVER, "_call_diagnostics_method", return_value=state) as call:
+                    self.assertTrue(SERVER.execute_tool(action, dict(args, dryRun=True))["isError"])
+                    self.assertEqual(1, call.call_count)
+            with mock.patch.object(SERVER, "_call_diagnostics_method") as call:
+                self.assertTrue(SERVER.execute_tool(action, dict(args, preconditions={"bad": True}))["isError"])
+                call.assert_not_called()
+
+    def test_failed_intermission_guard_stops_sequence_with_continuation(self):
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"ready":false}') as call:
+            response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
+                {"tool": "diagnostics_order_buy_intermission_shop_offer", "arguments": {"offerId": "offer-1", "preconditions": {"/ready": True}}},
+                {"tool": "diagnostics_get_navigator_state"}]})
+            self.assertTrue(response["isError"])
+            self.assertEqual(1, call.call_count)
+
     def test_missing_and_type_mismatch_timeout(self):
         for row in ({}, {"ready": 1}, {"ready": "true"}):
             with self.subTest(row=row), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(row)):

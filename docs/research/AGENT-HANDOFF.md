@@ -1,5 +1,11 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Guarded intermission controls
+
+- Reward choice and Shop purchase now accept `preconditions` (1–8 JSON Pointer/typed-value pairs) and `dryRun`. A fresh reward/native-panel query must satisfy every guard before the existing native action is called once. Dry runs return checks/observation and explicitly leave native action validation outstanding; no native mutation is invoked. Preconditions are snapshots, not atomic reservations.
+- Query failures, invalid/missing paths and mismatches fail closed; failed guarded calls stop sequences even with continuation enabled. Existing calls without these options retain their behavior. Local regressions cover both controls, query errors, invalid pointers, exact single dispatch, and sequence stopping. Full report: `artifacts/intermission-controls/final.json`.
+- Runtime skill/intermission reference and Antigravity synchronized. Connected MCP schema exposes the new controls. No game run or native UI acceptance is claimed.
+
 ## 2026-11-13 Intermission reward automation
 
 - Added `diagnostics_get_intermission_reward_state` to the explicit read-only state-wait allowlist and schema. Agents can now wait directly for reward/deck postconditions with bounded `maxCards` and consecutive samples, including inside ordered sequences. No reward choice or route mutation is automated implicitly.

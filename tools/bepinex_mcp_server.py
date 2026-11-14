@@ -979,6 +979,28 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         invalid = _validate_tool_arguments(name, arguments)
         if invalid:
             return _tool_response(json.dumps(invalid), is_error=True)
+        guarded_intermission = {
+            "diagnostics_order_choose_intermission_reward": "diagnostics_get_intermission_reward_state",
+            "diagnostics_order_buy_intermission_shop_offer": "diagnostics_get_intermission_native_panel_state",
+        }
+        if name in guarded_intermission and ("preconditions" in arguments or arguments.get("dryRun", False)):
+            guards = arguments.get("preconditions", {})
+            if any(not path.startswith("/") or re.search(r"~(?![01])", path) for path in guards):
+                return _tool_response(json.dumps({"error": "preconditions keys must be JSON Pointers"}), is_error=True)
+            state_response = execute_tool(guarded_intermission[name], {})
+            try:
+                state = json.loads("\n".join(block["text"] for block in state_response.get("content", []) if block.get("type") == "text"),
+                                   parse_constant=lambda value: (_ for _ in ()).throw(ValueError("non-finite JSON")))
+                if state_response.get("isError") or not isinstance(state, dict) or _state_failure(state):
+                    raise ValueError("Intermission preflight query failed")
+                checks = _state_checks(state, [{"path": path, "equals": value} for path, value in guards.items()])
+            except (ValueError, TypeError, KeyError) as exc:
+                return _tool_response(json.dumps({"error": str(exc), "nativeCallInvoked": False}), is_error=True)
+            passed = all(check["matched"] for check in checks)
+            if not passed or arguments.get("dryRun", False):
+                return _tool_response(json.dumps({"success": passed, "dryRun": arguments.get("dryRun", False),
+                    "nativeCallInvoked": False, "checks": checks, "observation": state,
+                    "actionValidationRequired": True}), is_error=not passed)
         # ---- Discovery (lazy, lightweight) ----
         if name == "automation_wait_for_state":
             return _wait_for_state(arguments)
@@ -1154,7 +1176,8 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 })
                 if step_failed:
                     failed = True
-                    if stop_on_failure or step.get("expect") or uncertain or budget_exceeded or step_tool == "automation_wait_for_state":
+                    if (stop_on_failure or step.get("expect") or uncertain or budget_exceeded or step_tool == "automation_wait_for_state"
+                            or (step_tool in guarded_intermission and ("preconditions" in resolved_arguments or resolved_arguments.get("dryRun", False)))):
                         break
                 if delay_after_ms:
                     remaining = max_duration - (time.monotonic() - started)
