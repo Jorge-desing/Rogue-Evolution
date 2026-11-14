@@ -417,6 +417,7 @@ public class SkillInfo
 
 public sealed class WorldGrid
 {
+    public Vector2Int World2Grid(Vector3 position) => new((int)System.Math.Round(position.x / 10f), (int)System.Math.Round(position.z / 10f));
     public static WorldGrid Instance { get; set; } = new();
     public float WorldWidth = 200f;
     public float WorldHeight = 200f;

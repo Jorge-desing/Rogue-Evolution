@@ -2,6 +2,14 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — native gathering search radius
+
+- Positive crystal resourceGathering.gatherRange now filters the native Harvest candidate list by Euclidean grid-cell radius around `_givenHarvestPosition ?? _self.Position`. Boundary cells remain; zero preserves native unrestricted search. Native claim exclusion, nearest/path selection, movement, refinery delivery and Stop on empty candidates remain intact. The global grid crystal list is never changed.
+- Unit profile registration carries ResourceGathering even when range is its only mechanic. Central patch plan installs NativeHarvestRangePatch for the native Harvest type; typed field/signature drift or anything other than one List<Vector2Int>.AddRange site aborts installation. The callback caches field access and contains exceptions.
+- Rechecked pinned game identity. Offline native IL decoder/probe accepted the actual 343-byte Harvest method: 112 instructions to 114, one filter call; log `artifacts/general-capability-audit/gather-range-native-il.log`. The standalone .NET 8 Harmony instruction reader reported Body-less method, so this evidence uses raw MethodBody decoding and is not a live Harmony installation claim.
+- Release/harness builds: zero warnings/errors. Full C# suite: 590 passed, zero failed, one Windows file-symlink-privilege skip. Full Python all-mode: 768 tests, successful true. Tests cover native callback/profile/destination resolution, radius boundary, preserved order, zero/empty range results and drift rejection. Logs `artifacts/general-capability-audit/gather-range-*`. Steam execution remains unverified.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/gather-range-deployment/manifest.json`.
+
 ## General capability audit — structured native crystal gathering
 
 - Connected positive resourceGathering.gatherRate/carryCapacity to native Harvester row maxArmor/gainCreditsAmount after role resolution, preserving raw/custom balance precedence. Native Harvest.Update consumes these values for extraction and cargo while retaining its crystal depletion, movement and refinery delivery state machine. No passive credit loop or Harvest action is synthesized.

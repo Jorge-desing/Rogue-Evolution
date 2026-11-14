@@ -31,6 +31,8 @@ Authoritative policy for creating, reviewing, and auditing BepInEx 5 / Harmony 2
 
 ## BepInEx 5 Plugin Lifecycle & Safety Rules
 
+NativeHarvestRangePatch targets instance void Harvest.ClaimClosestCrystalAndMoveToIt(). Validate its four typed private fields and exactly one List<Vector2Int>.AddRange call before injecting ldarg.0/call FilterCandidates. Drift aborts installation; callback exceptions remain contained. It filters only the local candidate list, never global crystal cells, claims, pathfinding or deposits. Preserve source order and existing native Stop behavior for an empty result.
+
 ### Lifecycle Phases
 1. **Plugin Bootstrap:** `[BepInPlugin(GUID, Name, Version)]` on class extending `BaseUnityPlugin`. BepInEx invokes `Awake()`.
 2. **Compatibility Gate:** Call `GameCompatibility.TryValidate(gameRoot)` before touching reflected types. Failure = abort all patching.
@@ -63,7 +65,7 @@ Patches use a programmatic registration plan rather than static attributes:
 
 ## Core Engine Harmony Patches (65 Installed Hooks & 16 CIL Transpilers)
 
-The loader registers 65 verified hooks across core game simulation systems, including 16 in-place CIL Transpilers:
+The established core set contains 65 verified hooks across core game simulation systems, including 16 in-place CIL Transpilers. The additional native Harvest range transpiler has local build, policy and offline native-IL evidence; Steam installation/execution remains unverified:
 
 | Category / Pillar | Target Method | Hook Type | Purpose & Telemetry Counter |
 |---|---|---|---|

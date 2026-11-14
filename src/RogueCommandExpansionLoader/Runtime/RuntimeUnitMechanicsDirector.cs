@@ -22,6 +22,7 @@ namespace RogueCommandExpansionLoader.Runtime
         public ContentUnitCommandDefinition Command { get; set; }
         public ContentUnitExperienceRewardDefinition ExperienceReward { get; set; }
         public ContentUnitAiBehaviorDefinition AiBehavior { get; set; }
+        public ContentUnitResourceGatheringDefinition ResourceGathering { get; set; }
         public float? MinAttackRange { get; set; }
         public float? CriticalHitChance { get; set; }
         public ContentOnHitStatusEffectDefinition[] OnHitStatusEffects { get; set; }
@@ -74,6 +75,7 @@ namespace RogueCommandExpansionLoader.Runtime
              (DeathNova.damage > 0f || DeathNova.stunDuration > 0f || DeathNova.slowDuration > 0f));
 
         public bool HasAnyMechanics =>
+            (ResourceGathering != null && ResourceGathering.gatherRange > 0f) ||
             HasRuntimeComponentMechanics ||
             HasAiBehaviorMechanics ||
             HasOnDamageDealtMechanics ||

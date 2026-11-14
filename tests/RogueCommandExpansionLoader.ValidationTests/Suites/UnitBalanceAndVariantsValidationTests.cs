@@ -16,6 +16,47 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetUnitBalanceAndVariantsValidationTests() => new (string Name, Action Run)[]
     {
+    ("native gathering range filters only distant candidates and preserves native order", () =>
+    {
+        var cells = new List<Vector2Int> { new(0, 0), new(3, 4), new(6, 0), new(-3, -4) };
+        NativeHarvestRangePatch.FilterCells(cells, new Vector2Int(0, 0), 5f);
+        if (cells.Count != 3 || cells[1].x != 3 || cells[2].x != -3)
+            throw new InvalidOperationException("Gathering range must include the boundary and preserve candidate order.");
+        NativeHarvestRangePatch.FilterCells(cells, new Vector2Int(100, 100), 0f);
+        if (cells.Count != 3)
+            throw new InvalidOperationException("Zero range must preserve native unrestricted search.");
+        NativeHarvestRangePatch.FilterCells(cells, new Vector2Int(100, 100), 1f);
+        if (cells.Count != 0)
+            throw new InvalidOperationException("No candidate inside the gathering range must leave an empty native search.");
+
+        MethodInfo target = typeof(HarvestRangeFixtures.Harvest).GetMethod("ClaimClosestCrystalAndMoveToIt", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        MethodInfo addRange = typeof(List<Vector2Int>).GetMethod("AddRange", new[] { typeof(IEnumerable<Vector2Int>) })!;
+        var original = new[] { new HarmonyLib.CodeInstruction(OpCodes.Callvirt, addRange), new HarmonyLib.CodeInstruction(OpCodes.Ret) };
+        var patched = NativeHarvestRangePatch.Transpiler(original, target).ToList();
+        if (patched.Count != 4 || patched[1].opcode != OpCodes.Ldarg_0 ||
+            !Equals(patched[2].operand, typeof(NativeHarvestRangePatch).GetMethod(nameof(NativeHarvestRangePatch.FilterCandidates))))
+            throw new InvalidOperationException("Gathering hook must filter immediately after native candidate population.");
+        bool rejected = false;
+        try { NativeHarvestRangePatch.Transpiler(new[] { new HarmonyLib.CodeInstruction(OpCodes.Ret) }, target).ToList(); }
+        catch (InvalidOperationException) { rejected = true; }
+        if (!rejected) throw new InvalidOperationException("Gathering hook accepted a drifted native search body.");
+
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            var self = new EntityController { entityId = "test:ranged-harvest", Role = UnitRole.Harvester };
+            RuntimeUnitMechanicsDirector.RegisterProfile(self.EntityId, new UnitRuntimeMechanicsProfile
+            {
+                ResourceGathering = new ContentUnitResourceGatheringDefinition { resourceType = "Crystals", gatherRange = 1f }
+            });
+            var candidates = new List<Vector2Int> { new(0, 0), new(9, 0), new(10, 0), new(12, 0) };
+            var harvest = new HarvestRangeFixtures.Harvest(self, WorldGrid.Instance, new Vector3(100f, 0f, 0f), candidates);
+            NativeHarvestRangePatch.FilterCandidates(harvest);
+            if (candidates.Count != 2 || candidates[0].x != 9 || candidates[1].x != 10)
+                throw new InvalidOperationException("Native harvest range callback did not resolve the product profile and given-position anchor.");
+        }
+        finally { RuntimeUnitMechanicsDirector.ClearProfiles(); }
+    }),
     ("structured gathering configures native harvester rate and cargo while preserving explicit balance", () =>
     {
         var row = new GatheringBalanceRow { roles = UnitRole.Harvester, maxArmor = 15f, gainCreditsAmount = 50f };
@@ -1450,5 +1491,30 @@ internal static partial class ValidationTestRunner
         public UnitRole roles;
         public float maxArmor;
         public float gainCreditsAmount;
+    }
+
+    private static class HarvestRangeFixtures
+    {
+        public sealed class Harvest
+        {
+            private readonly EntityController _self;
+            private readonly WorldGrid _grid;
+            private readonly Vector3? _givenHarvestPosition;
+            private readonly List<Vector2Int> _possibleCrystalCells;
+            public Harvest(EntityController self, WorldGrid grid, Vector3? given, List<Vector2Int> cells)
+            {
+                _self = self;
+                _grid = grid;
+                _givenHarvestPosition = given;
+                _possibleCrystalCells = cells;
+            }
+            private void ClaimClosestCrystalAndMoveToIt()
+            {
+                GC.KeepAlive(_self);
+                GC.KeepAlive(_grid);
+                GC.KeepAlive(_givenHarvestPosition);
+                GC.KeepAlive(_possibleCrystalCells);
+            }
+        }
     }
 }

@@ -9,6 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>../../.tools/bepinex-dist-5.4.23.5/BepInEx/core/0Harmony.dll</HintPath>
+    </Reference>
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/RangeDisplayPolicy.cs"
              Link="Runtime/RangeDisplayPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/LoaderLogBurstSummaryPolicy.cs"
@@ -182,6 +185,8 @@
              Link="Runtime/RuntimeUnitAiBehaviorPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Content/UnitResourceGatheringMapper.cs"
              Link="Content/UnitResourceGatheringMapper.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/NativeHarvestRangePatch.cs"
+             Link="Runtime/NativeHarvestRangePatch.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeFactionColorResolver.cs"
              Link="Runtime/Visual/RuntimeFactionColorResolver.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/WeaponShotFeedbackTracker.cs"

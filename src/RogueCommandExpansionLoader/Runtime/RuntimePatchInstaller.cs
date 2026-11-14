@@ -594,6 +594,15 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo entityDeleteCommandChainTranspiler = TranspilerHook(nameof(RuntimeTranspilerPatches.EntityControllerDeleteCommandChainTranspiler));
 
             List<PatchPlan> plan = new List<PatchPlan>();
+            Type harvestType = gameAssembly.GetType("Harvest", false);
+            if (harvestType != null)
+            {
+                MethodInfo harvestSearch = RuntimeReflection.FindUniqueMethod(harvestType,
+                    "ClaimClosestCrystalAndMoveToIt", method => !method.IsStatic &&
+                    method.ReturnType == typeof(void) && method.GetParameters().Length == 0);
+                plan.Add(new PatchPlan(harvestSearch, null, null,
+                    typeof(NativeHarvestRangePatch).GetMethod(nameof(NativeHarvestRangePatch.Transpiler)), null));
+            }
             plan.Add(new PatchPlan(init, null, entityInitPostfix));
             plan.Add(new PatchPlan(setScriptableObject, null, setScriptableObjectPostfix));
             plan.Add(new PatchPlan(createStageMap, stageMapPrefix, stageMapPostfix));
