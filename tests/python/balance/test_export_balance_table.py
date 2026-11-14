@@ -46,6 +46,15 @@ class ExportBalanceTableTests(unittest.TestCase):
         row = EXPORT.export_balance_table(pack)[0]
         self.assertEqual((25, 1), (row["Damage1"], row["Attack1Cooldown"]))
 
+        unit["detection"] = {"detectionRange": 9.6}
+        self.assertEqual(10, EXPORT.export_balance_table(pack)[0]["SightRadius"])
+        unit["detection"]["detectionRange"] = 9.4999999
+        self.assertEqual(10, EXPORT.export_balance_table(pack)[0]["SightRadius"])
+        unit["balanceOverrides"].append({"name": "sightRadius", "value": "5"})
+        self.assertEqual(5, EXPORT.export_balance_table(pack)[0]["SightRadius"])
+        unit["customBalance"]["SightRadius"] = 6
+        self.assertEqual(6, EXPORT.export_balance_table(pack)[0]["SightRadius"])
+
     def test_raw_override_parsed(self) -> None:
         pack = _valid_pack()
         unit = pack["units"][0]

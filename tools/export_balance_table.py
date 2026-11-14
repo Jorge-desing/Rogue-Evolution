@@ -14,6 +14,7 @@ import csv
 import io
 import json
 import sys
+import struct
 from pathlib import Path
 from typing import Any
 
@@ -141,6 +142,12 @@ def export_balance_table(pack: dict) -> list[dict[str, Any]]:
         build_time = _parse_number(queue.get("buildTime"))
         if build_time is not None and 0 < build_time < float("inf") and "ProductionDuration" not in row:
             row["ProductionDuration"] = build_time
+
+        detection = _as_dict(unit.get("detection"))
+        detection_range = _parse_number(detection.get("detectionRange"))
+        if detection_range is not None and 0 < detection_range < float("inf") and "SightRadius" not in row:
+            native_range = struct.unpack("<f", struct.pack("<f", min(detection_range, 16777216)))[0]
+            row["SightRadius"] = max(1, round(native_range))
 
         weapons = _as_list(unit.get("weapons"))
         if weapons and isinstance(weapons[0], dict):

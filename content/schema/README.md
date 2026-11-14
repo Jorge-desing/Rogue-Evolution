@@ -13,6 +13,8 @@ Use this contract with [content.schema.json](content.schema.json) and the [pack 
 
 ## Shape
 
+Positive `detection.detectionRange` supplies native `SightRadius` in grid cells. Values round to the nearest integer (midpoints to even), bounded to 1–16,777,216. Native sight and fog-of-war updates consume this value. Explicit raw `sightRadius` and `customBalance.SightRadius` take priority, and zero preserves the template. `sensorType` and `stealthDetection` remain descriptive.
+
 The primary `weapons[0]` entry applies positive `damage` to native `Damage1`, `range` to `WeaponRange` in native grid units, and `fireRate` in attacks per second to `Attack1Cooldown` as `1 / fireRate` seconds (bounded to the native Single maximum). Explicit custom/raw balance wins per parameter. Zero preserves template values. The template's native attack actions and minimum range/cooldown rules determine execution. Later weapon entries and `weaponType` remain descriptive.
 
 Positive `productionQueue.buildTime` sets the produced unit's native `productionDuration` in seconds. Explicit `customBalance.ProductionDuration` and raw `balanceOverrides` for `productionDuration` take priority. Zero retains the native template value. This field controls product fabrication time independently of the production building's own construction time.

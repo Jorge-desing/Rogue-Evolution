@@ -691,6 +691,14 @@ namespace RogueCommandExpansionLoader.Content
                 AddStructuredDefault(parameters, unit, "MoveSpeed", unit.movement.moveSpeed);
             }
 
+            if (unit.detection != null && unit.detection.detectionRange > 0f &&
+                !Single.IsInfinity(unit.detection.detectionRange))
+            {
+                double radius = Math.Max(1d, Math.Min(MaximumContiguousSingleExactInteger,
+                    Math.Round(unit.detection.detectionRange)));
+                AddStructuredDefault(parameters, unit, "SightRadius", radius);
+            }
+
             if (unit.weapons != null && unit.weapons.Length > 0 && unit.weapons[0] != null)
             {
                 ContentUnitWeaponDefinition primary = unit.weapons[0];

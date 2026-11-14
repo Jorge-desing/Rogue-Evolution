@@ -549,6 +549,16 @@ internal static partial class ValidationTestRunner
         mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
         if (mapped["Damage1"] != 25d || mapped.ContainsKey("Attack1Cooldown"))
             throw new InvalidOperationException("Explicit weapon balance must override primary weapon defaults.");
+
+        unit.detection = new ContentUnitDetectionDefinition { detectionRange = 9.6f };
+        if (UnitBalanceOverrideMapper.CreateCustomBalance(unit)["SightRadius"] != 10d)
+            throw new InvalidOperationException("Detection range must map to an integer native sight radius.");
+        unit.balanceOverrides = [new ContentBalanceOverride { name = "sightRadius", value = "5" }];
+        if (UnitBalanceOverrideMapper.CreateCustomBalance(unit).ContainsKey("SightRadius"))
+            throw new InvalidOperationException("Explicit native sight radius must retain precedence.");
+        unit.customBalance["SightRadius"] = 6d;
+        if (UnitBalanceOverrideMapper.CreateCustomBalance(unit)["SightRadius"] != 6d)
+            throw new InvalidOperationException("Custom sight radius must retain precedence.");
     }),
     ("balance overrides exclude units without registered entity rows", () =>
     {
