@@ -957,7 +957,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 foreach (object candidate in entities)
                 {
-                    if (candidate == null || ReferenceEquals(candidate, captainObj) || !IsEntityAlive(candidate) || IsEnemy(captainObj, candidate))
+                    if (candidate == null || ReferenceEquals(candidate, captainObj) || !IsEntityAlive(candidate) || !IsFriendly(captainObj, candidate))
                     {
                         continue;
                     }
@@ -3167,7 +3167,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 bool shockwave = string.Equals(normalizedPulseType, "Shockwave", StringComparison.OrdinalIgnoreCase);
 
-                if (shockwave != enemy)
+                if (shockwave ? !enemy : !IsFriendly(sourceObj, candidate))
 
                 {
 

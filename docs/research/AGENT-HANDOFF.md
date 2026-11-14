@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Dynamic support faction selection (2026-11-14)
+
+Dynamic command auras and friendly tactical pulses now use the same ally-faction selection as passive support; Shockwave still uses native hostility. Test fixture hostility now matches native Player/AI-only hostility. Release built cleanly and RuntimeAndDiagnostics passed 241/241 (`artifacts/general-capability-audit/dynamic-support-factions/runtime.log`). DLL deployed with game closed and backup/hash manifest at `artifacts/general-capability-audit/dynamic-support-deployment-20261114145435/manifest.json`. Verify neutral exclusion and hostile Shockwave in an authorized Steam run.
+
+
 ## Support faction selection (2026-11-14)
 
 Healing, passive auras, synergies and command pulses now match Player/AI factions for allies rather than treating all non-enemies as friendly. Static `Tags.AreEnemies` inspection established neutral is neither Player nor AI enemy. Release built without warnings; RuntimeAndDiagnostics passed 241/241 (`artifacts/general-capability-audit/support-factions/runtime.log`). Deployed with the game closed and a hash-verified backup; manifest `artifacts/general-capability-audit/support-factions-deployment-20261114145246/manifest.json`. Verify faction effects during an authorized Steam run.

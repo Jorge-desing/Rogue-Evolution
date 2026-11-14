@@ -196,7 +196,8 @@ public sealed class EntityController : MonoBehaviour
         CurrentHealth = System.Math.Max(0f, CurrentHealth - damageRemaining);
     }
     public void RankUp(int amount) { CurrentRank = System.Math.Min(CurrentRank + amount, MaxRank); }
-    public bool IsEnemy(EntityController other) => other != null && (IsControlledByPlayer != other.IsControlledByPlayer || IsControlledByAi != other.IsControlledByAi);
+    public bool IsEnemy(EntityController other) => other != null &&
+        ((IsControlledByPlayer && other.IsControlledByAi) || (IsControlledByAi && other.IsControlledByPlayer));
     public bool RejectStatusEffectsForTest { get; set; }
     public void SetActiveStatusEffect(StatusEffect effect, SetStatusEffect.DurationType durationType, float duration)
     {

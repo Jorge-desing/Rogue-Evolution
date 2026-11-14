@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Dynamic command auras and friendly tactical pulses also require matching Player/AI factions; neutral units are excluded. Shockwave continues to select native enemies. Runtime acceptance remains pending.
+
 Healing, passive auras, synergies and command pulses identify allies by the native Player/AI controller faction; neutral entities do not receive ally effects. Enemy aura selection continues to use native hostility. Steam behavior remains unverified.
 
 Healing and shield/armor support consider every positive deficit, including deficits below 0.1 points; native recovery still clamps the result. Verify in Steam before claiming gameplay acceptance.
