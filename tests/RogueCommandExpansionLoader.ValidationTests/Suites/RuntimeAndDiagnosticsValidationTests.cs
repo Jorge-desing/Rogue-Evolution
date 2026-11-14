@@ -929,8 +929,8 @@ internal static partial class ValidationTestRunner
     {
         var rows = new[]
         {
-            new AiRosterRow("unit:ai-1", false, 100, 80, 5f, 10f, 12f, 6f),
-            new AiRosterRow("building:ai-hq", true, 300, 200, 0f, 0f, 0f, 0f),
+            new AiRosterRow("unit:ai-1", false, 100, 80, 5f, 10f, 12f, 6f, 101),
+            new AiRosterRow("building:ai-hq", true, 300, 200, 0f, 0f, 0f, 0f, 102),
         };
         var census = new AiRosterCensus(1, 1, new[] { rows[0] }, new[] { rows[1] });
         string json = AgentDiagnosticsFormatter.SerializeAiRoster(census);
@@ -938,9 +938,9 @@ internal static partial class ValidationTestRunner
             !json.Contains("\"aiBuildingCount\":1") ||
             !json.Contains("\"aiUnitRowCount\":1") ||
             !json.Contains("\"aiBuildingRowCount\":1") ||
-            !json.Contains("\"entityKeyId\":\"unit:ai-1\"") ||
+            !json.Contains("\"entityKeyId\":\"unit:ai-1\",\"runtimeEntityKeyId\":\"101\"") ||
             !json.Contains("\"dps\":10") ||
-            !json.Contains("\"entityKeyId\":\"building:ai-hq\""))
+            !json.Contains("\"entityKeyId\":\"building:ai-hq\",\"runtimeEntityKeyId\":\"102\""))
         {
             throw new InvalidOperationException("SerializeAiRoster must report counts and rows.");
         }

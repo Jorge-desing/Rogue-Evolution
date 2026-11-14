@@ -45,6 +45,8 @@ The census exposes `value` as a number for sliders. Inspect `controlType`, `minV
 
 ## Battlefield orders
 
+Resolve enemy unit and building instances from `diagnostics_get_ai_roster` using each row's `runtimeEntityKeyId`. Pass that key as `targetEntityKeyId` to `diagnostics_order_unit_attack`. The native order checks hostility at dispatch. Use the same key to compare `attackTargetKeyId` in the attacker's subsequent observations.
+
 Find living player units with `diagnostics_get_battlefield_census` and use the row's string `runtimeEntityKeyId`. Refresh keys on scene changes. Confirm the match has started and choose a reachable destination before dispatch. The existing Move, Attack, AttackMove, HoldPosition and Stop tools issue native orders. A successful dispatch records the call. Observe the unit to establish its subsequent state.
 
 To withdraw a player unit when its remaining health reaches 35%, wait on the same unit and scene with the condition `{"path":"/healthRatio","atMost":0.35}`, then dispatch a Move to the chosen withdrawal point. The sample includes `currentHealth` in hit points and `healthRatio` as a fraction. A missing or nonnumeric health ratio cannot trigger the order.

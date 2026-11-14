@@ -2912,6 +2912,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                                 for item in candidate:
                                     if isinstance(item, dict) and (
                                         item.get("entityKeyId") == entity_key
+                                        or item.get("runtimeEntityKeyId") == entity_key
                                         or item.get("entityId") == entity_key
                                         or item.get("entityKey") == entity_key
                                     ):

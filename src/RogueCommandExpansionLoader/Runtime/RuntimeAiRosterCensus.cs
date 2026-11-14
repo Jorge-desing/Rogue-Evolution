@@ -19,7 +19,8 @@ namespace RogueCommandExpansionLoader.Runtime
             float moveSpeed,
             float dps,
             float damage1,
-            float weaponRange)
+            float weaponRange,
+            int uniqueEntityId = 0)
         {
             EntityKeyId = entityKeyId ?? string.Empty;
             IsBuilding = isBuilding;
@@ -29,9 +30,11 @@ namespace RogueCommandExpansionLoader.Runtime
             Dps = dps;
             Damage1 = damage1;
             WeaponRange = weaponRange;
+            UniqueEntityId = uniqueEntityId;
         }
 
         public string EntityKeyId { get; }
+        public int UniqueEntityId { get; }
         public bool IsBuilding { get; }
         public int Cost { get; }
         public int MaxHealth { get; }
@@ -121,7 +124,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         balance.MoveSpeed,
                         balance.Dps,
                         balance.Damage1,
-                        balance.WeaponRange));
+                        balance.WeaponRange,
+                        entity.UniqueEntityId));
                 }
 
                 var buildingRows = new List<AiRosterRow>();
@@ -140,7 +144,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         balance.MoveSpeed,
                         balance.Dps,
                         balance.Damage1,
-                        balance.WeaponRange));
+                        balance.WeaponRange,
+                        entity.UniqueEntityId));
                 }
 
                 return new AiRosterCensus(

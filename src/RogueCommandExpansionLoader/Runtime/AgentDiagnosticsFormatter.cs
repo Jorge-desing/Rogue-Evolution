@@ -619,6 +619,9 @@ namespace RogueCommandExpansionLoader.Runtime
             return new Dictionary<string, object>
             {
                 ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                ["runtimeEntityKeyId"] = row.UniqueEntityId > 0
+                    ? row.UniqueEntityId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    : null,
                 ["isBuilding"] = row.IsBuilding,
                 ["cost"] = row.Cost,
                 ["maxHealth"] = row.MaxHealth,
