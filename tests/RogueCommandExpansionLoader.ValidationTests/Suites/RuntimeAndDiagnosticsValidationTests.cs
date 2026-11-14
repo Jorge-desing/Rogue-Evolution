@@ -3361,6 +3361,47 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("combat experience applies all earned promotions immediately and retains partial progress", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:multi-promotion", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:multi-promotion",
+                Experience = new ContentUnitExperienceDefinition
+                {
+                    experiencePerLevel = 1, maxLevel = 3, experienceGainMultiplier = 8f, levelUpBonus = 0.1f
+                }
+            });
+            var attacker = new EntityController
+            {
+                entityId = "test:multi-promotion", UniqueEntityId = 9850,
+                IsUnit = true, IsControlledByPlayer = true, CurrentRank = 0, MaxRank = 5,
+                CurrentHealth = 10f, MaxHealth = 100f
+            };
+            var target = new EntityController { IsUnit = true, IsControlledByAi = true, CurrentHealth = 100f };
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+            if (attacker.CurrentRank != 2 || attacker.CurrentHealth != 30f)
+                throw new InvalidOperationException("One high-XP hit must grant both earned ranks and both promotion heals.");
+            var xp = RuntimeUnitMechanicsDirector.CombatXpEntries.Single(e => e.EntityKeyId == 9850);
+            if (xp.Experience != 2)
+                throw new InvalidOperationException("Partial experience was lost after multiple promotions.");
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+            if (attacker.CurrentRank != 3 || attacker.CurrentHealth != 40f ||
+                RuntimeUnitMechanicsDirector.CombatXpEntries.Single(e => e.EntityKeyId == 9850).Experience != 0)
+                throw new InvalidOperationException("Promotion exceeded profile cap or left unusable experience at maximum rank.");
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 1f, attacker);
+            if (attacker.CurrentRank != 3 || attacker.CurrentHealth != 40f)
+                throw new InvalidOperationException("Capped unit received another promotion reward.");
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("reattaching an active entity preserves its accumulated combat experience", () =>
     {
         ExistingControllers.Instance.Reset();

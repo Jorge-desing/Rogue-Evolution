@@ -75,6 +75,7 @@ When adding or altering runtime mechanics, update all 4 layers simultaneously: S
 - **Command range ownership:** Command pulses skip followers already owned by another captain before counting capacity or applying command buffs. Track linked followers per director; leaving range, losing eligibility, refreshing the profile or clearing runtime state releases only links still owned by that commander. Returning eligible followers can join again. Timed command buffs retain their declared expiry.
 - **Healing target selection:** Exclude native `canNotBeHealed` targets from health-pulse priority so they cannot starve healable allies. Armor selection is independent: native `RepairArmor` does not use that health-only flag. Keep native Heal/RepairArmor calls authoritative.
 - **Shield mechanic ordering:** Detect shield-overload depletion before local aura/regeneration effects can refill the shield. Record the final post-recharge shield value for the next update, so a recovered shield rearms subsequent breaks. Keep the nova cooldown independent; recharge alone must not fire it.
+- **Combat experience:** A single damage event may earn multiple ranks. Consume all full thresholds up to the lower native/profile rank cap, apply each rank's rewards, preserve partial XP below the cap and clear unusable surplus at the cap. Use wide intermediate XP arithmetic; repeated hits at maximum rank grant no further promotion rewards.
 
 ---
 

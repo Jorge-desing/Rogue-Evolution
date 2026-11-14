@@ -2051,24 +2051,24 @@ namespace RogueCommandExpansionLoader.Runtime
                         int maxRank = ReadIntProperty(_maxRankProperty, originatorObj, profile.Experience.maxLevel);
                         int maxAllowedRank = Mathf.Min(maxRank, profile.Experience.maxLevel);
 
-                        bool shouldPromote = false;
+                        int promotions = 0;
                         if (currentRank < maxAllowedRank)
                         {
                             lock (_entityCombatXp)
                             {
                                 int currentXp;
                                 _entityCombatXp.TryGetValue(uniqueId, out currentXp);
-                                currentXp += xpGain;
-                                if (currentXp >= threshold)
-                                {
-                                    currentXp -= threshold;
-                                    shouldPromote = true;
-                                }
-                                _entityCombatXp[uniqueId] = currentXp;
+                                long accumulatedXp = (long)currentXp + xpGain;
+                                promotions = _rankUpMethod != null
+                                    ? (int)Math.Min(accumulatedXp / threshold, maxAllowedRank - currentRank)
+                                    : 0;
+                                accumulatedXp -= (long)promotions * threshold;
+                                _entityCombatXp[uniqueId] = currentRank + promotions >= maxAllowedRank
+                                    ? 0 : (int)Math.Min(accumulatedXp, Int32.MaxValue);
                             }
                         }
 
-                        if (shouldPromote)
+                        for (int promotion = 0; promotion < promotions; promotion++, currentRank++)
                         {
                             if (_rankUpMethod != null)
                             {
