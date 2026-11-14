@@ -562,6 +562,7 @@ internal static partial class ValidationTestRunner
     ("factory reinforcement reserves queued slots in its own base and resumes after losses", () =>
     {
         ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
         IRogueCommandAiRuntimeBehaviour? behaviour = null;
         try
         {
@@ -573,6 +574,12 @@ internal static partial class ValidationTestRunner
             var first = new EntityController { IsControlledByAi = true, IsFactory = true, aiBaseIndex = 1, InProductionCount = 1 };
             var second = new EntityController { IsControlledByAi = true, IsFactory = true, aiBaseIndex = 1, InProductionCount = 0 };
             var foreign = new EntityController { IsControlledByAi = true, IsFactory = true, aiBaseIndex = 2, InProductionCount = 5 };
+            first.ProductionInfo = new ProductionInfo { entityId = "test:ordinary-product" };
+            second.ProductionInfo = new ProductionInfo { entityId = "test:urgent-product" };
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:urgent-product", new UnitRuntimeMechanicsProfile
+            {
+                ProductionQueue = new ContentUnitProductionQueueDefinition { productionPriority = 10 }
+            });
             ExistingControllers.Instance.AiBuildings().UnionWith(new[] { first, second, foreign });
             behaviour = new FactoryReinforcementAiModule().CreateBehaviour(new DefaultAiBehaviour(), new[]
             {
@@ -582,6 +589,8 @@ internal static partial class ValidationTestRunner
             });
             behaviour.OnInitialized();
             behaviour.Tick();
+            if (second.ProduceCallCount != 1 || first.ProduceCallCount != 0)
+                throw new InvalidOperationException("The higher-priority product must receive the remaining reinforcement slot.");
             if ((first.InProductionCount ?? 0) + (second.InProductionCount ?? 0) != 2 || foreign.ProduceCallCount != 0)
                 throw new InvalidOperationException("Reinforcement did not reserve exactly one remaining slot in the selected base.");
             int calls = first.ProduceCallCount + second.ProduceCallCount;
@@ -617,6 +626,7 @@ internal static partial class ValidationTestRunner
         finally
         {
             behaviour?.OnDestroyed();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
             ExistingControllers.Instance.Reset();
             DefaultAiBehaviour.ResetRuntimeState();
         }

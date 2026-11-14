@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+productionQueue.productionPriority orders product attempts in the factory-reinforcement AI module, highest value first. Equal values preserve the original scan order. Priority-only profiles register without a per-unit runtime component. Native production affordability and population/queue limits remain authoritative.
+
 Positive productionQueue.queueSize caps the native queuedCount independently per producing factory, including the in-progress product. The existing IsProductionPossible hook applies it to player and AI production before native payment/enqueue. Completion and cancellation free a slot through the native count. Zero preserves native queue behavior. Queue-only profiles register without attaching a per-unit runtime component.
 
 Positive productionQueue.resourceCost supplies the product's native Cost in credits, rounded to the nearest integer (midpoints to even), bounded to 1..16,777,216. Explicit raw cost/customBalance.Cost takes priority, including explicit free products. Zero retains the template. Native factory bank withdrawal/refund and affordability checks consume the registered product cost.

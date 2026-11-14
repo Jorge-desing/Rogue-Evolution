@@ -76,7 +76,7 @@ namespace RogueCommandExpansionLoader.Runtime
              (DeathNova.damage > 0f || DeathNova.stunDuration > 0f || DeathNova.slowDuration > 0f));
 
         public bool HasAnyMechanics =>
-            (ProductionQueue != null && ProductionQueue.queueSize > 0) ||
+            (ProductionQueue != null && (ProductionQueue.queueSize > 0 || ProductionQueue.productionPriority != 0)) ||
             (ResourceGathering != null && ResourceGathering.gatherRange > 0f) ||
             HasRuntimeComponentMechanics ||
             HasAiBehaviorMechanics ||
@@ -356,6 +356,23 @@ namespace RogueCommandExpansionLoader.Runtime
             lock (_profiles)
             {
                 return _profiles.TryGetValue(entityId, out profile);
+            }
+        }
+
+        public static int GetProductionPriority(object producerObj)
+        {
+            try
+            {
+                if (producerObj == null) return 0;
+                EnsureReflection(producerObj.GetType());
+                string productId = ReadProductionEntityId(ReadProductionInfo(producerObj));
+                return TryGetProfile(productId, out UnitRuntimeMechanicsProfile profile) && profile.ProductionQueue != null
+                    ? profile.ProductionQueue.productionPriority
+                    : 0;
+            }
+            catch
+            {
+                return 0;
             }
         }
 

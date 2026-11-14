@@ -37,6 +37,8 @@ Support repair tracks its own movement destinations. On each repair tick it repl
 
 Factory reinforcement applies `baseIndex` to both live-unit counts and factory queues (`-1` means all AI bases). `maxStandingArmy` reserves slots for pending production before dispatch; destroyed units release slots. Count only observed queue growth as new production. Native `Produce(forFree: true)` replaces/refunds a queued item, so free reinforcement waits for an existing queue to empty instead of restarting it.
 
+Factory reinforcement attempts products in descending productionQueue.productionPriority. Equal priorities retain the registry order. Native products and products without a registered priority use zero. A higher priority affects this module's scheduling order; each candidate still needs a legal queue, army slot and native production approval.
+
 Harvester escort retains its assigned squad across scans; `maxEscorts` caps the active group, not new recruits per scan. Owned orders refresh after one meter of destination drift using current-command replacement. Threat loss, ineligible defenders and shutdown release only owned current orders, preserving the native queue and unrelated current orders. Confirm threats through native hostility as well as registry membership.
 
 Retreat-and-regroup uses average health of eligible combatants in its configured base. Recovery is checked every two seconds independently of the dispatch cooldown. Recovery, loss of eligibility and shutdown release only the module's tagged current orders with current-command cancellation; preserve queued commands and any intervening order from another owner.

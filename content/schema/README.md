@@ -13,6 +13,8 @@ Use this contract with [content.schema.json](content.schema.json) and the [pack 
 
 ## Shape
 
+`productionQueue.productionPriority` orders attempts in the factory-reinforcement AI module, highest value first. Default zero retains equal-priority scan order. Priority influences loader-generated reinforcement requests; native production approval still checks economy and capacity.
+
 Positive `productionQueue.queueSize` limits the native pending count per factory, including the in-progress product. Player and AI factories use the existing `IsProductionPossible` hook before native production changes the bank or queue. Native completion/cancellation releases slots. Zero preserves native behavior.
 
 Positive `productionQueue.resourceCost` configures native product `Cost` in credits. It rounds to the nearest integer (midpoints to even), bounded to 1–16,777,216. Explicit raw `cost` and `customBalance.Cost` take priority. Zero retains the template; an explicit zero-cost override can declare free production. The native factory retains affordability, withdrawal, refund and unit-cap behavior.

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using RogueCommandExpansionLoader.Content;
 using RogueCommandExpansionLoader.Contracts;
+using RogueCommandExpansionLoader.Runtime;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Modules
@@ -118,7 +120,8 @@ namespace RogueCommandExpansionLoader.Modules
                 }
                 if (currentArmy >= _settings.MaxStandingArmy) return;
 
-                foreach (EntityController factory in buildings)
+                foreach (EntityController factory in buildings.OrderByDescending(
+                    factory => RuntimeUnitMechanicsDirector.GetProductionPriority(factory)))
                 {
                     if (!IsInScope(factory) || !factory.IsFactory)
                     {
