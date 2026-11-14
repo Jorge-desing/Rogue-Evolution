@@ -13,10 +13,10 @@ ROUTES = (
      ("content/schema/README.md", "docs/research/CONTENT-AUTHORING-TOOLS.md")),
     (r"loader|cargador|registry|registro|tests?|pruebas?|validaci[oó]n",
      ("docs/research/CONTENT-LOADER-TOOLS.md",)),
-    (r"harmony|rea|reflection|reflexi[oó]n|decompil\w*|ingenier[ií]a inversa",
-     ("docs/research/MANAGED-DLL-DECOMPILATION.md",)),
-    (r"steam|intermission|gameplay|runtime|bepinex|partida\w*",
-     ("docs/research/STEAM-RUNTIME-CONTROL.md",)),
+    (r"harmony|rea|reflection|reflexi[oó]n|decompil\w*|ingenier[ií]a inversa|patch\w*|parch\w*|transpiler\w*|hook\w*|mvid|sha256|assembly-csharp|cil|impl\w*",
+     ("docs/research/MANAGED-DLL-DECOMPILATION.md", ".agents/skills/rogue-command-harmony-policy/SKILL.md")),
+    (r"steam|intermission|gameplay|runtime|bepinex|partida\w*|mcp|scene\w*|escena\w*|gameobject\w*|component\w*|diagnostics\w*|explorer|unityexplorer|singleton\w*|dontdestroyonload|instanceid|ui|renderer\w*|camera\w*|anim\w*|probe\w*|sonda\w*|watch\w*",
+     ("docs/research/STEAM-RUNTIME-CONTROL.md", ".agents/skills/rogue-command-bepinex-mcp/SKILL.md")),
     (r"blender|unity|fbx|rig\w*|model\w*|prefab\w*",
      ("docs/research/UNIT-VISUAL-AUTHORING.md",)),
     (r"pbr|textur\w*|material\w*|shader\w*",
@@ -51,10 +51,16 @@ def excerpt(relative_path):
             rows.append(line)
         return "AGENTS.md routing table\n" + "\n".join(rows)
 
+    if source.startswith("---"):
+        parts = source.split("---", 2)
+        if len(parts) == 3:
+            source = parts[2].lstrip()
+            lines = source.splitlines()
+
     for index, line in enumerate(lines):
-        if line.startswith("**Current policy:**"):
-            return f"{relative_path}\n{line[:600]}"
-        if line.startswith(("## Start here", "## Load before", "## Load context")):
+        if line.startswith(("**Current policy:**", "**Current capabilities:**")):
+            return f"{relative_path}\n{line[:700]}"
+        if line.startswith(("## Start here", "## Load before", "## Load context", "## Fast tool discovery")):
             source = "\n".join(lines[index + 1:]).strip()
             break
     else:
@@ -90,15 +96,17 @@ def main():
     explicit = dict.fromkeys(
         match.group(1).lower() for match in SKILL_MENTION.finditer(prompt)
     )
+    explicit_paths = set()
     for name in explicit:
         path = f".agents/skills/{name}/SKILL.md"
         if (ROOT / path).is_file():
             guides.setdefault(path, None)
+            explicit_paths.add(path)
 
-    ordered_guides = sorted(guides, key=lambda path: not path.startswith(".agents/skills/"))
+    ordered_guides = sorted(guides, key=lambda path: path not in explicit_paths)
     for guide in ordered_guides:
-        entry = (f"Explicitly selected skill: {guide}"
-                 if guide.startswith(".agents/skills/") else excerpt(guide))
+        body = excerpt(guide)
+        entry = f"Explicitly selected skill: {body}" if guide in explicit_paths else body
         if sum(len(block) + 2 for block in context) + len(entry) + 2 > MAX_CONTEXT_CHARS:
             break
         context.append(entry)

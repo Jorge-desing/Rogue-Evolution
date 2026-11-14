@@ -1,9 +1,11 @@
 ---
 name: rogue-command-bepinex-mcp
-description: "Control Rogue Command at runtime through the project BepInEx MCP bridge without screenshots, screen captures, or Computer Use. Use for live scene inspection, native UI actions, gameplay commands, diagnostic telemetry, reversible probes, and Harmony 2 runtime patching."
+description: "Control Rogue Command at runtime through the project BepInEx MCP bridge without screenshots, screen captures, or Computer Use. Use for live scene/DontDestroyOnLoad/singleton search, CLR reflection and static/singleton/instanceId member get/set/invoke (diagnostics_explorer_query, diagnostics_explorer_member), native UI/intermission automation (diagnostics_get_runtime_control_surface), gameplay commands, diagnostic telemetry, reversible probes, and Harmony 2 runtime patching/inspection."
 ---
 
 # Rogue Command BepInEx MCP
+
+**Current capabilities:** Headless runtime control and inspection via `bepinex_mcp` (`discover_tools` / `describe_tool` with `includeAliases=false`): multi-scene/`DontDestroyOnLoad` object search, singletons, CLR reflection, `find_implementations`, Harmony `inspect_patches`, and static/singleton/`instanceId` `get`/`set`/`invoke` (`diagnostics_explorer_query`, `diagnostics_explorer_member`); native UI/intermission control (`diagnostics_get_runtime_control_surface`, `diagnostics_ui_invoke_native_button`, `diagnostics_ui_click_text`, `diagnostics_ui_set_value`); bounded sequences/waits (`automation_run_sequence`, `automation_wait_for_state`); and reversible runtime Harmony/class injection (`mod_patch_method`, `mod_inject_class`, `mod_list_patches`, `mod_remove_patch`, `diagnostics_get_runtime_hooks`).
 
 Use this skill as the single workflow for controlling or inspecting the live Rogue Command runtime. It uses the project-maintained MCP bridge and Unity telemetry; it does not require images or desktop automation.
 
