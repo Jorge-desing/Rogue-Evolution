@@ -2638,24 +2638,28 @@ namespace RogueCommandExpansionLoader.Runtime
                     continue;
                 }
 
+                bool affected = false;
                 if (string.Equals(auraType, "Buff", StringComparison.OrdinalIgnoreCase))
                 {
                     ApplyTimedStatusEffect(candidate, "CombatBoost", 1.5f);
                     ApplyTimedStatusEffect(candidate, "Robust", 1.5f);
+                    affected = true;
                 }
                 else if (string.Equals(auraType, "Debuff", StringComparison.OrdinalIgnoreCase))
                 {
                     ApplyTimedStatusEffect(candidate, "SlowedDown", 1.5f);
                     ApplyTimedStatusEffect(candidate, "Marked", 1.5f);
+                    affected = true;
                 }
                 else if (string.Equals(auraType, "Heal", StringComparison.OrdinalIgnoreCase) && !isEnemy)
                 {
                     float amount = aura.buffAmount > 0f ? aura.buffAmount : 4f;
                     float curHp = ReadFloatProperty(_currentHealthProperty, candidate, 0f);
                     float maxHp = ReadFloatProperty(_maxHealthProperty, candidate, 0f);
-                    if (maxHp > 0f && curHp < maxHp - 0.1f)
+                    if (!IsHealthHealingBlocked(candidate) && maxHp > 0f && curHp < maxHp - 0.1f)
                     {
                         InvokeHeal(candidate, amount, self);
+                        affected = ReadFloatProperty(_currentHealthProperty, candidate, curHp) > curHp;
                     }
                 }
                 else if (string.Equals(auraType, "Shield", StringComparison.OrdinalIgnoreCase) && !isEnemy)
@@ -2668,6 +2672,7 @@ namespace RogueCommandExpansionLoader.Runtime
                         if (maxShield > 0f && curShield < maxShield - 0.1f)
                         {
                             InvokeChargeShield(candidate, amount);
+                            affected = ReadFloatProperty(_currentShieldProperty, candidate, curShield) > curShield;
                         }
                     }
                     else
@@ -2677,11 +2682,12 @@ namespace RogueCommandExpansionLoader.Runtime
                         if (maxArmor > 0f && curArmor < maxArmor - 0.1f)
                         {
                             InvokeRepairArmor(candidate, amount, self);
+                            affected = ReadFloatProperty(_currentArmorProperty, candidate, curArmor) > curArmor;
                         }
                     }
                 }
 
-                affectedCount++;
+                if (affected) affectedCount++;
                 if (affectedCount >= 16)
                 {
                     break;

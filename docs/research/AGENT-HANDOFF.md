@@ -2,6 +2,12 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — effective support aura recipients
+
+- Heal/Shield aura recipient limits now count actual health, shield or fallback armor recovery. Full-resource, health-blocked and ineffective native calls no longer starve eligible damaged allies that appear later in the registry. Buff/Debuff status limits remain unchanged.
+- Release/harness builds: zero warnings/errors. RuntimeAndDiagnostics: 222/226; more than twenty healthy/blocked candidates no longer exclude a damaged ally, and the sixteen-effective-recipient cap remains enforced. The same four visual census failures remain; full suite is not green. Local evidence only; Steam remains unverified.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/aura-deployment/manifest.json`.
+
 ## General capability audit — native timed attribute coverage
 
 - Timed stat modifiers now accept actual native ChangeableValue names in addition to authoring aliases. Previously omitted attributes such as MaxMana, SkillManaCost and ProductionDurationOfProduct can now take effect through native timed modifiers.

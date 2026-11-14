@@ -3361,6 +3361,65 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("support auras reach damaged allies after full-health or healing-blocked candidates", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var profile = new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:aura-capacity",
+                Aura = new ContentUnitAuraDefinition { auraRadius = 4f, auraType = "Heal", buffAmount = 5f, affectsAllies = true }
+            };
+            RuntimeUnitMechanicsDirector.RegisterProfile(profile.EntityId, profile);
+            var source = new EntityController { entityId = profile.EntityId, IsUnit = true, IsControlledByPlayer = true };
+            ExistingControllers.Instance.PlayerUnits().Add(source);
+            for (int i = 0; i < 20; i++)
+                ExistingControllers.Instance.PlayerUnits().Add(new EntityController
+                {
+                    IsUnit = true, IsControlledByPlayer = true, CurrentHealth = i % 2 == 0 ? 100f : 10f,
+                    canNotBeHealed = i % 2 != 0, MaxHealth = 100f,
+                    HasShield = true, CurrentShield = 100f, MaxShield = 100f
+                });
+            var target = new EntityController
+            {
+                IsUnit = true, IsControlledByPlayer = true, CurrentHealth = 50f, MaxHealth = 100f,
+                HasShield = true, CurrentShield = 50f, MaxShield = 100f
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(target);
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(source);
+            var director = source.gameObject.GetComponent<RuntimeUnitMechanicsDirector>()!;
+            UnityEngine.Time.time = 11f;
+            director.TickMechanics();
+            if (target.CurrentHealth != 55f)
+                throw new InvalidOperationException("Healthy or unhealable candidates consumed the healing aura recipient budget.");
+            profile.Aura.auraType = "Shield";
+            UnityEngine.Time.time = 12.1f;
+            director.TickMechanics();
+            if (target.CurrentShield != 55f)
+                throw new InvalidOperationException("Fully charged candidates consumed the shield aura recipient budget.");
+            var extraTargets = new List<EntityController>();
+            for (int i = 0; i < 20; i++)
+            {
+                var extra = new EntityController { IsUnit = true, IsControlledByPlayer = true, CurrentHealth = 50f, MaxHealth = 100f };
+                extraTargets.Add(extra);
+                ExistingControllers.Instance.PlayerUnits().Add(extra);
+            }
+            profile.Aura.auraType = "Heal";
+            UnityEngine.Time.time = 13.2f;
+            director.TickMechanics();
+            if (target.CurrentHealth != 60f || extraTargets.Count(e => e.CurrentHealth == 55f) != 15)
+                throw new InvalidOperationException("Healing aura must retain its sixteen effective-recipient limit.");
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
     ("timed stat changes support native attributes and correctly invert severe fire-rate penalties", () =>
     {
         var unit = new EntityController();
