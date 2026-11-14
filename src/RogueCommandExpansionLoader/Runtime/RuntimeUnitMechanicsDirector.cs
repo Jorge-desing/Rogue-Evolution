@@ -78,7 +78,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public bool HasAnyMechanics =>
             (ProductionQueue != null && (ProductionQueue.queueSize > 0 || ProductionQueue.productionPriority != 0)) ||
-            (ResourceGathering != null && ResourceGathering.gatherRange > 0f) ||
+            (ResourceGathering != null && (ResourceGathering.gatherRange > 0f || ResourceGathering.gatherRate > 0f)) ||
             HasRuntimeComponentMechanics ||
             HasAiBehaviorMechanics ||
             HasOnDamageDealtMechanics ||

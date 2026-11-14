@@ -838,6 +838,56 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(shootFromFirepoint, null, null, shootFromFirepointTranspiler, null));
             plan.Add(new PatchPlan(entitySetActiveStatusEffect, null, null, setStatusEffectTranspiler, null));
             plan.Add(new PatchPlan(flockingGetMovementInfo, null, null, flockingGetMovementInfoTranspiler, null));
+
+            Type bankType = RuntimeReflection.FindUniqueType(gameAssembly, "Bank");
+            Type harvestTargetType = RuntimeReflection.FindUniqueType(gameAssembly, "Harvest");
+            MethodInfo harvestUpdate = RuntimeReflection.FindUniqueMethod(harvestTargetType, "Update",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.GetParameters().Length == 0 &&
+                        RuntimeReflection.HasSimpleName(method.ReturnType, "UpdateStatus");
+                });
+            MethodInfo bankDeposit = RuntimeReflection.FindUniqueMethod(bankType, "Deposit",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.IsStatic && method.ReturnType == typeof(void) &&
+                        parameters.Length == 2 &&
+                        parameters[0].ParameterType == typeof(string) &&
+                        parameters[1].ParameterType == typeof(float);
+                });
+            MethodInfo entityUpdateProduction = RuntimeReflection.FindUniqueMethod(entityController, "UpdateProduction",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.ReturnType == typeof(void) && method.GetParameters().Length == 0;
+                });
+            MethodInfo entityDestroyAndRepay = RuntimeReflection.FindUniqueMethod(entityController, "DestroyAndRepay",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.ReturnType == typeof(void) && method.GetParameters().Length == 0;
+                });
+            MethodInfo entityAbortProduction = RuntimeReflection.FindUniqueMethod(entityController, "AbortProduction",
+                delegate(MethodInfo method)
+                {
+                    return !method.IsStatic && method.ReturnType == typeof(void) && method.GetParameters().Length == 0;
+                });
+
+            MethodInfo harvestUpdateTranspiler = typeof(NativeEconomyFactoryTranspilers).GetMethod(
+                nameof(NativeEconomyFactoryTranspilers.HarvestUpdateTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo bankDepositTranspiler = typeof(NativeEconomyFactoryTranspilers).GetMethod(
+                nameof(NativeEconomyFactoryTranspilers.BankDepositTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo entityUpdateProductionTranspiler = typeof(NativeEconomyFactoryTranspilers).GetMethod(
+                nameof(NativeEconomyFactoryTranspilers.EntityControllerUpdateProductionTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo entityDestroyAndRepayTranspiler = typeof(NativeEconomyFactoryTranspilers).GetMethod(
+                nameof(NativeEconomyFactoryTranspilers.EntityControllerDestroyAndRepayTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo entityAbortProductionTranspiler = typeof(NativeEconomyFactoryTranspilers).GetMethod(
+                nameof(NativeEconomyFactoryTranspilers.EntityControllerAbortProductionTranspiler), BindingFlags.Public | BindingFlags.Static);
+
+            plan.Add(new PatchPlan(harvestUpdate, null, null, harvestUpdateTranspiler, null));
+            plan.Add(new PatchPlan(bankDeposit, null, null, bankDepositTranspiler, null));
+            plan.Add(new PatchPlan(entityUpdateProduction, null, null, entityUpdateProductionTranspiler, null));
+            plan.Add(new PatchPlan(entityDestroyAndRepay, null, null, entityDestroyAndRepayTranspiler, null));
+            plan.Add(new PatchPlan(entityAbortProduction, null, null, entityAbortProductionTranspiler, null));
             return plan;
         }
 

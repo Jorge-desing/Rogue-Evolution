@@ -70,6 +70,11 @@ namespace RogueCommandExpansionLoader.Runtime
         private static int _shootProjectileSpawnedTranspilerCount;
         private static int _entitySetStatusEffectTranspilerCount;
         private static int _flockingGetMovementInfoTranspilerCount;
+        private static int _harvestUpdateTranspilerCount;
+        private static int _bankDepositTranspilerCount;
+        private static int _factoryUpdateProductionTranspilerCount;
+        private static int _entityDestroyAndRepayTranspilerCount;
+        private static int _factoryAbortProductionTranspilerCount;
         private static string _lastExecutedCommandKind = string.Empty;
         private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
         private static FieldInfo _cachedCommandKindField;
@@ -113,6 +118,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static int ShootProjectileSpawnedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _shootProjectileSpawnedTranspilerCount, 0, 0);
         public static int EntitySetStatusEffectTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entitySetStatusEffectTranspilerCount, 0, 0);
         public static int FlockingGetMovementInfoTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _flockingGetMovementInfoTranspilerCount, 0, 0);
+        public static int HarvestUpdateTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _harvestUpdateTranspilerCount, 0, 0);
+        public static int BankDepositTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _bankDepositTranspilerCount, 0, 0);
+        public static int FactoryUpdateProductionTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _factoryUpdateProductionTranspilerCount, 0, 0);
+        public static int EntityDestroyAndRepayTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityDestroyAndRepayTranspilerCount, 0, 0);
+        public static int FactoryAbortProductionTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _factoryAbortProductionTranspilerCount, 0, 0);
 
         public static string LastExecutedCommandKind
         {
@@ -195,6 +205,11 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Exchange(ref _shootProjectileSpawnedTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _entitySetStatusEffectTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _flockingGetMovementInfoTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _harvestUpdateTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _bankDepositTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _factoryUpdateProductionTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityDestroyAndRepayTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _factoryAbortProductionTranspilerCount, 0);
             lock (Gate)
             {
                 _lastExecutedCommandKind = string.Empty;
@@ -2437,6 +2452,287 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static FieldInfo _cachedHarvestSelfField;
+        private static PropertyInfo _cachedEntityIdProperty;
+
+        private static float SanitizeNonNegativeFinite(float value)
+        {
+            return float.IsNaN(value) || float.IsInfinity(value) || value < 0f ? 0f : value;
+        }
+
+        private static object TryExtractHarvestSelf(object harvestObj)
+        {
+            if (harvestObj == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                Type harvestType = harvestObj.GetType();
+                if (_cachedHarvestSelfField == null || _cachedHarvestSelfField.DeclaringType != harvestType)
+                {
+                    _cachedHarvestSelfField = harvestType.GetField(
+                        "_self",
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                }
+
+                return _cachedHarvestSelfField?.GetValue(harvestObj);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string TryReadEntityId(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return null;
+            }
+
+            if (entityObj is EntityController entityController)
+            {
+                return entityController.EntityId;
+            }
+
+            try
+            {
+                Type entityType = entityObj.GetType();
+                if (_cachedEntityIdProperty == null || _cachedEntityIdProperty.DeclaringType != entityType)
+                {
+                    _cachedEntityIdProperty = entityType.GetProperty(
+                        "EntityId",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                }
+
+                return _cachedEntityIdProperty?.GetValue(entityObj, null) as string;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool TryReadActiveAffixes(object entityObj, out IReadOnlyList<string> affixes)
+        {
+            affixes = null;
+            if (entityObj == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key == 0)
+                {
+                    return false;
+                }
+
+                return RuntimeGameplayCommandDirector.TryGetActiveAffixes(
+                    key.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    out affixes);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool HasActiveAffix(object entityObj, string affixName)
+        {
+            if (string.IsNullOrEmpty(affixName) || !TryReadActiveAffixes(entityObj, out IReadOnlyList<string> affixes) || affixes == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < affixes.Count; i++)
+            {
+                if (string.Equals(affixes[i], affixName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static int GetEntityVeterancyRank(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return 0;
+            }
+
+            try
+            {
+                RuntimeUnitMechanicsDirector.GetUnitVeterancyStats(
+                    entityObj,
+                    out int currentRank,
+                    out _,
+                    out _,
+                    out _,
+                    out _,
+                    out _);
+                return currentRank;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private static bool HasHarvestOverchargeBonus(object harvesterEntity)
+        {
+            return HasActiveAffix(harvesterEntity, "Overcharged") || GetEntityVeterancyRank(harvesterEntity) >= 1;
+        }
+
+        public static float OnHarvestExtractionRateTranspiler(float baseMaxArmorRate, object harvestObj)
+        {
+            System.Threading.Interlocked.Increment(ref _harvestUpdateTranspilerCount);
+            float rate = SanitizeNonNegativeFinite(baseMaxArmorRate);
+
+            try
+            {
+                object harvesterEntity = TryExtractHarvestSelf(harvestObj);
+                if (harvesterEntity == null)
+                {
+                    return rate;
+                }
+
+                bool customized = false;
+                string entityId = TryReadEntityId(harvesterEntity);
+                if (!string.IsNullOrEmpty(entityId) &&
+                    RuntimeUnitMechanicsDirector.TryGetProfile(entityId, out UnitRuntimeMechanicsProfile profile) &&
+                    profile?.ResourceGathering != null &&
+                    profile.ResourceGathering.gatherRate > 0f &&
+                    !float.IsNaN(profile.ResourceGathering.gatherRate) &&
+                    !float.IsInfinity(profile.ResourceGathering.gatherRate))
+                {
+                    rate = profile.ResourceGathering.gatherRate;
+                    customized = true;
+                }
+
+                if (HasHarvestOverchargeBonus(harvesterEntity))
+                {
+                    rate *= 1.10f;
+                    customized = true;
+                }
+
+                return customized ? Mathf.Clamp(rate, 0.1f, 500f) : rate;
+            }
+            catch
+            {
+                return rate;
+            }
+        }
+
+        public static float OnHarvestDepositLoadTranspiler(float currentLoad, object harvestObj)
+        {
+            System.Threading.Interlocked.Increment(ref _harvestUpdateTranspilerCount);
+            float sanitized = SanitizeNonNegativeFinite(currentLoad);
+
+            try
+            {
+                object harvesterEntity = TryExtractHarvestSelf(harvestObj);
+                if (harvesterEntity != null && HasHarvestOverchargeBonus(harvesterEntity))
+                {
+                    return Mathf.Clamp(sanitized * 1.10f, 0f, 10000f);
+                }
+
+                return sanitized;
+            }
+            catch
+            {
+                return sanitized;
+            }
+        }
+
+        public static float OnBankDepositTranspiler(float amount, string accountNumber)
+        {
+            System.Threading.Interlocked.Increment(ref _bankDepositTranspilerCount);
+            if (float.IsNaN(amount) || float.IsInfinity(amount))
+            {
+                return 0f;
+            }
+
+            return amount;
+        }
+
+        public static void OnFactoryUpdateProductionTranspiler(object producedUnitObj, object factoryEntityObj)
+        {
+            System.Threading.Interlocked.Increment(ref _factoryUpdateProductionTranspilerCount);
+            if (producedUnitObj == null || factoryEntityObj == null)
+            {
+                return;
+            }
+
+            try
+            {
+                int factoryKey = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(factoryEntityObj);
+                int unitKey = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(producedUnitObj);
+                if (factoryKey == 0 || unitKey == 0)
+                {
+                    return;
+                }
+
+                string unitKeyStr = unitKey.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                string factoryStance = TryReadUnitTacticalStance(factoryEntityObj);
+                if (!string.IsNullOrWhiteSpace(factoryStance) &&
+                    !string.Equals(factoryStance, "Standard", StringComparison.OrdinalIgnoreCase))
+                {
+                    RuntimeGameplayCommandDirector.TrySetUnitTacticalStance(unitKeyStr, factoryStance);
+                }
+
+                if (TryReadActiveAffixes(factoryEntityObj, out IReadOnlyList<string> factoryAffixes) &&
+                    factoryAffixes != null &&
+                    factoryAffixes.Count > 0)
+                {
+                    var snapshot = new List<string>(factoryAffixes);
+                    for (int i = 0; i < snapshot.Count; i++)
+                    {
+                        string affix = snapshot[i];
+                        if (!string.IsNullOrWhiteSpace(affix))
+                        {
+                            RuntimeGameplayCommandDirector.TryApplyUnitAffix(unitKeyStr, affix);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        public static float OnEntityDestroyAndRepayTranspiler(float baseRefundAmount, object entityObj)
+        {
+            System.Threading.Interlocked.Increment(ref _entityDestroyAndRepayTranspilerCount);
+            float sanitized = SanitizeNonNegativeFinite(baseRefundAmount);
+
+            try
+            {
+                if (entityObj != null &&
+                    (HasActiveAffix(entityObj, "Fortified") || HasActiveAffix(entityObj, "Bulwark")))
+                {
+                    return Mathf.Clamp(sanitized * 1.10f, 0f, 100000f);
+                }
+
+                return sanitized;
+            }
+            catch
+            {
+                return sanitized;
+            }
+        }
+
+        public static float OnFactoryAbortProductionTranspiler(float refundCost, object factoryEntityObj)
+        {
+            System.Threading.Interlocked.Increment(ref _factoryAbortProductionTranspilerCount);
+            return SanitizeNonNegativeFinite(refundCost);
+        }
+
         public static void AfterEntityReused(object entityObj)
         {
             if (entityObj == null)
@@ -3176,6 +3472,36 @@ namespace RogueCommandExpansionLoader.Runtime
         public static float OnFlockingGetMovementInfoSpeedTranspilerHook(float baseSpeed, object flockingMovement)
         {
             return RuntimeHooks.OnFlockingGetMovementInfoSpeedTranspiler(baseSpeed, flockingMovement);
+        }
+
+        public static float OnHarvestExtractionRateTranspilerHook(float baseMaxArmorRate, object harvest)
+        {
+            return RuntimeHooks.OnHarvestExtractionRateTranspiler(baseMaxArmorRate, harvest);
+        }
+
+        public static float OnHarvestDepositLoadTranspilerHook(float currentLoad, object harvest)
+        {
+            return RuntimeHooks.OnHarvestDepositLoadTranspiler(currentLoad, harvest);
+        }
+
+        public static float OnBankDepositTranspilerHook(float amount, string accountNumber)
+        {
+            return RuntimeHooks.OnBankDepositTranspiler(amount, accountNumber);
+        }
+
+        public static void OnFactoryUpdateProductionTranspilerHook(object producedUnit, object factoryEntity)
+        {
+            RuntimeHooks.OnFactoryUpdateProductionTranspiler(producedUnit, factoryEntity);
+        }
+
+        public static float OnEntityDestroyAndRepayTranspilerHook(float baseRefundAmount, object entityController)
+        {
+            return RuntimeHooks.OnEntityDestroyAndRepayTranspiler(baseRefundAmount, entityController);
+        }
+
+        public static float OnFactoryAbortProductionTranspilerHook(float refundCost, object factoryEntity)
+        {
+            return RuntimeHooks.OnFactoryAbortProductionTranspiler(refundCost, factoryEntity);
         }
     }
 

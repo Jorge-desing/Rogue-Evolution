@@ -6835,6 +6835,508 @@ internal static partial class ValidationTestRunner
             RuntimeHooks.ResetCoreHookTelemetry();
         }
     }),
+    ("native economy and factory transpilers inject expected hooks, fail closed on drift, and report telemetry counters", () =>
+    {
+        try
+        {
+            RuntimeHooks.ResetCoreHookTelemetry();
+
+            void AssertFailsClosed(Action action, string label)
+            {
+                bool threw = false;
+                try
+                {
+                    action();
+                }
+                catch (InvalidOperationException)
+                {
+                    threw = true;
+                }
+
+                if (!threw)
+                {
+                    throw new InvalidOperationException($"Expected fail-closed InvalidOperationException for {label}.");
+                }
+            }
+
+            // 1. Harvest.Update transpiler: 2 anchors (extraction rate + bank deposit)
+            var harvestUpdateMethod = typeof(EconomyFactoryTranspilerFixtures.Harvest).GetMethod(
+                nameof(EconomyFactoryTranspilerFixtures.Harvest.Update),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var harvestWrongMethod = typeof(EconomyFactoryTranspilerFixtures.Harvest).GetMethod(
+                nameof(EconomyFactoryTranspilerFixtures.Harvest.WrongUpdate),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var harvestSelfField = typeof(EconomyFactoryTranspilerFixtures.Harvest).GetField(
+                nameof(EconomyFactoryTranspilerFixtures.Harvest._self),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var harvestLoadField = typeof(EconomyFactoryTranspilerFixtures.Harvest).GetField(
+                nameof(EconomyFactoryTranspilerFixtures.Harvest._currentLoad),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var getMaxArmorMethod = typeof(EconomyFactoryTranspilerFixtures.EntityController).GetProperty(
+                nameof(EconomyFactoryTranspilerFixtures.EntityController.MaxArmor),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!.GetGetMethod()!;
+            var bankDepositMethod = typeof(EconomyFactoryTranspilerFixtures.Bank).GetMethod(
+                nameof(EconomyFactoryTranspilerFixtures.Bank.Deposit),
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)!;
+
+            var validHarvestIl = new List<HarmonyLib.CodeInstruction>
+            {
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldarg_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldfld, harvestSelfField),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Callvirt, getMaxArmorMethod),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Mul),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Stloc_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldstr, "Player"),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldarg_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldfld, harvestLoadField),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Call, bankDepositMethod),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_I4_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ret),
+            };
+            var patchedHarvestIl = new List<HarmonyLib.CodeInstruction>(
+                NativeEconomyFactoryTranspilers.HarvestUpdateTranspiler(validHarvestIl, harvestUpdateMethod));
+            int harvestExtractionHookCalls = 0;
+            int harvestDepositHookCalls = 0;
+            foreach (var ins in patchedHarvestIl)
+            {
+                if (ins.opcode == System.Reflection.Emit.OpCodes.Call && ins.operand is System.Reflection.MethodInfo mi)
+                {
+                    if (mi.Name == nameof(RuntimeHarmonyPatches.OnHarvestExtractionRateTranspilerHook)) harvestExtractionHookCalls++;
+                    if (mi.Name == nameof(RuntimeHarmonyPatches.OnHarvestDepositLoadTranspilerHook)) harvestDepositHookCalls++;
+                }
+            }
+            if (harvestExtractionHookCalls != 1 || harvestDepositHookCalls != 1)
+            {
+                throw new InvalidOperationException($"HarvestUpdateTranspiler should inject 1 extraction + 1 deposit hook, got {harvestExtractionHookCalls}/{harvestDepositHookCalls}.");
+            }
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.HarvestUpdateTranspiler(Array.Empty<HarmonyLib.CodeInstruction>(), harvestUpdateMethod), "HarvestUpdate empty IL");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.HarvestUpdateTranspiler(validHarvestIl, harvestWrongMethod), "HarvestUpdate drifted signature");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.HarvestUpdateTranspiler(validHarvestIl.GetRange(5, validHarvestIl.Count - 5), harvestUpdateMethod), "HarvestUpdate missing extraction anchor");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.HarvestUpdateTranspiler(validHarvestIl.GetRange(0, 5), harvestUpdateMethod), "HarvestUpdate missing deposit anchor");
+
+            // 2. Bank.Deposit transpiler
+            var validBankIl = new List<HarmonyLib.CodeInstruction>
+            {
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldloc_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldarg_1),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Add),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Stloc_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ret),
+            };
+            var patchedBankIl = new List<HarmonyLib.CodeInstruction>(
+                NativeEconomyFactoryTranspilers.BankDepositTranspiler(validBankIl, bankDepositMethod));
+            int bankHookCalls = 0;
+            foreach (var ins in patchedBankIl)
+            {
+                if (ins.opcode == System.Reflection.Emit.OpCodes.Call &&
+                    ins.operand is System.Reflection.MethodInfo mi &&
+                    mi.Name == nameof(RuntimeHarmonyPatches.OnBankDepositTranspilerHook))
+                {
+                    bankHookCalls++;
+                }
+            }
+            if (bankHookCalls != 1)
+            {
+                throw new InvalidOperationException($"BankDepositTranspiler should inject 1 hook, got {bankHookCalls}.");
+            }
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.BankDepositTranspiler(Array.Empty<HarmonyLib.CodeInstruction>(), bankDepositMethod), "BankDeposit empty IL");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.BankDepositTranspiler(validBankIl, harvestWrongMethod), "BankDeposit drifted signature");
+            var duplicatedBankIl = new List<HarmonyLib.CodeInstruction>(validBankIl);
+            duplicatedBankIl.InsertRange(0, new[]
+            {
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldloc_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldarg_1),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Add),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Stloc_0),
+            });
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.BankDepositTranspiler(duplicatedBankIl, bankDepositMethod), "BankDeposit duplicate anchor");
+
+            // 3. EntityController.UpdateProduction transpiler
+            var updateProductionMethod = typeof(EconomyFactoryTranspilerFixtures.EntityController).GetMethod(
+                nameof(EconomyFactoryTranspilerFixtures.EntityController.UpdateProduction),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var wrongEntityMethod = typeof(EconomyFactoryTranspilerFixtures.EntityController).GetMethod(
+                nameof(EconomyFactoryTranspilerFixtures.EntityController.WrongSignature),
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)!;
+            var instantiateEntityMethod = typeof(EconomyFactoryTranspilerFixtures.EntityFactory).GetMethod(
+                nameof(EconomyFactoryTranspilerFixtures.EntityFactory.InstantiateEntity),
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public)!;
+            var validUpdateProdIl = new List<HarmonyLib.CodeInstruction>
+            {
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Call, instantiateEntityMethod),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Stloc_1),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ret),
+            };
+            var patchedUpdateProdIl = new List<HarmonyLib.CodeInstruction>(
+                NativeEconomyFactoryTranspilers.EntityControllerUpdateProductionTranspiler(validUpdateProdIl, updateProductionMethod));
+            int updateProdHookCalls = 0;
+            foreach (var ins in patchedUpdateProdIl)
+            {
+                if (ins.opcode == System.Reflection.Emit.OpCodes.Call &&
+                    ins.operand is System.Reflection.MethodInfo mi &&
+                    mi.Name == nameof(RuntimeHarmonyPatches.OnFactoryUpdateProductionTranspilerHook))
+                {
+                    updateProdHookCalls++;
+                }
+            }
+            if (updateProdHookCalls != 1)
+            {
+                throw new InvalidOperationException($"EntityControllerUpdateProductionTranspiler should inject 1 hook, got {updateProdHookCalls}.");
+            }
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerUpdateProductionTranspiler(Array.Empty<HarmonyLib.CodeInstruction>(), updateProductionMethod), "UpdateProduction empty IL");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerUpdateProductionTranspiler(validUpdateProdIl, wrongEntityMethod), "UpdateProduction drifted signature");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerUpdateProductionTranspiler(new[] { new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ret) }, updateProductionMethod), "UpdateProduction missing anchor");
+
+            // 4. EntityController.DestroyAndRepay transpiler (must patch ONLY first Bank.Deposit)
+            var destroyAndRepayMethod = typeof(EconomyFactoryTranspilerFixtures.EntityController).GetMethod(
+                nameof(EconomyFactoryTranspilerFixtures.EntityController.DestroyAndRepay),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var paidField = typeof(EconomyFactoryTranspilerFixtures.EntityController).GetField(
+                nameof(EconomyFactoryTranspilerFixtures.EntityController.crystalAmountThePlayerPaidForIt),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var validDestroyRepayIl = new List<HarmonyLib.CodeInstruction>
+            {
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldstr, "Player"),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldc_R4, 0.75f),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldarg_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldfld, paidField),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Conv_R4),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Mul),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Call, bankDepositMethod),
+                // Second Bank.Deposit for queued items must remain untouched
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldstr, "Player"),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldloc_1),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Conv_R4),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Call, bankDepositMethod),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ret),
+            };
+            var patchedDestroyRepayIl = new List<HarmonyLib.CodeInstruction>(
+                NativeEconomyFactoryTranspilers.EntityControllerDestroyAndRepayTranspiler(validDestroyRepayIl, destroyAndRepayMethod));
+            int destroyRepayHookCalls = 0;
+            foreach (var ins in patchedDestroyRepayIl)
+            {
+                if (ins.opcode == System.Reflection.Emit.OpCodes.Call &&
+                    ins.operand is System.Reflection.MethodInfo mi &&
+                    mi.Name == nameof(RuntimeHarmonyPatches.OnEntityDestroyAndRepayTranspilerHook))
+                {
+                    destroyRepayHookCalls++;
+                }
+            }
+            if (destroyRepayHookCalls != 1)
+            {
+                throw new InvalidOperationException($"EntityControllerDestroyAndRepayTranspiler must inject exactly 1 hook on first Bank.Deposit, got {destroyRepayHookCalls}.");
+            }
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerDestroyAndRepayTranspiler(Array.Empty<HarmonyLib.CodeInstruction>(), destroyAndRepayMethod), "DestroyAndRepay empty IL");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerDestroyAndRepayTranspiler(validDestroyRepayIl, wrongEntityMethod), "DestroyAndRepay drifted signature");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerDestroyAndRepayTranspiler(validDestroyRepayIl.GetRange(7, validDestroyRepayIl.Count - 7), destroyAndRepayMethod), "DestroyAndRepay missing anchor");
+
+            // 5. EntityController.AbortProduction transpiler
+            var abortProductionMethod = typeof(EconomyFactoryTranspilerFixtures.EntityController).GetMethod(
+                nameof(EconomyFactoryTranspilerFixtures.EntityController.AbortProduction),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var costField = typeof(EconomyFactoryTranspilerFixtures.ProductionInfo).GetField(
+                nameof(EconomyFactoryTranspilerFixtures.ProductionInfo.cost),
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)!;
+            var validAbortProdIl = new List<HarmonyLib.CodeInstruction>
+            {
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldstr, "Player"),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldloc_0),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ldfld, costField),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Conv_R4),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Call, bankDepositMethod),
+                new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ret),
+            };
+            var patchedAbortProdIl = new List<HarmonyLib.CodeInstruction>(
+                NativeEconomyFactoryTranspilers.EntityControllerAbortProductionTranspiler(validAbortProdIl, abortProductionMethod));
+            int abortProdHookCalls = 0;
+            foreach (var ins in patchedAbortProdIl)
+            {
+                if (ins.opcode == System.Reflection.Emit.OpCodes.Call &&
+                    ins.operand is System.Reflection.MethodInfo mi &&
+                    mi.Name == nameof(RuntimeHarmonyPatches.OnFactoryAbortProductionTranspilerHook))
+                {
+                    abortProdHookCalls++;
+                }
+            }
+            if (abortProdHookCalls != 1)
+            {
+                throw new InvalidOperationException($"EntityControllerAbortProductionTranspiler should inject 1 hook, got {abortProdHookCalls}.");
+            }
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerAbortProductionTranspiler(Array.Empty<HarmonyLib.CodeInstruction>(), abortProductionMethod), "AbortProduction empty IL");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerAbortProductionTranspiler(validAbortProdIl, wrongEntityMethod), "AbortProduction drifted signature");
+            AssertFailsClosed(() => NativeEconomyFactoryTranspilers.EntityControllerAbortProductionTranspiler(new[] { new HarmonyLib.CodeInstruction(System.Reflection.Emit.OpCodes.Ret) }, abortProductionMethod), "AbortProduction missing anchor");
+
+            // 6. Telemetry counters, JSON serialization, and ResetCoreHookTelemetry
+            RuntimeHooks.ResetCoreHookTelemetry();
+            RuntimeHarmonyPatches.OnHarvestExtractionRateTranspilerHook(5f, null);
+            RuntimeHarmonyPatches.OnHarvestDepositLoadTranspilerHook(10f, null);
+            RuntimeHarmonyPatches.OnBankDepositTranspilerHook(15f, "Player");
+            RuntimeHarmonyPatches.OnFactoryUpdateProductionTranspilerHook(null, null);
+            RuntimeHarmonyPatches.OnEntityDestroyAndRepayTranspilerHook(20f, null);
+            RuntimeHarmonyPatches.OnFactoryAbortProductionTranspilerHook(25f, null);
+
+            if (RuntimeHooks.HarvestUpdateTranspilerCount != 2 ||
+                RuntimeHooks.BankDepositTranspilerCount != 1 ||
+                RuntimeHooks.FactoryUpdateProductionTranspilerCount != 1 ||
+                RuntimeHooks.EntityDestroyAndRepayTranspilerCount != 1 ||
+                RuntimeHooks.FactoryAbortProductionTranspilerCount != 1)
+            {
+                throw new InvalidOperationException("Unexpected economy/factory transpiler telemetry counter values after hook invocations.");
+            }
+
+            string hooksJson = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(true, 79, string.Empty, 30);
+            using (var doc = JsonDocument.Parse(hooksJson))
+            {
+                JsonElement root = doc.RootElement;
+                if (root.GetProperty("harvestUpdateTranspilerCount").GetInt32() != 2 ||
+                    root.GetProperty("bankDepositTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("factoryUpdateProductionTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("entityDestroyAndRepayTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("factoryAbortProductionTranspilerCount").GetInt32() != 1)
+                {
+                    throw new InvalidOperationException("SerializeRuntimeHooksState missing or mismatched economy/factory transpiler counters: " + hooksJson);
+                }
+            }
+
+            RuntimeHooks.ResetCoreHookTelemetry();
+            if (RuntimeHooks.HarvestUpdateTranspilerCount != 0 ||
+                RuntimeHooks.BankDepositTranspilerCount != 0 ||
+                RuntimeHooks.FactoryUpdateProductionTranspilerCount != 0 ||
+                RuntimeHooks.EntityDestroyAndRepayTranspilerCount != 0 ||
+                RuntimeHooks.FactoryAbortProductionTranspilerCount != 0)
+            {
+                throw new InvalidOperationException("ResetCoreHookTelemetry must reset all economy/factory transpiler counters to 0.");
+            }
+        }
+        finally
+        {
+            RuntimeHooks.ResetCoreHookTelemetry();
+        }
+    }),
+    ("native economy and factory transpiler hooks enforce bounded rules while preserving default native neutrality", () =>
+    {
+        try
+        {
+            ExistingControllers.Instance.Reset();
+            RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            RuntimeHooks.ResetCoreHookTelemetry();
+
+            // 1. Bank.Deposit sanitization preserves negative debits while zeroing NaN/Infinity
+            if (Math.Abs(RuntimeHarmonyPatches.OnBankDepositTranspilerHook(25f, "Player") - 25f) > 0.001f ||
+                Math.Abs(RuntimeHarmonyPatches.OnBankDepositTranspilerHook(-40f, "Player") - (-40f)) > 0.001f ||
+                RuntimeHarmonyPatches.OnBankDepositTranspilerHook(float.NaN, "Player") != 0f ||
+                RuntimeHarmonyPatches.OnBankDepositTranspilerHook(float.PositiveInfinity, "Player") != 0f ||
+                RuntimeHarmonyPatches.OnBankDepositTranspilerHook(float.NegativeInfinity, "Player") != 0f)
+            {
+                throw new InvalidOperationException("OnBankDepositTranspilerHook must sanitize NaN/Infinity to 0 while preserving positive/negative finite amounts.");
+            }
+
+            // 2. AbortProduction sanitizes negative/non-finite to 0 while remaining neutral on valid refunds
+            if (Math.Abs(RuntimeHarmonyPatches.OnFactoryAbortProductionTranspilerHook(150f, null) - 150f) > 0.001f ||
+                RuntimeHarmonyPatches.OnFactoryAbortProductionTranspilerHook(-10f, null) != 0f ||
+                RuntimeHarmonyPatches.OnFactoryAbortProductionTranspilerHook(float.NaN, null) != 0f ||
+                RuntimeHarmonyPatches.OnFactoryAbortProductionTranspilerHook(float.PositiveInfinity, null) != 0f)
+            {
+                throw new InvalidOperationException("OnFactoryAbortProductionTranspilerHook failed finite/non-negative sanitization.");
+            }
+
+            // 3. DestroyAndRepay: neutral by default, +10% capped at 100000 for Fortified or Bulwark
+            var buildingAGo = new GameObject("EconomyBuildingA");
+            var buildingA = buildingAGo.AddComponent<EntityController>();
+            buildingA.entityId = "test:econ-building-a";
+            buildingA.UniqueEntityId = 7101;
+            buildingA.IsControlledByPlayer = true;
+            ExistingControllers.Instance.PlayerBuildings().Add(buildingA);
+
+            var buildingBGo = new GameObject("EconomyBuildingB");
+            var buildingB = buildingBGo.AddComponent<EntityController>();
+            buildingB.entityId = "test:econ-building-b";
+            buildingB.UniqueEntityId = 7102;
+            buildingB.IsControlledByPlayer = true;
+            ExistingControllers.Instance.PlayerBuildings().Add(buildingB);
+
+            float neutralRepay = RuntimeHarmonyPatches.OnEntityDestroyAndRepayTranspilerHook(100f, buildingA);
+            if (Math.Abs(neutralRepay - 100f) > 0.001f)
+            {
+                throw new InvalidOperationException($"DestroyAndRepay must be neutral on unbuffed building, got {neutralRepay}.");
+            }
+
+            string buildingAKey = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(buildingA).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!RuntimeGameplayCommandDirector.TryApplyUnitAffix(buildingAKey, "Fortified").Success)
+            {
+                throw new InvalidOperationException("TryApplyUnitAffix must accept Fortified on tracked building.");
+            }
+            float fortifiedRepay = RuntimeHarmonyPatches.OnEntityDestroyAndRepayTranspilerHook(100f, buildingA);
+            if (Math.Abs(fortifiedRepay - 110f) > 0.001f)
+            {
+                throw new InvalidOperationException($"Fortified building expected +10% repay (110), got {fortifiedRepay}.");
+            }
+
+            string buildingBKey = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(buildingB).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!RuntimeGameplayCommandDirector.TryApplyUnitAffix(buildingBKey, "Bulwark").Success)
+            {
+                throw new InvalidOperationException("TryApplyUnitAffix must accept Bulwark on tracked building.");
+            }
+            float bulwarkRepay = RuntimeHarmonyPatches.OnEntityDestroyAndRepayTranspilerHook(200f, buildingB);
+            float bulwarkCapped = RuntimeHarmonyPatches.OnEntityDestroyAndRepayTranspilerHook(200000f, buildingB);
+            if (Math.Abs(bulwarkRepay - 220f) > 0.001f ||
+                Math.Abs(bulwarkCapped - 100000f) > 0.001f ||
+                RuntimeHarmonyPatches.OnEntityDestroyAndRepayTranspilerHook(float.NaN, buildingB) != 0f ||
+                RuntimeHarmonyPatches.OnEntityDestroyAndRepayTranspilerHook(-50f, buildingB) != 0f)
+            {
+                throw new InvalidOperationException($"Bulwark DestroyAndRepay bounds failed: repay={bulwarkRepay}, capped={bulwarkCapped}.");
+            }
+
+            // 4. Harvest.Update extraction & deposit rules: neutral, custom ResourceGathering.gatherRate, Overcharged affix, Veterancy >= 1
+            var harvNeutralGo = new GameObject("EconHarvesterNeutral");
+            var harvNeutral = harvNeutralGo.AddComponent<EntityController>();
+            harvNeutral.entityId = "test:neutral-harvester";
+            harvNeutral.UniqueEntityId = 7103;
+            harvNeutral.IsUnit = true;
+            harvNeutral.IsControlledByPlayer = true;
+            ExistingControllers.Instance.PlayerUnits().Add(harvNeutral);
+
+            var harvestNeutralFixture = new EconomyFactoryTranspilerFixtures.Harvest { _self = harvNeutral, _currentLoad = 30f };
+            if (Math.Abs(RuntimeHarmonyPatches.OnHarvestExtractionRateTranspilerHook(12f, harvestNeutralFixture) - 12f) > 0.001f ||
+                Math.Abs(RuntimeHarmonyPatches.OnHarvestDepositLoadTranspilerHook(30f, harvestNeutralFixture) - 30f) > 0.001f)
+            {
+                throw new InvalidOperationException("Harvest transpiler hooks must stay neutral for unprofiled/neutral harvesters.");
+            }
+
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:custom-harvester", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:custom-harvester",
+                ResourceGathering = new ContentUnitResourceGatheringDefinition { gatherRate = 25f }
+            });
+            var harvCustomGo = new GameObject("EconHarvesterCustom");
+            var harvCustom = harvCustomGo.AddComponent<EntityController>();
+            harvCustom.entityId = "test:custom-harvester";
+            harvCustom.UniqueEntityId = 7104;
+            harvCustom.IsUnit = true;
+            harvCustom.IsControlledByPlayer = true;
+            ExistingControllers.Instance.PlayerUnits().Add(harvCustom);
+            var harvestCustomFixture = new EconomyFactoryTranspilerFixtures.Harvest { _self = harvCustom };
+
+            if (Math.Abs(RuntimeHarmonyPatches.OnHarvestExtractionRateTranspilerHook(12f, harvestCustomFixture) - 25f) > 0.001f ||
+                Math.Abs(RuntimeHarmonyPatches.OnHarvestDepositLoadTranspilerHook(30f, harvestCustomFixture) - 30f) > 0.001f)
+            {
+                throw new InvalidOperationException("Harvest extraction rate should apply custom gatherRate=25 while keeping deposit neutral.");
+            }
+
+            string harvCustomKey = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(harvCustom).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!RuntimeGameplayCommandDirector.TryApplyUnitAffix(harvCustomKey, "Overcharged").Success)
+            {
+                throw new InvalidOperationException("TryApplyUnitAffix must accept Overcharged on custom harvester.");
+            }
+            if (Math.Abs(RuntimeHarmonyPatches.OnHarvestExtractionRateTranspilerHook(12f, harvestCustomFixture) - 27.5f) > 0.01f ||
+                Math.Abs(RuntimeHarmonyPatches.OnHarvestDepositLoadTranspilerHook(30f, harvestCustomFixture) - 33f) > 0.01f ||
+                Math.Abs(RuntimeHarmonyPatches.OnHarvestDepositLoadTranspilerHook(9500f, harvestCustomFixture) - 10000f) > 0.01f)
+            {
+                throw new InvalidOperationException("Overcharged harvester expected +10% extraction and deposit bounded at 10000.");
+            }
+
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:clamped-harvester", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:clamped-harvester",
+                ResourceGathering = new ContentUnitResourceGatheringDefinition { gatherRate = 600f }
+            });
+            var harvVetGo = new GameObject("EconHarvesterVeteran");
+            var harvVet = harvVetGo.AddComponent<EntityController>();
+            harvVet.entityId = "test:clamped-harvester";
+            harvVet.UniqueEntityId = 7105;
+            harvVet.IsUnit = true;
+            harvVet.IsControlledByPlayer = true;
+            harvVet.CurrentRank = 1;
+            ExistingControllers.Instance.PlayerUnits().Add(harvVet);
+            var harvestVetFixture = new EconomyFactoryTranspilerFixtures.Harvest { _self = harvVet };
+            if (Math.Abs(RuntimeHarmonyPatches.OnHarvestExtractionRateTranspilerHook(10f, harvestVetFixture) - 500f) > 0.01f ||
+                Math.Abs(RuntimeHarmonyPatches.OnHarvestDepositLoadTranspilerHook(40f, harvestVetFixture) - 44f) > 0.01f)
+            {
+                throw new InvalidOperationException("Rank >= 1 harvester expected clamped 500 extraction rate and +10% deposit (44).");
+            }
+
+            // 5. Factory UpdateProduction: neutral factory stays Standard with no affixes; configured factory passes stance + affixes to produced unit
+            var unitNeutralGo = new GameObject("EconProducedNeutral");
+            var unitNeutral = unitNeutralGo.AddComponent<EntityController>();
+            unitNeutral.entityId = "test:produced-neutral";
+            unitNeutral.UniqueEntityId = 7106;
+            unitNeutral.IsUnit = true;
+            unitNeutral.IsControlledByPlayer = true;
+            ExistingControllers.Instance.PlayerUnits().Add(unitNeutral);
+
+            RuntimeHarmonyPatches.OnFactoryUpdateProductionTranspilerHook(unitNeutral, buildingAGo); // buildingAGo != EntityController check safe
+            var neutralFactoryGo = new GameObject("EconFactoryNeutral");
+            var neutralFactory = neutralFactoryGo.AddComponent<EntityController>();
+            neutralFactory.entityId = "test:econ-factory-neutral";
+            neutralFactory.UniqueEntityId = 7107;
+            neutralFactory.IsControlledByPlayer = true;
+            ExistingControllers.Instance.PlayerBuildings().Add(neutralFactory);
+
+            RuntimeHarmonyPatches.OnFactoryUpdateProductionTranspilerHook(unitNeutral, neutralFactory);
+            string unitNeutralKey = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(unitNeutral).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (RuntimeGameplayCommandDirector.TryGetActiveAffixes(unitNeutralKey, out IReadOnlyList<string> noAffixes) && noAffixes.Count != 0)
+            {
+                throw new InvalidOperationException("Neutral factory must not bestow affixes onto produced unit.");
+            }
+
+            var configuredFactoryGo = new GameObject("EconFactoryConfigured");
+            var configuredFactory = configuredFactoryGo.AddComponent<EntityController>();
+            configuredFactory.entityId = "test:econ-factory-configured";
+            configuredFactory.UniqueEntityId = 7108;
+            configuredFactory.IsControlledByPlayer = true;
+            ExistingControllers.Instance.PlayerBuildings().Add(configuredFactory);
+
+            string configuredFactoryKey = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(configuredFactory).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!RuntimeGameplayCommandDirector.TrySetUnitTacticalStance(configuredFactoryKey, "Aggressive").Success ||
+                !RuntimeGameplayCommandDirector.TryApplyUnitAffix(configuredFactoryKey, "Swift").Success ||
+                !RuntimeGameplayCommandDirector.TryApplyUnitAffix(configuredFactoryKey, "Fortified").Success)
+            {
+                throw new InvalidOperationException("Failed to configure tactical stance and affixes on test factory.");
+            }
+
+            var unitInheritedGo = new GameObject("EconProducedInherited");
+            var unitInherited = unitInheritedGo.AddComponent<EntityController>();
+            unitInherited.entityId = "test:produced-inherited";
+            unitInherited.UniqueEntityId = 7109;
+            unitInherited.IsUnit = true;
+            unitInherited.IsControlledByPlayer = true;
+            ExistingControllers.Instance.PlayerUnits().Add(unitInherited);
+
+            RuntimeHarmonyPatches.OnFactoryUpdateProductionTranspilerHook(unitInherited, configuredFactory);
+            string unitInheritedKey = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(unitInherited).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            TacticalStanceCensus stanceCensus = RuntimeGameplayCommandDirector.GetTacticalStanceCensus(32);
+            bool foundAggressiveProduced = false;
+            for (int i = 0; i < stanceCensus.StanceRows.Count; i++)
+            {
+                if (string.Equals(stanceCensus.StanceRows[i].EntityKeyId, unitInheritedKey, StringComparison.Ordinal) &&
+                    string.Equals(stanceCensus.StanceRows[i].Stance, "Aggressive", StringComparison.OrdinalIgnoreCase))
+                {
+                    foundAggressiveProduced = true;
+                    break;
+                }
+            }
+            if (!foundAggressiveProduced)
+            {
+                throw new InvalidOperationException("Produced unit must inherit factory Aggressive tactical stance.");
+            }
+
+            if (!RuntimeGameplayCommandDirector.TryGetActiveAffixes(unitInheritedKey, out IReadOnlyList<string> inheritedAffixes) ||
+                !inheritedAffixes.Contains("Swift") ||
+                !inheritedAffixes.Contains("Fortified"))
+            {
+                throw new InvalidOperationException("Produced unit must inherit Swift and Fortified affixes from factory.");
+            }
+        }
+        finally
+        {
+            RuntimeHooks.ResetCoreHookTelemetry();
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            RuntimeGameplayCommandDirector.ClearTacticalStancesAndAffixes();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("model geometry census detects collapsed skinned bounds and serializes", () =>
     {
         ModelGeometryRow healthy = RuntimeModelGeometryCensus.EvaluateGeometryRow(
@@ -13251,6 +13753,66 @@ internal static class CombatMovementTranspilerFixtures
         public TestFlockingMovement(global::EntityController entityController)
         {
             _entityController = entityController;
+        }
+    }
+}
+
+internal static class EconomyFactoryTranspilerFixtures
+{
+    public enum UpdateStatus
+    {
+        Running,
+        Finished
+    }
+
+    public sealed class ProductionInfo
+    {
+        public int cost = 1;
+    }
+
+    public static class Bank
+    {
+        public static void Deposit(string accountNumber, float amount)
+        {
+        }
+    }
+
+    public sealed class EntityController
+    {
+        public float MaxArmor => 10f;
+        public int crystalAmountThePlayerPaidForIt = 1;
+
+        public void UpdateProduction()
+        {
+        }
+
+        public void DestroyAndRepay()
+        {
+        }
+
+        public void AbortProduction()
+        {
+        }
+
+        public static void WrongSignature(int x)
+        {
+        }
+    }
+
+    public static class EntityFactory
+    {
+        public static EntityController InstantiateEntity() => null!;
+    }
+
+    public sealed class Harvest
+    {
+        public global::EntityController? _self;
+        public float _currentLoad;
+
+        public UpdateStatus Update() => UpdateStatus.Running;
+
+        public void WrongUpdate()
+        {
         }
     }
 }

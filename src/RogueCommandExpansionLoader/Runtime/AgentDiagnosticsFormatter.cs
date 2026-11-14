@@ -332,6 +332,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["shootProjectileSpawnedTranspilerCount"] = RuntimeHooks.ShootProjectileSpawnedTranspilerCount,
                 ["entitySetStatusEffectTranspilerCount"] = RuntimeHooks.EntitySetStatusEffectTranspilerCount,
                 ["flockingGetMovementInfoTranspilerCount"] = RuntimeHooks.FlockingGetMovementInfoTranspilerCount,
+                ["harvestUpdateTranspilerCount"] = RuntimeHooks.HarvestUpdateTranspilerCount,
+                ["bankDepositTranspilerCount"] = RuntimeHooks.BankDepositTranspilerCount,
+                ["factoryUpdateProductionTranspilerCount"] = RuntimeHooks.FactoryUpdateProductionTranspilerCount,
+                ["entityDestroyAndRepayTranspilerCount"] = RuntimeHooks.EntityDestroyAndRepayTranspilerCount,
+                ["factoryAbortProductionTranspilerCount"] = RuntimeHooks.FactoryAbortProductionTranspilerCount,
             };
             return Serialize(view);
         }

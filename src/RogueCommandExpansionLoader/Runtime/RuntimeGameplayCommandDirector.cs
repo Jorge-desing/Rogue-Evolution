@@ -6886,11 +6886,12 @@ namespace RogueCommandExpansionLoader.Runtime
             bool isVampiric = string.Equals(normalized, "Vampiric", StringComparison.OrdinalIgnoreCase);
             bool isBulwark = string.Equals(normalized, "Bulwark", StringComparison.OrdinalIgnoreCase);
             bool isVolatile = string.Equals(normalized, "Volatile", StringComparison.OrdinalIgnoreCase);
+            bool isFortified = string.Equals(normalized, "Fortified", StringComparison.OrdinalIgnoreCase);
 
-            if (!isSwift && !isJuggernaut && !isOvercharged && !isVampiric && !isBulwark && !isVolatile)
+            if (!isSwift && !isJuggernaut && !isOvercharged && !isVampiric && !isBulwark && !isVolatile && !isFortified)
             {
                 return new UnitAffixResult(false, entityKeyId, normalized, "Apply", 0,
-                    "Unsupported unit affix '" + normalized + "'. Supported: Swift, Juggernaut, Overcharged, Vampiric, Bulwark, Volatile.");
+                    "Unsupported unit affix '" + normalized + "'. Supported: Swift, Juggernaut, Overcharged, Vampiric, Bulwark, Volatile, Fortified.");
             }
 
             try
