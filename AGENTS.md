@@ -1,5 +1,10 @@
 # Instructions for repository agents
 
+## Documentation is for agents
+
+Treat repository documentation as operational context for agents. Write so a new agent can resume the task from the repository and its evidence without access to the previous chat. Follow the [agent documentation contract](docs/AGENT-DOCUMENTATION.md) when creating or updating the README, handoffs, runbooks, specifications, and skills. During each completed pass, update the relevant canonical instructions and record the evidence and next action in the handoff when they affect continuation.
+
+
 Before changing this repository, read [the agent handoff](docs/research/AGENT-HANDOFF.md), the root [README](README.md), and the content contract in `content/schema/README.md` when the change touches packs.
 
 **Always consult context before acting** (start of every task and conversation): query the mem0 memory store for durable user preferences, facts, and decisions; inspect the current checkout state with `git status`, `git log`, and the current HEAD (never trust remembered state alone); and review the handoff and README. Memory and handoff notes may be stale or contradicted by newer commits — verify against the current tree and recent history before relying on them.

@@ -1,5 +1,8 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
+
+
 ## 2026-11-13 Material Maker CLI warning cleanup
 
 - `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker` now builds an isolated Material Maker 1.7 CLI runtime via `tools/Build-MaterialMakerCli.ps1`. The source patcher pins official Material Maker 1.7 and Godot 4.7 archives by SHA-256, fixes the CLI GPU-resource shutdown order (including joining the render worker), drops the unavailable optional Steam extension from the CLI-only build, and corrects verified upstream packaging issues: three absent demo `.mtl` references, one stale logo UID, and Godot 3 `shader_param/` keys. The official install and Unity/game files remain unchanged.
