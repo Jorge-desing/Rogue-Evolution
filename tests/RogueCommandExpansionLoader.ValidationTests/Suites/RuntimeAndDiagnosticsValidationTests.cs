@@ -4930,6 +4930,19 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("Caster must receive ActiveSkillOnTarget command with target.");
             }
 
+            caster.SkillInfo = new SkillInfo { targetOrigin = TargetOrigin.ChosenLocation };
+            enemyTarget.Position = new Vector3(44f, 0f, 65f);
+            ActiveSkillOrderResult locationTargetRes = RuntimeGameplayCommandDirector.TryOrderActiveSkill(
+                "unit:arc-caster-01", targetEntityKeyId: "unit:enemy-mech-01");
+            if (!locationTargetRes.Success || locationTargetRes.SkillTargetMode != "Position" ||
+                caster.LastExecutedCommand?.command != EntityCommand.Command.ActiveSkillAtPosition ||
+                caster.LastExecutedCommand.Value.destination.x != 44f ||
+                caster.LastExecutedCommand.Value.destination.z != 65f ||
+                locationTargetRes.TargetX != 44f || locationTargetRes.TargetZ != 65f)
+            {
+                throw new InvalidOperationException("A location skill aimed at an entity must use its live position.");
+            }
+
             // Ground position active skill
             ActiveSkillOrderResult posRes = RuntimeGameplayCommandDirector.TryOrderActiveSkill("unit:arc-caster-01", targetX: 75f, targetZ: 85f);
             if (!posRes.Success || posRes.SkillTargetMode != "Position" || posRes.TargetX != 75f || posRes.TargetZ != 85f)

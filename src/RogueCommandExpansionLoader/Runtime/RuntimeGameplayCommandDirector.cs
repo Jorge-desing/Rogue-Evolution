@@ -2120,13 +2120,21 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
 
-                    skillCmd = EntityCommand.ActiveSkillOnTarget(target);
+                    Vector3 targetPosition = target.Position;
+                    if (caster.SkillInfo != null && caster.SkillInfo.targetOrigin == TargetOrigin.ChosenLocation)
+                    {
+                        skillCmd = EntityCommand.ActiveSkillAtPosition(targetPosition);
+                        mode = "Position";
+                    }
+                    else
+                    {
+                        skillCmd = EntityCommand.ActiveSkillOnTarget(target);
+                        mode = "Target";
+                    }
 
-                    mode = "Target";
+                    tx = targetPosition.x;
 
-                    tx = target.Position.x;
-
-                    tz = target.Position.z;
+                    tz = targetPosition.z;
 
                 }
 

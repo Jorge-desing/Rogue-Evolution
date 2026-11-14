@@ -67,6 +67,8 @@ Use runtime keys from the AI roster to select one target among instances that sh
 
 The battlefield unit observation also exposes native skill mana and queued activation for conditional casting sequences. See the automation reference for the wait conditions and subsequent native order.
 
+The active-skill order accepts a live entity key for location skills and samples its current position when dispatching the native location command.
+
 1. Read `system_get_game_process_state`. If the game is closed, launch it through Steam only when the user's current request authorizes a live run; never launch the game executable directly. If it is open, ping the bridge and read runtime capabilities before diagnosis.
 2. Read game paths and runtime identity. Before reflection, type inspection, or a Harmony patch, verify the current game version, `Assembly-CSharp.dll` SHA-256 and MVID together, plus Unity backend, BepInEx version, architecture, and supported patch types. Treat the values in `rogue-command-harmony-policy` as a pinned baseline, not as proof that the current installation still matches. If the identity differs, stop using remembered signatures/tokens and re-verify the target assembly before continuing.
 3. Start from read-only census and snapshots. Before mutating a match, identify the exact stage, entity, selector, and expected postcondition. Use stable `UniqueEntityId` / `entityKeyId` for spawned entities when native `EntityId` values can repeat.
