@@ -342,7 +342,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
 
             bool isHarvester = entity.HasRole(UnitRole.Harvester);
             bool isSupport = entity.IsEngineer || entity.HasRole(UnitRole.Supporter) || entity.HasRole(UnitRole.Heal);
-            bool hasQueued = HasQueuedCommands(entity);
+            bool hasQueued = TryReadQueuedCommands(entity, out bool hasCommands) && hasCommands;
             int targetId = entity.CurrentAttackTarget != null ? entity.CurrentAttackTarget.UniqueEntityId : -1;
 
             int statusFlags = 0;
@@ -426,8 +426,9 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 activeSkillRequiresNearbyHostile: skillRequiresNearbyHostile);
         }
 
-        private static bool HasQueuedCommands(EntityController entity)
+        internal static bool TryReadQueuedCommands(EntityController entity, out bool hasCommands)
         {
+            hasCommands = false;
             if (entity == null || NativeCommandChainField == null)
             {
                 return false;
@@ -436,7 +437,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             try
             {
                 LinkedList<EntityCommand> chain = NativeCommandChainField.GetValue(entity) as LinkedList<EntityCommand>;
-                return chain != null && chain.Count > 0;
+                hasCommands = chain != null && chain.Count > 0;
+                return true;
             }
             catch
             {

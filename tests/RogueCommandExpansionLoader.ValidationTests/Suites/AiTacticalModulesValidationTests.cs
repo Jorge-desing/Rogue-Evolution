@@ -3700,8 +3700,10 @@ internal static partial class ValidationTestRunner
             var legacyModule = new DelegatingTestAiRuntimeBehaviour(() => legacyTickCount++);
 
             // Module 1 proposes lower-priority CombatTargeting (score 75) onto hostile 960
+            bool queueNativeOrder = false;
             var combatModule = new CoordinatedTestAiRuntimeBehaviour((snapshot, weights, proposals) =>
             {
+                if (queueNativeOrder) aiUnit.CommandChainForTest.AddLast(new EntityCommand { command = EntityCommand.Command.Move });
                 proposals.Add(new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
                     moduleId: "sample:threat-prioritization",
                     commandTag: "tag.combat",
@@ -3712,7 +3714,7 @@ internal static partial class ValidationTestRunner
                     category: RogueCommandExpansionLoader.Runtime.Ai.AiIntentCategory.CombatTargeting,
                     utilityScore: 75f,
                     lockoutDurationSeconds: 0.5f,
-                    requiresEmptyQueue: false));
+                    requiresEmptyQueue: true));
             });
 
             // Module 2 proposes higher-priority SurvivalKite (score 160) away from hostile to (0, 10)
@@ -3767,6 +3769,13 @@ internal static partial class ValidationTestRunner
             composite.Tick();
             if (aiUnit.ExecuteCommandCallCount != 2 || aiUnit.CurrentCommandTag != "tag.combat")
                 throw new InvalidOperationException("A completed retreat must release its lockout and retarget protection.");
+
+            aiUnit.CurrentPlayerCommandName = EntityCommand.Command.DoNothing;
+            queueNativeOrder = true;
+            UnityEngine.Time.time = 32f;
+            composite.Tick();
+            if (aiUnit.ExecuteCommandCallCount != 2 || aiUnit.CommandChainForTest.Count != 1)
+                throw new InvalidOperationException("An idle-only proposal must respect commands queued after collection.");
 
             composite.OnDestroyed();
         }

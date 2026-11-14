@@ -414,28 +414,12 @@ namespace RogueCommandExpansionLoader.Modules
                 return false;
             }
 
-            if (proposal.RequiresEmptyQueue)
+            if (proposal.RequiresEmptyQueue &&
+                (unit.CurrentPlayerCommandName != EntityCommand.Command.DoNothing ||
+                 !RuntimeAiBattlefieldCollector.TryReadQueuedCommands(unit, out bool hasQueue) ||
+                 hasQueue))
             {
-                if (unit.CurrentPlayerCommandName != EntityCommand.Command.DoNothing)
-                {
-                    return false;
-                }
-
-                bool hasQueue = false;
-                IReadOnlyList<AiUnitSnapshot> aiUnits = _lastBattlefieldSnapshot.AiUnits;
-                for (int i = 0; i < aiUnits.Count; i++)
-                {
-                    if (aiUnits[i].UniqueEntityId == proposal.UnitId)
-                    {
-                        hasQueue = aiUnits[i].HasQueuedCommands;
-                        break;
-                    }
-                }
-
-                if (hasQueue)
-                {
-                    return false;
-                }
+                return false;
             }
 
             try

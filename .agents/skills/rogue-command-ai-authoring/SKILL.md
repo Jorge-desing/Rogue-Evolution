@@ -204,3 +204,5 @@ Runtime arbitration commits leases and spends dispatch slots only after a native
 Arbitration retains alternative intents until a unit receives an order. It checks each intent against the lease and attempts eligible intents in global utility order, with one successful dispatch per unit and the existing tick limit.
 
 Before arbitration, reconcile leases for sampled units against the live current command. Idle units and units whose native command tag differs release the old lease. An active command with the matching tag keeps its lockout and retarget protection.
+
+Idle-only coordinated proposals require a live DoNothing command and a successfully read empty native command queue at dispatch. Snapshot queue state is for planning.
