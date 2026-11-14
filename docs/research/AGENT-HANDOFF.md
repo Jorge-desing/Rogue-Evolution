@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Snapshot assertion deduplication
+
+- Removed two duplicate presence assertions for `GetVisualMaterialCensusJson` and `GetVisualSurfaceCensusJson` in `test_runtime_snapshot_passes_safe_arguments_to_bounded_getters`. The immediately preceding exact argument lookups still require each method to exist and pass `[64]`. The independent `GetGameTimeScaleJson` presence assertion remains; no test case or production behavior was removed.
+- Full before/after reports: `artifacts/test-dedup-current/after.json` and `after-snapshot.json`.
+
 ## 2026-11-13 Material Maker duplicate config scenario
 
 - Consolidated `MaterialMakerWorkflowConfigTests.test_config_preserves_the_four_map_contract` into `test_config_covers_urp_blender_3d_and_procedural_workflows`: both exercised the same config, and the latter already ran the validator. The exact four-map and shader assertions remain independent of validator constants. Temporary config mutations to a missing map and a wrong shader each fail the retained test. Full before/after reports: `artifacts/test-dedup-current/before.json` and `after.json`.

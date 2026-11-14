@@ -112,3 +112,5 @@ Ironclad asset tests inspect the current source blend with pinned Blender and cu
 General offline reviews must inspect auxiliary validator coverage as well as suite status: healthy default values and swallowed decode exceptions can conceal unsupported serialized fields. Audio/modifier audits now have explicit read-error/non-finite regressions; audit JSON is local evidence only.
 
 Material Maker config validation and the explicit four-map/shader assertions share one test on the same configuration; retain both the validator result and independent literal assertions in that test.
+
+In snapshot tests, an exact-argument lookup using `next` already fails when the method is absent; repeating a separate presence assertion for the same call is redundant. Preserve independent presence checks for methods without argument lookups.

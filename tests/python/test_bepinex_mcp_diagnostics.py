@@ -1054,8 +1054,6 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertEqual([64], next(args for method, args in calls if method == "GetIntermissionCensusJson"))
         self.assertEqual([], next(args for method, args in calls if method == "GetNavigatorStateJson"))
         self.assertNotIn("GetUnitLoadoutAndPoolCensusJson", [method for method, _ in calls])
-        self.assertIn("GetVisualMaterialCensusJson", [method for method, _ in calls])
-        self.assertIn("GetVisualSurfaceCensusJson", [method for method, _ in calls])
         self.assertIn("GetGameTimeScaleJson", [method for method, _ in calls])
 
     def test_fast_snapshot_gui_and_intermission_presets_include_accessible_ui(self) -> None:

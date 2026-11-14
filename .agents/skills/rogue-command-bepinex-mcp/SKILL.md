@@ -91,3 +91,5 @@ Discover → observe → act → wait/verify → decide the next step. **Require
 - [Harmony Policy](../rogue-command-harmony-policy/SKILL.md) — BepInEx 5, Harmony 2, compatibility tuple, and source patch rules.
 - `tools/bepinex_mcp_server.py` and `tools/build_bepinex_mcp.py` — project bridge handlers and schemas. Keep them synchronized when changing the tool contract.
 - [Native UI and intermission](references/ui-intermission.md) — screenshot-free control selection, reward screens, run-map actions, and transition checks.
+
+Snapshot regression tests verify presence and exact bounded arguments together for visual material and surface censuses; the GameTimeScale presence assertion remains independent.
