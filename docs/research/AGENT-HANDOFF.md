@@ -2,6 +2,12 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — authored muzzle feedback integration
+
+- RuntimeVisualDirector now binds the primary muzzle's authored `FirePoint_0` ParticleSystem, falling back to a unique descendant emitter. Weapon feedback preserves an already playing native emitter and does not spawn the procedural muzzle burst alongside it. Unbound authored emitters retain the mesh/procedural fallback. Pool reuse stops and clears the bound muzzle emitter.
+- Read native ShootProjectile initialization/play paths against existing decompilation. Release build: zero warnings/errors; diff check clean. Actual visual director is excluded from the general stub harness, so no new harness claim is made for this integration. Native firing, effect appearance and reuse require Steam evidence; existing four visual census failures remain unresolved.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/authored-muzzle-deployment/manifest.json`.
+
 ## General capability audit — first-shot visual feedback
 
 - Automatic weapon feedback now tracks initialization separately from the native negative idle shot timestamp. After bind captures the current clock, the first subsequent shot (including timestamp zero) triggers recoil/fire feedback. Pool reuse re-primes without replaying old shots; unchanged or invalid clocks do not trigger effects.

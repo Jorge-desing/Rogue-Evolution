@@ -29,6 +29,8 @@ For Unity particle authoring, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`
 
 The automatic weapon-feedback tracker treats native `EntityAttack._timeOfLastShot = float.MinValue` as a valid idle sample, not an uninitialized tracker. Bind/reset captures the current clock without replaying it; the first subsequent shot, including timestamp zero, triggers feedback once. Reuse resets the tracker; unchanged or invalid clocks do not trigger effects.
 
+Weapon feedback reuses the authored muzzle ParticleSystem: prefer `Socket_MuzzlePrimary/FirePoint_0`, otherwise require one unique descendant emitter. If native ShootProjectile already plays it, do not restart it or add a procedural burst. Only absent authored binding uses the existing mesh/procedural fallback. Pool reuse stops and clears the bound emitter; ambiguous socket roles remain unbound.
+
 Damage suppresses ERA, APS and FuelDrums independently of requested attachment visibility. Repair restores the requested state for that slot. Pool reuse restores the original attachment visibility and clears the previous visual stance.
 
 Temporary turret and deployment door overrides apply to one entity lifetime. Pool reuse clears both overrides and restores the authored closed door and recoil rest positions. Native production drives the door again on the next visual update.

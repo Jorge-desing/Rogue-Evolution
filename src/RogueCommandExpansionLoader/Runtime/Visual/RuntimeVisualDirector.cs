@@ -39,6 +39,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private GameObject _fireVfxInstance;
         private ParticleSystem _authoredDamageSmoke;
         private ParticleSystem _authoredDamageFire;
+        private ParticleSystem _authoredMuzzleFlash;
         private bool _movementAudioBound;
         private bool _weaponAudioBound;
         private float _audioBindingStartedAt;
@@ -268,6 +269,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _doorOpenOverride = null;
             _doorOpenProgress = 0f;
             _currentRecoilOffset = 0f;
+            if (_authoredMuzzleFlash != null)
+                _authoredMuzzleFlash.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             if (_socketDeployUnit != null)
             {
                 _socketDeployUnit.localPosition = _doorClosedLocalPos;
@@ -566,6 +569,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _socketThrusterVectorR = GetSocketRoleValue("thruster_right");
             _authoredDamageSmoke = GetUniqueParticleSystemUnder(_socketDamageSmoke);
             _authoredDamageFire = GetUniqueParticleSystemUnder(_socketDamageFire);
+            Transform muzzleFirePoint = _socketMuzzlePrimary != null ? _socketMuzzlePrimary.Find("FirePoint_0") : null;
+            _authoredMuzzleFlash = muzzleFirePoint != null ? muzzleFirePoint.GetComponent<ParticleSystem>() : null;
+            if (_authoredMuzzleFlash == null)
+                _authoredMuzzleFlash = GetUniqueParticleSystemUnder(_socketMuzzlePrimary);
 
             if (_socketAntenna != null)
             {
@@ -1970,7 +1977,15 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
             if (_socketMuzzlePrimary != null)
             {
-                RuntimeVisualVfxFallback.TriggerMuzzleFlash(_socketMuzzlePrimary, this, 0.07f);
+                if (_authoredMuzzleFlash != null)
+                {
+                    // Native ShootProjectile may already have played this emitter in the same frame.
+                    if (!_authoredMuzzleFlash.isPlaying) _authoredMuzzleFlash.Play(true);
+                }
+                else
+                {
+                    RuntimeVisualVfxFallback.TriggerMuzzleFlash(_socketMuzzlePrimary, this, 0.07f);
+                }
             }
 
             if (_animator != null && _hasFireAnimationParameter && !_deathAnimationTriggered)
