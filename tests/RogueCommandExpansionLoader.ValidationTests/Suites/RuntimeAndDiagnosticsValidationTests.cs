@@ -38,6 +38,10 @@ internal static partial class ValidationTestRunner
             update.Invoke(timer, null);
             if (attacker.ResumedCommandsForTest != 1) throw new Exception("Taunt overrode a newer order.");
             if (attacker.CommandChainForTest.Count != 0) throw new Exception("Expired queued taunt was not removed.");
+            if (!timer.TryApply(attacker, source, 10f)) throw new Exception("Third taunt was not issued.");
+            source.UniqueEntityId++;
+            update.Invoke(timer, null);
+            if (attacker.ResumedCommandsForTest != 2) throw new Exception("Reused source did not terminate the previous lifetime's taunt.");
         }
         finally { UnityEngine.Time.time = saved; }
     }),

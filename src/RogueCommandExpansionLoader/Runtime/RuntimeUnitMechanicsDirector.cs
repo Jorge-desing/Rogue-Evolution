@@ -108,6 +108,8 @@ namespace RogueCommandExpansionLoader.Runtime
     {
         private EntityController _unit;
         private EntityController _source;
+        private int _unitId;
+        private int _sourceId;
         private string _tag;
         private float _expiresAt;
         private static int _nextTag;
@@ -122,12 +124,15 @@ namespace RogueCommandExpansionLoader.Runtime
             if (CommandChain == null || !(CommandChain.GetValue(unit) is LinkedList<EntityCommand>)) return false;
             if (_tag != null)
             {
-                if (_source != source || !unit.CurrentCommandIsTaggedWith(_tag)) return false;
+                if (_source != source || _sourceId != source.UniqueEntityId || _unitId != unit.UniqueEntityId ||
+                    !unit.CurrentCommandIsTaggedWith(_tag)) return false;
                 _expiresAt = Time.time + duration;
                 return true;
             }
             _unit = unit;
             _source = source;
+            _unitId = unit.UniqueEntityId;
+            _sourceId = source.UniqueEntityId;
             _tag = "rcl-taunt:" + (++_nextTag).ToString();
             _expiresAt = Time.time + duration;
             EntityCommand command = EntityCommand.Attack(source);
@@ -139,8 +144,10 @@ namespace RogueCommandExpansionLoader.Runtime
         private void Update()
         {
             if (_tag == null || _unit == null) return;
+            if (_unit.UniqueEntityId != _unitId) { _tag = null; _unit = null; _source = null; return; }
             bool current = _unit.CurrentCommandIsTaggedWith(_tag);
-            if (Time.time < _expiresAt && _source != null && !_source.IsDestroyed && !_source.DestroyHasBeenStarted) return;
+            if (Time.time < _expiresAt && _source != null && _source.UniqueEntityId == _sourceId &&
+                !_source.IsDestroyed && !_source.DestroyHasBeenStarted) return;
             if (!current)
             {
                 var chain = CommandChain?.GetValue(_unit) as LinkedList<EntityCommand>;

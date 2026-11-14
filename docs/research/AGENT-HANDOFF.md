@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Taunt lifetime identity (2026-11-14)
+
+Timed taunts bind source and target native UniqueEntityId: a source reused as a new entity ends the prior taunt, while a reused target discards the prior timer. Static EntityFactory inspection shows it assigns new unique IDs on reuse. Release built cleanly; RuntimeAndDiagnostics passed 242/242 (`artifacts/general-capability-audit/taunt-lifetimes/runtime.log`), including source-ID change. Deployed after game closure with backup/hash manifest `artifacts/general-capability-audit/taunt-lifetimes-deployment-20261114150553/manifest.json`. Native Unity pooling and queue behavior remain unverified in Steam.
+
+
 ## Timed taunt queue access (2026-11-14)
 
 Timed taunts now require the native command chain to be accessible before inserting the tagged command, preventing an interrupted taunt from becoming unremovable if that field is unavailable. Static native inspection found reuse clears the command chain and current command; Unity component lifecycle remains unverified. Release built cleanly and RuntimeAndDiagnostics passed 242/242 (`artifacts/general-capability-audit/taunt-queue-access/runtime.log`). Deployed with game closed and hash-verified backup (`artifacts/general-capability-audit/taunt-queue-access-deployment-20261114150400/manifest.json`). Next verify expiry, interruptions and pooling in Steam.

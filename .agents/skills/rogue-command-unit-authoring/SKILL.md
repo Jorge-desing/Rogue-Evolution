@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Timed taunt snapshots native UniqueEntityId for source and target. Reused sources end the previous taunt, and reused targets discard the previous timer state; verify Unity pooling in Steam.
+
 Timed taunt starts only when the native command chain is accessible for exact tagged cleanup; missing queue access leaves the target's orders untouched. Native pooling clears the command chain, but the component lifecycle still needs Steam verification.
 
 Taunt uses a tagged native attack inserted before the current command. A timer attached to the affected unit renews the same source's pulse and stops/restarts the chain on expiry or source death only while its tag remains current; a newer order is never overwritten. Paused chains wait for resumption. Steam gameplay remains unverified.
