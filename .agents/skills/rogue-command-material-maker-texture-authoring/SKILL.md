@@ -7,6 +7,8 @@ description: "Use Material Maker 1.7 for all procedural or painted Rogue Command
 
 Use this skill when Material Maker is selected for procedural PBR graphs or a supported 3D paint pass. Read [Rogue Command PBR Texture Authoring](../rogue-command-pbr-texture-authoring/SKILL.md) first; it remains authoritative for the source mesh, channel packing, and Unity import.
 
+Material Maker saves or generates material graphs as `.ptex`. The integrated Blender/Unity route exports that graph to the four PNG maps; the repository's downstream tools consume images rather than directly importing `.ptex`. Keep reproducible generated templates under `artifacts/`, and preserve a hand-authored graph required for a promoted material as task-owned source art with its inputs.
+
 ## Setup and source protection
 
 - Material Maker 1.7 is the required standard tool and is staged under ignored `.tools/MaterialMaker-1.7/`. To prepare it in another checkout, use `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker`; the script verifies the pinned release archive SHA-256 and extracts safely.
@@ -19,10 +21,12 @@ Use this skill when Material Maker is selected for procedural PBR graphs or a su
 2. Build or edit a material graph for the observed finish and feature scale. Avoid generic noise that obscures panel layout or material separation at the game's RTS camera distance. A connected edge-emission graph can outline a large fraction of a repeated procedural panel field; inspect its coverage on the target UV model and keep emission for powered features only. Generate and tune experimental graphs under `artifacts/` unless the requested change explicitly includes a shared preset.
 3. Export image files as PNG to the temporary workspace. Do not use generated Unity `.mat` files, shader templates, or mesh exports as Rogue Command assets.
 4. Deliver the exact set `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png`. Pack metallic in R/G/B and smoothness (`1 - roughness`) in A. Do not pack AO into MetallicGloss; the current shader reads only R and A.
-5. Keep auxiliary AO, height, and curvature maps separate unless the in-project shader is changed and verified. If an output target cannot produce the required channel layout reliably, return to Blender's deterministic `--bake-atlas` path or use a separately verified image-packing step.
-6. Preserve any Material Maker project/graph needed to reproduce the images under `artifacts/`; it is source art, not a replacement for the Blender model or Unity material builder.
+5. Keep auxiliary AO, height, and curvature maps separate unless the in-project shader is changed and verified. Use the repository's scalar export and four-map packer for the required channel layout. If export fails, keep the Blender baseline and report the failed Material Maker pass; the baseline does not replace the required authoring pass.
+6. Keep experimental/generated graphs under `artifacts/`. Preserve a hand-authored graph needed to reproduce a promoted material with its task-owned source-art inputs; it remains a Material Maker source project, while the Blender model and Unity material builder retain their roles.
 
 ## Headless export (CLI)
+
+For the integrated pipeline, use `tools/Run-MaterialMakerBake.ps1`; the raw application CLI below explains upstream behavior and does not replace project packing/auditing.
 
 Material Maker supports batch export without the GUI:
 
@@ -135,6 +139,14 @@ All workflows write an `material-maker-workflow.json` manifest beside the output
 ## Pack report and quality gates
 
 `tools/pack_material_maker_pbr.py` re-saves Albedo/Normal/Emission as opaque RGB, caps smoothness at 1 - 0.04 (roughness floor, anti-aliasing at RTS distance) and writes `<Name>_pack-report.json` with per-map stats and warnings (flat/blank export, non power-of-two, non-unit normals, implausible albedo, mid-tone metallic, over-bright emission). Pass `--strict` to fail (exit 2) on warnings. Shader changes (weld normal tilt, mud breakup, specular AA, softened cavity occlusion, aero-alloy glancing sheen) are local authoring changes and must be compiled/verified in Unity 2021.3.45f2 before being called validated.
+
+## Compatible finish and microdetail recipes
+
+Read [recipes 1, 2 and 6](../rogue-command-pbr-texture-authoring/references/compatible-texture-recipes.md) for existing graph controls and the scalar-to-four-map path. Use a task-owned `.ptex`, an existing `-TemplatePath` and an isolated `-OutputDirectory`. Output names follow the template stem, not `-UnitName`. Never use `-ForceTemplate` on an edited graph, and keep paint originals outside the runner's cleared output directory.
+
+Palette/response curves and the `micro_perlin` normal/roughness stack are supported controls; model-aware material classification is not automatic. Preserve the audited graph wiring and quality metadata. The audit requires the tactical profile and positive graph emission energy; report a conflicting finish rather than adding artificial glow. Neither passing those checks nor normal-vector renormalization proves surface quality or correct normal orientation.
+
+The `three_d` path prepares the proxy and procedural images; it does not automate strokes or validate arbitrary painted-project CLI export. Use only a separately verified manual image export for subsequent painting, and distinguish its final-image review from the baseline graph audit.
 
 ## Validation handoff
 

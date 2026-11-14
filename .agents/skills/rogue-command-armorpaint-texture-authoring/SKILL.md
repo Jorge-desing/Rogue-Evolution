@@ -10,7 +10,7 @@ Use this skill when ArmorPaint is selected for painting or texture refinement. R
 ## Setup and source protection
 
 - Use only a locally accessible official ArmorPaint Windows archive. The project setup script stages that archive under ignored `.tools/` and verifies safe extraction: `tools/Setup-TextureAuthoringTools.ps1 -ArmorPaintArchivePath <official-zip>`.
-- Do not fetch or bypass purchase access to obtain the portable binary. If the archive is unavailable, continue with Blender 4.5.14 or Material Maker.
+- Do not fetch or bypass purchase access to obtain the portable binary. If the archive is unavailable, continue through the required Material Maker pass using the Blender 4.5.14 baseline.
 - Start from finalized UVs and an exported copy of the Blender mesh under `artifacts/texture-work/<Name>/ArmorPaint/`. Preserve the source `.blend`, production FBX, canonical sockets, hierarchy, LODs, and mesh `Color` RGBA vertex-wear attribute.
 - Do not edit or re-export the Unity mesh from ArmorPaint. Its mesh export is for separate, explicitly authorized model migrations only.
 
@@ -21,7 +21,17 @@ Use this skill when ArmorPaint is selected for painting or texture refinement. R
 3. Create or select a custom texture preset. The generic Unity preset packs metallic, occlusion, and smoothness; it does not match this project's shader contract.
 4. Export the required files only: `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png`. In MetallicGloss, set R/G/B to metallic and A to smoothness (`1 - roughness`). Do not pack AO in this texture; the shader does not consume AO there.
 5. Use ArmorPaint's texture export padding and inspect the alpha channel independently of the RGB preview. Do not infer correct packing from the viewport or preset name. Keep `.arm` work files and intermediates under `artifacts/` when they are needed to reproduce the pass.
-6. Do not make neural nodes or downloaded AI models a production dependency. If used for ideation, review and author the final maps locally; the project workflow must remain reproducible without those models or remote services.
+6. Keep this refinement path local and reproducible through the supported image operations. Neural generation is outside these integrated recipes.
+
+## Compatible manual refinements
+
+Use [recipes 3–6](../rogue-command-pbr-texture-authoring/references/compatible-texture-recipes.md) for surface masks, channel-specific fill/paint layers, markings, localized emission and export padding. Start after the required Material Maker baseline and retain its scalar maps and reports. These operations are manual; the repository does not automate ArmorPaint painting.
+
+- Record the actual local build and verify the needed layer/channel and export controls with a disposable image export. The current official online manual describes version 1.1; do not assume an older build matches it. ArmorPaint is not required to use the automated Material Maker recipes.
+- Import baseline scalar metallic/roughness data with the correct meanings; packed MetallicGloss is not a roughness map. Preserve the baseline normal and unchanged channels. Use separate masks for coatings, exposed metal, rubber and optics without changing geometry or UVs.
+- Export either a checked custom four-map set or the five named scalar PNGs for `python -m tools.pack_material_maker_pbr`. Its strict checks and post-processing are described in recipe 6. Keep raw/manual images outside the Material Maker runner's cleared export directory.
+- Check padding on the frozen UV model and under minification; there is no universal padding value. Verify imported/compressed results in Unity before claiming seam quality. A painted marking/decal is atlas image content, not a runtime component.
+- Preserve baseline provenance and label final painted-map validation separately. Do not attach an unchanged graph's passing report to modified images as acceptance evidence.
 
 ## Validation handoff
 

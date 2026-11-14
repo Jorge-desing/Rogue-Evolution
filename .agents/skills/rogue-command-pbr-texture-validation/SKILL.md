@@ -15,6 +15,18 @@ Before reviewing, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`, `unity/Rog
 
 ## Validation Checklist
 
+Use the [compatible texture recipes](../rogue-command-pbr-texture-authoring/references/compatible-texture-recipes.md) to identify the path being reviewed. Record automated graph checks, final-image checks and visual review independently. The current runner's procedural audit still applies without `-Strict`; strict mode additionally checks pack warnings and requested resolution.
+
+| Technique | Check before acceptance | What existing automation does not prove |
+|---|---|---|
+| Procedural finish variation | Retained tactical profile/wiring; current maps, dimensions and packed channels | That procedural regions match the model's paint, metal, rubber or optics |
+| Microdetail | Retained normal/roughness stack; normal data; close and RTS-scale model review | Correct normal convention, readable detail or absence of temporal shimmer |
+| Manual masks and markings | Actual tool version/export, aligned channel masks, final-map inspection, preserved mesh/UVs | That a baseline graph report validates later painting |
+| Localized emission | Functional placement and map coverage; retain procedural emission requirements when applicable | That positive graph energy corresponds to a useful light on the model |
+| Padding | Island borders, reduced previews and effective Unity mip/compression result, including alpha | Automatic seam quality or a universally safe padding value |
+
+Keep original graphs and baseline reports alongside provenance for subsequent manual edits. A failure caused by a legitimate uniform or non-emissive finish is a current tool limitation to report; do not fabricate variation/emission, remove provenance or weaken a gate to get a pass. For manually exported maps, use the applicable image/import checks without claiming tactical graph acceptance. Recipes that require unverified export routes are outside this integrated workflow.
+
 ### 1. Source maps
 
 - Confirm the model has the expected `<Name>_Albedo.png`, `<Name>_MetallicGloss.png`, `<Name>_Normal.png`, and `<Name>_Emission.png` files in the texture directory selected by `VehiclePrefabBuilder`.

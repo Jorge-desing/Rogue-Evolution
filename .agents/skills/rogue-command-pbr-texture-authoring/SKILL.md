@@ -41,6 +41,15 @@ The current `RogueCommand/VehiclePBR_VertexWear` shader samples metallic from `M
 5. Put the four named PNGs in the existing Unity authoring texture folder. Keep generated intermediates under `artifacts/` until they are ready to replace a specific task-owned asset.
 6. Rebuild the relevant visual prefab with the existing Unity builder and continue with the AssetBundle authoring skill when a bundle is in scope. Verify effective importer settings after the builder/reimport; do not rely only on `.meta` text.
 
+## Compatible technique selection
+
+Use [compatible texture recipes](references/compatible-texture-recipes.md) when varying a finish or refining an atlas. It separates the existing automated Material Maker graph path from optional manual surface masks, markings, emission and padding. Keep this skill authoritative for the four-map and mesh contracts.
+
+- Start with the existing tactical graph's palette, panel scale, metallic/roughness curves and microdetail controls. Keep `tactical-hd-v2` nodes, connections and metadata; the CLI has no new per-technique switches.
+- Use manual surface masks only with a version-checked export path. Keep baseline Material Maker reports separate from later painted images; a baseline audit does not validate a manual edit.
+- Graph acceptance, exported-image checks and Unity visual review are separate results. Do not add fake emission or noise, drop provenance or bypass a failed check to make a finish pass.
+- Curvature/AO-driven wear, baked triplanar projection and cross-tool normal composition are not integrated by these recipes. Availability in an application's manual is insufficient to add them to this workflow.
+
 ## Preservation Rules
 
 - Never overwrite the source `.blend`, change generator CLI behavior, alter the AssetBundle contract, or modify unrelated model files as part of a texture-only task.
@@ -54,6 +63,6 @@ List the model and maps changed, the authoring application/version, channel pack
 
 ## Level 2 Module PBR Application
 
-- Reuse the canonical preset material set assigned to each module in `content/source-art/canonical-visual-modules.json`; 35 modules share 28 four-map 2048x2048 sets. Do not create duplicate texture sets unless the manifest maps a module to a genuinely new preset.
+- Reuse the canonical preset material set assigned to each module in `content/source-art/canonical-visual-modules.json`; read current module/preset coverage from the manifest rather than relying on a historical count. Do not create duplicate texture sets unless the manifest maps a module to a genuinely new preset.
 - Module meshes keep the RGBA vertex-wear contract on the FBX `Color` attribute, separate from the four texture maps. Keep Albedo/Emission sRGB, MetallicGloss linear with metallic in R and smoothness in A, and Normal as a normal map; the module builder verifies the imported material and mesh data.
 - Use `tools/Build-CanonicalVisualModuleTextures.ps1` for the current procedural batch and keep Material Maker mesh/material exports out of Unity.

@@ -7,15 +7,14 @@ This document defines the project-specific handoff from vehicle texturing to Uni
 | Path | Role | Project decision |
 |---|---|---|
 | Blender 4.5.14 LTS with `tools/generate_unit_model.py` / `tools/RogueModelKit.py` | Deterministic model and PBR atlas generation | Production baseline; retain the editable `.blend` and use the existing bake flags. |
-| ArmorPaint | Optional local painting and image-to-PBR assistance | Implemented as [a project skill](../../.agents/skills/rogue-command-armorpaint-texture-authoring/SKILL.md). The portable app can be staged only from an official archive the user already has access to; its neural models are optional. |
+| ArmorPaint | Optional local masks, channel painting, markings and padding | Implemented as [a project skill](../../.agents/skills/rogue-command-armorpaint-texture-authoring/SKILL.md). Stage only an accessible official archive and check its actual version/export. This is a manual refinement after the required Material Maker baseline. |
 | Material Maker 1.7 | Procedural material graphs and 3D texture painting | Implemented as [a project skill](../../.agents/skills/rogue-command-material-maker-texture-authoring/SKILL.md). The app is already staged under ignored `.tools/`; its paint project requires UVs and a single-submesh model. |
 | `blendsmith` | Public agent skill reference | Implemented as a [Rogue Command adaptation](../../.agents/skills/blendsmith/SKILL.md). The GPL-3.0-only upstream skill, templates, references, license, and notice are retained under that skill; the active entrypoint adapts its Blender 4.4 baseline and generic map assumptions to this project. |
 | `EL4CTEO/blender-skills` | Public Blender PBR and baking skills | Implemented as a [selective Blender 4.5.14 adaptation](../../.agents/skills/rogue-command-blender-pbr-45/SKILL.md). No unadapted Blender 5.2+ scripts are installed; ORM packing and the unsupported 5.2 `Thin Wall` socket are excluded. |
-| Adobe Substance 3D Sampler generative workflows | Optional ideation reference | Do not make beta/service-dependent generation a reproducible build requirement. |
 
 ## Repository Material Maker matrix
 
-The canonical configuration is `tools/material-maker/rogue-command-material-maker.json`; run `python tools/validate_material_maker_config.py` before changing it. It configures four image-authoring routes while keeping Blender authoritative for production geometry:
+The canonical configuration is `tools/material-maker/rogue-command-material-maker.json`; run `python -m tools.validate_material_maker_config` before changing it. It configures four image-authoring routes while keeping Blender authoritative for production geometry:
 
 | Workflow | Use | Authority | Downstream |
 |---|---|---|---|
@@ -25,6 +24,18 @@ The canonical configuration is `tools/material-maker/rogue-command-material-make
 | `procedural` | Graph-only texture generation | Blender UV contract | Same four-map packer and validation |
 
 Use `tools/Run-MaterialMakerBake.ps1 -Workflow <name>`. The runner clears stale raw/final outputs before every export, writes a workflow manifest beside the maps, passes the `.ptex` and 3D-paint workspace to `audit_material_maker_output.py`, uses the same four-map contract, and never imports Material Maker-generated Unity `.mat` files. The audit report exposes machine-readable URP map metrics (dimensions, MetallicGloss RGB consistency and smoothness alpha, tangent-normal length/Z health, emission coverage), procedural graph metrics (`colorize_metallic`, `edge_detect_emission`, `colorize_emission`, and the `micro_perlin` multi-scale detail stack), and 3D-paint preservation flags (`requiresUv`, `uvFrozen`, `singleSubmeshForPaint`, `paintProxyPresent`, `productionMeshUntouched`, and source hash). The `tactical-hd-v2` graph drives high-frequency micrograin into both tangent normal and roughness so 2048/4096 maps retain material breakup without flattening panel seams. Keep the report under `artifacts/`; it is authoring/local evidence, not runtime render evidence.
+
+## Compatible techniques and acceptance boundaries
+
+Use the [shared compatible texture recipes](../../.agents/skills/rogue-command-pbr-texture-authoring/references/compatible-texture-recipes.md). Existing tactical graph palette/scale/response controls and the `micro_perlin` detail stack use the current runner, packer and graph audit. An edited `-TemplatePath` must exist; do not combine it with `-ForceTemplate`. Export prefixes follow the template filename. Use a dedicated output directory because the runner clears its raw and matching final outputs.
+
+Material Maker `.ptex` files are saved/generated material graphs. Compatibility follows `.ptex` → Material Maker → four PNG maps → Blender or Unity; the repository's Blender/Unity tools do not directly import the graph. Generated templates stay in `artifacts/`, while a hand-authored graph required for a promoted material is preserved with its task-owned source-art inputs.
+
+Surface masks, painted markings, localized emission and padding are optional manual refinements through a version-checked ArmorPaint image export. Preserve Material Maker baseline provenance and use the manual packing/four-map validation path from the recipes. A baseline graph audit is not acceptance of subsequently painted images, and `three_d` proxy preparation is not automated painting.
+
+Record graph acceptance, final-map checks, source-art review and effective Unity review separately. The current procedural audit requires tactical wiring/profile and positive graph emission energy even without `-Strict`; strict mode also checks pack warnings and requested resolution. Report incompatible uniform/non-emissive finishes rather than adding fake noise/glow or hiding provenance. Padding and minification need UV-model/Unity review; image statistics cannot prove seam quality, material identity or absence of temporal shimmer.
+
+Curvature/AO-driven automatic wear, baked triplanar projection, cross-tool normal composition, displacement, UDIM, changed UVs, new shader channels and neural generation have no integrated recipe here. Do not infer a repository export/acceptance path from application documentation alone.
 
 ## Unity and AssetBundle diagnostic report
 
