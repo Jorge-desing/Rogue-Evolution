@@ -1,5 +1,11 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Native damage event routing
+
+Hit mechanics now follow native OnHasDealtDamage with the final post-armor amount. Native invulnerability, ignored damage and shield interception control event emission. OnHasKilledEntity handles kill experience/currency when hit notification is suppressed. The shared lifetime claim prevents duplicate processing. Kill-only events skip hit boosts and life recovery. The regression covers native argument routing and repeated kill-only notifications. Steam behavior remains unverified.
+
+Release built with zero warnings/errors. Complete C# acceptance passed 599 checks with one Windows symlink skip in artifacts/general-capability-audit/native-damage-events/complete-final.log. Python all-mode passed 821 with one skip in artifacts/general-capability-audit/native-damage-events-python-final.json. Two stale MCP catalog fixtures were updated to the existing 234 canonical tools. Deployment backup/hash manifest is under artifacts/general-capability-audit/native-damage-events-deployment-20261114143222. Next verify native accepted damage and suppressed-hit kills in Steam under the runtime runbook.
+
 ## Combat kill reward ownership
 
 The first hostile lethal notification claims the loader's hit effects for a target lifetime, including currency rewards, experience and life recovery. Later lethal notifications return before those effects. Living spawn/reuse attachment resets the claim and profile/registry resets clear it. The claim uses weak references. The regression exercises both reward sources, experience, life recovery, repeated notifications and target reuse. Steam behavior remains unverified.

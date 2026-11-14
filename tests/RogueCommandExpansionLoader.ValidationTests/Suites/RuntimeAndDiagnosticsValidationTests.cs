@@ -3508,6 +3508,16 @@ internal static partial class ValidationTestRunner
             if (Bank.Deposits.Count != rewardedCount + 2 ||
                 RuntimeUnitMechanicsDirector.GetCombatXpForEntity(commander) != earnedXp + 3)
                 throw new InvalidOperationException("A reused target must be able to award a reward for its new life.");
+            float recoveredHealth = commander.CurrentHealth;
+            enemy.CurrentHealth = 100f;
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(enemy);
+            enemy.CurrentHealth = 0f;
+            RuntimeHarmonyPatches.EntityHasKilledEntityPostfix(commander, enemy);
+            RuntimeHarmonyPatches.EntityHasKilledEntityPostfix(commander, enemy);
+            if (Bank.Deposits.Count != rewardedCount + 4 ||
+                RuntimeUnitMechanicsDirector.GetCombatXpForEntity(commander) != earnedXp + 6 ||
+                commander.CurrentHealth != recoveredHealth)
+                throw new InvalidOperationException("Native kill-only events must grant one reward and experience without hit recovery.");
         }
         finally
         {
@@ -4044,7 +4054,7 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("Fixture reports same-player entities as enemies.");
             }
 
-            RuntimeHooks.EntityTakeDamagePostfix(friendlyTarget, 1f, attacker);
+            RuntimeHarmonyPatches.EntityHasDealtDamagePostfix(attacker, friendlyTarget, 1f);
             if (friendlyTarget.AppliedStatusEffects.Any(effect => effect.Effect == StatusEffect.Stun))
             {
                 throw new InvalidOperationException("On-hit status effects must not affect a friendly target.");
@@ -4058,7 +4068,7 @@ internal static partial class ValidationTestRunner
                 CurrentHealth = 100f,
                 MaxHealth = 100f
             };
-            RuntimeHooks.EntityTakeDamagePostfix(hostileTarget, 1f, attacker);
+            RuntimeHarmonyPatches.EntityHasDealtDamagePostfix(attacker, hostileTarget, 1f);
             if (!hostileTarget.AppliedStatusEffects.Any(effect =>
                     effect.Effect == StatusEffect.Stun &&
                     effect.DurationType == SetStatusEffect.DurationType.Seconds &&

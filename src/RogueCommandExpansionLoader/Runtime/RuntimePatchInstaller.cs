@@ -396,13 +396,24 @@ namespace RogueCommandExpansionLoader.Runtime
                         parameters[0].ParameterType == typeof(int);
                 });
             MethodInfo isProductionPossiblePrefix = Hook("EntityControllerIsProductionPossiblePrefix");
-            MethodInfo takeDamage = RuntimeReflection.FindUniqueMethod(entityController, "TakeDamage",
+            MethodInfo dealtDamage = RuntimeReflection.FindUniqueMethod(entityController, "OnHasDealtDamage",
                 delegate(MethodInfo method)
                 {
                     ParameterInfo[] parameters = method.GetParameters();
-                    return parameters.Length == 4 && parameters[0].ParameterType == typeof(float) && parameters[1].ParameterType == entityController;
+                    return method.ReturnType == typeof(void) && parameters.Length == 3 &&
+                        parameters[0].ParameterType == entityController &&
+                        parameters[1].ParameterType == typeof(int) &&
+                        parameters[2].ParameterType == typeof(float);
                 });
-            MethodInfo takeDamagePostfix = Hook("EntityTakeDamagePostfix");
+            MethodInfo dealtDamagePostfix = Hook("EntityHasDealtDamagePostfix");
+            MethodInfo killedEntity = RuntimeReflection.FindUniqueMethod(entityController, "OnHasKilledEntity",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.ReturnType == typeof(void) && parameters.Length == 1 &&
+                        parameters[0].ParameterType == entityController;
+                });
+            MethodInfo killedEntityPostfix = Hook("EntityHasKilledEntityPostfix");
 
             // Optional gameplay hooks: resolved defensively so a missing target never
             // disables the rest of the patch plan. These extend gameplay (death,
@@ -642,7 +653,8 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(entityDestroy, null, entityDestroyPostfix, entityDestroyTranspiler, null));
             plan.Add(new PatchPlan(entityFixedUpdate, entityFixedUpdatePrefix, entityFixedUpdatePostfix));
             plan.Add(new PatchPlan(isProductionPossible, isProductionPossiblePrefix, null));
-            plan.Add(new PatchPlan(takeDamage, null, takeDamagePostfix));
+            plan.Add(new PatchPlan(dealtDamage, null, dealtDamagePostfix));
+            plan.Add(new PatchPlan(killedEntity, null, killedEntityPostfix));
 
             // Optional gameplay hooks (resolved defensively): death, healing, and armor
             // repair. These are additive and never disable the rest of the plan when

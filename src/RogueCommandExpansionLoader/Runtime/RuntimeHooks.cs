@@ -1443,6 +1443,11 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static void EntityHasKilledEntityPostfix(object __instance, object __0)
+        {
+            RuntimeUnitMechanicsDirector.OnEntityKilledBy(__0, __instance);
+        }
+
         public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
         {
             if (__instance == null || __1 == null || __0 <= 0f)
@@ -2514,6 +2519,16 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void EntityTakeDamagePostfix(object __instance, float __0, object __1)
         {
             RuntimeHooks.EntityTakeDamagePostfix(__instance, __0, __1);
+        }
+
+        public static void EntityHasDealtDamagePostfix(object __instance, object __0, float __2)
+        {
+            RuntimeHooks.EntityTakeDamagePostfix(__0, __2, __instance);
+        }
+
+        public static void EntityHasKilledEntityPostfix(object __instance, object __0)
+        {
+            RuntimeHooks.EntityHasKilledEntityPostfix(__instance, __0);
         }
 
         public static void CreateBuildingPlacementGhostPrefix()

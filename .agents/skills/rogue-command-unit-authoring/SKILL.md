@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Combat hit mechanics consume native OnHasDealtDamage with the post-armor amount. Native invulnerability, ignored damage and shield interception decide whether that event fires. OnHasKilledEntity grants kill experience and currency when the native hit notification was suppressed, with the same lifetime claim preventing duplicate kill effects. Kill-only processing skips combat boosts and life recovery.
+
 The first hostile lethal notification processes the loader's hit effects once per target lifetime, including experience, life recovery and attacker/victim currency rewards. Later lethal notifications return before those effects. Living spawn/reuse attachment resets the claim, and profile/registry reset clears it. Claims use weak target references so retired entities can be collected.
 
 Field healing and armor repair share a pulse interval of one divided by positive healRate, bounded to 0.25–5 seconds. Zero uses a one-second interval.

@@ -198,7 +198,7 @@ class StateWaitTests(unittest.TestCase):
         spec = next(tool for tool in SERVER.TOOLS if tool["name"] == "automation_wait_for_state")
         self.assertEqual(set(spec["inputSchema"]["properties"]["tool"]["enum"]), SERVER.WAIT_STATE_TOOLS)
         canonical = [tool for tool in SERVER.TOOLS if not tool["description"].startswith("Alias for")]
-        self.assertEqual(len(canonical), 232)
+        self.assertEqual(len(canonical), 234)
         self.assertLess(len(json.dumps({"tools": canonical}, separators=(",", ":")).encode("utf-8")), 91000)
 
     def test_battlefield_sequence_dispatches_once_and_waits_for_arrival(self):

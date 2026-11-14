@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Harmony Policy
 
+Damage effects hook the exact instance void EntityController.OnHasDealtDamage(EntityController, int, float) signature. The shim maps its target and final amount to the shared combat handler. Kill effects also hook instance void OnHasKilledEntity(EntityController) for native damage paths that suppress hit events. Both paths share lifetime kill ownership. The legacy TakeDamage postfix helper remains callable for compatibility.
+
 The existing EntityController.IsProductionPossible gate calls ShouldBlockProduction for per-factory queue capacity before the existing per-product AI population caps. It reads the product profile and native ProductionInfo.queuedCount. Native Produce remains responsible for bank changes, free/instant replacement behavior and the actual queue.
 
 Authoritative policy for creating, reviewing, and auditing BepInEx 5 / Harmony 2 patches in Rogue Command.

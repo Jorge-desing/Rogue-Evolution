@@ -2009,7 +2009,17 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static void OnEntityDealtDamage(object targetObj, float amount, object originatorObj)
         {
-            if (targetObj == null || originatorObj == null || amount <= 0f)
+            ProcessDamageEffects(targetObj, amount, originatorObj, false);
+        }
+
+        public static void OnEntityKilledBy(object targetObj, object originatorObj)
+        {
+            ProcessDamageEffects(targetObj, 0f, originatorObj, true);
+        }
+
+        private static void ProcessDamageEffects(object targetObj, float amount, object originatorObj, bool killOnly)
+        {
+            if (targetObj == null || originatorObj == null || (!killOnly && amount <= 0f))
             {
                 return;
             }
@@ -2019,6 +2029,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 EnsureReflection(originatorObj.GetType());
                 float targetHealth = ReadFloatProperty(_currentHealthProperty, targetObj, 1f);
                 bool targetKilled = targetHealth <= 0f || ReadBoolProperty(_destroyStartedProperty, targetObj);
+                if (killOnly && !targetKilled)
+                {
+                    return;
+                }
                 bool hostileTarget = IsEnemy(originatorObj, targetObj);
                 if (targetKilled && hostileTarget && !TryClaimKillEffects(targetObj))
                 {
@@ -2039,7 +2053,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     IsEnemy(originatorObj, targetObj))
                 {
                     // 1. Combat Boosts on hit (visual status effect + exact numeric SpecificValueChange)
-                    if (profile.CombatBoosts != null && profile.CombatBoosts.Length > 0)
+                    if (!killOnly && profile.CombatBoosts != null && profile.CombatBoosts.Length > 0)
                     {
                         for (int i = 0; i < profile.CombatBoosts.Length; i++)
                         {
@@ -2271,7 +2285,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     }
 
                     // 4. Vampiric Leech on dealt damage
-                    if (profile.VampiricLeech != null && profile.VampiricLeech.siphonRatio > 0f)
+                    if (!killOnly && profile.VampiricLeech != null && profile.VampiricLeech.siphonRatio > 0f)
                     {
                         float siphon = amount * profile.VampiricLeech.siphonRatio;
                         if (profile.VampiricLeech.maxSiphonPerHit > 0f && siphon > profile.VampiricLeech.maxSiphonPerHit)
