@@ -37,6 +37,8 @@ Factory reinforcement applies `baseIndex` to both live-unit counts and factory q
 
 Harvester escort retains its assigned squad across scans; `maxEscorts` caps the active group, not new recruits per scan. Owned orders refresh after one meter of destination drift using current-command replacement. Threat loss, ineligible defenders and shutdown release only owned current orders, preserving the native queue and unrelated current orders. Confirm threats through native hostility as well as registry membership.
 
+Retreat-and-regroup uses average health of eligible combatants in its configured base. Recovery is checked every two seconds independently of the dispatch cooldown. Recovery, loss of eligibility and shutdown release only the module's tagged current orders with current-command cancellation; preserve queued commands and any intervening order from another owner.
+
 1. **Decide** (FSM / Behavior Tree / Utility Scorer) $\rightarrow$ Intent & Target
 2. **Path** (NavMesh / Bounded A*) $\rightarrow$ Waypoints (timer-gated repaths, never every frame)
 3. **Steer** (`EntityController` movement forces) $\rightarrow$ Motion ($\Delta\text{pos} \cdot dt$)
@@ -87,7 +89,7 @@ All 23 modules are registered in `AiModuleRegistry.CreateDefault()`:
 | `sample:tactical-regroup` | Pulls combatants back to rally point upon heavy losses | `baseIndex` (-1–31), `healthRatioThreshold` (0.1–0.7), `regroupRadiusCells` (5–50) | `base: -1`, `threshold: 0.35`, `radius: 15` |
 | `sample:factory-reinforcement` | Produces reinforcements within scoped live-plus-queued army and factory queue limits | `baseIndex` (-1–31), `checkIntervalSeconds` (1–120s), `maxQueuePerFactory` (1–5), `maxStandingArmy` (1–100), `requireEconomy` (bool), `minGameTimeSeconds` (0–600s) | `base: -1`, `check: 10s`, `queue: 1`, `army: 25`, `economy: true`, `minTime: 15s` |
 | `sample:flanking-strike` | Flanking assault groups maneuver around main battle lines | `baseIndex` (0–31), `flankAngleDegrees` (30–90), `squadSize` (2–6) | `angle: 60`, `squadSize: 3` |
-| `sample:retreat-and-regroup` | Pulls critically damaged units back to base repair zones | `baseIndex` (0–31), `retreatHealthRatio` (0.1–0.5), `cooldownSeconds` (5–120s) | `ratio: 0.25`, `cooldown: 20s` |
+| `sample:retreat-and-regroup` | Regroups a base's combatants when their average health falls below threshold, then releases them on recovery | `baseIndex` (0–31), `healthThresholdPercent` (1–99), `regroupRadiusCells` (1–32), `cooldownSeconds` (5–300s) | `base: 0`, `health: 30%`, `radius: 8`, `cooldown: 20s` |
 | `sample:harvester-escort` | Maintains a capped defensive squad for the nearest threatened harvester | `baseIndex` (0–31), `escortRadiusCells` (1–64), `scanIntervalSeconds` (1–60s), `maxEscorts` (1–16), `engageAttackers` (bool) | `base: 0`, `radius: 8`, `scan: 5s`, `max: 3`, `engage: true` |
 | `sample:patrol-and-intercept` | Perimeter patrol; requires `CurrentPlayerCommandName == DoNothing` and empty `_commandChain` queue | None (fails closed on non-empty queue) | None |
 | `sample:adaptive-commander` | Promotes commander, pulses command auras, modulates tactical stances & doctrine | None (binds to profile defaults) | Dynamic |

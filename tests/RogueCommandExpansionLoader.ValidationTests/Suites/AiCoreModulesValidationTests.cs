@@ -2054,6 +2054,63 @@ internal static partial class ValidationTestRunner
             }
         }
     }),
+    ("retreat and regroup releases recovered squads during cooldown and preserves foreign orders", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var unit = new EntityController
+            {
+                IsControlledByAi = true, IsUnit = true, IsCombatUnit = true,
+                CanAttackAndIsAttackEnabled = true, CanMoveAndMovementIsEnabled = true,
+                CurrentHealth = 10f, MaxHealth = 100f
+            };
+            ExistingControllers.Instance.AiUnits().Add(unit);
+            behaviour = new RetreatAndRegroupAiModule().CreateBehaviour(new DefaultAiBehaviour(), null);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            if (unit.ExecuteCommandCallCount != 1 || unit.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand)
+                throw new InvalidOperationException("Critical squad did not retreat ahead of its existing order.");
+            UnityEngine.Time.time = 13f;
+            unit.CurrentHealth = 100f;
+            behaviour.Tick();
+            if (!unit.LastExecutedCommand.HasValue || unit.LastExecutedCommand.Value.command != EntityCommand.Stop().command ||
+                unit.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand)
+                throw new InvalidOperationException("Recovered squad stayed in retreat during dispatch cooldown.");
+            unit.CurrentHealth = 10f;
+            UnityEngine.Time.time = 16f;
+            behaviour.Tick();
+            if (unit.ExecuteCommandCallCount != 2)
+                throw new InvalidOperationException("Retreat cooldown allowed immediate repeated dispatch.");
+            UnityEngine.Time.time = 31f;
+            behaviour.Tick();
+            if (unit.ExecuteCommandCallCount != 3)
+                throw new InvalidOperationException("Squad could not retreat again after cooldown.");
+            var foreign = EntityCommand.Move(new Vector3(20f, 0f, 0f));
+            foreign.tag = "foreign-owner";
+            unit.ExecuteCommand(foreign, EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+            int count = unit.ExecuteCommandCallCount;
+            behaviour.OnDestroyed();
+            if (unit.ExecuteCommandCallCount != count || unit.CurrentCommandTag != "foreign-owner")
+                throw new InvalidOperationException("Retreat shutdown cancelled an unrelated current order.");
+
+            behaviour = new RetreatAndRegroupAiModule().CreateBehaviour(new DefaultAiBehaviour(), null);
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            behaviour.OnDestroyed();
+            if (unit.ExecuteCommandCallCount != count + 2 || !unit.LastExecutedCommand.HasValue ||
+                unit.LastExecutedCommand.Value.command != EntityCommand.Stop().command)
+                throw new InvalidOperationException("Retreat shutdown did not release its own active order.");
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("retreat-and-regroup AI parameter parser supplies bounded defaults and validates limits", () =>
     {
         if (!RetreatAndRegroupParameterParser.TryParse(null, out RetreatAndRegroupSettings defaults,

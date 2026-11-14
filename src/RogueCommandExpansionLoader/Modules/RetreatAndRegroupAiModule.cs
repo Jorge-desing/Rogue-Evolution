@@ -49,8 +49,10 @@ namespace RogueCommandExpansionLoader.Modules
 
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly RetreatAndRegroupSettings _settings;
+            private readonly HashSet<EntityController> _retreatingUnits = new HashSet<EntityController>();
             private string _commandTag;
             private float _nextScanAt;
+            private float _nextRetreatAt;
             private bool _stopped;
 
             public RetreatAndRegroupRuntimeBehaviour(
@@ -84,9 +86,11 @@ namespace RogueCommandExpansionLoader.Modules
 
                 _nextScanAt = now + ScanIntervalSeconds;
 
-                HashSet<EntityController> aiUnits = ExistingControllers.Instance.AiUnits();
+                ExistingControllers existing = ExistingControllers.Instance;
+                HashSet<EntityController> aiUnits = existing != null ? existing.AiUnits() : null;
                 if (aiUnits == null || aiUnits.Count == 0)
                 {
+                    ReleaseRetreats(null);
                     return;
                 }
 
@@ -114,16 +118,22 @@ namespace RogueCommandExpansionLoader.Modules
                     }
                 }
 
+                ReleaseRetreats(candidates);
                 if (candidates.Count == 0 || counted == 0)
                 {
+                    ReleaseRetreats(null);
                     return;
                 }
 
                 float averageHealthPercent = totalHealthPercent / counted;
                 if (averageHealthPercent >= _settings.HealthThresholdPercent)
                 {
+                    ReleaseRetreats(null);
                     return;
                 }
+
+                // Recovery is checked every scan even while dispatch is cooling down.
+                if (now < _nextRetreatAt) return;
 
                 Vector3 regroupPoint = _gameBehaviour.transform.position;
                 // Offset the regroup point slightly so units cluster around the base rather than stacking.
@@ -152,6 +162,7 @@ namespace RogueCommandExpansionLoader.Modules
                     {
                         unit.ExecuteCommand(retreatCommand,
                             EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                        _retreatingUnits.Add(unit);
                         dispatched++;
                     }
                     catch (Exception ex)
@@ -163,7 +174,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                 if (dispatched > 0)
                 {
-                    _nextScanAt = now + _settings.CooldownSeconds;
+                    _nextRetreatAt = now + _settings.CooldownSeconds;
                     Debug.Log("[RogueCommandExpansionLoader] AI base " + _settings.BaseIndex +
                         " ordered retreat-and-regroup (" + dispatched + " units) at " + regroupPoint + ".");
                 }
@@ -172,7 +183,30 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
+                ReleaseRetreats(null);
                 _commandTag = null;
+            }
+
+            private void ReleaseRetreats(List<EntityController> retained)
+            {
+                foreach (EntityController unit in new List<EntityController>(_retreatingUnits))
+                {
+                    if (retained != null && retained.Contains(unit) && unit != null &&
+                        unit.CurrentCommandIsTaggedWith(_commandTag)) continue;
+                    if (unit != null && !unit.IsDestroyed && !unit.DestroyHasBeenStarted &&
+                        _commandTag != null && unit.CurrentCommandIsTaggedWith(_commandTag))
+                    {
+                        try
+                        {
+                            unit.ExecuteCommand(EntityCommand.Stop(), EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogWarning("[RogueCommandExpansionLoader] Could not release retreat order: " + ex.Message);
+                        }
+                    }
+                    _retreatingUnits.Remove(unit);
+                }
             }
         }
     }

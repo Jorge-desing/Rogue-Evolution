@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — retreat recovery lifecycle
+
+- Retreat-and-regroup tracks its dispatched combatants and releases tagged current orders when average group health recovers, eligibility is lost, or the module shuts down. Pending native orders and foreign current orders are preserved.
+- Recovery checks retain the two-second scan independently of dispatch cooldown; cooldown still prevents rapid repeat retreats. Existing average-health/base scope and attack-move regroup behavior are retained.
+- Release build: zero warnings/errors. AiCoreModules: 71/71 passed, including recovery before cooldown expiry, redispatch timing, foreign ownership and active shutdown cleanup. Local evidence only; Steam and active-profile execution remain unverified.
+- Deployment backup and hash manifest: `artifacts/general-capability-audit/retreat-deployment/manifest.json`.
+
 ## General capability audit — persistent harvester escorts
 
 - Harvester escort keeps one capped squad across scans instead of recruiting another `maxEscorts` defenders while previous escorts remain active. Existing escorts are preferred; lost/ineligible units can be replaced.
