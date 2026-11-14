@@ -17,6 +17,31 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("support aura restores fractional missing health and shield", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var profile = new UnitRuntimeMechanicsProfile { EntityId = "test:fractional-aura", Aura = new ContentUnitAuraDefinition { auraRadius = 4f, auraType = "Heal", buffAmount = 1f, affectsAllies = true } };
+            RuntimeUnitMechanicsDirector.RegisterProfile(profile.EntityId, profile);
+            var source = new EntityController { entityId = profile.EntityId, IsUnit = true, IsControlledByPlayer = true };
+            var target = new EntityController { IsUnit = true, IsControlledByPlayer = true, CurrentHealth = 99.95f, MaxHealth = 100f, HasShield = true, CurrentShield = 99.95f, MaxShield = 100f };
+            ExistingControllers.Instance.PlayerUnits().Add(source);
+            ExistingControllers.Instance.PlayerUnits().Add(target);
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(source);
+            var director = source.gameObject.GetComponent<RuntimeUnitMechanicsDirector>()!;
+            UnityEngine.Time.time = 11f;
+            director.TickMechanics();
+            if (target.CurrentHealth != 100f) throw new Exception("Fractional missing health was not restored.");
+            profile.Aura.auraType = "Shield";
+            UnityEngine.Time.time = 12.1f;
+            director.TickMechanics();
+            if (target.CurrentShield != 100f) throw new Exception("Fractional missing shield was not restored.");
+        }
+        finally { ExistingControllers.Instance.Reset(); RuntimeUnitMechanicsDirector.ClearProfiles(); UnityEngine.Time.time = 0f; }
+    }),
     ("stealth pulse applies native AI targeting protection after grace", () =>
     {
         var director = typeof(RuntimeUnitMechanicsDirector);

@@ -2655,7 +2655,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     float curHp = ReadFloatProperty(_currentHealthProperty, candidate, 0f);
                     float maxHp = ReadFloatProperty(_maxHealthProperty, candidate, 0f);
-                    if (maxHp > 0f && curHp < maxHp - 0.1f)
+                    if (maxHp > 0f && curHp < maxHp)
                     {
                         float ratio = curHp / maxHp;
                         if (ratio < lowestHealthRatio)
@@ -2670,7 +2670,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     float curArmor = ReadFloatProperty(_currentArmorProperty, candidate, 0f);
                     float maxArmor = ReadFloatProperty(_maxArmorProperty, candidate, 0f);
-                    if (maxArmor > 0f && curArmor < maxArmor - 0.1f)
+                    if (maxArmor > 0f && curArmor < maxArmor)
                     {
                         float ratio = curArmor / maxArmor;
                         if (ratio < lowestArmorRatio)
@@ -2768,7 +2768,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     float amount = aura.buffAmount > 0f ? aura.buffAmount : 4f;
                     float curHp = ReadFloatProperty(_currentHealthProperty, candidate, 0f);
                     float maxHp = ReadFloatProperty(_maxHealthProperty, candidate, 0f);
-                    if (!IsHealthHealingBlocked(candidate) && maxHp > 0f && curHp < maxHp - 0.1f)
+                    if (!IsHealthHealingBlocked(candidate) && maxHp > 0f && curHp < maxHp)
                     {
                         InvokeHeal(candidate, amount, self);
                         affected = ReadFloatProperty(_currentHealthProperty, candidate, curHp) > curHp;
@@ -2781,7 +2781,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         float curShield = ReadFloatProperty(_currentShieldProperty, candidate, 0f);
                         float maxShield = ReadFloatProperty(_maxShieldProperty, candidate, 0f);
-                        if (maxShield > 0f && curShield < maxShield - 0.1f)
+                        if (maxShield > 0f && curShield < maxShield)
                         {
                             InvokeChargeShield(candidate, amount);
                             affected = ReadFloatProperty(_currentShieldProperty, candidate, curShield) > curShield;
@@ -2791,7 +2791,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         float curArmor = ReadFloatProperty(_currentArmorProperty, candidate, 0f);
                         float maxArmor = ReadFloatProperty(_maxArmorProperty, candidate, 0f);
-                        if (maxArmor > 0f && curArmor < maxArmor - 0.1f)
+                        if (maxArmor > 0f && curArmor < maxArmor)
                         {
                             InvokeRepairArmor(candidate, amount, self);
                             affected = ReadFloatProperty(_currentArmorProperty, candidate, curArmor) > curArmor;

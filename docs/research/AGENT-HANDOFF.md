@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Fractional support recovery (2026-11-14)
+
+Healing and Heal/Shield aura pulses now consider health, armor and shield deficits below 0.1 instead of leaving them unrecovered. Release built without warnings; RuntimeAndDiagnostics passed 240/240 (`artifacts/general-capability-audit/fractional-support/runtime.log`). Game was closed for deployment; backup and SHA-256 manifest are `artifacts/general-capability-audit/fractional-support-deployment-20261114145018/manifest.json`. Steam behavior remains unverified; next inspect native recovery and pulse behavior during an authorized match.
+
+
 ## Combat aura modifiers (2026-11-14)
 
 Deployment completed after the game closed. Release rebuilt without warnings and the installed DLL matched SHA-256 `43F0A13B0E0BFF358DAD77B79D46071D852374CF4A5760ED95DD4421202403DF`. Backup and manifest: `artifacts/general-capability-audit/aura-deployment-20261114144714/manifest.json`. The pending-deployment note below is superseded; gameplay and balance remain unverified.
