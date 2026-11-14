@@ -371,6 +371,21 @@ def patch_source(source: Path) -> list[str]:
         if _replace_once(source / relative_path, before, after, label):
             changed.append(label)
 
+    animation_scene = source / "material_maker/windows/export_animation/export_animation.tscn"
+    for shader_id, material_id in (("1", "2"), ("3", "4"), ("10", "11")):
+        before = (
+            f'[sub_resource type="Shader" id="{shader_id}"]\n\n'
+            f'[sub_resource type="ShaderMaterial" id="{material_id}"]\n'
+        )
+        after = (
+            f'[sub_resource type="Shader" id="{shader_id}"]\n'
+            'code = "shader_type canvas_item;\\nvoid fragment() { COLOR = vec4(0.0); }\\n"\n\n'
+            f'[sub_resource type="ShaderMaterial" id="{material_id}"]\n'
+        )
+        label = f"valid transparent fallback for animation shader {shader_id}"
+        if _replace_once(animation_scene, before, after, label):
+            changed.append(label)
+
     ptex_spatial = source / "addons/material_maker/import_plugin/ptex_spatial_material.gd"
     if _replace_once(
         ptex_spatial,
