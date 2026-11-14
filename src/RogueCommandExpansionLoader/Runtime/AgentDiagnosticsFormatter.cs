@@ -327,6 +327,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 ["aiCreateBuildingTranspilerCount"] = RuntimeHooks.AiCreateBuildingTranspilerCount,
                 ["aiConstructableEntitiesTranspilerCount"] = RuntimeHooks.AiConstructableEntitiesTranspilerCount,
                 ["entityAttackClosestEntityTranspilerCount"] = RuntimeHooks.EntityAttackClosestEntityTranspilerCount,
+                ["entityTakeDamageTranspilerCount"] = RuntimeHooks.EntityTakeDamageTranspilerCount,
+                ["entityLandsCriticalHitTranspilerCount"] = RuntimeHooks.EntityLandsCriticalHitTranspilerCount,
+                ["shootProjectileSpawnedTranspilerCount"] = RuntimeHooks.ShootProjectileSpawnedTranspilerCount,
+                ["entitySetStatusEffectTranspilerCount"] = RuntimeHooks.EntitySetStatusEffectTranspilerCount,
+                ["flockingGetMovementInfoTranspilerCount"] = RuntimeHooks.FlockingGetMovementInfoTranspilerCount,
             };
             return Serialize(view);
         }

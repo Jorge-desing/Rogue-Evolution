@@ -197,6 +197,8 @@
              Link="Runtime/NativeHarvestRangePatch.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/NativeAiDirectorTranspilers.cs"
              Link="Runtime/NativeAiDirectorTranspilers.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/NativeCombatMovementTranspilers.cs"
+             Link="Runtime/NativeCombatMovementTranspilers.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeFactionColorResolver.cs"
              Link="Runtime/Visual/RuntimeFactionColorResolver.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/WeaponShotFeedbackTracker.cs"

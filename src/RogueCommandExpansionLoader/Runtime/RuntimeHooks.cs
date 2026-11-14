@@ -65,6 +65,11 @@ namespace RogueCommandExpansionLoader.Runtime
         private static int _aiCreateBuildingTranspilerCount;
         private static int _aiConstructableEntitiesTranspilerCount;
         private static int _entityAttackClosestEntityTranspilerCount;
+        private static int _entityTakeDamageTranspilerCount;
+        private static int _entityLandsCriticalHitTranspilerCount;
+        private static int _shootProjectileSpawnedTranspilerCount;
+        private static int _entitySetStatusEffectTranspilerCount;
+        private static int _flockingGetMovementInfoTranspilerCount;
         private static string _lastExecutedCommandKind = string.Empty;
         private static readonly HashSet<int> _activeRegisteredEntities = new HashSet<int>();
         private static FieldInfo _cachedCommandKindField;
@@ -103,6 +108,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static int AiCreateBuildingTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _aiCreateBuildingTranspilerCount, 0, 0);
         public static int AiConstructableEntitiesTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _aiConstructableEntitiesTranspilerCount, 0, 0);
         public static int EntityAttackClosestEntityTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityAttackClosestEntityTranspilerCount, 0, 0);
+        public static int EntityTakeDamageTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityTakeDamageTranspilerCount, 0, 0);
+        public static int EntityLandsCriticalHitTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entityLandsCriticalHitTranspilerCount, 0, 0);
+        public static int ShootProjectileSpawnedTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _shootProjectileSpawnedTranspilerCount, 0, 0);
+        public static int EntitySetStatusEffectTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _entitySetStatusEffectTranspilerCount, 0, 0);
+        public static int FlockingGetMovementInfoTranspilerCount => System.Threading.Interlocked.CompareExchange(ref _flockingGetMovementInfoTranspilerCount, 0, 0);
 
         public static string LastExecutedCommandKind
         {
@@ -180,6 +190,11 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Exchange(ref _aiCreateBuildingTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _aiConstructableEntitiesTranspilerCount, 0);
             System.Threading.Interlocked.Exchange(ref _entityAttackClosestEntityTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityTakeDamageTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entityLandsCriticalHitTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _shootProjectileSpawnedTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _entitySetStatusEffectTranspilerCount, 0);
+            System.Threading.Interlocked.Exchange(ref _flockingGetMovementInfoTranspilerCount, 0);
             lock (Gate)
             {
                 _lastExecutedCommandKind = string.Empty;
@@ -2195,6 +2210,233 @@ namespace RogueCommandExpansionLoader.Runtime
             return false;
         }
 
+        private static FieldInfo _cachedFlockingEntityControllerField;
+        private static FieldInfo _cachedShootProjectileSelfField;
+        private const int NegativeStatusEffectMask = 0x10 | 0x20 | 0x40 | 0x200 | 0x8000 | 0x40000 | 0x1000000 | 0x2000000;
+
+        private static string TryReadUnitTacticalStance(object entityObj)
+        {
+            if (entityObj == null)
+            {
+                return "Standard";
+            }
+
+            try
+            {
+                int key = RuntimeUnitMechanicsDirector.GetEntityTrackingKey(entityObj);
+                if (key == 0)
+                {
+                    return "Standard";
+                }
+
+                string stance = RuntimeGameplayCommandDirector.GetUnitTacticalStance(key.ToString());
+                return string.IsNullOrWhiteSpace(stance) ? "Standard" : stance;
+            }
+            catch
+            {
+                return "Standard";
+            }
+        }
+
+        public static float OnEntityTakeDamageTranspiler(float amount, object targetObj, object originatorObj, bool ignoreArmor)
+        {
+            System.Threading.Interlocked.Increment(ref _entityTakeDamageTranspilerCount);
+            if (amount <= 0f || float.IsNaN(amount) || float.IsInfinity(amount))
+            {
+                return amount;
+            }
+
+            try
+            {
+                float multiplier = 1f;
+                if (originatorObj != null)
+                {
+                    string originatorStance = TryReadUnitTacticalStance(originatorObj);
+                    if (string.Equals(originatorStance, "Aggressive", StringComparison.OrdinalIgnoreCase))
+                    {
+                        multiplier *= 1.15f;
+                    }
+                    else if (string.Equals(originatorStance, "Defensive", StringComparison.OrdinalIgnoreCase))
+                    {
+                        multiplier *= 0.90f;
+                    }
+                }
+
+                if (targetObj != null)
+                {
+                    string targetStance = TryReadUnitTacticalStance(targetObj);
+                    if (string.Equals(targetStance, "Defensive", StringComparison.OrdinalIgnoreCase))
+                    {
+                        multiplier *= 0.80f;
+                    }
+                    else if (string.Equals(targetStance, "Aggressive", StringComparison.OrdinalIgnoreCase))
+                    {
+                        multiplier *= 1.10f;
+                    }
+                }
+
+                if (Math.Abs(multiplier - 1f) < 0.0001f)
+                {
+                    return amount;
+                }
+
+                float adjusted = amount * multiplier;
+                return adjusted < 0.1f ? 0.1f : adjusted;
+            }
+            catch
+            {
+                return amount;
+            }
+        }
+
+        public static float OnEntityLandsCriticalHitTranspiler(float baseChance, object attackerObj, object targetObj)
+        {
+            System.Threading.Interlocked.Increment(ref _entityLandsCriticalHitTranspilerCount);
+            if (float.IsNaN(baseChance) || float.IsInfinity(baseChance) || attackerObj == null)
+            {
+                return baseChance;
+            }
+
+            try
+            {
+                string stance = TryReadUnitTacticalStance(attackerObj);
+                float bonus = 0f;
+                if (string.Equals(stance, "Aggressive", StringComparison.OrdinalIgnoreCase))
+                {
+                    bonus = 0.10f;
+                }
+                else if (string.Equals(stance, "Kiting", StringComparison.OrdinalIgnoreCase))
+                {
+                    bonus = 0.05f;
+                }
+
+                if (bonus <= 0f)
+                {
+                    return baseChance;
+                }
+
+                float adjusted = baseChance + bonus;
+                return adjusted > 1f ? 1f : adjusted;
+            }
+            catch
+            {
+                return baseChance;
+            }
+        }
+
+        public static void OnShootProjectileSpawnedTranspiler(object projectileObj, object shootActionObj, int firePointIndex)
+        {
+            System.Threading.Interlocked.Increment(ref _shootProjectileSpawnedTranspilerCount);
+            if (projectileObj == null || shootActionObj == null)
+            {
+                return;
+            }
+
+            try
+            {
+                Type shootType = shootActionObj.GetType();
+                if (_cachedShootProjectileSelfField == null || _cachedShootProjectileSelfField.DeclaringType != shootType)
+                {
+                    _cachedShootProjectileSelfField = shootType.GetField(
+                        "_self",
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                }
+
+                object selfEntity = _cachedShootProjectileSelfField?.GetValue(shootActionObj);
+                if (selfEntity == null)
+                {
+                    return;
+                }
+
+                // Telemetry-safe tracking point for shooter stance; projectile stays clean-room unmodified.
+                TryReadUnitTacticalStance(selfEntity);
+            }
+            catch
+            {
+            }
+        }
+
+        public static float OnEntitySetActiveStatusEffectTranspiler(object targetObj, int statusEffectMask, int durationType, float duration)
+        {
+            System.Threading.Interlocked.Increment(ref _entitySetStatusEffectTranspilerCount);
+            if (targetObj == null || duration <= 0f || float.IsNaN(duration) || float.IsInfinity(duration) || durationType == 2)
+            {
+                return duration;
+            }
+
+            try
+            {
+                if ((statusEffectMask & NegativeStatusEffectMask) == 0)
+                {
+                    return duration;
+                }
+
+                string stance = TryReadUnitTacticalStance(targetObj);
+                if (!string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase))
+                {
+                    return duration;
+                }
+
+                float scaled = duration * 0.75f;
+                if (durationType == 0)
+                {
+                    return scaled < 1f ? 1f : (float)Math.Round(scaled);
+                }
+
+                return scaled < 0.1f ? 0.1f : scaled;
+            }
+            catch
+            {
+                return duration;
+            }
+        }
+
+        public static float OnFlockingGetMovementInfoSpeedTranspiler(float baseSpeed, object flockingMovementObj)
+        {
+            System.Threading.Interlocked.Increment(ref _flockingGetMovementInfoTranspilerCount);
+            if (flockingMovementObj == null || baseSpeed <= 0f || float.IsNaN(baseSpeed) || float.IsInfinity(baseSpeed))
+            {
+                return baseSpeed;
+            }
+
+            try
+            {
+                Type movementType = flockingMovementObj.GetType();
+                if (_cachedFlockingEntityControllerField == null || _cachedFlockingEntityControllerField.DeclaringType != movementType)
+                {
+                    _cachedFlockingEntityControllerField = movementType.GetField(
+                        "_entityController",
+                        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                }
+
+                object entityObj = _cachedFlockingEntityControllerField?.GetValue(flockingMovementObj);
+                if (entityObj == null)
+                {
+                    return baseSpeed;
+                }
+
+                string stance = TryReadUnitTacticalStance(entityObj);
+                if (string.Equals(stance, "Defensive", StringComparison.OrdinalIgnoreCase))
+                {
+                    return baseSpeed * 0.85f;
+                }
+                if (string.Equals(stance, "Aggressive", StringComparison.OrdinalIgnoreCase))
+                {
+                    return baseSpeed * 1.10f;
+                }
+                if (string.Equals(stance, "Kiting", StringComparison.OrdinalIgnoreCase))
+                {
+                    return baseSpeed * 1.15f;
+                }
+
+                return baseSpeed;
+            }
+            catch
+            {
+                return baseSpeed;
+            }
+        }
+
         public static void AfterEntityReused(object entityObj)
         {
             if (entityObj == null)
@@ -2909,6 +3151,31 @@ namespace RogueCommandExpansionLoader.Runtime
         public static object OnEntityAttackClosestEntityTranspilerHook(object selectedTarget, object attackerEntityController, object candidateEntities)
         {
             return RuntimeHooks.OnEntityAttackClosestEntityTranspiler(selectedTarget, attackerEntityController, candidateEntities);
+        }
+
+        public static float OnEntityTakeDamageTranspilerHook(float amount, object target, object originator, bool ignoreArmor)
+        {
+            return RuntimeHooks.OnEntityTakeDamageTranspiler(amount, target, originator, ignoreArmor);
+        }
+
+        public static float OnEntityLandsCriticalHitTranspilerHook(float baseChance, object attacker, object target)
+        {
+            return RuntimeHooks.OnEntityLandsCriticalHitTranspiler(baseChance, attacker, target);
+        }
+
+        public static void OnShootProjectileSpawnedTranspilerHook(object projectile, object shootAction, int firePointIndex)
+        {
+            RuntimeHooks.OnShootProjectileSpawnedTranspiler(projectile, shootAction, firePointIndex);
+        }
+
+        public static float OnEntitySetActiveStatusEffectTranspilerHook(object target, int statusEffectMask, int durationType, float duration)
+        {
+            return RuntimeHooks.OnEntitySetActiveStatusEffectTranspiler(target, statusEffectMask, durationType, duration);
+        }
+
+        public static float OnFlockingGetMovementInfoSpeedTranspilerHook(float baseSpeed, object flockingMovement)
+        {
+            return RuntimeHooks.OnFlockingGetMovementInfoSpeedTranspiler(baseSpeed, flockingMovement);
         }
     }
 

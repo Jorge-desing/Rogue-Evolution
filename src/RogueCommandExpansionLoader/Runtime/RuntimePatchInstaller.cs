@@ -228,6 +228,8 @@ namespace RogueCommandExpansionLoader.Runtime
             Type entityAttack = RuntimeReflection.FindUniqueType(gameAssembly, "EntityAttack");
             Type entityController = RuntimeReflection.FindUniqueType(gameAssembly, "EntityController");
             Type existingControllers = RuntimeReflection.FindUniqueType(gameAssembly, "ExistingControllers");
+            Type shootProjectile = RuntimeReflection.FindUniqueType(gameAssembly, "ShootProjectile");
+            Type entityFlockingMovement = RuntimeReflection.FindUniqueType(gameAssembly, "EntityFlockingMovement");
 
             MethodInfo init = RuntimeReflection.FindUniqueMethod(entityStore, "Init",
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0; });
@@ -776,6 +778,66 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(aiCreateBuilding, null, null, aiCreateBuildingTranspiler, null));
             plan.Add(new PatchPlan(aiConstructableEntities, null, null, aiConstructableEntitiesTranspiler, null));
             plan.Add(new PatchPlan(entityAttackClosestEntity, null, null, entityAttackClosestEntityTranspiler, null));
+
+            MethodInfo entityTakeDamage = RuntimeReflection.FindUniqueMethod(entityController, "TakeDamage",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 4 &&
+                        parameters[0].ParameterType == typeof(float) &&
+                        parameters[1].ParameterType == entityController &&
+                        parameters[2].ParameterType == typeof(bool) &&
+                        parameters[3].ParameterType == typeof(bool);
+                });
+            MethodInfo entityLandsCriticalHit = RuntimeReflection.FindUniqueMethod(entityController, "LandsCriticalHit",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(bool) && parameters.Length == 2 &&
+                        parameters[0].ParameterType == entityController &&
+                        RuntimeReflection.HasSimpleName(parameters[1].ParameterType, "EventPayload");
+                });
+            MethodInfo shootFromFirepoint = RuntimeReflection.FindUniqueMethod(shootProjectile, "ShootFromFirepoint",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 1 &&
+                        parameters[0].ParameterType == typeof(int);
+                });
+            MethodInfo entitySetActiveStatusEffect = RuntimeReflection.FindUniqueMethod(entityController, "SetActiveStatusEffect",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.ReturnType == typeof(void) && parameters.Length == 3 &&
+                        parameters[0].ParameterType.IsEnum &&
+                        parameters[1].ParameterType.IsEnum &&
+                        parameters[2].ParameterType == typeof(float);
+                });
+            MethodInfo flockingGetMovementInfo = RuntimeReflection.FindUniqueMethod(entityFlockingMovement, "GetMovementInfo",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return !method.IsStatic && method.GetParameters().Length == 1 &&
+                        parameters[0].ParameterType == typeof(int) &&
+                        RuntimeReflection.HasSimpleName(method.ReturnType, "MovingEntityInfo");
+                });
+
+            MethodInfo takeDamageTranspiler = typeof(NativeCombatMovementTranspilers).GetMethod(
+                nameof(NativeCombatMovementTranspilers.EntityControllerTakeDamageTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo landsCriticalHitTranspiler = typeof(NativeCombatMovementTranspilers).GetMethod(
+                nameof(NativeCombatMovementTranspilers.EntityControllerLandsCriticalHitTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo shootFromFirepointTranspiler = typeof(NativeCombatMovementTranspilers).GetMethod(
+                nameof(NativeCombatMovementTranspilers.ShootProjectileShootFromFirepointTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo setStatusEffectTranspiler = typeof(NativeCombatMovementTranspilers).GetMethod(
+                nameof(NativeCombatMovementTranspilers.EntityControllerSetActiveStatusEffectTranspiler), BindingFlags.Public | BindingFlags.Static);
+            MethodInfo flockingGetMovementInfoTranspiler = typeof(NativeCombatMovementTranspilers).GetMethod(
+                nameof(NativeCombatMovementTranspilers.EntityFlockingMovementGetMovementInfoTranspiler), BindingFlags.Public | BindingFlags.Static);
+
+            plan.Add(new PatchPlan(entityTakeDamage, null, null, takeDamageTranspiler, null));
+            plan.Add(new PatchPlan(entityLandsCriticalHit, null, null, landsCriticalHitTranspiler, null));
+            plan.Add(new PatchPlan(shootFromFirepoint, null, null, shootFromFirepointTranspiler, null));
+            plan.Add(new PatchPlan(entitySetActiveStatusEffect, null, null, setStatusEffectTranspiler, null));
+            plan.Add(new PatchPlan(flockingGetMovementInfo, null, null, flockingGetMovementInfoTranspiler, null));
             return plan;
         }
 
