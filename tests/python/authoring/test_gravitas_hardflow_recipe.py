@@ -26,10 +26,13 @@ SOURCE_BLEND = Path(os.environ.get(
 
 
 class GravitasHardflowRecipeTests(unittest.TestCase):
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         if not SOURCE_BLEND.is_file():
             raise FileNotFoundError(SOURCE_BLEND)
         bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
+
+    def setUp(self) -> None:
         self.objects = list(bpy.context.scene.objects)
 
     def test_gravitas_hardware_names_follow_their_correct_rig_axis(self) -> None:

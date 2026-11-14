@@ -22,8 +22,9 @@ import ast
 import unittest
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-TOOLS = REPO_ROOT / "tools"
+from tests.python.helpers import TOOLS_DIR, parse_ast_cached, read_text_cached
+
+TOOLS = TOOLS_DIR
 RMK = TOOLS / "RogueModelKit.py"
 GUM = TOOLS / "generate_unit_model.py"
 
@@ -58,8 +59,8 @@ PRESET_BUILDERS = [
 ]
 
 
-def _function_arg_names(source: str, class_name: str, function_name: str) -> set[str]:
-    tree = ast.parse(source)
+def _function_arg_names(path: Path, class_name: str, function_name: str) -> set[str]:
+    tree = parse_ast_cached(path)
     for node in tree.body:
         if isinstance(node, ast.ClassDef) and node.name == class_name:
             for item in node.body:
@@ -70,8 +71,8 @@ def _function_arg_names(source: str, class_name: str, function_name: str) -> set
     return set()
 
 
-def _module_function_arg_names(source: str, function_name: str) -> set[str]:
-    tree = ast.parse(source)
+def _module_function_arg_names(path: Path, function_name: str) -> set[str]:
+    tree = parse_ast_cached(path)
     for node in tree.body:
         if isinstance(node, ast.FunctionDef) and node.name == function_name:
             return {arg.arg for arg in node.args.args} | {
@@ -82,20 +83,19 @@ def _module_function_arg_names(source: str, function_name: str) -> set[str]:
 
 class PbrAuthoringContractTests(unittest.TestCase):
     def test_structure_builder_accepts_structural_wear_mask(self) -> None:
-        source = RMK.read_text(encoding="utf-8")
-        args = _function_arg_names(source, "RogueStructureBuilder", "build_and_export")
+        source = read_text_cached(RMK)
+        args = _function_arg_names(RMK, "RogueStructureBuilder", "build_and_export")
         self.assertIn("structural_wear_mask", args)
         structure_slice = source[source.index("class RogueStructureBuilder") :]
         self.assertIn("structural_wear_mask=structural_wear_mask", structure_slice)
 
     def test_vehicle_builder_accepts_structural_wear_mask(self) -> None:
-        source = RMK.read_text(encoding="utf-8")
-        args = _function_arg_names(source, "RogueVehicleBuilder", "build_and_export")
+        args = _function_arg_names(RMK, "RogueVehicleBuilder", "build_and_export")
         self.assertIn("structural_wear_mask", args)
 
     def test_generate_structure_forwards_structural_wear_mask(self) -> None:
-        source = GUM.read_text(encoding="utf-8")
-        args = _module_function_arg_names(source, "build_structure_model")
+        source = read_text_cached(GUM)
+        args = _module_function_arg_names(GUM, "build_structure_model")
         self.assertIn("structural_wear_mask", args)
         structure_call = source[source.index("res = build_structure_model(") :]
         structure_call = structure_call[: structure_call.index("res = build_vehicle_model(")]

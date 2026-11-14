@@ -1,14 +1,44 @@
+import ctypes
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import shutil
 
+from tests.python.helpers import REPO_ROOT
 from tools.bepinex_mcp_shared import ensure_worker, connect, identity, _STARTED
 from multiprocessing.connection import Client
 from multiprocessing import AuthenticationError
+
+
+def _wait_for_pid_exit(pid: int, state: Path, timeout: float = 10.0) -> None:
+    """Wait for worker and launcher processes to release state files before temp cleanup."""
+    for process in list(_STARTED):
+        process.wait(timeout=timeout)
+    _STARTED.clear()
+    if os.name == "nt":
+        synchronize = 0x00100000
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(synchronize, False, int(pid))
+        if handle:
+            try:
+                kernel32.WaitForSingleObject(handle, int(timeout * 1000))
+            finally:
+                kernel32.CloseHandle(handle)
+        log_path = state / "worker.log"
+        deadline = time.monotonic() + min(timeout, 2.0)
+        while log_path.exists():
+            try:
+                log_path.unlink()
+                break
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
 
 
 class SharedTests(unittest.TestCase):
@@ -30,13 +60,11 @@ class SharedTests(unittest.TestCase):
                 with connect(state) as conn:
                     conn.send_bytes(b'{"control":"stop"}')
                     conn.recv_bytes()
-                for process in _STARTED:
-                    if process.pid == pid:
-                        process.wait(timeout=10)
+                _wait_for_pid_exit(pid, state)
 
     @unittest.skipUnless(shutil.which('node') and sys.platform == 'win32', 'Windows Node adapter')
     def test_hidden_node_adapter_roundtrip_and_clean_exit(self):
-        script = Path(__file__).resolve().parents[2] / 'tools/bepinex_mcp_client.cjs'
+        script = REPO_ROOT / 'tools/bepinex_mcp_client.cjs'
         result = subprocess.run([shutil.which('node'), str(script)],
                                 input='{"jsonrpc":"2.0","id":9,"method":"ping"}\n',
                                 capture_output=True, text=True, timeout=15,
@@ -49,7 +77,7 @@ class SharedTests(unittest.TestCase):
             state = Path(tmp)
             clients = []
             try:
-                script = Path(__file__).resolve().parents[2] / 'tools/bepinex_mcp_shared.py'
+                script = REPO_ROOT / 'tools/bepinex_mcp_shared.py'
                 for _ in range(2):
                     clients.append(subprocess.Popen([sys.executable, str(script), '--state', str(state)], stdin=subprocess.PIPE,
                                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8'))
@@ -75,7 +103,5 @@ class SharedTests(unittest.TestCase):
                 with connect(state) as conn:
                     conn.send_bytes(b'{"control":"stop"}')
                     conn.recv_bytes()
-                for process in _STARTED:
-                    if process.pid == pid:
-                        process.wait(timeout=10)
+                _wait_for_pid_exit(pid, state)
 

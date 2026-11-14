@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 import unittest
 
+from tests.python.helpers import REPO_ROOT, TOOLS_DIR, parse_ast_cached, read_text_cached
 
-ROOT = Path(__file__).resolve().parents[3]
-MODEL_KIT = ROOT / "tools" / "RogueModelKit.py"
+
+MODEL_KIT = TOOLS_DIR / "RogueModelKit.py"
 VEHICLE_BUILDER = (
-    ROOT
+    REPO_ROOT
     / "unity/RogueCommandAssetAuthoring/Assets/Editor/VehiclePrefabBuilder.cs"
 )
 
@@ -18,8 +18,8 @@ VEHICLE_BUILDER = (
 class AttackClipAuthoringContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.model_kit_text = MODEL_KIT.read_text(encoding="utf-8")
-        cls.model_kit_tree = ast.parse(cls.model_kit_text, filename=str(MODEL_KIT))
+        cls.model_kit_text = read_text_cached(MODEL_KIT)
+        cls.model_kit_tree = parse_ast_cached(MODEL_KIT)
         cls.action_function = next(
             node
             for node in cls.model_kit_tree.body

@@ -13,16 +13,16 @@ $Py = Join-Path $Root ".venv\Scripts\python.exe"
 if (-not (Test-Path $Py)) { $Py = Join-Path $Root ".venv/bin/python" }
 if (-not (Test-Path $Py)) { throw "No Python interpreter found in .venv" }
 
-echo "=== Python unit tests ==="
-& $Py -B -m unittest discover -s tests/python -t . -v
+echo "=== Python test suite (unit + Blender) ==="
+& $Py -B -m tools.run_python_tests --output artifacts/python-tests/report.json
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 echo "=== Content bundle references ==="
-& $Py -B tools/validate_content_bundle_references.py content/packs/sample-native-expansion
+& $Py -B -m tools.validate_content_bundle_references content/packs/sample-native-expansion
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 echo "=== Loader registry ==="
-& $Py -B tools/validate_loader_registry.py
+& $Py -B -m tools.validate_loader_registry
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 echo "=== Whitespace check ==="

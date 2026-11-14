@@ -41,12 +41,11 @@ class ReloadingHandler:
                 self.module = candidate
                 self.catalog = catalog
                 self.fingerprint = fingerprint
-            except Exception:
+            finally:
                 if old_builder is None:
                     sys.modules.pop("build_bepinex_mcp", None)
                 else:
                     sys.modules["build_bepinex_mcp"] = old_builder
-                raise
 
         self.catalog_changed = self.catalog_changed or changed
         return changed

@@ -4,7 +4,8 @@ import ast
 from pathlib import Path
 import unittest
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
+from tests.python.helpers import REPO_ROOT, parse_ast_cached, read_text_cached
+
 TOOLS_RMK = REPO_ROOT / "tools" / "RogueModelKit.py"
 SKILL_RMK = REPO_ROOT / ".agents" / "skills" / "rogue-command-3d-model-authoring" / "scripts" / "RogueModelKit.py"
 
@@ -15,28 +16,11 @@ SKILL_GUM = REPO_ROOT / ".agents" / "skills" / "rogue-command-3d-model-authoring
 class TestModelKitSkillCopy(unittest.TestCase):
     """Verifies that the canonical authoring tools match their skill copies exactly."""
 
-    @classmethod
-    def setUpClass(cls):
-        cls._source_snapshots = {}
-        cls._syntax_snapshots = {}
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._source_snapshots.clear()
-        cls._syntax_snapshots.clear()
-
     def _read_source(self, path):
-        path = Path(path)
-        if path not in self._source_snapshots:
-            self._source_snapshots[path] = path.read_text(encoding="utf-8")
-        return self._source_snapshots[path]
+        return read_text_cached(Path(path))
 
     def _parse_source(self, source, filename):
-        # These contract checks only traverse ASTs; none mutates them.
-        key = (filename, source)
-        if key not in self._syntax_snapshots:
-            self._syntax_snapshots[key] = ast.parse(source, filename=filename)
-        return self._syntax_snapshots[key]
+        return parse_ast_cached(Path(filename))
 
     def test_rogue_model_kit_byte_parity(self) -> None:
         """RogueModelKit.py in tools/ and in skill scripts/ must be byte-for-byte identical."""

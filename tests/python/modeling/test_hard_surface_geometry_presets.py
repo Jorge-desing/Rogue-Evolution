@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Any
 import unittest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests.python.helpers import REPO_ROOT
+
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 from hard_surface_geometry_presets import (

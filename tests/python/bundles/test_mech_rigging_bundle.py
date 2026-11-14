@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import copy
 import unittest
-from pathlib import Path
 
-from tests.python.helpers import load_tool_module
+from tests.python.helpers import REPO_ROOT, load_tool_module
 
 
 validator = load_tool_module("validate_mech_rigging")
-REPO_ROOT = Path(__file__).resolve().parents[3]
 TACTICAL_BUNDLE = (
     REPO_ROOT
     / "content"
@@ -34,14 +32,21 @@ class MechRiggingBundleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._audits = {}
+        cls._envs = {}
 
     @classmethod
     def tearDownClass(cls):
         cls._audits.clear()
+        cls._envs.clear()
+
+    def _env(self, path):
+        if path not in self._envs:
+            self._envs[path] = validator.UnityPy.load(str(path))
+        return self._envs[path]
 
     def _audit(self, path):
         if path not in self._audits:
-            self._audits[path] = validator.MechRigValidator().validate_asset_bundle(path)
+            self._audits[path] = validator.MechRigValidator().validate_asset_bundle(path, env=self._env(path))
         return copy.deepcopy(self._audits[path])
 
     def test_tactical_operations_bundle_exposes_rig_animator_and_action_contract(self) -> None:
@@ -106,7 +111,7 @@ class MechRiggingBundleTests(unittest.TestCase):
     def test_all_fire_recoil_clips_have_dynamic_serialized_samples(self) -> None:
         for bundle_path in (TACTICAL_BUNDLE, SAMPLE_NATIVE_BUNDLE):
             with self.subTest(bundle=bundle_path.name):
-                env = validator.UnityPy.load(str(bundle_path))
+                env = self._env(bundle_path)
                 clips = (obj.read() for obj in env.objects if obj.type.name == "AnimationClip")
                 fire_clips = [clip for clip in clips if "FireRecoil" in clip.m_Name]
                 self.assertEqual(len(fire_clips), 9)

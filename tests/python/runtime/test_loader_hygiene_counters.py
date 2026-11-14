@@ -3,7 +3,8 @@ from pathlib import Path
 import re
 import unittest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests.python.helpers import REPO_ROOT
+
 FORMATTER = REPO_ROOT / "src" / "RogueCommandExpansionLoader" / "Runtime" / "AgentDiagnosticsFormatter.cs"
 SCOPE = REPO_ROOT / "src" / "RogueCommandExpansionLoader" / "Runtime" / "BlueprintRewardFactoryScope.cs"
 

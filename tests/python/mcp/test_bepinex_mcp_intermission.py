@@ -1,7 +1,7 @@
 """Hermetic contract tests: intermission/navigator diagnostics tools + press-button envelope fix.
 
 No live game: all bridge access is mocked via SERVER._call_http, following the
-fixture style of tests/python/test_bepinex_mcp_diagnostics.py.
+fixture style of tests/python/mcp/test_bepinex_mcp_diagnostics.py.
 """
 
 from __future__ import annotations

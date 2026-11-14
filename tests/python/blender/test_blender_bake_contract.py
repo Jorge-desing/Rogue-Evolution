@@ -23,7 +23,7 @@ class BlenderBakeContractTests(unittest.TestCase):
     def test_bake_preserves_pbr_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             result = subprocess.run(
-                [BLENDER, "-b", "--python", str(SCRIPT), "--", temp_dir],
+                [BLENDER, "-b", "--factory-startup", "--python", str(SCRIPT), "--", temp_dir],
                 capture_output=True, text=True, timeout=300,
             )
             self.assertIn("BAKED", result.stdout, result.stdout[-2000:] + result.stderr[-2000:])

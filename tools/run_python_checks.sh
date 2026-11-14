@@ -19,14 +19,14 @@ if [[ ! -x "$PY" ]]; then
   exit 2
 fi
 
-echo "=== Python unit tests ==="
-"$PY" -B -m unittest discover -s tests/python -t . -v
+echo "=== Python test suite (unit + Blender) ==="
+"$PY" -B -m tools.run_python_tests --output artifacts/python-tests/report.json
 
 echo "=== Content bundle references ==="
-"$PY" -B tools/validate_content_bundle_references.py content/packs/sample-native-expansion
+"$PY" -B -m tools.validate_content_bundle_references content/packs/sample-native-expansion
 
 echo "=== Loader registry ==="
-"$PY" -B tools/validate_loader_registry.py
+"$PY" -B -m tools.validate_loader_registry
 
 echo "=== Whitespace check ==="
 git diff --check -- ':!unity/'

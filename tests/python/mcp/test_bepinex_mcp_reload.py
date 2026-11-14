@@ -7,14 +7,14 @@ import subprocess
 import sys
 import shutil
 
-from tests.python.helpers import load_tool_module
+from tests.python.helpers import REPO_ROOT, load_tool_module
 
 RELOAD = load_tool_module("bepinex_mcp_reload")
 
 
 class ReloadTests(unittest.TestCase):
     def test_stdio_process_observes_code_edit_without_reconnection(self):
-        source = Path(__file__).resolve().parents[2] / "tools"
+        source = REPO_ROOT / "tools"
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             for name in ("bepinex_mcp_server.py", "bepinex_mcp_reload.py", "build_bepinex_mcp.py"):
@@ -117,7 +117,7 @@ def handle_request(message):
             self.assertEqual(3, recovered["version"])
 
     def test_real_handler_initializes_and_reloads_builder(self):
-        handler = RELOAD.ReloadingHandler(Path(__file__).resolve().parents[2] / "tools/bepinex_mcp_server.py")
+        handler = RELOAD.ReloadingHandler(REPO_ROOT / "tools/bepinex_mcp_server.py")
         response, changed = handler.dispatch({"jsonrpc":"2.0", "id":1, "method":"initialize", "params":{}})
         self.assertTrue(response["result"]["capabilities"]["tools"]["listChanged"])
         response, _ = handler.dispatch({"jsonrpc":"2.0", "id":2, "method":"tools/list", "params":{"includeAliases":False}})

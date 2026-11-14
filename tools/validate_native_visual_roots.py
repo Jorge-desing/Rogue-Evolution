@@ -53,21 +53,17 @@ def verify_identity(game_root: Path) -> Path:
 class NativeHierarchy:
     def __init__(self, serialized_asset: Path):
         self.environment = UnityPy.load(str(serialized_asset))
-        self.objects = {obj.path_id: obj for obj in self.environment.objects}
-        self.transforms: dict[int, int] = {}
-        self.candidates: dict[str, list[int]] = {}
-        for obj in self.objects.values():
-            if self.kind(obj.path_id) != "GameObject":
-                continue
-            data = self.data(obj.path_id)
-            components = self.components(obj.path_id)
-            transforms = [cid for cid in components if self.kind(cid) in ("Transform", "RectTransform")]
-            if len(transforms) != 1:
-                continue
-            self.transforms[obj.path_id] = transforms[0]
-            # Render-only nested model objects can share the gameplay prefab name.
-            if any(self.kind(cid) == "MonoBehaviour" for cid in components):
-                self.candidates.setdefault(data.get("m_Name", ""), []).append(obj.path_id)
+        self.objects = {}
+        self._game_objects_by_name: dict[str, list[int]] = {}
+        self._transforms: dict[int, int | None] = {}
+        for obj in self.environment.objects:
+            self.objects[obj.path_id] = obj
+            if obj.type.name == "GameObject":
+                peek = getattr(obj, "peek_name", None)
+                name = peek() if callable(peek) else None
+                if name is None:
+                    name = self.data(obj.path_id).get("m_Name", "")
+                self._game_objects_by_name.setdefault(name, []).append(obj.path_id)
 
     def kind(self, path_id: int) -> str:
         return str(self.objects[path_id].type.name)
@@ -79,8 +75,19 @@ class NativeHierarchy:
     def components(self, game_object_id: int) -> list[int]:
         return [int(item["component"]["m_PathID"]) for item in self.data(game_object_id).get("m_Component", [])]
 
+    def transform_id(self, game_object_id: int) -> int | None:
+        if game_object_id not in self._transforms:
+            transforms = [
+                cid for cid in self.components(game_object_id) if self.kind(cid) in ("Transform", "RectTransform")
+            ]
+            self._transforms[game_object_id] = transforms[0] if len(transforms) == 1 else None
+        return self._transforms[game_object_id]
+
     def children(self, game_object_id: int) -> list[int]:
-        transform = self.data(self.transforms[game_object_id])
+        transform_id = self.transform_id(game_object_id)
+        if transform_id is None:
+            raise KeyError(game_object_id)
+        transform = self.data(transform_id)
         children = []
         for reference in transform.get("m_Children", []):
             if int(reference.get("m_FileID", 0)) != 0:
@@ -90,7 +97,13 @@ class NativeHierarchy:
         return children
 
     def resolve_template_root(self, template: str) -> int:
-        candidates = self.candidates.get(template, [])
+        # Render-only nested model objects can share the gameplay prefab name.
+        candidates = [
+            gid
+            for gid in self._game_objects_by_name.get(template, [])
+            if self.transform_id(gid) is not None
+            and any(self.kind(cid) == "MonoBehaviour" for cid in self.components(gid))
+        ]
         if len(candidates) != 1:
             raise ValueError(f"native template {template!r} has {len(candidates)} scripted candidates; cannot select uniquely")
         return candidates[0]
@@ -146,7 +159,7 @@ class BundleHierarchy(NativeHierarchy):
         if len(roots) != 1:
             raise ValueError(f"bundle prefab {asset_name!r} has {len(roots)} exact GameObject container entries")
         root = roots[0]
-        if root not in self.transforms:
+        if self.transform_id(root) is None:
             raise ValueError(f"bundle prefab {asset_name!r} has no unique Transform component")
         return root
 

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import unittest
-from pathlib import Path
 
+from tests.python.helpers import REPO_ROOT as ROOT
 
-ROOT = Path(__file__).resolve().parents[2]
 LOADER_PATH = ROOT / "src" / "RogueCommandExpansionLoader" / "Content" / "ContentPackRuntimeLoader.cs"
 
 

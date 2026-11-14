@@ -109,6 +109,44 @@ class RunnerTests(unittest.TestCase):
             self.assertFalse(report['successful'])
             self.assertEqual(['tests.python.test_fake'], report['groups'][0]['modules'])
 
+    def test_partition_unit_balances_shards_by_weights(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            folder = root / 'tests/python'
+            folder.mkdir(parents=True)
+            modules = []
+            for name in ('test_heavy_a', 'test_heavy_b', 'test_light_c', 'test_light_d'):
+                (folder / (name + '.py')).write_text('import unittest')
+                modules.append('tests.python.' + name)
+            weights = {
+                'tests.python.test_heavy_a': 10.0,
+                'tests.python.test_heavy_b': 10.0,
+                'tests.python.test_light_c': 0.5,
+                'tests.python.test_light_d': 0.5,
+            }
+            shards, exclusive = runner.partition_unit(modules, 2, root, weights=weights)
+            self.assertEqual([], exclusive)
+            self.assertEqual(2, len(shards))
+            # LPT places one heavy and one light test into each shard.
+            self.assertEqual(10.5, sum(weights[m] for m in shards[0]))
+            self.assertEqual(10.5, sum(weights[m] for m in shards[1]))
+
+    def test_worker_isolates_multiple_blender_modules_in_one_session(self):
+        with tempfile.TemporaryDirectory() as temp:
+            out = Path(temp) / 'worker.json'
+            calls = []
+            fake_bpy = mock.MagicMock()
+            fake_bpy.ops.wm.read_factory_settings.side_effect = lambda **kw: calls.append(kw)
+            fake_loader = mock.MagicMock()
+            fake_loader.errors = []
+            fake_loader.loadTestsFromNames.side_effect = lambda names: unittest.TestSuite()
+            with mock.patch.dict(sys.modules, {'bpy': fake_bpy}), mock.patch.object(unittest, 'TestLoader', return_value=fake_loader):
+                code = runner.worker(['mod.first', 'mod.second', 'mod.third'], out)
+            self.assertEqual(0, code)
+            self.assertEqual([{'use_empty': True}, {'use_empty': True}], calls)
+            report = json.loads(out.read_text())
+            self.assertEqual(['mod.first', 'mod.second', 'mod.third'], report['modules'])
+
 
 if __name__ == '__main__':
     unittest.main()

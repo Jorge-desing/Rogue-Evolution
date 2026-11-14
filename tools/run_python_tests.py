@@ -31,10 +31,50 @@ def inventory(root: Path = ROOT) -> dict[str, list[str]]:
     return groups
 
 
-def partition_unit(modules: list[str], jobs: int, root: Path = ROOT) -> tuple[list[list[str]], list[str]]:
-    """Keep Blender subprocess tests exclusive; never split module fixtures."""
+def _historical_module_weights(report_path: Path, modules: list[str], root: Path = ROOT) -> dict[str, float]:
+    """Derive LPT scheduling weights from a prior report, falling back to file size."""
+    by_module: dict[str, float] = {}
+    by_leaf: dict[str, float] = {}
+    try:
+        if report_path.is_file():
+            prior = json.loads(report_path.read_text(encoding='utf-8'))
+            for group in prior.get('groups') or []:
+                group_modules = group.get('modules') or []
+                cases = group.get('cases') or []
+                mod_seconds = group.get('moduleSeconds') or {}
+                for mod in group_modules:
+                    total = float(mod_seconds.get(mod) or 0.0)
+                    if total <= 0.0:
+                        prefix = mod + '.'
+                        total = sum(float(c.get('seconds') or 0.0) for c in cases if str(c.get('id', '')).startswith(prefix))
+                    if total <= 0.0 and len(group_modules) == 1:
+                        total = float(group.get('executionSeconds') or 0.0)
+                    if total > 0.0:
+                        by_module[mod] = total
+                        by_leaf.setdefault(mod.rsplit('.', 1)[-1], total)
+    except (OSError, ValueError, TypeError):
+        pass
+    weights: dict[str, float] = {}
+    for module in modules:
+        if module in by_module:
+            weights[module] = by_module[module]
+        elif (leaf := module.rsplit('.', 1)[-1]) in by_leaf:
+            weights[module] = by_leaf[leaf]
+        else:
+            path = (root / Path(*module.split('.'))).with_suffix('.py')
+            try:
+                weights[module] = max(0.05, path.stat().st_size / 20000.0)
+            except OSError:
+                weights[module] = 0.1
+    return weights
+
+
+def partition_unit(modules: list[str], jobs: int, root: Path = ROOT, weights: dict[str, float] | None = None) -> tuple[list[list[str]], list[str]]:
+    """Keep Blender subprocess tests exclusive; balance unit shards by weight without splitting fixtures."""
     shards = [[] for _ in range(jobs)]
+    shard_weights = [0.0] * jobs
     exclusive = []
+    normal = []
     for module in modules:
         path = (root / Path(*module.split('.'))).with_suffix('.py')
         source = path.read_text(encoding='utf-8-sig')
@@ -46,7 +86,13 @@ def partition_unit(modules: list[str], jobs: int, root: Path = ROOT) -> tuple[li
         if '.blender.' in module or blender_binding or ('blender' in source.lower() and 'subprocess' in source):
             exclusive.append(module)
         else:
-            min(shards, key=len).append(module)
+            normal.append(module)
+    if weights is not None:
+        normal.sort(key=lambda m: (-weights.get(m, 0.1), m))
+    for module in normal:
+        index = min(range(jobs), key=lambda i: (shard_weights[i], len(shards[i]), i))
+        shards[index].append(module)
+        shard_weights[index] += weights.get(module, 1.0) if weights is not None else 1.0
     return [shard for shard in shards if shard], exclusive
 
 
@@ -114,11 +160,9 @@ def flatten(suite):
 
 def worker(modules: list[str], output: Path) -> int:
     sys.path.insert(0, str(ROOT))
-    started = time.perf_counter()
+    bpy = sys.modules.get('bpy')
+    isolate_blender = bpy is not None and len(modules) > 1
     loader = unittest.TestLoader()
-    suite = loader.loadTestsFromNames(modules)
-    ids = list(flatten(suite))
-    discovery = time.perf_counter() - started
     result = ReportResult(unittest.runner._WritelnDecorator(sys.stderr), True, 1)
     original = unittest.TestCase._callSetUp
     def timed_setup(case):
@@ -127,15 +171,30 @@ def worker(modules: list[str], output: Path) -> int:
             return original(case)
         finally:
             result.preparation += time.perf_counter() - before
+
+    ids = []
+    discovery = 0.0
+    elapsed = 0.0
+    module_seconds = {}
     unittest.TestCase._callSetUp = timed_setup
-    before = time.perf_counter()
     try:
-        suite.run(result)
+        for index, mod in enumerate(modules):
+            if isolate_blender and index > 0:
+                bpy.ops.wm.read_factory_settings(use_empty=True)
+            started = time.perf_counter()
+            suite = loader.loadTestsFromNames([mod])
+            ids.extend(flatten(suite))
+            disc_delta = time.perf_counter() - started
+            discovery += disc_delta
+            before = time.perf_counter()
+            suite.run(result)
+            run_delta = time.perf_counter() - before
+            elapsed += run_delta
+            module_seconds[mod] = disc_delta + run_delta
     finally:
         unittest.TestCase._callSetUp = original
-    elapsed = time.perf_counter() - before
-    report = {'modules': modules, 'inventory': ids, 'cases': result.cases,
-              'successful': result.wasSuccessful(), 'testsRun': result.testsRun,
+    report = {'modules': modules, 'moduleSeconds': module_seconds, 'inventory': ids, 'cases': result.cases,
+              'successful': result.wasSuccessful() and not loader.errors, 'testsRun': result.testsRun,
               'discoverySeconds': discovery, 'preparationSeconds': result.preparation,
               'executionSeconds': elapsed - result.preparation,
               'fixtureTimingScope': 'preparation measures per-test setUp; class/module fixtures are included in execution',
@@ -204,32 +263,51 @@ def main(argv=None) -> int:
         return 1
     reports = []
     script = str(Path(__file__).resolve())
+    unit_tasks = []
     if args.mode in ('all', 'unit') and groups['unit']:
         if args.jobs == 1:
             shards, exclusive = [groups['unit']], []
         else:
-            shards, exclusive = partition_unit(groups['unit'], args.jobs)
-        def execute_unit(item):
-            index, modules = item
-            destination = args.output.with_name(args.output.stem + f'-unit-{index}.json')
-            return {'group': 'unit', 'modules': modules, **run_process([sys.executable, script, '--output', str(destination), '--worker', *modules], destination, args.timeout)}
-        # A single integration worker owns every Blender subprocess launch;
-        # pure unit shards can progress while it runs. Never overlap two
-        # Blender integration modules, nor split a class/module fixture.
-        tasks = list(enumerate(shards))
+            weights = _historical_module_weights(args.output, groups['unit'], ROOT)
+            shards, exclusive = partition_unit(groups['unit'], args.jobs, ROOT, weights=weights)
+        unit_tasks = list(enumerate(shards))
         if exclusive:
-            tasks.append((len(shards), exclusive))
-        with ThreadPoolExecutor(max_workers=args.jobs + bool(exclusive)) as executor:
-            reports.extend(executor.map(execute_unit, tasks))
-    if args.mode in ('all', 'blender'):
-        for index, module in enumerate(groups['blender']):
-            destination = args.output.with_name(args.output.stem + f'-blender-{index}.json')
-            destination.unlink(missing_ok=True)
-            if not args.blender.is_file():
+            unit_tasks.append((len(shards), exclusive))
+
+    def execute_unit(item):
+        index, modules = item
+        destination = args.output.with_name(args.output.stem + f'-unit-{index}.json')
+        return {'group': 'unit', 'modules': modules, **run_process([sys.executable, script, '--output', str(destination), '--worker', *modules], destination, args.timeout)}
+
+    run_blender_batch = False
+    if args.mode in ('all', 'blender') and groups['blender']:
+        if not args.blender.is_file():
+            for module in groups['blender']:
                 reports.append({'group': 'blender', 'modules': [module], 'successful': False, 'error': f'Blender missing: {args.blender}'})
-                continue
-            command = [str(args.blender), '--background', '--factory-startup', '--python-exit-code', '1', '--python', script, '--', '--output', str(destination), '--worker', module]
-            reports.append({'group': 'blender', 'modules': [module], **run_process(command, destination, args.timeout)})
+        else:
+            run_blender_batch = True
+
+    def execute_blender():
+        destination = args.output.with_name(args.output.stem + '-blender.json')
+        destination.unlink(missing_ok=True)
+        command = [str(args.blender), '--background', '--factory-startup', '--python-exit-code', '1',
+                   '--python', script, '--', '--output', str(destination), '--worker', *groups['blender']]
+        return {'group': 'blender', 'modules': list(groups['blender']), **run_process(command, destination, args.timeout)}
+
+    if args.jobs == 1:
+        for task in unit_tasks:
+            reports.append(execute_unit(task))
+        if run_blender_batch:
+            reports.append(execute_blender())
+    else:
+        max_workers = max(1, len(unit_tasks) + (1 if run_blender_batch else 0))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            unit_futures = [executor.submit(execute_unit, task) for task in unit_tasks]
+            blender_future = executor.submit(execute_blender) if run_blender_batch else None
+            for future in unit_futures:
+                reports.append(future.result())
+            if blender_future is not None:
+                reports.append(blender_future.result())
     report = {'mode': args.mode, 'jobs': args.jobs, 'moduleInventory': groups, 'groups': reports,
               'wallSeconds': time.perf_counter() - started, 'successful': bool(reports) and all(r['successful'] for r in reports)}
     if not reports:

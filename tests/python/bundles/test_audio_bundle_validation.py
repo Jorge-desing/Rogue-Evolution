@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import patch
-from tests.python.helpers import load_tool_module
+from tests.python.helpers import REPO_ROOT, load_tool_module
 
 AUDIO = load_tool_module("validate_audio_assets")
 
@@ -51,6 +51,6 @@ class AudioBundleValidationTests(unittest.TestCase):
                 AUDIO.AudioAssetValidator().validate_bundle_audio(Path(directory) / "absent.bundle")
 
     def test_skill_copy_matches(self):
-        root = Path(__file__).resolve().parents[2]
+        root = REPO_ROOT
         self.assertEqual((root / "tools/validate_audio_assets.py").read_bytes(),
                          (root / ".agents/skills/rogue-command-audio-authoring/scripts/validate_audio_assets.py").read_bytes())

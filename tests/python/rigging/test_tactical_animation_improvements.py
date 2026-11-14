@@ -10,17 +10,17 @@ Verifica por inspección estática de RogueModelKit (sin Blender) que:
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 import re
 import unittest
 
-ROOT = Path(__file__).resolve().parents[3]
-MODEL_KIT = ROOT / "tools" / "RogueModelKit.py"
+from tests.python.helpers import TOOLS_DIR, parse_ast_cached, read_text_cached
+
+MODEL_KIT = TOOLS_DIR / "RogueModelKit.py"
 
 
 def _func_source() -> tuple[str, ast.FunctionDef, str]:
-    text = MODEL_KIT.read_text(encoding="utf-8")
-    tree = ast.parse(text, filename=str(MODEL_KIT))
+    text = read_text_cached(MODEL_KIT)
+    tree = parse_ast_cached(MODEL_KIT)
     fn = next(
         node
         for node in tree.body

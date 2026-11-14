@@ -7,13 +7,10 @@ import json
 import math
 import struct
 import unittest
-from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
-ROOT = Path(__file__).resolve().parents[3]
-SCHEMA_PATH = ROOT / "content" / "schema" / "content.schema.json"
-SAMPLE_PATH = ROOT / "content" / "packs" / "sample-native-expansion" / "content.json"
+from tests.python.helpers import CONTENT_DIR, SAMPLE_NATIVE_PATH, SCHEMA_PATH
 
 
 def to_float32(value: float) -> float:
@@ -31,7 +28,21 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         cls.schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
         Draft202012Validator.check_schema(cls.schema)
         cls.validator = Draft202012Validator(cls.schema)
-        cls.sample = json.loads(SAMPLE_PATH.read_text(encoding="utf-8"))
+        cls.sample = json.loads(SAMPLE_NATIVE_PATH.read_text(encoding="utf-8"))
+        cls.minimal_sample = {
+            "schemaVersion": cls.sample["schemaVersion"],
+            "packId": cls.sample["packId"],
+            "assetBundles": [],
+            "units": [copy.deepcopy(cls.sample["units"][0])],
+            "relics": [copy.deepcopy(cls.sample["relics"][0])],
+            "stages": [],
+            "aiProfiles": [],
+        }
+        if not cls.validator.is_valid(cls.minimal_sample):
+            raise AssertionError("minimal_sample fixture must validate against content schema")
+
+    def _clone_minimal(self) -> dict:
+        return copy.deepcopy(self.minimal_sample)
 
     def test_card_scale_schema_matches_float32_lower_bound(self) -> None:
         runtime_minimum = to_float32(0.01)
@@ -51,7 +62,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
 
         for value in probes:
             with self.subTest(value=value):
-                manifest = copy.deepcopy(self.sample)
+                manifest = self._clone_minimal()
                 manifest["units"][0]["cardModelScalingFactor"] = value
                 schema_accepts = self.validator.is_valid(manifest)
                 runtime_accepts = to_float32(value) > runtime_minimum and to_float32(value) <= 100.0
@@ -63,7 +74,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 )
 
     def test_native_grounding_parameters_valid(self) -> None:
-        manifest = copy.deepcopy(self.sample)
+        manifest = self._clone_minimal()
         unit = manifest["units"][0]
         unit["copyUpgradesToEntityId"] = "sample:unit-ironclad"
         unit["roles"] = ["Attacker", "Mech"]
@@ -95,12 +106,12 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = copy.deepcopy(self.sample)
+                manifest = self._clone_minimal()
                 manifest["units"][0][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
     def test_relic_expanded_card_changes_valid(self) -> None:
-        manifest = copy.deepcopy(self.sample)
+        manifest = self._clone_minimal()
         relic = manifest["relics"][0]
         relic["coinsAmount"] = 150
         relic["inactive"] = False
@@ -139,7 +150,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = copy.deepcopy(self.sample)
+                manifest = self._clone_minimal()
                 if field == "coinsAmount":
                     manifest["relics"][0]["coinsAmount"] = invalid_val
                 else:
@@ -147,7 +158,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
     def test_production_building_structured_parameters_valid(self) -> None:
-        manifest = copy.deepcopy(self.sample)
+        manifest = self._clone_minimal()
         pb = manifest["units"][0]["productionBuilding"]
         pb["gridSize"] = 2
         pb["maxCapacity"] = 10
@@ -179,12 +190,12 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = copy.deepcopy(self.sample)
+                manifest = self._clone_minimal()
                 manifest["units"][0]["productionBuilding"][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject productionBuilding.{field}={invalid_val}")
 
     def test_standalone_buildings_schema_valid(self) -> None:
-        manifest = copy.deepcopy(self.sample)
+        manifest = self._clone_minimal()
         manifest["buildings"] = [
             {
                 "id": "sample-native:test-defense-turret",
@@ -246,7 +257,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = copy.deepcopy(self.sample)
+                manifest = self._clone_minimal()
                 manifest["buildings"] = [
                     {
                         "id": "sample-native:test-turret",
@@ -257,7 +268,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject building.{field}={invalid_val}")
 
     def test_unit_behavioral_and_audio_schema_valid(self) -> None:
-        manifest = copy.deepcopy(self.sample)
+        manifest = self._clone_minimal()
         unit = manifest["units"][0]
         unit["rotationDegreesPerSecond"] = 180.0
         unit["collisionRadius"] = 2.5
@@ -290,12 +301,12 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         ]
         for field, invalid_val in invalid_cases:
             with self.subTest(field=field, value=invalid_val):
-                manifest = copy.deepcopy(self.sample)
+                manifest = self._clone_minimal()
                 manifest["units"][0][field] = invalid_val
                 self.assertFalse(self.validator.is_valid(manifest), f"Expected schema to reject {field}={invalid_val}")
 
     def test_unit_level_ai_module_is_rejected(self) -> None:
-        manifest = copy.deepcopy(self.sample)
+        manifest = self._clone_minimal()
         manifest["units"][0]["aiModule"] = {
             "moduleId": "sample:skirmish-kiting",
             "parameters": {},
@@ -306,7 +317,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
         )
 
     def test_tactical_operations_ai_modules_are_profile_scoped(self) -> None:
-        tactical_path = ROOT / "content" / "packs" / "tactical-operations" / "content.json"
+        tactical_path = CONTENT_DIR / "packs" / "tactical-operations" / "content.json"
         tactical_manifest = json.loads(tactical_path.read_text(encoding="utf-8"))
         self.assertTrue(self.validator.is_valid(tactical_manifest))
         units_by_id = {u["id"]: u for u in tactical_manifest["units"]}
@@ -342,7 +353,7 @@ class StructuredUnitParameterSchemaTests(unittest.TestCase):
             "tactical-operations",
         ]
         for pack_name in packs:
-            pack_path = ROOT / "content" / "packs" / pack_name / "content.json"
+            pack_path = CONTENT_DIR / "packs" / pack_name / "content.json"
             pack_manifest = json.loads(pack_path.read_text(encoding="utf-8"))
             for profile in pack_manifest.get("aiProfiles", []):
                 modules = [m["moduleId"] for m in profile.get("modules", [])]

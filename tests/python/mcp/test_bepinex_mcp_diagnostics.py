@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from tests.python.helpers import load_tool_module
+from tests.python.helpers import REPO_ROOT, load_tool_module
 
 SERVER = load_tool_module("bepinex_mcp_server")
 
@@ -1117,7 +1117,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("EventSystem", tools["diagnostics_ui_click_text"]["description"])
 
     def test_ui_census_source_limits_native_pointer_controls_to_canvas_ui(self) -> None:
-        repository = Path(__file__).resolve().parents[2]
+        repository = REPO_ROOT
         source = (repository / "src/RogueCommandExpansionLoader/Runtime/RuntimeUiAccessibility.cs").read_text(encoding="utf-8")
         self.assertIn("behaviour is IPointerClickHandler && IsCanvasUiControl(behaviour)", source)
         self.assertIn("behaviour.GetComponent<RectTransform>() == null", source)
@@ -1342,7 +1342,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         import importlib.util as _ilu
         import sys as _sys
         _spec = _ilu.spec_from_file_location(
-            "build_bepinex_mcp_check", _P(__file__).resolve().parents[2] / "tools" / "build_bepinex_mcp.py"
+            "build_bepinex_mcp_check", REPO_ROOT / "tools" / "build_bepinex_mcp.py"
         )
         assert _spec is not None and _spec.loader is not None
         _mod = _ilu.module_from_spec(_spec)
@@ -1956,7 +1956,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
 
         _spec = _ilu.spec_from_file_location(
             "build_bepinex_mcp_opt",
-            _P(__file__).resolve().parents[2] / "tools" / "build_bepinex_mcp.py",
+            REPO_ROOT / "tools" / "build_bepinex_mcp.py",
         )
         assert _spec is not None and _spec.loader is not None
         _mod = _ilu.module_from_spec(_spec)

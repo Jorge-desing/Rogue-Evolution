@@ -223,23 +223,30 @@ class MechRigValidator:
         audit.score = max(0, audit.score)
         return audit
 
-    def validate_asset_bundle(self, bundle_path: Path) -> List[MechRigAudit]:
+    def validate_asset_bundle(self, bundle_path: Path, *, env: Any = None) -> List[MechRigAudit]:
         """Audits compiled AssetBundle or .assets file using UnityPy."""
         audits: List[MechRigAudit] = []
         if not HAS_UNITYPY:
             return audits
 
-        if not bundle_path.exists():
-            return audits
+        if env is None:
+            if not bundle_path.exists():
+                return audits
 
-        try:
-            env = UnityPy.load(str(bundle_path))
-        except Exception:
-            return audits
+            try:
+                env = UnityPy.load(str(bundle_path))
+            except Exception:
+                return audits
 
         for obj in env.objects:
             if obj.type.name == "GameObject":
                 try:
+                    peek = getattr(obj, "peek_name", None)
+                    peeked_name = peek() if callable(peek) else None
+                    if peeked_name is not None and not any(
+                        k in peeked_name.lower() for k in ("visual", "model", "walker", "mech")
+                    ):
+                        continue
                     data = obj.read()
                     name = getattr(data, "m_Name", "")
                     if not any(k in name.lower() for k in ("visual", "model", "walker", "mech")):

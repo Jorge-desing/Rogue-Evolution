@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from tests.python.helpers import REPO_ROOT, parse_ast_cached
 from tools.canonical_module_inventory_staging import (
     ModelBudgetError,
     sha256_file,
@@ -250,8 +251,8 @@ class CanonicalModuleInventoryStagingTests(unittest.TestCase):
             self.assertEqual(marker.read_text(encoding="utf-8"), "preserve")
 
     def test_builder_routes_staging_before_the_normal_production_build(self):
-        builder_path = Path(__file__).resolve().parents[2] / "tools" / "Build-CanonicalVisualModules.py"
-        module = ast.parse(builder_path.read_text(encoding="utf-8"))
+        builder_path = REPO_ROOT / "tools" / "Build-CanonicalVisualModules.py"
+        module = parse_ast_cached(builder_path)
         main = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "main")
         staging_call = next(
             node for node in ast.walk(main)
@@ -273,8 +274,8 @@ class CanonicalModuleInventoryStagingTests(unittest.TestCase):
         self.assertTrue(any(isinstance(node, ast.Return) for node in ast.walk(stage_branch)))
 
     def test_candidate_builder_checks_nonempty_geometry_and_inspects_after_export(self):
-        builder_path = Path(__file__).resolve().parents[2] / "tools" / "Build-CanonicalVisualModules.py"
-        module = ast.parse(builder_path.read_text(encoding="utf-8"))
+        builder_path = REPO_ROOT / "tools" / "Build-CanonicalVisualModules.py"
+        module = parse_ast_cached(builder_path)
         candidate_builder = next(
             node for node in module.body
             if isinstance(node, ast.FunctionDef) and node.name == "build_candidate_module_fbx"

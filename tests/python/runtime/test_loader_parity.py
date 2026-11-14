@@ -4,7 +4,8 @@ import json
 import re
 import unittest
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from tests.python.helpers import REPO_ROOT
+
 SCHEMA = REPO_ROOT / "content" / "schema" / "content.schema.json"
 DEFS = REPO_ROOT / "src" / "RogueCommandExpansionLoader" / "Content" / "ContentPackDefinition.cs"
 VALIDATION = REPO_ROOT / "src" / "RogueCommandExpansionLoader" / "Content" / "ContentPackValidation.cs"

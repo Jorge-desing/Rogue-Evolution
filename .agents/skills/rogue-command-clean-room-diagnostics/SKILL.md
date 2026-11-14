@@ -255,7 +255,7 @@ Live in-game visual verification requires checking `diagnostics_get_visual_censu
 ### Native Michsky UI callbacks
 
 - The screenshot-free `diagnostics_ui_invoke_native_button` adapter handles exact `Michsky.UI.Reach.ButtonManager` controls that are not Unity `Selectable`s. Require exact GameObject name, the current active scene, expected `buttonText`, and an optional exact scene-qualified path when names repeat. The bridge must resolve one control and read active, enabled, `isActiveAndEnabled`, and `isInteractable` as true before calling the fixed `InvokeOnClick` callback. Unknown state, scene mismatch, inactive controls, mismatched text, truncation, or ambiguity means no callback.
-- Live Profile2 proof: `Continue Run` matched `buttonText="Continuar la partida"` in `MainMenu`; `InvokeOnClick` returned success and the saved run advanced to `IntermissionScreen`, level 3, stage 0. This validates the native callback and state transition without screenshots; it does not prove the rendered menu appearance. Bridge handler/schema tests belong in `tests/python/test_bepinex_mcp_diagnostics.py`.
+- Live Profile2 proof: `Continue Run` matched `buttonText="Continuar la partida"` in `MainMenu`; `InvokeOnClick` returned success and the saved run advanced to `IntermissionScreen`, level 3, stage 0. This validates the native callback and state transition without screenshots; it does not prove the rendered menu appearance. Bridge handler/schema tests belong in `tests/python/mcp/test_bepinex_mcp_diagnostics.py`.
 
 ### Native-pathfinding retarget sample
 

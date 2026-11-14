@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from tests.python.helpers import load_tool_module
+from tests.python.helpers import REPO_ROOT, load_tool_module
 
 SERVER = load_tool_module("bepinex_mcp_server")
 QUERY = "diagnostics_get_game_time_scale"
@@ -219,7 +219,7 @@ class StateWaitTests(unittest.TestCase):
             call.assert_not_called()
 
     def test_skill_examples_validate_and_slider_recipe_runs_with_typed_refs(self):
-        doc = Path(__file__).resolve().parents[2] / ".agents/skills/rogue-command-bepinex-mcp/references/automation.md"
+        doc = REPO_ROOT / ".agents/skills/rogue-command-bepinex-mcp/references/automation.md"
         examples = [json.loads(block) for block in re.findall(r"```json\n(.*?)\n```", doc.read_text(encoding="utf-8"), re.S)]
         self.assertEqual(len(examples), 3)
         for example in examples:

@@ -2,6 +2,19 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## 2026-11-14 Python test suite restructuring & optimization
+
+- **Layout:** Moved 69 loose root `tests/python/test_*.py` modules into domain subpackages (`mcp/`, `packs/`, `pbr/`, `modeling/`, `runtime/`, plus additions to `balance/`, `bundles/`, `registry/`, `schema/`), leaving `helpers.py`, `__init__.py`, and `test_run_python_tests.py` at root. All moved depth-sensitive files now resolve `REPO_ROOT` / `TOOLS_DIR` / `CONTENT_DIR` through `tests.python.helpers`.
+- **Optimizations:**
+  - `tools/validate_native_visual_roots.py` (`NativeHierarchy`): replaced eager `parse_as_dict()` over all 106,910 GameObjects with fast `peek_name()` indexing and lazy component/transform lookup.
+  - `tests/python/helpers.py`: added `BLENDER_EXE`, `GAME_ROOT`, `read_text_cached`, and `parse_ast_cached` (keeping `read_json` strictly uncached) and shared AST/text parses across `RogueModelKit.py` contract specs.
+  - `tests/python/schema/test_structured_unit_parameter_schema.py` & `tests/python/bundles/test_mech_rigging_bundle.py`: validate minimal 1-unit fixtures for field-mutation loops and reuse loaded `UnityPy` environments per bundle.
+  - `tests/python/authoring/test_gravitas_hardflow_recipe.py`: load `gravitas-breaker.blend` once in `setUpClass` instead of per-test `setUp`.
+  - `tools/bepinex_mcp_reload.py`: always restore `sys.modules["build_bepinex_mcp"]` in `finally:` so fake reload tests never leak across sequentially executed worker modules.
+  - `tests/python/mcp/test_bepinex_mcp_shared.py`: added `_wait_for_pid_exit` using Windows `OpenProcess` synchronization + bounded `worker.log` cleanup wait so venv launcher stubs cannot cause `WinError 32` temp-dir failures.
+  - `tools/run_python_tests.py` & `tools/run_python_checks.{ps1,sh}`: added `moduleSeconds` per-module timing, LPT weighted shard balancing in `partition_unit()`, single-process sequential Blender (`bpy`) batching with `read_factory_settings(use_empty=True)` between modules (parallel with unit shards for `--jobs >= 2`, serial for `--jobs 1`), and `--factory-startup` in Blender bake/budget subprocess tests.
+- **Verification:** `.venv` `python -m tools.run_python_tests --output artifacts/python-tests/report.json` passed **749/749** tests (`748 passed, 1 skipped`, `successful: true`, wall time `25.43s`; system Python `24.17s` vs `36.05s` baseline). `git diff --check -- ':!unity/'` clean.
+
 
 ## General capability audit — AI field repair
 
