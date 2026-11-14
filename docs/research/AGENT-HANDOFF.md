@@ -1,5 +1,9 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Pack statistics scenario consolidation
+
+- Consolidated `ContentPackStatsTests.test_ai_modules_counted` into `test_localization_stats`, which already called `pack_stats` on the identical generated scaffold. All localization and module assertions remain. Isolated mock mutations of bilingual percentage and AI-module counts each fail the retained test. Full before/after reports: `artifacts/test-dedup-current/after-balance.json` and `after-stats.json`.
+
 ## 2026-11-13 Balance table assertion deduplication
 
 - Removed a duplicate `unitId` membership assertion in `ExportBalanceTableTests.test_valid_pack_rows`: the same immutable row is already indexed by `unitId` and compared to the source ID. The nearby obsolete cost comment was removed. No case or production behavior changed. Full before/after reports: `artifacts/test-dedup-current/after-registry.json` and `after-balance.json`.

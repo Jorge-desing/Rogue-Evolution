@@ -30,11 +30,8 @@ class ContentPackStatsTests(unittest.TestCase):
         self.assertEqual(1, units_loc["english"])
         self.assertEqual(1, units_loc["bilingual"])
         self.assertEqual(100.0, units_loc["bilingualPercent"])
-
-    def test_ai_modules_counted(self) -> None:
-        pack = SCAFFOLD.generate_scaffold("ns:pack", "alpha")
-        stats = STATS.pack_stats(pack)
         self.assertEqual({"sample:scheduled-base-build": 1}, stats["aiModules"])
+
 
 
 if __name__ == "__main__":

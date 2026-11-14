@@ -118,3 +118,5 @@ In snapshot tests, an exact-argument lookup using `next` already fails when the 
 For registry tests, an exact ID-filtered entry lookup used to verify product mapping already fails when the factory is absent; preserve the independent unit-ID check.
 
 An earlier successful `row["unitId"]` value assertion already establishes the key exists in that same row; preserve its value check when removing the redundant membership check.
+
+The scaffold statistics localization and AI-module assertions share one `pack_stats` call on the same generated input; retain both independent output checks.
