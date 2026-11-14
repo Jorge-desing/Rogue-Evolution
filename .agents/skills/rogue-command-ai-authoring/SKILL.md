@@ -202,3 +202,5 @@ Coordinated dispatch checks the live LowHealth threshold and horizontal skill ra
 Runtime arbitration commits leases and spends dispatch slots only after a native command returns successfully. Rejected winners preserve prior leases and leave capacity for other units in the tick.
 
 Arbitration retains alternative intents until a unit receives an order. It checks each intent against the lease and attempts eligible intents in global utility order, with one successful dispatch per unit and the existing tick limit.
+
+Before arbitration, reconcile leases for sampled units against the live current command. Idle units and units whose native command tag differs release the old lease. An active command with the matching tag keeps its lockout and retarget protection.

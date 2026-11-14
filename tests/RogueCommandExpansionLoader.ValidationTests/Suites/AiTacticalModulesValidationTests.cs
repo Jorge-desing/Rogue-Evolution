@@ -3716,8 +3716,10 @@ internal static partial class ValidationTestRunner
             });
 
             // Module 2 proposes higher-priority SurvivalKite (score 160) away from hostile to (0, 10)
+            bool proposeKite = true;
             var kiteModule = new CoordinatedTestAiRuntimeBehaviour((snapshot, weights, proposals) =>
             {
+                if (!proposeKite) return;
                 proposals.Add(new RogueCommandExpansionLoader.Runtime.Ai.AiIntentProposal(
                     moduleId: "sample:skirmish-kiting",
                     commandTag: "tag.kite",
@@ -3752,6 +3754,19 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("CompositeAiRuntimeBehaviour did not arbitrate coordinated modules into a single winning native command.");
             }
+
+            proposeKite = false;
+            aiUnit.CurrentPlayerCommandName = EntityCommand.Command.Move;
+            UnityEngine.Time.time = 30.5f;
+            composite.Tick();
+            if (aiUnit.ExecuteCommandCallCount != 1)
+                throw new InvalidOperationException("An active retreat must keep its lockout.");
+
+            aiUnit.CurrentPlayerCommandName = EntityCommand.Command.DoNothing;
+            UnityEngine.Time.time = 31f;
+            composite.Tick();
+            if (aiUnit.ExecuteCommandCallCount != 2 || aiUnit.CurrentCommandTag != "tag.combat")
+                throw new InvalidOperationException("A completed retreat must release its lockout and retarget protection.");
 
             composite.OnDestroyed();
         }

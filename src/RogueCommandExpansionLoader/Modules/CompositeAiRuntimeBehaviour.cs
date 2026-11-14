@@ -379,6 +379,24 @@ namespace RogueCommandExpansionLoader.Modules
                 }
             }
 
+            // A completed or replaced native command must not keep its retarget protection.
+            foreach (AiUnitSnapshot snapshot in _lastBattlefieldSnapshot.AiUnits)
+            {
+                int unitId = snapshot.UniqueEntityId;
+                if (!_arbiterState.TryGetLease(unitId, out AiCommandArbiterState.UnitLease lease) ||
+                    !_battlefieldCollector.TryResolveAiEntity(unitId, out EntityController unit) ||
+                    unit == null)
+                {
+                    continue;
+                }
+
+                if (unit.CurrentPlayerCommandName == EntityCommand.Command.DoNothing ||
+                    !unit.CurrentCommandIsTaggedWith(lease.CommandTag))
+                {
+                    _arbiterState.ReleaseLease(unitId);
+                }
+            }
+
             _lastArbitrationResult = AiCommandArbiterPolicy.Arbitrate(
                 _arbiterState,
                 now: Time.time,
