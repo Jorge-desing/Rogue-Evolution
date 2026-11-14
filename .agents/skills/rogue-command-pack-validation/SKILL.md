@@ -122,3 +122,5 @@ An earlier successful `row["unitId"]` value assertion already establishes the ke
 The scaffold statistics localization and AI-module assertions share one `pack_stats` call on the same generated input; retain both independent output checks.
 
 Unit-catalog scaffold count and JSON-serializability checks share one exported report; keep both checks when consolidating their identical input scenario.
+
+Scope exact-body duplicate scans to discoverable test methods. Identical `pass` bodies nested inside a test fixture may deliberately produce different outcomes through skip decorators or fixture setup; retain them when they exercise distinct runner states.

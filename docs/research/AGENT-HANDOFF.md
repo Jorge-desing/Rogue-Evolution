@@ -1,5 +1,12 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Follow-up suite test deduplication audit
+
+- Re-audited the current 106 Python test modules and all 737 discovered cases. The full suite passed: 736 passed, one skipped, zero failures/errors; IDs are unique. Report: `artifacts/test-dedup-current/reaudit-full.json`.
+- An exact AST scan found no identical bodies among the 737 class-level test methods. Three nested no-op fixture methods in `test_run_python_tests.py` have identical bodies by design: one reports passed, one is decorated to skip, and one is prevented by a failing class fixture. They are not discovered top-level cases and cover distinct runner outcomes.
+- Reviewed all three Python test modules added since the prior suite-wide audit: serialized audio decoding/read errors, finite versus invalid modifier values, and HTTP overload versus stateless authentication/connection behavior. Their cases exercise different inputs and outcomes; no redundant case was found.
+- The existing C# triage still covers 577 lambda cases with no identical bodies; its five manually reviewed similar pairs cover different types, diagnostics, graph scope, or asset-reference boundaries and remain separate. Current harness run: 573/574 checks passed, with the single Windows symlink-privilege skip.
+
 ## 2026-11-13 Material Maker shutdown diagnostics (partial correction)
 
 - `MaterialMakerWaitDevice.gd` now explicitly frees the pinned 1.7 renderer's non-RefCounted shader error handler on CLI exit. The upstream handler extends Object and was never freed. Real strict export removes the retained `shader_error_handler.gd` resource error and reduces the original six leaked ObjectDB instances to three. The remaining renderer ObjectDB warning is unresolved; this is not a warning-free shutdown claim.
