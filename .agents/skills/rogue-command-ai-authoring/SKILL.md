@@ -35,6 +35,8 @@ Support repair tracks its own movement destinations. On each repair tick it repl
 
 Factory reinforcement applies `baseIndex` to both live-unit counts and factory queues (`-1` means all AI bases). `maxStandingArmy` reserves slots for pending production before dispatch; destroyed units release slots. Count only observed queue growth as new production. Native `Produce(forFree: true)` replaces/refunds a queued item, so free reinforcement waits for an existing queue to empty instead of restarting it.
 
+Harvester escort retains its assigned squad across scans; `maxEscorts` caps the active group, not new recruits per scan. Owned orders refresh after one meter of destination drift using current-command replacement. Threat loss, ineligible defenders and shutdown release only owned current orders, preserving the native queue and unrelated current orders. Confirm threats through native hostility as well as registry membership.
+
 1. **Decide** (FSM / Behavior Tree / Utility Scorer) $\rightarrow$ Intent & Target
 2. **Path** (NavMesh / Bounded A*) $\rightarrow$ Waypoints (timer-gated repaths, never every frame)
 3. **Steer** (`EntityController` movement forces) $\rightarrow$ Motion ($\Delta\text{pos} \cdot dt$)
@@ -86,7 +88,7 @@ All 23 modules are registered in `AiModuleRegistry.CreateDefault()`:
 | `sample:factory-reinforcement` | Produces reinforcements within scoped live-plus-queued army and factory queue limits | `baseIndex` (-1–31), `checkIntervalSeconds` (1–120s), `maxQueuePerFactory` (1–5), `maxStandingArmy` (1–100), `requireEconomy` (bool), `minGameTimeSeconds` (0–600s) | `base: -1`, `check: 10s`, `queue: 1`, `army: 25`, `economy: true`, `minTime: 15s` |
 | `sample:flanking-strike` | Flanking assault groups maneuver around main battle lines | `baseIndex` (0–31), `flankAngleDegrees` (30–90), `squadSize` (2–6) | `angle: 60`, `squadSize: 3` |
 | `sample:retreat-and-regroup` | Pulls critically damaged units back to base repair zones | `baseIndex` (0–31), `retreatHealthRatio` (0.1–0.5), `cooldownSeconds` (5–120s) | `ratio: 0.25`, `cooldown: 20s` |
-| `sample:harvester-escort` | Assigns dedicated combat escorts to shadow harvesters | `baseIndex` (0–31), `escortsPerHarvester` (1–3), `leashDistance` (3.0–20.0) | `escorts: 1`, `leashDistance: 8.0` |
+| `sample:harvester-escort` | Maintains a capped defensive squad for the nearest threatened harvester | `baseIndex` (0–31), `escortRadiusCells` (1–64), `scanIntervalSeconds` (1–60s), `maxEscorts` (1–16), `engageAttackers` (bool) | `base: 0`, `radius: 8`, `scan: 5s`, `max: 3`, `engage: true` |
 | `sample:patrol-and-intercept` | Perimeter patrol; requires `CurrentPlayerCommandName == DoNothing` and empty `_commandChain` queue | None (fails closed on non-empty queue) | None |
 | `sample:adaptive-commander` | Promotes commander, pulses command auras, modulates tactical stances & doctrine | None (binds to profile defaults) | Dynamic |
 | `sample:tactical-director` | **HUB-D 2.0 Macro Director**: 8-ray safe retreat, base defense, flanking, focus fire with status/affix scoring | `baseIndex` (-1–31), `evalIntervalSeconds` (0.1–10.0), `engagementRadius` (5–120), `defenseRadius` (5–60), `retreatHealthRatio` (0.05–0.80), `maxProposalsPerUnit` (1–4), `enableSurvivalKiting` (bool), `enableBaseDefense` (bool), `enableFocusTargeting` (bool), `enableFlanking` (bool), `minFlankSpeed` (3.0–25.0) | `base: -1`, `eval: 0.5s`, `engagementRadius: 40`, `defenseRadius: 20`, `retreatRatio: 0.30`, `maxProposals: 2`, flags: `true`, `minFlankSpeed: 7.5` |

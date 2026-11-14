@@ -43,6 +43,7 @@ namespace RogueCommandExpansionLoader.Modules
             private const string CommandTagPrefix = "roguecommand.expansionloader.harvester-escort.";
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly HarvesterEscortSettings _settings;
+            private readonly Dictionary<EntityController, Vector3> _escortDestinations = new Dictionary<EntityController, Vector3>();
             private string _commandTag;
             private float _nextScanAt;
             private bool _stopped;
@@ -82,10 +83,12 @@ namespace RogueCommandExpansionLoader.Modules
                 EntityController attacker;
                 if (!TryFindThreat(out threatenedHarvester, out attacker))
                 {
+                    ReleaseEscorts(null);
                     return;
                 }
 
                 List<EntityController> escorts = SelectEscorts(threatenedHarvester.Position, attacker.Position);
+                ReleaseEscorts(escorts);
                 if (escorts.Count == 0)
                 {
                     return;
@@ -99,6 +102,13 @@ namespace RogueCommandExpansionLoader.Modules
                 for (int i = 0; i < escorts.Count; i++)
                 {
                     EntityController escort = escorts[i];
+                    bool ownsCommand = escort.CurrentCommandIsTaggedWith(_commandTag);
+                    Vector3 priorDestination;
+                    if (ownsCommand && _escortDestinations.TryGetValue(escort, out priorDestination) &&
+                        (priorDestination - destination).sqrMagnitude < 1f)
+                    {
+                        continue;
+                    }
                     EntityCommand command = EntityCommand.AttackMoveOnPosition(
                         destination,
                         EntityCommand.Role.None,
@@ -108,7 +118,9 @@ namespace RogueCommandExpansionLoader.Modules
                     try
                     {
                         escort.ExecuteCommand(command,
-                            EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                            ownsCommand ? EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand
+                                : EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                        _escortDestinations[escort] = destination;
                         dispatched++;
                     }
                     catch (Exception exception)
@@ -129,7 +141,29 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
+                ReleaseEscorts(null);
                 _commandTag = null;
+            }
+
+            private void ReleaseEscorts(List<EntityController> retained)
+            {
+                foreach (EntityController escort in new List<EntityController>(_escortDestinations.Keys))
+                {
+                    if (retained != null && retained.Contains(escort)) continue;
+                    if (escort != null && !escort.IsDestroyed && !escort.DestroyHasBeenStarted &&
+                        _commandTag != null && escort.CurrentCommandIsTaggedWith(_commandTag))
+                    {
+                        try
+                        {
+                            escort.ExecuteCommand(EntityCommand.Stop(), EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+                        }
+                        catch (Exception exception)
+                        {
+                            Debug.LogWarning("[RogueCommandExpansionLoader] Could not release harvester escort: " + exception.Message);
+                        }
+                    }
+                    _escortDestinations.Remove(escort);
+                }
             }
 
             private bool TryFindThreat(out EntityController harvester, out EntityController attacker)
@@ -138,7 +172,9 @@ namespace RogueCommandExpansionLoader.Modules
                 attacker = null;
                 float bestDistance = float.MaxValue;
 
-                HashSet<EntityController> harvesters = ExistingControllers.Instance.Harvesters;
+                ExistingControllers existing = ExistingControllers.Instance;
+                if (existing == null || existing.PlayerUnits() == null) return false;
+                HashSet<EntityController> harvesters = existing.Harvesters;
                 if (harvesters == null || harvesters.Count == 0)
                 {
                     return false;
@@ -157,7 +193,7 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    foreach (EntityController enemy in ExistingControllers.Instance.PlayerUnits())
+                    foreach (EntityController enemy in existing.PlayerUnits())
                     {
                         if (enemy == null ||
                             enemy.IsDestroyed ||
@@ -167,7 +203,7 @@ namespace RogueCommandExpansionLoader.Modules
                             !enemy.IsCombatUnit ||
                             enemy.canNotBeAttacked ||
                             enemy.canNotBeTargetedByAi ||
-                            enemy.doNotRegisterGlobally)
+                            enemy.doNotRegisterGlobally || !candidateHarvester.IsEnemy(enemy))
                         {
                             continue;
                         }
@@ -214,17 +250,16 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
-                    if (unit.CurrentCommandIsTaggedWith(_commandTag))
-                    {
-                        continue;
-                    }
-
                     candidates.Add(unit);
                 }
 
                 Vector3 reference = _settings.EngageAttackers ? attackerPosition : harvesterPosition;
                 candidates.Sort((a, b) =>
                 {
+                    // Keep the assigned squad instead of recruiting another MaxEscorts each scan.
+                    bool aAssigned = a.CurrentCommandIsTaggedWith(_commandTag);
+                    bool bAssigned = b.CurrentCommandIsTaggedWith(_commandTag);
+                    if (aAssigned != bAssigned) return aAssigned ? -1 : 1;
                     float distanceA = Vector3.Distance(a.Position, reference);
                     float distanceB = Vector3.Distance(b.Position, reference);
                     return distanceA.CompareTo(distanceB);

@@ -16,6 +16,72 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetAiTacticalModulesValidationTests() => new (string Name, Action Run)[]
     {
+    ("harvester escort maintains a capped squad, follows threats and releases only owned orders", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            var harvester = new EntityController { IsControlledByAi = true, IsUnit = true, Role = UnitRole.Harvester };
+            var enemy = new EntityController { IsControlledByPlayer = true, IsUnit = true, IsCombatUnit = true, Position = new Vector3(2f, 0f, 0f) };
+            var defenders = new List<EntityController>();
+            for (int i = 0; i < 4; i++)
+            {
+                var defender = new EntityController
+                {
+                    IsControlledByAi = true, IsUnit = true, IsCombatUnit = true,
+                    CanAttackAndIsAttackEnabled = true, CanMoveAndMovementIsEnabled = true,
+                    Position = new Vector3(i + 1f, 0f, 0f)
+                };
+                defenders.Add(defender);
+                ExistingControllers.Instance.AiUnits().Add(defender);
+            }
+            ExistingControllers.Instance.Harvesters.Add(harvester);
+            ExistingControllers.Instance.PlayerUnits().Add(enemy);
+            behaviour = new HarvesterEscortAiModule().CreateBehaviour(new DefaultAiBehaviour(), new[]
+            {
+                new ContentModuleParameter { name = "maxEscorts", value = "1" }
+            });
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            var assigned = defenders.Single(d => d.ExecuteCommandCallCount == 1);
+            UnityEngine.Time.time += 6f;
+            behaviour.Tick();
+            if (defenders.Sum(d => d.ExecuteCommandCallCount) != 1)
+                throw new InvalidOperationException("Persistent threat recruited additional escorts or repeated an unchanged order.");
+            enemy.Position = new Vector3(5f, 0f, 0f);
+            UnityEngine.Time.time += 6f;
+            behaviour.Tick();
+            if (assigned.ExecuteCommandCallCount != 2 || !assigned.LastExecutedCommand.HasValue || assigned.LastExecutedCommand.Value.destination.x != 5f ||
+                assigned.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand)
+                throw new InvalidOperationException("Assigned escort did not refresh its threat destination without stacking orders.");
+            enemy.Position = new Vector3(100f, 0f, 0f);
+            UnityEngine.Time.time += 6f;
+            behaviour.Tick();
+            if (!assigned.LastExecutedCommand.HasValue || assigned.LastExecutedCommand.Value.command != EntityCommand.Stop().command ||
+                assigned.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand)
+                throw new InvalidOperationException("Escort did not release its order after the threat left.");
+
+            enemy.Position = new Vector3(2f, 0f, 0f);
+            UnityEngine.Time.time += 6f;
+            behaviour.Tick();
+            assigned = defenders.Single(d => d.CurrentCommandTag != null);
+            var foreignOrder = EntityCommand.Move(new Vector3(30f, 0f, 0f));
+            foreignOrder.tag = "another-module";
+            assigned.ExecuteCommand(foreignOrder, EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+            int count = assigned.ExecuteCommandCallCount;
+            behaviour.OnDestroyed();
+            if (assigned.ExecuteCommandCallCount != count || assigned.CurrentCommandTag != "another-module")
+                throw new InvalidOperationException("Escort shutdown overwrote another module's current order.");
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("harvester-escort AI parser supplies bounded defaults", () =>
     {
         if (!HarvesterEscortParameterParser.TryParse(null, out HarvesterEscortSettings defaults,

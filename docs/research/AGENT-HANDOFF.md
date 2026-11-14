@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — persistent harvester escorts
+
+- Harvester escort keeps one capped squad across scans instead of recruiting another `maxEscorts` defenders while previous escorts remain active. Existing escorts are preferred; lost/ineligible units can be replaced.
+- Destination drift refreshes the owned current order without stacking old commands. Threat disappearance and shutdown release owned orders while preserving queued native orders and unrelated current commands. Threat selection checks native hostility.
+- Release build: zero warnings/errors. Focused AiTacticalModules suite: 68/68 passed, covering repeated scans, moving threats, threat departure and foreign-command ownership. Local evidence only; Steam/profile execution remains unverified.
+- Deployment backup and hash manifest: `artifacts/general-capability-audit/escort-deployment/manifest.json`.
+
 ## General capability audit — scoped factory reinforcements
 
 - Factory reinforcement now counts only live units in its selected AI base, and reserves army slots for all in-scope factory queues before adding production. Base `-1` retains the shared AI scope. Losses release capacity on the next scan.
