@@ -11,45 +11,7 @@ from pathlib import Path
 
 import jsonschema
 
-CONTENT_SCHEMA = {
-    "type": "object",
-    "required": ["packId"],
-    "properties": {
-        "packId": {"type": "string", "minLength": 1},
-        "schemaVersion": {"type": ["string", "integer"]},
-        "displayName": {"type": "string", "minLength": 1},
-        "version": {"type": "string"},
-        "assetBundleManifestPath": {"type": "string"},
-        "assetBundles": {"type": "array"},
-        "units": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "string", "minLength": 1},
-                    "unitId": {"type": "string", "minLength": 1},
-                    "displayName": {"type": "string", "minLength": 1},
-                    "assetBundleId": {"type": "string"},
-                    "productionBuilding": {"type": ["object", "string"]},
-                },
-            },
-        },
-        "buildings": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "buildingId": {"type": "string", "minLength": 1},
-                    "id": {"type": "string", "minLength": 1},
-                    "displayName": {"type": "string", "minLength": 1},
-                },
-            },
-        },
-        "stages": {"type": "array"},
-        "aiProfiles": {"type": "array"},
-    },
-    "additionalProperties": True,
-}
+SCHEMA_PATH = Path(__file__).resolve().parents[1] / "content/schema/content.schema.json"
 
 
 def validate_pack(pack_dir: str, schema_path: str | None = None) -> list[str]:
@@ -66,23 +28,22 @@ def validate_pack(pack_dir: str, schema_path: str | None = None) -> list[str]:
 
     try:
         data = json.loads(content_json.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
+    except (ValueError, OSError) as e:
         return [f"content.json inválido: {e}"]
 
-    active_schema = CONTENT_SCHEMA
-    if schema_path:
-        schema_file = Path(schema_path)
-        if not schema_file.is_file():
-            return [f"Schema no encontrado: {schema_path}"]
-        try:
-            active_schema = json.loads(schema_file.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            return [f"Schema inválido ({schema_path}): {e}"]
-
+    schema_file = Path(schema_path) if schema_path else SCHEMA_PATH
+    if not schema_file.is_file():
+        return [f"Schema no encontrado: {schema_file}"]
     try:
+        active_schema = json.loads(schema_file.read_text(encoding="utf-8"))
         jsonschema.validate(instance=data, schema=active_schema)
     except jsonschema.ValidationError as e:
-        errors.append(f"Schema: {e.message} (path: {'/'.join(str(p) for p in e.absolute_path)})")
+        return [f"Schema: {e.message} (path: {'/'.join(str(p) for p in e.absolute_path)})"]
+    except (ValueError, OSError, jsonschema.SchemaError) as e:
+        return [f"Schema inválido ({schema_file}): {e}"]
+
+    if not isinstance(data, dict):
+        return ["content.json debe ser un objeto"]
 
     # Verificar archivos referenciados por unidad (iconPath, prefabPath, bundlePath)
     for unit in data.get("units", []):

@@ -11,8 +11,6 @@ from tests.python.helpers import load_tool_module
 from tools.validate_content_pack import validate_pack
 
 SCAFFOLD = load_tool_module("scaffold_pack")
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-SCHEMA_PATH = REPO_ROOT / "content" / "schema" / "content.schema.json"
 
 
 class ScaffoldPackTests(unittest.TestCase):
@@ -56,7 +54,7 @@ class ScaffoldPackTests(unittest.TestCase):
             content = Path(tmp) / "content.json"
             self.assertEqual(scaffold, json.loads(content.read_text(encoding="utf-8")))
 
-            errors = validate_pack(tmp, schema_path=str(SCHEMA_PATH))
+            errors = validate_pack(tmp)
             self.assertEqual([], errors)
 
 

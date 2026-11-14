@@ -3,6 +3,11 @@
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
 
+## General capability audit — pack validator integration
+
+- The documented pack validator now loads the canonical schema by default and stops before inspecting files when schema validation fails. An explicit schema remains supported. The scaffold regression uses the default entry point.
+- All four manifest shapes pass. Native expansion, reactive AI, and tactical operations pass file validation. The excluded sample-expansion still reports two missing bundles. Full Python evidence is under `artifacts/general-capability-audit/pack-validator-full.json`. Runtime loading and authoring remain separate audit areas.
+
 ## General capability audit — Python acceptance runner
 
 - Fixed false success for empty test selection and malformed worker report shapes. Worker report contract failures are retained in the aggregate report, with the worker log and exit code. The CLI also rejects non-finite timeout values.

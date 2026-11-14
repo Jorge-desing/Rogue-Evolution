@@ -30,6 +30,8 @@ Authoritative protocol for validating content manifests, AssetBundles, loader bu
 
 ## 2. Manifest Schema & Parameter Rules
 
+Use `python -m tools.validate_content_pack <pack_dir>` for canonical schema and pack file checks. Schema errors stop file inspection. Use `--schema` for an intentional alternate contract.
+
 The Python acceptance runner fails and emits an aggregate report when the selected inventory is empty or a worker returns an invalid report. A successful worker must report a positive integer test count. Use a finite positive per-worker timeout.
 
 Default `--jobs 2` partitions CPython modules without splitting their fixtures. Modules in the Blender test directory, with Blender bindings, or explicit Blender subprocess usage are placed together in one serial integration worker. Blender-only modules run serially after all CPython workers finish. Use `--jobs 1` for serial comparison or diagnosis, and `--jobs 2..4` to bound unit concurrency. Compare case inventories and outcomes before accepting scheduling changes.

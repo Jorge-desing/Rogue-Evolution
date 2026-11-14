@@ -18,18 +18,16 @@ class ValidateContentPackTests(unittest.TestCase):
             p.write_text("dummy", encoding="utf-8")
         return d
 
-    def test_valid_minimal_pack(self):
-        content = {
-            "packId": "test-pack",
-            "displayName": "Test Pack",
-            "version": "1.0.0",
-            "units": [{"unitId": "u1", "displayName": "Unit 1"}],
-            "buildings": [{"buildingId": "b1", "displayName": "Building 1"}],
-            "stages": [{"stageId": "s1", "displayName": "Stage 1"}],
-        }
-        d = self._make_pack(content)
-        errors = validate_content_pack.validate_pack(d)
-        self.assertEqual(errors, [])
+    def test_default_schema_rejects_invalid_unit_shape_and_missing_factory(self):
+        content = {"schemaVersion": 1, "packId": "test:pack", "assetBundles": [],
+                   "stages": [], "aiProfiles": []}
+        for units in ([None], [{"id": "test:unit", "nativeTemplateId": "PCXBaseTank"}]):
+            with self.subTest(units=units):
+                errors = validate_content_pack.validate_pack(self._make_pack(dict(content, units=units)))
+                self.assertTrue(errors[0].startswith("Schema:"))
+                self.assertIn("units/0", errors[0])
+                if units[0] is not None:
+                    self.assertIn("productionBuilding", errors[0])
 
     def test_missing_content_json(self):
         d = tempfile.mkdtemp()
@@ -55,7 +53,9 @@ class ValidateContentPackTests(unittest.TestCase):
             "stages": [],
         }
         d = self._make_pack(content)
-        errors = validate_content_pack.validate_pack(d)
+        schema = Path(d) / "legacy-schema.json"
+        schema.write_text(json.dumps({"type": "object"}), encoding="utf-8")
+        errors = validate_content_pack.validate_pack(d, schema_path=str(schema))
         self.assertTrue(any("duplicad" in e.lower() or "duplicate" in e.lower() for e in errors))
 
     def test_referenced_file_missing(self):
@@ -68,7 +68,9 @@ class ValidateContentPackTests(unittest.TestCase):
             "stages": [],
         }
         d = self._make_pack(content)
-        errors = validate_content_pack.validate_pack(d)
+        schema = Path(d) / "legacy-schema.json"
+        schema.write_text(json.dumps({"type": "object"}), encoding="utf-8")
+        errors = validate_content_pack.validate_pack(d, schema_path=str(schema))
         self.assertTrue(any("no existe" in e or "missing" in e.lower() for e in errors))
 
     def test_referenced_file_exists(self):
@@ -81,7 +83,9 @@ class ValidateContentPackTests(unittest.TestCase):
             "stages": [],
         }
         d = self._make_pack(content, files=["icons/ok.png"])
-        errors = validate_content_pack.validate_pack(d)
+        schema = Path(d) / "legacy-schema.json"
+        schema.write_text(json.dumps({"type": "object"}), encoding="utf-8")
+        errors = validate_content_pack.validate_pack(d, schema_path=str(schema))
         self.assertEqual(errors, [])
 
     def test_custom_schema_validation(self):

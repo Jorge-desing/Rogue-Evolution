@@ -2,6 +2,8 @@
 
 ## Start here for a pack change
 
+The pack validator loads this repository schema by default. Supply `--schema` only when intentionally validating against a different schema.
+
 Use this contract with [content.schema.json](content.schema.json) and the [pack validation skill](../../.agents/skills/rogue-command-pack-validation/SKILL.md). From the repository root, run `python -m tools.validate_content_pack <pack_dir>` for the edited pack and `python -m tools.audit_content_references --all` for cross-pack links. Inspect reported schema paths and unresolved IDs before packaging.
 
 
