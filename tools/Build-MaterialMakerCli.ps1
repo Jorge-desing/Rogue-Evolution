@@ -107,6 +107,8 @@ try {
         throw 'Godot runtime executables must both be the pinned 4.7 stable build.'
     }
 
+    # Keep the source import isolated from an interactive desktop editor session.
+    # The actual Material Maker CLI export is separately exercised with its Vulkan renderer.
     $importArguments = "--headless --editor --path `"$sourceProject`" --quit"
     Invoke-MaterialMakerBuildProcess -Executable $godotConsole -Arguments $importArguments -WorkingDirectory $sourceProject -LogName 'godot-import'
 

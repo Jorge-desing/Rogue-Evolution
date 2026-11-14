@@ -151,6 +151,111 @@ def patch_source(source: Path) -> list[str]:
     ):
         changed.append("texture RID cleanup")
 
+    ptex_import = source / "addons/material_maker/import_plugin/ptex_import.gd"
+    if _replace_once(
+        ptex_import,
+        "\t\tvar file : File = File.new()\n"
+        "\t\tif file.open(source_file, File.READ) == OK:\n"
+        "\t\t\tvar test_json_conv = JSON.new()\n"
+        "\t\t\ttest_json_conv.parse(file.get_as_text())))\n"
+        "\t\t\tmaterial.set_ptex_no_render(JSON.new().stringify(test_json_conv.get_data()\n"
+        "\t\t\tfile.close()\n",
+        "\t\tvar file = FileAccess.open(source_file, FileAccess.READ)\n"
+        "\t\tif file != null:\n"
+        "\t\t\tvar test_json_conv = JSON.new()\n"
+        "\t\t\tvar parse_status : int = test_json_conv.parse(file.get_as_text())\n"
+        "\t\t\tif parse_status == OK:\n"
+        "\t\t\t\tmaterial.set_ptex_no_render(JSON.new().stringify(test_json_conv.get_data()))\n"
+        "\t\t\tfile.close()\n",
+        "Godot 4 PTeX importer syntax and FileAccess compatibility",
+    ):
+        changed.append("Godot 4 PTeX importer syntax and FileAccess compatibility")
+    ptex_import_migrations = (
+        (
+            "func _get_import_options(preset : int) -> Array:\n\treturn PRESET_OPTIONS[preset]\n",
+            "func _get_import_options(path: String, preset: int) -> Array[Dictionary]:\n"
+            "\tvar import_options : Array[Dictionary] = []\n"
+            "\tfor option in PRESET_OPTIONS[preset]:\n"
+            "\t\timport_options.append(option)\n"
+            "\treturn import_options\n",
+            "Godot 4.7 EditorImportPlugin import-options signature",
+        ),
+        (
+            "func _get_option_visibility(option: String, options: Dictionary) -> bool:\n",
+            "func _get_option_visibility(path: String, option_name: StringName, options: Dictionary) -> bool:\n",
+            "Godot 4.7 EditorImportPlugin option-visibility signature",
+        ),
+        (
+            "func _get_recognized_extensions() -> Array:\n\treturn [ \"ptex\" ]\n",
+            "func _get_recognized_extensions() -> PackedStringArray:\n\treturn PackedStringArray([ \"ptex\" ])\n",
+            "Godot 4.7 EditorImportPlugin recognized-extensions signature",
+        ),
+        (
+            "\t\tvar gen = mm_loader.load_gen(source_file)\n",
+            "\t\tvar gen = await mm_loader.load_gen(source_file)\n",
+            "await asynchronous PTeX graph loading",
+        ),
+        (
+            "\t\t\t\t\tvar result = c.export_material(source_file.get_basename(), \"Godot\")\n"
+            "\t\t\t\t\twhile result is GDScriptFunctionState:\n"
+            "\t\t\t\t\t\tresult = await result.completed\n",
+            "\t\t\t\t\tawait c.export_material(source_file.get_basename(), \"Godot\")\n",
+            "await asynchronous PTeX material export",
+        ),
+    )
+    for before, after, label in ptex_import_migrations:
+        if _replace_once(ptex_import, before, after, label):
+            changed.append(label)
+
+    ptex_spatial = source / "addons/material_maker/import_plugin/ptex_spatial_material.gd"
+    if _replace_once(
+        ptex_spatial,
+        "\ttest_json_conv.parse(ptex))\n\tvar mm_graph = mm_loader.create_gen(test_json_conv.get_data()\n",
+        "\tvar parse_status : int = test_json_conv.parse(ptex)\n"
+        "\tif parse_status != OK:\n"
+        "\t\treturn\n"
+        "\tvar mm_graph = mm_loader.create_gen(test_json_conv.get_data())\n",
+        "Godot 4 PTeX material importer syntax",
+    ):
+        changed.append("Godot 4 PTeX material importer syntax")
+    if _replace_once(
+        ptex_spatial,
+        "\tvar mm_graph = mm_loader.create_gen(test_json_conv.get_data())\n",
+        "\tvar mm_graph = await mm_loader.create_gen(test_json_conv.get_data())\n",
+        "await asynchronous PTeX graph creation",
+    ):
+        changed.append("await asynchronous PTeX graph creation")
+    if _replace_once(
+        ptex_spatial,
+        "\tvar status = mm_material.render_textures()\n"
+        "\twhile status is GDScriptFunctionState:\n"
+        "\t\tstatus = await status.completed\n",
+        "\tawait mm_material.render_textures()\n",
+        "await asynchronous PTeX texture rendering",
+    ):
+        changed.append("await asynchronous PTeX texture rendering")
+
+    fixup = source / "scripts/fixup.gd"
+    if _replace_once(
+        fixup,
+        "\tvar dir : Directory = Directory.new()\n"
+        "\tdir.open(\"res://addons/material_maker/nodes\")\n"
+        "\tdir.list_dir_begin() # TODOGODOT4 fill missing arguments https://github.com/godotengine/godot/pull/40547\n",
+        "\tvar dir = DirAccess.open(\"res://addons/material_maker/nodes\")\n"
+        "\tif dir == null:\n"
+        "\t\treturn\n"
+        "\tdir.list_dir_begin()\n",
+        "Godot 4 directory access in the manual fixup script",
+    ):
+        changed.append("Godot 4 directory access in the manual fixup script")
+    if _replace_once(
+        fixup,
+        "\t\t\tvar g = mm_loader.load_gen(file_path)\n",
+        "\t\t\tvar g = await mm_loader.load_gen(file_path)\n",
+        "await asynchronous graph load in the manual fixup script",
+    ):
+        changed.append("await asynchronous graph load in the manual fixup script")
+
     parse_args = source / "parse_args.gd"
     if _replace_once(
         parse_args,
