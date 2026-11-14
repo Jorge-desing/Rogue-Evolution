@@ -109,6 +109,21 @@ class StateWaitTests(unittest.TestCase):
                 self.assertTrue(SERVER.execute_tool("diagnostics_order_leave_intermission_shop", args)["isError"])
             call.assert_not_called()
 
+    def test_shop_exit_wait_requires_stable_map_without_redispatch(self):
+        tool = "diagnostics_order_leave_intermission_shop"
+        invoked = '{"success":false,"nativeCallInvoked":true,"effectObserved":false}'
+        ready = '{"isIntermissionActive":true,"nativePanelState":{"isShopActive":false}}'
+        pending = '{"isIntermissionActive":false,"nativePanelState":{"isShopActive":true}}'
+        for samples, timeout, expected in [([ready, pending, ready, ready], 2, True), ([pending, ready], 0.5, False)]:
+            self.clock.now = 0
+            with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=[invoked, *samples]) as call:
+                result = SERVER.execute_tool(tool, {"gameObjectId": 42, "waitSeconds": timeout})
+            payload = json.loads(result["content"][0]["text"])
+            self.assertIs(payload["effectObserved"], expected)
+            self.assertTrue(payload["nativeCallInvoked"])
+            self.assertEqual(mock.call("OrderLeaveIntermissionShopJson", [42]), call.call_args_list[0])
+            self.assertEqual(["GetRuntimeControlSurfaceJson"] * len(samples), [entry.args[0] for entry in call.call_args_list[1:]])
+
     def test_missing_and_type_mismatch_timeout(self):
         for row in ({}, {"ready": 1}, {"ready": "true"}):
             with self.subTest(row=row), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(row)):

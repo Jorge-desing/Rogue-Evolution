@@ -1442,7 +1442,7 @@ def _optimise_spec(spec: dict) -> dict:
     }
 
 
-TOOL_SPECS.append({"name": "diagnostics_order_leave_intermission_shop", "description": "MUTATION: native Shop exit saves and finishes node. Verify transition; never replay an uncertain call.", "parameters": {"type": "object", "properties": {"gameObjectId": {"type": "integer"}}, "required": ["gameObjectId"], "additionalProperties": False}})
+TOOL_SPECS.append({"name": "diagnostics_order_leave_intermission_shop", "description": "MUTATION: finish Shop and save. Optional wait for the map.", "parameters": {"type": "object", "properties": {"gameObjectId": {"type": "integer"}, "waitSeconds": {"type": "number", "minimum": 0.1, "maximum": 30}}, "required": ["gameObjectId"], "additionalProperties": False}})
 
 for _spec in TOOL_SPECS:
     if _spec["name"] == "diagnostics_post_agent_message":

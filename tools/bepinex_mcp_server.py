@@ -3381,7 +3381,36 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             return _tool_response(res)
 
         elif name == "diagnostics_order_leave_intermission_shop":
-            return _tool_response(_call_diagnostics_method("OrderLeaveIntermissionShopJson", [arguments["gameObjectId"]]))
+            wait_seconds = arguments.get("waitSeconds")
+            if wait_seconds is not None and not 0.1 <= wait_seconds <= 30:
+                return _tool_response(json.dumps({"error": "waitSeconds must be between 0.1 and 30"}), is_error=True)
+            raw = _call_diagnostics_method("OrderLeaveIntermissionShopJson", [arguments["gameObjectId"]])
+            if wait_seconds is None:
+                return _tool_response(raw)
+            try:
+                action = json.loads(raw)
+            except (TypeError, ValueError):
+                return _tool_response(json.dumps({"error": "Unreadable Shop exit reply", "completionStatus": "unknown"}), is_error=True)
+            if not isinstance(action, dict):
+                return _tool_response(json.dumps({"error": "Invalid Shop exit reply", "completionStatus": "unknown"}), is_error=True)
+            if action.get("nativeCallInvoked") is not True or action.get("completionStatus") == "unknown":
+                return _tool_response(raw)
+            wait = _wait_for_state({
+                "tool": "diagnostics_get_runtime_control_surface",
+                "arguments": {"maxUiResults": 1},
+                "timeoutSeconds": wait_seconds,
+                "stableSamples": 2,
+                "expect": [
+                    {"path": "/isIntermissionActive", "equals": True},
+                    {"path": "/nativePanelState/isShopActive", "equals": False},
+                ],
+            })
+            transition = json.loads(wait["content"][0]["text"])
+            observed = transition.get("success") is True
+            return _tool_response(json.dumps({
+                "success": observed, "nativeCallInvoked": True, "effectObserved": observed,
+                "nativeResult": action, "transition": transition,
+            }), is_error=not observed)
 
         elif name == "diagnostics_order_reroll_intermission_shop":
             res = _call_diagnostics_method("OrderRerollIntermissionShopJson", [])

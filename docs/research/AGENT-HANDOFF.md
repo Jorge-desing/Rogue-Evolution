@@ -1,5 +1,9 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Shop exit with map transition
+
+- The native Shop exit order accepts optional waitSeconds. It executes the native exit once and waits for two consecutive map observations with Shop inactive under the inherited sequence budget. The response preserves the original action result and exposes the wait outcome. Local regression covers transient map observations and timeout without replay.
+
 ## 2026-11-13 Native Shop exit control
 
 - REA verified game 1.0.9 Assembly-CSharp SHA-256/MVID against the compatibility identity; source evidence `artifacts/intermission-native-controls/research-ledger.json` records decompilation hashes and native entry points. `ShopLeaveButton.OnPress()` finishes the node, writes the save and loads intermission. Display-only DropPodPanel/NextLevelButton are not action entry points.
