@@ -61,6 +61,9 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private float _currentRecoilOffset;
         private float _radarRpm = 30f;
         private float _turretTraverseSpeed = 120f;
+        private readonly Dictionary<string, bool> _attachmentBaseline = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, bool> _attachmentVisibility = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _damageHiddenAttachments = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private bool _isDamagedStateActive;
         private bool _isCriticalStateActive;
         private bool _isTurretJammed;
@@ -326,6 +329,14 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             UpdateHealthAndDamageTransitions(false, 1f);
             UpdateDamageFire();
             if (wasOnFire) ApplyProceduralScorch(false);
+            foreach (var entry in _attachmentBaseline)
+            {
+                if (TryGetHardpointVisual(entry.Key, out Transform visual))
+                    visual.gameObject.SetActive(entry.Value);
+            }
+            _attachmentVisibility.Clear();
+            _damageHiddenAttachments.Clear();
+            _activeTacticalStanceVisual = "Standard";
             RestorePrimaryVisualVariant();
         }
 
@@ -961,7 +972,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     Vector3 effectPosition = effectAnchor.position;
                     Quaternion effectRotation = effectAnchor.rotation;
                     bool hidesEffectAnchor = eraVisual == effectAnchor;
-                    eraVisual.gameObject.SetActive(false);
+                    SetAttachmentDamageHidden("ERA", true);
                     if (hidesEffectAnchor)
                     {
                         RuntimeVisualVfxFallback.TriggerMuzzleFlashAt(transform, effectPosition, effectRotation);
@@ -971,14 +982,14 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                         RuntimeVisualVfxFallback.TriggerMuzzleFlash(effectAnchor, this);
                     }
                 }
+                else
+                {
+                    SetAttachmentDamageHidden("ERA", true);
+                }
             }
             else if (ratio > 0.85f && !isDead)
             {
-                Transform eraSocket;
-                if (TryGetHardpointVisual("ERA", out eraSocket) && !eraSocket.gameObject.activeSelf)
-                {
-                    eraSocket.gameObject.SetActive(true);
-                }
+                SetAttachmentDamageHidden("ERA", false);
             }
 
             // 2. Moderate Damage (<= 50% HP): Smoke particle spawner & Damaged mesh transition
@@ -1018,7 +1029,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                         Vector3 effectPosition = effectAnchor.position;
                         Quaternion effectRotation = effectAnchor.rotation;
                         bool hidesEffectAnchor = fuelVisual == effectAnchor;
-                        fuelVisual.gameObject.SetActive(false);
+                        SetAttachmentDamageHidden("FuelDrums", true);
                         if (hidesEffectAnchor)
                         {
                             RuntimeVisualVfxFallback.SpawnDamageSmokeAt(transform, effectPosition, effectRotation);
@@ -1027,6 +1038,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                         {
                             RuntimeVisualVfxFallback.SpawnDamageSmoke(effectAnchor);
                         }
+                    }
+                    else
+                    {
+                        SetAttachmentDamageHidden("FuelDrums", true);
                     }
                 }
             }
@@ -1056,11 +1071,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     ApplyProceduralScorch(_isOnFireVisualActive);
                 }
 
-                Transform fuelSocket;
-                if (TryGetHardpointVisual("FuelDrums", out fuelSocket) && !fuelSocket.gameObject.activeSelf)
-                {
-                    fuelSocket.gameObject.SetActive(true);
-                }
+                SetAttachmentDamageHidden("FuelDrums", false);
             }
 
             // 3. Critical Damage (<= 25% HP): Fire particles, APS burnout, and jammed turret tilt
@@ -1078,12 +1089,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                         _socketTurretPivot.localRotation *= Quaternion.Euler(4.5f, 0f, 3.8f);
                     }
 
-                    // APS radar burnout
-                    Transform apsSocket;
-                    if (TryGetHardpointVisual("APS", out apsSocket))
-                    {
-                        apsSocket.gameObject.SetActive(false);
-                    }
+                    SetAttachmentDamageHidden("APS", true);
                 }
             }
             else if (ratio > 0.25f && !isDead && _isCriticalStateActive)
@@ -1097,11 +1103,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                     _socketTurretPivot.localRotation = _turretRotationBeforeDamage;
                 }
 
-                Transform apsSocket;
-                if (TryGetHardpointVisual("APS", out apsSocket) && !apsSocket.gameObject.activeSelf)
-                {
-                    apsSocket.gameObject.SetActive(true);
-                }
+                SetAttachmentDamageHidden("APS", false);
             }
 
             // 4. Destruction cleanup
@@ -1900,7 +1902,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             Transform visual;
             if (TryGetHardpointVisual(attachmentType, out visual) && visual != null)
             {
-                visual.gameObject.SetActive(active);
+                string key = NormalizeHardpointType(attachmentType);
+                if (!_attachmentBaseline.ContainsKey(key))
+                    _attachmentBaseline[key] = visual.gameObject.activeSelf;
+                _attachmentVisibility[key] = active;
+                visual.gameObject.SetActive(active && !_damageHiddenAttachments.Contains(key));
                 return true;
             }
             return false;
@@ -1967,10 +1973,28 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
 
         public void SetAttachmentActive(string attachmentType, bool active)
         {
-            Transform visual;
-            if (TryGetHardpointVisual(attachmentType, out visual))
+            TrySetAttachmentState(attachmentType, active);
+        }
+
+        private void SetAttachmentDamageHidden(string key, bool hidden)
+        {
+            if (hidden)
             {
-                visual.gameObject.SetActive(active);
+                if (!_damageHiddenAttachments.Add(key)) return;
+                if (TryGetHardpointVisual(key, out Transform visual))
+                {
+                    if (!_attachmentBaseline.ContainsKey(key))
+                        _attachmentBaseline[key] = visual.gameObject.activeSelf;
+                    if (!_attachmentVisibility.ContainsKey(key))
+                        _attachmentVisibility[key] = visual.gameObject.activeSelf;
+                    visual.gameObject.SetActive(false);
+                }
+            }
+            else if (_damageHiddenAttachments.Remove(key) &&
+                     _attachmentVisibility.TryGetValue(key, out bool visible) &&
+                     TryGetHardpointVisual(key, out Transform visual))
+            {
+                visual.gameObject.SetActive(visible);
             }
         }
 

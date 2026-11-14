@@ -11,6 +11,8 @@ Turret tracking now treats Stun and critical damage independently. Repair restor
 
 ## General capability audit — visual variant lifecycle
 
+Damage suppression now takes precedence over manual and stance visibility requests for ERA, APS and FuelDrums. Repair restores the latest request and pool reuse restores the original visibility. Release build evidence is local. Live appearance remains unverified.
+
 Pool reuse clears transient turret and door overrides and restores authored door and recoil rest poses. Check the next life in Steam when runtime acceptance is authorized.
 
 Pool reuse also clears health-driven chassis damage, smoke, fire and disabled damage attachments before restoring the primary. It uses the existing repair transitions, without writing gameplay health. Steam appearance and natural reuse still require runtime evidence.
