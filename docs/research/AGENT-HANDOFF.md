@@ -6,6 +6,16 @@ This handoff is for the next agent. Start with the latest relevant entry, then v
 
 - Dispatch uses live SkillInfo to select self, entity, or location commands and rechecks mana, queued activation, and hostile target availability. Release builds cleanly and the tactical AI suite passes 70/70. Steam execution remains unverified.
 
+## Material Maker & Blender PBR Texture Generation Optimization (2026-11-14)
+
+- Sped up the 28-preset Material Maker 1.7 + RNM + audit pipeline from ~21 min sequential to **100.33 s** total (`0.29 s` template prepare, `72.48 s` 4-way parallel GPU export, `26.03 s` 4-worker pack/RNM/audit) with **0 pixel differences** across all 112 promoted `2048x2048` PBR maps:
+  - Added `tools/batch_material_maker_textures.py` (`prepare` + `pack-audit`) and updated `tools/Build-CanonicalVisualModuleTextures.ps1` (`-MaxParallelExports 4`, `-PackWorkers 4`, single `override.cfg` / `.mme` setup+restore per batch, `-OptimizePng` opt-in).
+  - Optimized `tools/pack_material_maker_pbr.py` (2.65 s single preset vs 10.94 s baseline: precomputed smoothness LUT with NumPy indexing, concurrent map load/encode threads, single-pass in-memory RNM detail normal composition via `detail_rgb`, consolidated Voronoi distance transform, in-memory report stats, lossless `compress_level=1` default with `--optimize-png` preserved), `tools/pbr_texture_algorithms.py` (`compute_uv_dilation_map` / `apply_uv_dilation_map` + in-place float32 RNM arithmetic), and `tools/functional_engineering_integration.py` (`compose_normals_rnm_rgb`).
+  - Optimized `tools/RogueModelKit.py` `bake_pbr_texture_atlas` via `_configure_direct_cycles_bake` / `_restore_cycles_bake_settings` (zero Cycles GI ray bounces + disabled adaptive sampling for `EMIT`/`NORMAL`/`ROUGHNESS` atlas bakes, restored in `try/finally`) and synced `.agents/skills/rogue-command-3d-model-authoring/scripts/RogueModelKit.py`.
+- Verification after final edits:
+  - Full 28-preset `Build-CanonicalVisualModuleTextures.ps1 -SizePower 11 -DetailNormalPath .../RCL_SteelMicroDetail_Normal.png -DetailNormalStrength 0.25 -SkipPromote`: **100.33 s**, 112/112 maps pixel-identical (`np.array_equal`, `mismatches=0`) against `VisualModules/Textures/RCLModule_*.png`, 28/28 `qualityGate.passed == true` (`2048x2048`).
+  - Full Python suite (`python -m tools.run_python_tests --output artifacts/python-tests/texture-perf-opt.json`): `mode: all`, **771/771** passed (`328 + 328 + 85 + 30`), `0` errors, `35.34 s`. Updated `.agents/skills/rogue-command-pbr-texture-authoring/SKILL.md` and `docs/research/PBR-TEXTURE-WORKFLOW.md`. Local offline evidence only.
+
 ## Tactical skills — CombatEngaged
 
 - Standalone tactical casts require a native in-range hostile attack target and use that target. Coordinated skill readiness requires the same engagement. Release builds cleanly and the tactical AI suite passes 70/70. Steam behavior remains unverified.

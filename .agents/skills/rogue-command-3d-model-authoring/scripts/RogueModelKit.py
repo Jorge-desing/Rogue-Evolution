@@ -12480,6 +12480,44 @@ def unwrap_atlas_uvs(
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
+def _configure_direct_cycles_bake(scene: bpy.types.Scene) -> tuple[str, dict[str, Any]]:
+    """Configure Cycles for direct surface/EMIT/NORMAL/ROUGHNESS baking with zero GI bounces."""
+    prev_engine = scene.render.engine
+    scene.render.engine = "CYCLES"
+    cycles = scene.cycles
+    direct_settings: dict[str, Any] = {
+        "device": "CPU",
+        "samples": 1,
+        "bake_type": "DIFFUSE",
+        "max_bounces": 0,
+        "diffuse_bounces": 0,
+        "glossy_bounces": 0,
+        "transmission_bounces": 0,
+        "volume_bounces": 0,
+        "transparent_max_bounces": 0,
+        "use_adaptive_sampling": False,
+    }
+    prev_cycles: dict[str, Any] = {}
+    for attr, value in direct_settings.items():
+        if hasattr(cycles, attr):
+            prev_cycles[attr] = getattr(cycles, attr)
+            setattr(cycles, attr, value)
+    return prev_engine, prev_cycles
+
+
+def _restore_cycles_bake_settings(
+    scene: bpy.types.Scene,
+    prev_engine: str,
+    prev_cycles: dict[str, Any],
+) -> None:
+    cycles = getattr(scene, "cycles", None)
+    if cycles is not None:
+        for attr, value in prev_cycles.items():
+            if hasattr(cycles, attr):
+                setattr(cycles, attr, value)
+    scene.render.engine = prev_engine
+
+
 def bake_pbr_texture_atlas(
     objects: Sequence[bpy.types.Object],
     prefix: str,
@@ -12498,11 +12536,28 @@ def bake_pbr_texture_atlas(
         return maps
 
     scene = bpy.context.scene
-    prev_engine = scene.render.engine
-    scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
-    scene.cycles.samples = 1
-    scene.cycles.bake_type = "DIFFUSE"
+    prev_engine, prev_cycles = _configure_direct_cycles_bake(scene)
+    try:
+        return _bake_pbr_texture_atlas_impl(
+            scene,
+            valid_mesh_objs,
+            prefix,
+            output_dir,
+            resolution,
+            maps,
+        )
+    finally:
+        _restore_cycles_bake_settings(scene, prev_engine, prev_cycles)
+
+
+def _bake_pbr_texture_atlas_impl(
+    scene: bpy.types.Scene,
+    valid_mesh_objs: list[bpy.types.Object],
+    prefix: str,
+    output_dir: Path,
+    resolution: int,
+    maps: dict[str, Path],
+) -> dict[str, Path]:
 
     # Unity expects OpenGL tangent-space normals (+X +Y +Z). Make that explicit and give the
     # bake a pixel gutter that is wide enough for mipmaps but scales with atlas resolution.
@@ -12707,7 +12762,6 @@ def bake_pbr_texture_atlas(
                 if b_node:
                     mat.node_tree.nodes.remove(b_node)
 
-    scene.render.engine = prev_engine
     return maps
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,6 +15,7 @@ from tests.python.helpers import load_tool_module
 
 pbr_algo = load_tool_module("pbr_texture_algorithms")
 packer = load_tool_module("pack_material_maker_pbr")
+batch_mm = load_tool_module("batch_material_maker_textures")
 
 
 class PbrTextureAlgorithmsTests(unittest.TestCase):
@@ -119,6 +122,172 @@ class PbrTextureAlgorithmsTests(unittest.TestCase):
             packed_albedo = np.asarray(Image.open(out_dir / "Unit_Albedo.png"))
             # Border pixel 2px outside island should be dilated from island color
             self.assertGreater(int(packed_albedo[6, 16, 0]), 100)
+
+    def test_compute_and_apply_uv_dilation_map_matches_single_call(self) -> None:
+        rgba = np.zeros((32, 32, 4), dtype=np.uint8)
+        rgb = np.zeros((32, 32, 3), dtype=np.uint8)
+        mask = np.zeros((32, 32), dtype=bool)
+        mask[10:22, 10:22] = True
+        rgba[10:22, 10:22] = [180, 90, 45, 255]
+        rgb[10:22, 10:22] = [30, 210, 120]
+
+        expected_rgba = pbr_algo.dilate_uv_islands(rgba, mask, max_distance=4)
+        expected_rgb = pbr_algo.dilate_uv_islands(rgb, mask, max_distance=4)
+
+        dilation_map = pbr_algo.compute_uv_dilation_map(mask, max_distance=4)
+        self.assertIsNotNone(dilation_map)
+        fill_mask, nearest_y, nearest_x = dilation_map  # type: ignore[misc]
+        actual_rgba = pbr_algo.apply_uv_dilation_map(rgba, fill_mask, nearest_y, nearest_x)
+        actual_rgb = pbr_algo.apply_uv_dilation_map(rgb, fill_mask, nearest_y, nearest_x)
+
+        self.assertTrue(np.array_equal(expected_rgba, actual_rgba))
+        self.assertTrue(np.array_equal(expected_rgb, actual_rgb))
+
+    def test_pack_maps_fast_png_and_in_memory_detail_normal_pixel_identical(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            in_dir = tmp_path / "in"
+            out_opt = tmp_path / "out_opt"
+            out_fast = tmp_path / "out_fast"
+            in_dir.mkdir()
+
+            rng = np.random.default_rng(42)
+            albedo = rng.integers(60, 180, size=(32, 32, 4), dtype=np.uint8)
+            albedo[..., 3] = 255
+            albedo[:6, :6] = 0
+            Image.fromarray(albedo, "RGBA").save(in_dir / "Unit_Albedo.png")
+
+            metallic = rng.choice(np.array([0, 255], dtype=np.uint8), size=(32, 32))
+            roughness = rng.integers(40, 220, size=(32, 32), dtype=np.uint8)
+            Image.fromarray(metallic, "L").save(in_dir / "Unit_Metallic.png")
+            Image.fromarray(roughness, "L").save(in_dir / "Unit_Roughness.png")
+
+            base_h = pbr_algo.synthesize_periodic_fbm(32, seed=7, octaves=2)
+            base_n = pbr_algo.height_to_normal_scharr(base_h, strength=1.5, as_uint8=True)
+            Image.fromarray(base_n, "RGB").save(in_dir / "Unit_Normal.png")
+
+            det_h = pbr_algo.synthesize_periodic_fbm(16, seed=99, octaves=2)
+            det_n = pbr_algo.height_to_normal_scharr(det_h, strength=1.2, as_uint8=True)
+            det_path = tmp_path / "detail_n.png"
+            Image.fromarray(det_n, "RGB").save(det_path)
+
+            emission = np.zeros((32, 32, 3), dtype=np.uint8)
+            Image.fromarray(emission, "RGB").save(in_dir / "Unit_Emission.png")
+
+            packer.pack_maps(
+                in_dir,
+                out_opt,
+                "Unit",
+                dilate_px=3,
+                detail_normal=det_path,
+                detail_strength=0.25,
+                optimize_png=True,
+            )
+            packer.pack_maps(
+                in_dir,
+                out_fast,
+                "Unit",
+                dilate_px=3,
+                detail_strength=0.25,
+                compress_level=1,
+                optimize_png=False,
+                detail_rgb=det_n,
+            )
+
+            for suffix in ("Albedo", "MetallicGloss", "Normal", "Emission"):
+                a = np.asarray(Image.open(out_opt / f"Unit_{suffix}.png"))
+                b = np.asarray(Image.open(out_fast / f"Unit_{suffix}.png"))
+                self.assertTrue(np.array_equal(a, b), f"Mismatch in {suffix}")
+
+    def test_batch_material_maker_prepare_and_pack_audit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            manifest_path = tmp_path / "batch.json"
+            summary_path = tmp_path / "summary.json"
+            entries = []
+            for preset in ("orbital_titanium", "battleship_tungsten"):
+                out_dir = tmp_path / preset
+                raw_dir = out_dir / "raw"
+                template = tmp_path / f"tactical-{preset}-template.ptex"
+                entries.append(
+                    {
+                        "preset": preset,
+                        "unitName": f"RCLModule_{preset}",
+                        "template": str(template),
+                        "outputDir": str(out_dir),
+                        "rawDir": str(raw_dir),
+                    }
+                )
+            manifest_path.write_text(json.dumps(entries), encoding="utf-8")
+
+            old_argv = sys.argv
+            try:
+                sys.argv = [
+                    "batch_material_maker_textures.py",
+                    "prepare",
+                    "--batch-manifest",
+                    str(manifest_path),
+                    "--size",
+                    "5",
+                    "--force",
+                ]
+                self.assertEqual(batch_mm.main(), 0)
+
+                det_h = pbr_algo.synthesize_periodic_fbm(16, seed=13, octaves=2)
+                det_n = pbr_algo.height_to_normal_scharr(det_h, strength=1.0, as_uint8=True)
+                det_path = tmp_path / "detail.png"
+                Image.fromarray(det_n, "RGB").save(det_path)
+
+                for entry in entries:
+                    template_path = Path(entry["template"])
+                    self.assertTrue(template_path.is_file())
+                    prefix = template_path.stem
+                    raw_dir = Path(entry["rawDir"])
+                    rng = np.random.default_rng(7)
+                    albedo = rng.integers(80, 160, size=(32, 32, 3), dtype=np.uint8)
+                    Image.fromarray(albedo, "RGB").save(raw_dir / f"{prefix}_Albedo.png")
+                    metallic = rng.choice(np.array([0, 255], dtype=np.uint8), size=(32, 32))
+                    roughness = rng.integers(50, 200, size=(32, 32), dtype=np.uint8)
+                    Image.fromarray(metallic, "L").save(raw_dir / f"{prefix}_Metallic.png")
+                    Image.fromarray(roughness, "L").save(raw_dir / f"{prefix}_Roughness.png")
+                    base_h = pbr_algo.synthesize_periodic_fbm(32, seed=5, octaves=2)
+                    base_n = pbr_algo.height_to_normal_scharr(base_h, strength=1.5, as_uint8=True)
+                    Image.fromarray(base_n, "RGB").save(raw_dir / f"{prefix}_Normal.png")
+                    emission = np.zeros((32, 32, 3), dtype=np.uint8)
+                    Image.fromarray(emission, "RGB").save(raw_dir / f"{prefix}_Emission.png")
+
+                sys.argv = [
+                    "batch_material_maker_textures.py",
+                    "pack-audit",
+                    "--batch-manifest",
+                    str(manifest_path),
+                    "--workflow",
+                    "procedural",
+                    "--size",
+                    "5",
+                    "--detail-normal",
+                    str(det_path),
+                    "--detail-strength",
+                    "0.25",
+                    "--workers",
+                    "2",
+                    "--strict",
+                    "--summary-output",
+                    str(summary_path),
+                ]
+                self.assertEqual(batch_mm.main(), 0)
+            finally:
+                sys.argv = old_argv
+
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            self.assertEqual(summary["presetCount"], 2)
+            self.assertEqual(summary["resolution"], 32)
+            for entry in entries:
+                out_dir = Path(entry["outputDir"])
+                prefix = Path(entry["template"]).stem
+                qr = json.loads((out_dir / f"{prefix}_quality-report.json").read_text(encoding="utf-8"))
+                self.assertTrue(qr["qualityGate"]["passed"], qr)
+                self.assertTrue((out_dir / "material-maker-workflow.json").is_file())
 
 
 if __name__ == "__main__":

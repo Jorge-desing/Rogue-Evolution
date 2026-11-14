@@ -25,6 +25,33 @@ MIN_ROUGHNESS = 0.04
 MAX_SMOOTHNESS_F = 1.0 - MIN_ROUGHNESS
 
 
+def compute_uv_dilation_map(
+    mask: np.ndarray,
+    max_distance: int = 16,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """Compute reusable Voronoi dilation coordinates `(fill_mask, nearest_y, nearest_x)`."""
+    if max_distance <= 0:
+        return None
+    valid = np.asarray(mask, dtype=bool)
+    if np.all(valid) or not np.any(valid):
+        return None
+    distances, indices = ndimage.distance_transform_edt(~valid, return_indices=True)
+    fill_mask = (~valid) & (distances <= float(max_distance))
+    return fill_mask, indices[0], indices[1]
+
+
+def apply_uv_dilation_map(
+    image: np.ndarray,
+    fill_mask: np.ndarray,
+    nearest_y: np.ndarray,
+    nearest_x: np.ndarray,
+) -> np.ndarray:
+    """Apply a precomputed Voronoi dilation map to ``image``."""
+    out = image.copy()
+    out[fill_mask] = image[nearest_y[fill_mask], nearest_x[fill_mask]]
+    return out
+
+
 def dilate_uv_islands(
     image: np.ndarray,
     mask: np.ndarray,
@@ -46,17 +73,11 @@ def dilate_uv_islands(
     valid = np.asarray(mask, dtype=bool)
     if valid.shape != image.shape[:2]:
         raise ValueError(f"Mask shape {valid.shape} does not match image {image.shape[:2]}")
-    if np.all(valid) or not np.any(valid):
+    dilation_map = compute_uv_dilation_map(valid, max_distance=max_distance)
+    if dilation_map is None:
         return image.copy()
-
-    distances, indices = ndimage.distance_transform_edt(~valid, return_indices=True)
-    nearest_y, nearest_x = indices[0], indices[1]
-    sampled = image[nearest_y, nearest_x]
-
-    out = image.copy()
-    fill_mask = (~valid) & (distances <= float(max_distance))
-    out[fill_mask] = sampled[fill_mask]
-    return out
+    fill_mask, nearest_y, nearest_x = dilation_map
+    return apply_uv_dilation_map(image, fill_mask, nearest_y, nearest_x)
 
 
 def _decode_normal_rgb(rgb: np.ndarray) -> np.ndarray:
@@ -91,25 +112,31 @@ def blend_normals_rnm(
     """
     n1 = _decode_normal_rgb(base_rgb)
     n2 = _decode_normal_rgb(detail_rgb)
+    if n1 is np.asarray(base_rgb):
+        n1 = n1.copy()
+    if n2 is np.asarray(detail_rgb):
+        n2 = n2.copy()
+
     if detail_strength != 1.0:
-        n2[..., 0] *= float(detail_strength)
-        n2[..., 1] *= float(detail_strength)
+        strength_f = float(detail_strength)
+        n2[..., 0] *= strength_f
+        n2[..., 1] *= strength_f
         l2 = np.sqrt(np.sum(n2 * n2, axis=-1, keepdims=True))
-        n2 = n2 / np.maximum(l2, 1e-6)
+        n2 /= np.maximum(l2, 1e-6)
 
-    # Normalize base
     l1 = np.sqrt(np.sum(n1 * n1, axis=-1, keepdims=True))
-    n1 = n1 / np.maximum(l1, 1e-6)
+    n1 /= np.maximum(l1, 1e-6)
 
-    t = n1.copy()
-    t[..., 2] += 1.0
-    u = n2.copy()
-    u[..., 0] = -u[..., 0]
-    u[..., 1] = -u[..., 1]
+    # Compute RNM in-place on n1 (t) and n2 (u) to reduce 2K/4K temporary buffers.
+    n1[..., 2] += 1.0
+    n2[..., 0] = -n2[..., 0]
+    n2[..., 1] = -n2[..., 1]
 
-    dot_tu = np.sum(t * u, axis=-1, keepdims=True)
-    r = t * (dot_tu / np.maximum(t[..., 2:3], 1e-5)) - u
-    return _encode_normal_rgb(r, as_uint8=(np.asarray(base_rgb).dtype == np.uint8))
+    dot_tu = np.sum(n1 * n2, axis=-1, keepdims=True)
+    scale = dot_tu / np.maximum(n1[..., 2:3], 1e-5)
+    n1 *= scale
+    n1 -= n2
+    return _encode_normal_rgb(n1, as_uint8=(np.asarray(base_rgb).dtype == np.uint8))
 
 
 def height_to_normal_scharr(
@@ -373,10 +400,10 @@ def _load_rgb(path: Path) -> np.ndarray:
         return np.asarray(img.convert("RGB"), dtype=np.uint8)
 
 
-def _save_png(arr: np.ndarray, path: Path) -> None:
+def _save_png(arr: np.ndarray, path: Path, compress_level: int = 1) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     mode = "RGBA" if arr.ndim == 3 and arr.shape[2] == 4 else "RGB"
-    Image.fromarray(arr, mode).save(path, format="PNG", optimize=True)
+    Image.fromarray(arr, mode).save(path, format="PNG", compress_level=compress_level)
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
@@ -448,10 +475,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         out_dir = args.output_dir
         out_dir.mkdir(parents=True, exist_ok=True)
         Image.fromarray(np.clip(np.round(wear * 255.0), 0, 255).astype(np.uint8), "L").save(
-            out_dir / f"{args.prefix}_EdgeWear.png", format="PNG", optimize=True
+            out_dir / f"{args.prefix}_EdgeWear.png", format="PNG", compress_level=1
         )
         Image.fromarray(np.clip(np.round(cavity * 255.0), 0, 255).astype(np.uint8), "L").save(
-            out_dir / f"{args.prefix}_CavityAO.png", format="PNG", optimize=True
+            out_dir / f"{args.prefix}_CavityAO.png", format="PNG", compress_level=1
         )
         print(json.dumps({"command": "normal-to-curvature", "outputDir": str(out_dir), "prefix": args.prefix}))
         return 0

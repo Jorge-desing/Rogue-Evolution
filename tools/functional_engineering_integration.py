@@ -199,39 +199,52 @@ def apply_canonical_two_level_mesh_pass_bpy(
     }
 
 
-def compose_canonical_pbr_detail(
-    normal_path: Path,
-    detail_normal_path: Path,
-    output_normal_path: Path,
+def compose_normals_rnm_rgb(
+    base_rgb: np.ndarray,
+    detail_rgb: np.ndarray,
     *,
     detail_strength: float = 0.35,
-) -> dict[str, Any]:
-    """Compose a tileable micro-detail normal onto a canonical Normal map using RNM."""
+) -> np.ndarray:
+    """Tile/fit ``detail_rgb`` in memory and blend onto ``base_rgb`` via RNM."""
     from PIL import Image
     try:
         from tools import pbr_texture_algorithms as pbr_algo
     except ImportError:
         import pbr_texture_algorithms as pbr_algo
 
+    det_arr = np.asarray(detail_rgb, dtype=np.uint8)
+    if det_arr.shape[:2] != base_rgb.shape[:2]:
+        bh, bw = base_rgb.shape[:2]
+        dh, dw = det_arr.shape[:2]
+        if dh <= bh and dw <= bw and (bh % dh == 0) and (bw % dw == 0):
+            det_arr = np.tile(det_arr, (bh // dh, bw // dw, 1))
+        else:
+            det_arr = np.asarray(
+                Image.fromarray(det_arr, "RGB").resize((bw, bh), Image.Resampling.BILINEAR),
+                dtype=np.uint8,
+            )
+
+    return pbr_algo.blend_normals_rnm(base_rgb, det_arr, detail_strength=detail_strength)
+
+
+def compose_canonical_pbr_detail(
+    normal_path: Path,
+    detail_normal_path: Path,
+    output_normal_path: Path,
+    *,
+    detail_strength: float = 0.35,
+    compress_level: int = 1,
+) -> dict[str, Any]:
+    """Compose a tileable micro-detail normal onto a canonical Normal map using RNM."""
+    from PIL import Image
+
     with Image.open(normal_path) as base_im, Image.open(detail_normal_path) as det_im:
         base_rgb = np.asarray(base_im.convert("RGB"), dtype=np.uint8)
         det_rgb = np.asarray(det_im.convert("RGB"), dtype=np.uint8)
 
-    if det_rgb.shape[:2] != base_rgb.shape[:2]:
-        # Tile detail map if smaller, or resize if larger
-        bh, bw = base_rgb.shape[:2]
-        dh, dw = det_rgb.shape[:2]
-        if dh <= bh and dw <= bw and (bh % dh == 0) and (bw % dw == 0):
-            det_rgb = np.tile(det_rgb, (bh // dh, bw // dw, 1))
-        else:
-            det_rgb = np.asarray(
-                Image.fromarray(det_rgb, "RGB").resize((bw, bh), Image.Resampling.BILINEAR),
-                dtype=np.uint8,
-            )
-
-    blended = pbr_algo.blend_normals_rnm(base_rgb, det_rgb, detail_strength=detail_strength)
+    blended = compose_normals_rnm_rgb(base_rgb, det_rgb, detail_strength=detail_strength)
     output_normal_path.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(blended, "RGB").save(output_normal_path, format="PNG", optimize=True)
+    Image.fromarray(blended, "RGB").save(output_normal_path, format="PNG", compress_level=compress_level)
     return {
         "baseNormal": str(normal_path),
         "detailNormal": str(detail_normal_path),
