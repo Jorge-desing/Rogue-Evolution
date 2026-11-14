@@ -47,6 +47,7 @@ namespace RogueCommandExpansionLoader.Modules
             private const string CommandTagPrefix = "rcl-supportrepair-";
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly SupportRepairSettings _settings;
+            private readonly Dictionary<EntityController, Vector3> _repairDestinations = new Dictionary<EntityController, Vector3>();
             private string _commandTag;
             private float _nextRepairTickAt;
             private bool _stopped;
@@ -145,6 +146,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                 if (damagedCandidates.Count == 0)
                 {
+                    ReleaseRepairMovement();
                     _nextRepairTickAt = now + 1.5f;
                     return;
                 }
@@ -176,6 +178,7 @@ namespace RogueCommandExpansionLoader.Modules
                     bool isModuleCommand = repairer.CurrentCommandIsTaggedWith(_commandTag);
                     if (!isModuleCommand && currentCommand != EntityCommand.Command.DoNothing)
                     {
+                        _repairDestinations.Remove(repairer);
                         // Preserve unrelated combat, movement, and player-issued orders.
                         continue;
                     }
@@ -218,11 +221,16 @@ namespace RogueCommandExpansionLoader.Modules
                             // If far from target (> 4m distance), dispatch movement toward target
                             if (bestDistSq > 16.0f)
                             {
-                                if (!repairer.CurrentCommandIsTaggedWith(_commandTag))
+                                Vector3 previousDestination;
+                                if (!isModuleCommand || !_repairDestinations.TryGetValue(repairer, out previousDestination) ||
+                                    (previousDestination - bestTarget.Position).sqrMagnitude >= 1f)
                                 {
                                     EntityCommand moveCmd = EntityCommand.Move(bestTarget.Position);
                                     moveCmd.tag = _commandTag;
-                                    repairer.ExecuteCommand(moveCmd, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                                    repairer.ExecuteCommand(moveCmd, isModuleCommand
+                                        ? EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand
+                                        : EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                                    _repairDestinations[repairer] = bestTarget.Position;
                                 }
                             }
                             else
@@ -230,7 +238,7 @@ namespace RogueCommandExpansionLoader.Modules
                                 // Arrived within repair range: cancel movement if arriving via our command
                                 if (repairer.CurrentCommandIsTaggedWith(_commandTag))
                                 {
-                                    repairer.ExecuteCommand(EntityCommand.Stop(), EntityController.CommandProcessingType.ExecuteAndDeleteCommandChain);
+                                    ReleaseRepairMovement(repairer);
                                 }
 
                                 // Apply active field repair / healing
@@ -261,6 +269,10 @@ namespace RogueCommandExpansionLoader.Modules
                                 repairer.gameObject.name + "': " + ex.Message);
                         }
                     }
+                    else
+                    {
+                        ReleaseRepairMovement(repairer);
+                    }
                 }
 
                 _nextRepairTickAt = now + _settings.CooldownSeconds;
@@ -282,7 +294,34 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
+                ReleaseRepairMovement();
                 _commandTag = null;
+            }
+
+            private void ReleaseRepairMovement(EntityController repairer)
+            {
+                if (repairer != null && !repairer.IsDestroyed && !repairer.DestroyHasBeenStarted &&
+                    _commandTag != null && repairer.CurrentCommandIsTaggedWith(_commandTag))
+                {
+                    try
+                    {
+                        repairer.ExecuteCommand(EntityCommand.Stop(), EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning("[RogueCommandExpansionLoader] Support repair could not release movement: " + ex.Message);
+                    }
+                }
+                if (!ReferenceEquals(repairer, null)) _repairDestinations.Remove(repairer);
+            }
+
+            private void ReleaseRepairMovement()
+            {
+                foreach (EntityController repairer in new List<EntityController>(_repairDestinations.Keys))
+                {
+                    ReleaseRepairMovement(repairer);
+                }
+                _repairDestinations.Clear();
             }
         }
     }

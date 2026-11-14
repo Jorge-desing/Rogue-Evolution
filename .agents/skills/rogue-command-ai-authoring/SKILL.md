@@ -31,6 +31,8 @@ Use this skill when implementing an AI profile, adding a compiled module, or con
 
 Support repair considers missing armor even when health is above the configured health threshold. Dispatch excludes the repairer itself and native hostile targets.
 
+Support repair tracks its own movement destinations. On each repair tick it replaces an owned move when the target drifts at least one meter, preserving pending native orders. Arrival, lost targets and module shutdown cancel only the tagged current move; never clear the command chain to stop a repairer. Unrelated current orders retain ownership.
+
 1. **Decide** (FSM / Behavior Tree / Utility Scorer) $\rightarrow$ Intent & Target
 2. **Path** (NavMesh / Bounded A*) $\rightarrow$ Waypoints (timer-gated repaths, never every frame)
 3. **Steer** (`EntityController` movement forces) $\rightarrow$ Motion ($\Delta\text{pos} \cdot dt$)

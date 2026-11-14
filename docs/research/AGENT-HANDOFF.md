@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — repairer pursuit lifecycle
+
+- Repairers refresh their owned movement destination on repair ticks after at least one meter of target drift. Replacements cancel only the current owned move, preserving pending native orders.
+- Arrival, no eligible target, and module shutdown release owned movement. Unrelated current commands remain untouched.
+- Release build: zero warnings/errors. Focused AiTacticalModules harness: 66/66 passed, including moving-target, recovery and shutdown behavior. This is local evidence; active stage binding and Steam behavior remain unverified.
+- Deployment backup and SHA-256 manifest: `artifacts/general-capability-audit/repair-follow-deployment/manifest.json`.
+
 ## 2026-11-14 Python test suite restructuring & optimization
 
 - **Layout:** Moved 69 loose root `tests/python/test_*.py` modules into domain subpackages (`mcp/`, `packs/`, `pbr/`, `modeling/`, `runtime/`, plus additions to `balance/`, `bundles/`, `registry/`, `schema/`), leaving `helpers.py`, `__init__.py`, and `test_run_python_tests.py` at root. All moved depth-sensitive files now resolve `REPO_ROOT` / `TOOLS_DIR` / `CONTENT_DIR` through `tests.python.helpers`.

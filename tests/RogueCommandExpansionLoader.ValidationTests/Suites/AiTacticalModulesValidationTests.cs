@@ -2914,6 +2914,36 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("Repair movement was not queued ahead of the idle repairer's current order.");
             }
+
+            // A moving ally must remain the destination without stacking obsolete movement orders.
+            idleRepairer.Position = new Vector3(0f, 0f, 0f);
+            damagedHarvester.Position = new Vector3(22f, 0f, 0f);
+            UnityEngine.Time.time += 3f;
+            behaviour.Tick();
+            if (idleRepairer.LastExecutedCommand.Value.destination.x != 22f ||
+                idleRepairer.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand)
+            {
+                throw new InvalidOperationException("Repairer failed to replace its stale destination while following an ally.");
+            }
+
+            damagedHarvester.CurrentHealth = damagedHarvester.MaxHealth;
+            UnityEngine.Time.time += 3f;
+            behaviour.Tick();
+            if (idleRepairer.LastExecutedCommand.Value.command != EntityCommand.Stop().command ||
+                idleRepairer.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand)
+            {
+                throw new InvalidOperationException("Repairer did not release its movement without deleting queued orders after recovery.");
+            }
+
+            damagedHarvester.CurrentHealth = 40f;
+            idleRepairer.Position = new Vector3(0f, 0f, 0f);
+            UnityEngine.Time.time += 3f;
+            behaviour.Tick();
+            behaviour.OnDestroyed();
+            if (idleRepairer.LastExecutedCommand.Value.command != EntityCommand.Stop().command)
+            {
+                throw new InvalidOperationException("Repair module shutdown left its movement active.");
+            }
         }
         finally
         {
