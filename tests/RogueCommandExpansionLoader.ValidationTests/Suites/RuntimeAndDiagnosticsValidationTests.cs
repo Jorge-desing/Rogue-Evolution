@@ -3657,6 +3657,9 @@ internal static partial class ValidationTestRunner
             director.TickMechanics();
             if (!target.HasActiveStatusEffect(StatusEffect.CombatBoost) || !target.HasActiveStatusEffect(StatusEffect.Robust))
                 throw new InvalidOperationException("Failed status applications must leave room for a later aura recipient.");
+            if (!target.AppliedSpecificValueChanges.Any(c => c.Value == EntityController.ChangeableValue.Damage && Math.Abs(c.Change.ValueToAdd - 0.05f) < 0.0001f) ||
+                !target.AppliedSpecificValueChanges.Any(c => c.Value == EntityController.ChangeableValue.ArmorProtection && Math.Abs(c.Change.ValueToAdd - 0.05f) < 0.0001f))
+                throw new InvalidOperationException("Buff aura must apply its percentage to damage and armor protection.");
         }
         finally
         {

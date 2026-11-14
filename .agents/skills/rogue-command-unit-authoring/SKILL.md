@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Combat aura `buffAmount` uses percentage points: Buff increases Damage and ArmorProtection; Debuff reduces MoveSpeed by up to 100%. Same source unit IDs refresh the same 1.5-second native modifier rather than stacking. Heal/Shield amounts are points per pulse. Status application must succeed for the combat modifier. Verify balance and behavior in Steam.
+
 Stealth pulses apply the status tag and the native timed `CanNotBeTargetedByAi` parameter after the damage grace period. Native expiry owns the parameter; damage stops renewal but does not cancel an already active timer. This does not establish visual invisibility or gradual detection reduction. Verify in Steam before claiming gameplay acceptance.
 
 Combat hit mechanics consume native OnHasDealtDamage with the post-armor amount. Native invulnerability, ignored damage and shield interception decide whether that event fires. OnHasKilledEntity grants kill experience and currency when the native hit notification was suppressed, with the same lifetime claim preventing duplicate kill effects. Kill-only processing skips combat boosts and life recovery.

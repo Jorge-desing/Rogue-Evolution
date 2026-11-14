@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Combat aura modifiers (2026-11-14)
+
+Buff auras now apply `buffAmount` percentage points to native Damage and ArmorProtection; Debuff reduces MoveSpeed by that percentage, bounded at 100%. Same source unit ID refreshes the 1.5-second modifier; statuses must be applied successfully and recipient cap remains 16. Heal/Shield retain point amounts. Release built without warnings and C# acceptance passed 602 with one symlink privilege skip (`artifacts/general-capability-audit/aura/complete.log`). Steam behavior and balance are unverified. Deployment is pending: a Rogue Command process was active during the pass; after safe game closure back up the installed DLL, deploy the verified Release artifact and check hashes. Next verify combat modifiers and expiry in an authorized run.
+
+
 ## Timed stealth AI target protection (2026-11-14)
 
 The stealth pulse now uses native `ChangeParameter(CanNotBeTargetedByAi, expiry)` in addition to its status tag. Static inspection of the pinned `EntityAttack` shows AI target selection and retention check that flag. Damage blocks renewal during the existing grace interval but does not cancel an existing timer; native expiration handles the parameter. This is not visual invisibility or graded detection: `detectionReduction` currently changes the grace period only. Release built without warnings; C# acceptance passed 602 with one symlink privilege skip (`artifacts/general-capability-audit/stealth/complete.log`). The installed DLL matched SHA-256 `6B22FAF16675B1C821A8DD652AC160AB46071E39EBDA9191AF96306E15BC4788` after backup (`artifacts/general-capability-audit/stealth-deployment-20261114144029/manifest.json`). Next verify targeting and expiration in an authorized Steam run; no live gameplay was observed in this pass.

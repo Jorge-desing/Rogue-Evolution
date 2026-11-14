@@ -2710,6 +2710,10 @@ namespace RogueCommandExpansionLoader.Runtime
             float worldRadius = aura.auraRadius <= 25f ? aura.auraRadius * 10f : aura.auraRadius;
             float radiusSq = worldRadius * worldRadius;
             string auraType = aura.auraType;
+            // Buff/debuff magnitudes are percentage points; source definition IDs
+            // deliberately refresh rather than stack copies of the same aura.
+            float auraMagnitude = aura.buffAmount / 100f;
+            string auraOrigin = "aura:" + (ReadEntityId(self) ?? "unknown") + ":" + auraType;
 
             int affectedCount = 0;
             foreach (object candidate in entities)
@@ -2743,12 +2747,21 @@ namespace RogueCommandExpansionLoader.Runtime
                     bool boosted = ApplyTimedStatusEffect(candidate, "CombatBoost", 1.5f);
                     bool reinforced = ApplyTimedStatusEffect(candidate, "Robust", 1.5f);
                     affected = boosted || reinforced;
+                    if (affected)
+                    {
+                        ApplyTimedStatChange(candidate, "Damage", auraMagnitude, 1.5f, auraOrigin);
+                        ApplyTimedStatChange(candidate, "ArmorProtection", auraMagnitude, 1.5f, auraOrigin);
+                    }
                 }
                 else if (string.Equals(auraType, "Debuff", StringComparison.OrdinalIgnoreCase))
                 {
                     bool slowed = ApplyTimedStatusEffect(candidate, "SlowedDown", 1.5f);
                     bool marked = ApplyTimedStatusEffect(candidate, "Marked", 1.5f);
                     affected = slowed || marked;
+                    if (affected)
+                    {
+                        ApplyTimedStatChange(candidate, "MoveSpeed", -Mathf.Min(auraMagnitude, 1f), 1.5f, auraOrigin);
+                    }
                 }
                 else if (string.Equals(auraType, "Heal", StringComparison.OrdinalIgnoreCase) && !isEnemy)
                 {
