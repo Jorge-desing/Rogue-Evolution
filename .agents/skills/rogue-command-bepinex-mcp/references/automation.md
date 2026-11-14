@@ -45,6 +45,8 @@ The census exposes `value` as a number for sliders. Inspect `controlType`, `minV
 
 ## Battlefield orders
 
+For active skills, the unit observation provides `hasActiveSkill`, `currentMana`, `skillManaCost`, `skillManaAvailable`, and `skillActivationQueued`. Wait for an existing skill with sufficient mana and no queued activation, then issue `diagnostics_order_active_skill` with its native target arguments. Retain the unit and scene expectations in the wait. Native target geometry and command execution determine whether the skill takes effect. Read the resulting mana, queued activation and target state before planning another cast.
+
 Resolve enemy unit and building instances from `diagnostics_get_ai_roster` using each row's `runtimeEntityKeyId`. Pass that key as `targetEntityKeyId` to `diagnostics_order_unit_attack`. The native order checks hostility at dispatch. Use the same key to compare `attackTargetKeyId` in the attacker's subsequent observations.
 
 Find living player units with `diagnostics_get_battlefield_census` and use the row's string `runtimeEntityKeyId`. Refresh keys on scene changes. Confirm the match has started and choose a reachable destination before dispatch. The existing Move, Attack, AttackMove, HoldPosition and Stop tools issue native orders. A successful dispatch records the call. Observe the unit to establish its subsequent state.

@@ -1288,6 +1288,8 @@ namespace RogueCommandExpansionLoader.Runtime
             Vector3 position = unit.Position;
             EntityController target = unit.CurrentAttackTarget;
             bool hasTarget = target != null && !target.IsDestroyed && !target.DestroyHasBeenStarted;
+            SkillInfo skill = unit.SkillInfo;
+            bool skillQueued = unit.HasSkillActivationInCommandChain;
             double deltaX = (double)position.x - goalX;
             double deltaZ = (double)position.z - goalZ;
             double? goalDistance = useGoal
@@ -1301,6 +1303,11 @@ namespace RogueCommandExpansionLoader.Runtime
                 isControlledByPlayer = unit.IsControlledByPlayer,
                 currentHealth = unit.CurrentHealth,
                 healthRatio = unit.MaxHealth > 0f ? (float?)(unit.CurrentHealth / unit.MaxHealth) : null,
+                currentMana = unit.CurrentMana,
+                hasActiveSkill = skill != null,
+                skillManaCost = skill != null ? (float?)skill.manaCost : null,
+                skillActivationQueued = skillQueued,
+                skillManaAvailable = skill != null && unit.CurrentMana >= skill.manaCost,
                 command = unit.CurrentPlayerCommandName.ToString(),
                 attackTargetKeyId = hasTarget ? target.UniqueEntityId.ToString(CultureInfo.InvariantCulture) : null,
                 attackTargetInRange = hasTarget && unit.IsTargetInRange,
