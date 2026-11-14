@@ -125,7 +125,12 @@ public sealed class EntityController : MonoBehaviour
     }
     private void FixedUpdate() { }
     public bool IsProductionPossible(int balance) => true;
-    public void Produce(bool instant = false, bool forFree = false, bool noEvent = false) { }
+    public int ProduceCallCount { get; private set; }
+    public void Produce(bool instant = false, bool forFree = false, bool noEvent = false)
+    {
+        ProduceCallCount++;
+        InProductionCount = (InProductionCount ?? 0) + 1;
+    }
     public UnitRole Role { get; set; }
     public int aiBaseIndex { get; set; }
     public float CurrentHealth { get; set; } = 100f;

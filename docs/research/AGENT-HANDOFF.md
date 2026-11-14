@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — scoped factory reinforcements
+
+- Factory reinforcement now counts only live units in its selected AI base, and reserves army slots for all in-scope factory queues before adding production. Base `-1` retains the shared AI scope. Losses release capacity on the next scan.
+- Production dispatch counts actual queue growth. Free reinforcement waits for an existing queue to empty because native free Produce replaces/refunds an existing entry.
+- Release build: zero warnings/errors. Focused AiTacticalModules suite: 67/67 passed, including scoped pending-capacity, subsequent scans, losses and free-production continuation. Local evidence only; Steam and active stage/profile execution remain unverified.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/reinforcement-deployment/manifest.json`.
+
 ## General capability audit — repairer pursuit lifecycle
 
 - Repairers refresh their owned movement destination on repair ticks after at least one meter of target drift. Replacements cancel only the current owned move, preserving pending native orders.

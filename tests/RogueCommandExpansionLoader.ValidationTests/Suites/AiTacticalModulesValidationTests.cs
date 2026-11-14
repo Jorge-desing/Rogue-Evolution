@@ -493,6 +493,68 @@ internal static partial class ValidationTestRunner
             DefaultAiBehaviour.ResetRuntimeState();
         }
     }),
+    ("factory reinforcement reserves queued slots in its own base and resumes after losses", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        IRogueCommandAiRuntimeBehaviour? behaviour = null;
+        try
+        {
+            UnityEngine.Time.time = 20f;
+            var localUnit = new EntityController { IsControlledByAi = true, IsUnit = true, aiBaseIndex = 1 };
+            ExistingControllers.Instance.AiUnits().Add(localUnit);
+            for (int i = 0; i < 5; i++)
+                ExistingControllers.Instance.AiUnits().Add(new EntityController { IsControlledByAi = true, IsUnit = true, aiBaseIndex = 2 });
+            var first = new EntityController { IsControlledByAi = true, IsFactory = true, aiBaseIndex = 1, InProductionCount = 1 };
+            var second = new EntityController { IsControlledByAi = true, IsFactory = true, aiBaseIndex = 1, InProductionCount = 0 };
+            var foreign = new EntityController { IsControlledByAi = true, IsFactory = true, aiBaseIndex = 2, InProductionCount = 5 };
+            ExistingControllers.Instance.AiBuildings().UnionWith(new[] { first, second, foreign });
+            behaviour = new FactoryReinforcementAiModule().CreateBehaviour(new DefaultAiBehaviour(), new[]
+            {
+                new ContentModuleParameter { name = "baseIndex", value = "1" },
+                new ContentModuleParameter { name = "maxStandingArmy", value = "3" },
+                new ContentModuleParameter { name = "maxQueuePerFactory", value = "2" }
+            });
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            if ((first.InProductionCount ?? 0) + (second.InProductionCount ?? 0) != 2 || foreign.ProduceCallCount != 0)
+                throw new InvalidOperationException("Reinforcement did not reserve exactly one remaining slot in the selected base.");
+            int calls = first.ProduceCallCount + second.ProduceCallCount;
+            UnityEngine.Time.time += 11f;
+            behaviour.Tick();
+            if (first.ProduceCallCount + second.ProduceCallCount != calls)
+                throw new InvalidOperationException("Queued reinforcements exceeded the standing army cap on the next scan.");
+            localUnit.IsDestroyed = true;
+            UnityEngine.Time.time += 11f;
+            behaviour.Tick();
+            if (first.ProduceCallCount + second.ProduceCallCount != calls + 1)
+                throw new InvalidOperationException("Reinforcement did not resume after a local unit was lost.");
+
+            behaviour.OnDestroyed();
+            first.InProductionCount = second.InProductionCount = 1;
+            calls = first.ProduceCallCount + second.ProduceCallCount;
+            behaviour = new FactoryReinforcementAiModule().CreateBehaviour(new DefaultAiBehaviour(), new[]
+            {
+                new ContentModuleParameter { name = "baseIndex", value = "1" },
+                new ContentModuleParameter { name = "requireEconomy", value = "false" },
+                new ContentModuleParameter { name = "maxQueuePerFactory", value = "2" }
+            });
+            behaviour.OnInitialized();
+            behaviour.Tick();
+            if (first.ProduceCallCount + second.ProduceCallCount != calls)
+                throw new InvalidOperationException("Free reinforcement restarted existing native production.");
+            second.InProductionCount = 0;
+            UnityEngine.Time.time += 11f;
+            behaviour.Tick();
+            if (second.InProductionCount != 1 || first.ProduceCallCount + second.ProduceCallCount != calls + 1)
+                throw new InvalidOperationException("Free reinforcement failed to resume after production completed.");
+        }
+        finally
+        {
+            behaviour?.OnDestroyed();
+            ExistingControllers.Instance.Reset();
+            DefaultAiBehaviour.ResetRuntimeState();
+        }
+    }),
     ("factory-reinforcement AI parameter parser supplies bounded defaults and validates limits", () =>
     {
         if (!FactoryReinforcementParameterParser.TryParse(null, out FactoryReinforcementSettings defaults,

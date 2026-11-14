@@ -88,7 +88,14 @@ namespace RogueCommandExpansionLoader.Modules
                 }
 
                 HashSet<EntityController> aiUnits = existing.AiUnits();
-                int currentArmy = aiUnits != null ? aiUnits.Count : 0;
+                int currentArmy = 0;
+                if (aiUnits != null)
+                {
+                    foreach (EntityController unit in aiUnits)
+                    {
+                        if (IsInScope(unit) && unit.IsUnit && !unit.IsBuilding) currentArmy++;
+                    }
+                }
                 if (currentArmy >= _settings.MaxStandingArmy)
                 {
                     return;
@@ -100,9 +107,20 @@ namespace RogueCommandExpansionLoader.Modules
                     return;
                 }
 
+                // Reserve slots for units already being produced, including factories whose
+                // local queue is full. Otherwise every scan can oversubscribe the army cap.
                 foreach (EntityController factory in buildings)
                 {
-                    if (factory == null || factory.DestroyHasBeenStarted || !factory.IsFactory || !factory.IsControlledByAi)
+                    if (IsInScope(factory) && factory.IsFactory)
+                    {
+                        currentArmy += Math.Max(0, factory.InProductionCount ?? 0);
+                    }
+                }
+                if (currentArmy >= _settings.MaxStandingArmy) return;
+
+                foreach (EntityController factory in buildings)
+                {
+                    if (!IsInScope(factory) || !factory.IsFactory)
                     {
                         continue;
                     }
@@ -119,6 +137,10 @@ namespace RogueCommandExpansionLoader.Modules
                         continue;
                     }
 
+                    // Native free production replaces/refunds an existing queued entry.
+                    // Wait for it to finish rather than restarting paid or free production.
+                    if (!_settings.RequireEconomy && queued > 0) continue;
+
                     int balance = _settings.RequireEconomy ? Bank.ActualBalance(factory.gameObject.tag) : Int32.MaxValue;
                     if (!factory.IsProductionPossible(balance))
                     {
@@ -128,10 +150,12 @@ namespace RogueCommandExpansionLoader.Modules
                     try
                     {
                         factory.Produce(false, !_settings.RequireEconomy, false);
+                        int added = Math.Max(0, (factory.InProductionCount ?? 0) - queued);
+                        if (added == 0) continue;
                         Debug.Log("[RogueCommandExpansionLoader] AI Factory '" + factory.gameObject.name +
                             "' queued reinforcement (" + (queued + 1) + "/" + _settings.MaxQueuePerFactory +
                             ", standing army: " + (currentArmy + 1) + "/" + _settings.MaxStandingArmy + ").");
-                        currentArmy++;
+                        currentArmy += added;
                         if (currentArmy >= _settings.MaxStandingArmy)
                         {
                             break;
@@ -148,6 +172,13 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
+            }
+
+            private bool IsInScope(EntityController entity)
+            {
+                return entity != null && !entity.IsDestroyed && !entity.DestroyHasBeenStarted &&
+                    entity.IsControlledByAi &&
+                    (_settings.BaseIndex < 0 || entity.aiBaseIndex == _settings.BaseIndex);
             }
         }
     }

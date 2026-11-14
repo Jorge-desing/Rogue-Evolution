@@ -33,6 +33,8 @@ Support repair considers missing armor even when health is above the configured 
 
 Support repair tracks its own movement destinations. On each repair tick it replaces an owned move when the target drifts at least one meter, preserving pending native orders. Arrival, lost targets and module shutdown cancel only the tagged current move; never clear the command chain to stop a repairer. Unrelated current orders retain ownership.
 
+Factory reinforcement applies `baseIndex` to both live-unit counts and factory queues (`-1` means all AI bases). `maxStandingArmy` reserves slots for pending production before dispatch; destroyed units release slots. Count only observed queue growth as new production. Native `Produce(forFree: true)` replaces/refunds a queued item, so free reinforcement waits for an existing queue to empty instead of restarting it.
+
 1. **Decide** (FSM / Behavior Tree / Utility Scorer) $\rightarrow$ Intent & Target
 2. **Path** (NavMesh / Bounded A*) $\rightarrow$ Waypoints (timer-gated repaths, never every frame)
 3. **Steer** (`EntityController` movement forces) $\rightarrow$ Motion ($\Delta\text{pos} \cdot dt$)
@@ -81,7 +83,7 @@ All 23 modules are registered in `AiModuleRegistry.CreateDefault()`:
 | `sample:focus-fire` | Concentrates squad firepower onto high-priority targets | `baseIndex` (-1–31), `evalIntervalSeconds` (0.5–15s), `selectionMode` (`LowestHealth`, `HighestThreat`, `HighestDps`) | `base: -1`, `eval: 2.0s`, `mode: LowestHealth` |
 | `sample:construction-expansion` | Expands base perimeter with defensive buildings | `baseIndex` (0–31), `expansionIntervalSeconds` (10–300s), `maxExpansions` (1–10) | `interval: 45s`, `maxExpansions: 3` |
 | `sample:tactical-regroup` | Pulls combatants back to rally point upon heavy losses | `baseIndex` (-1–31), `healthRatioThreshold` (0.1–0.7), `regroupRadiusCells` (5–50) | `base: -1`, `threshold: 0.35`, `radius: 15` |
-| `sample:factory-reinforcement` | Routes newly produced factory units directly to the frontline | `baseIndex` (0–31), `rallyDistanceThreshold` (5.0–100.0) | `threshold: 25.0` |
+| `sample:factory-reinforcement` | Produces reinforcements within scoped live-plus-queued army and factory queue limits | `baseIndex` (-1–31), `checkIntervalSeconds` (1–120s), `maxQueuePerFactory` (1–5), `maxStandingArmy` (1–100), `requireEconomy` (bool), `minGameTimeSeconds` (0–600s) | `base: -1`, `check: 10s`, `queue: 1`, `army: 25`, `economy: true`, `minTime: 15s` |
 | `sample:flanking-strike` | Flanking assault groups maneuver around main battle lines | `baseIndex` (0–31), `flankAngleDegrees` (30–90), `squadSize` (2–6) | `angle: 60`, `squadSize: 3` |
 | `sample:retreat-and-regroup` | Pulls critically damaged units back to base repair zones | `baseIndex` (0–31), `retreatHealthRatio` (0.1–0.5), `cooldownSeconds` (5–120s) | `ratio: 0.25`, `cooldown: 20s` |
 | `sample:harvester-escort` | Assigns dedicated combat escorts to shadow harvesters | `baseIndex` (0–31), `escortsPerHarvester` (1–3), `leashDistance` (3.0–20.0) | `escorts: 1`, `leashDistance: 8.0` |
