@@ -3361,6 +3361,48 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("vampiric siphon splits shield overflow into health within one per-hit budget", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:split-siphon", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:split-siphon",
+                VampiricLeech = new ContentUnitVampiricLeechDefinition
+                {
+                    siphonRatio = 0.5f, siphonToShield = true, maxSiphonPerHit = 10f
+                }
+            });
+            var attacker = new EntityController
+            {
+                entityId = "test:split-siphon", IsUnit = true, IsControlledByPlayer = true,
+                HasShield = true, CurrentShield = 98f, MaxShield = 100f,
+                CurrentHealth = 50f, MaxHealth = 100f
+            };
+            var target = new EntityController { IsUnit = true, IsControlledByAi = true, CurrentHealth = 100f };
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 100f, attacker);
+            if (attacker.CurrentShield != 100f || attacker.CurrentHealth != 58f)
+                throw new InvalidOperationException("Capped siphon should restore two shield and eight health instead of losing overflow.");
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 100f, attacker);
+            if (attacker.CurrentShield != 100f || attacker.CurrentHealth != 68f)
+                throw new InvalidOperationException("Full shield should route the siphon budget to health.");
+            attacker.CurrentShield = 90f;
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 100f, attacker);
+            if (attacker.CurrentShield != 100f || attacker.CurrentHealth != 68f)
+                throw new InvalidOperationException("Shield restoration duplicated the siphon budget into health.");
+            attacker.CurrentShield = 99.95f;
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(target, 2f, attacker);
+            if (Math.Abs(attacker.CurrentShield - 100f) > 0.001f || Math.Abs(attacker.CurrentHealth - 68.95f) > 0.001f)
+                throw new InvalidOperationException("Near-full shield should preserve fractional siphon overflow.");
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+        }
+    }),
     ("combat experience applies all earned promotions immediately and retains partial progress", () =>
     {
         ExistingControllers.Instance.Reset();

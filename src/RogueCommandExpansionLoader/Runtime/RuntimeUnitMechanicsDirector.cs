@@ -2196,21 +2196,25 @@ namespace RogueCommandExpansionLoader.Runtime
 
                         if (siphon > 0.05f)
                         {
-                            bool restoredShield = false;
+                            float remainingSiphon = siphon;
                             if (profile.VampiricLeech.siphonToShield && ReadBoolProperty(_hasShieldProperty, originatorObj))
                             {
                                 float curShield = ReadFloatProperty(_currentShieldProperty, originatorObj, 0f);
                                 float maxShield = ReadFloatProperty(_maxShieldProperty, originatorObj, 0f);
-                                if (curShield < maxShield - 0.1f)
+                                if (curShield < maxShield)
                                 {
-                                    InvokeChargeShield(originatorObj, siphon);
-                                    restoredShield = true;
+                                    float shieldAmount = Mathf.Min(siphon, maxShield - curShield);
+                                    InvokeChargeShield(originatorObj, shieldAmount);
+                                    float restoredShield = Mathf.Clamp(
+                                        ReadFloatProperty(_currentShieldProperty, originatorObj, curShield) - curShield,
+                                        0f, shieldAmount);
+                                    remainingSiphon -= restoredShield;
                                 }
                             }
 
-                            if (!restoredShield)
+                            if (remainingSiphon > 0f)
                             {
-                                InvokeHeal(originatorObj, siphon, originatorObj);
+                                InvokeHeal(originatorObj, remainingSiphon, originatorObj);
                             }
 
                             ApplyTimedStatusEffect(originatorObj, "Vampirism", 0.75f);

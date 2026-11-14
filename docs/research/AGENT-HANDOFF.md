@@ -2,6 +2,12 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — shield-priority vampiric recovery
+
+- Shield-priority leech now restores only missing shield and routes the unused per-hit budget to native health healing. It subtracts observed shield restoration capped to the requested amount, preserving fractional deficits without duplicating recovery. The existing siphon ratio and per-hit cap still bound the combined recovery.
+- Release/harness builds: zero warnings/errors. RuntimeAndDiagnostics: 220/224; the split-recovery scenario passes near-full shield, full shield, shield-only and fractional overflow cases. The same four visual census failures remain; full suite is not green. Local evidence only; Steam remains unverified.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/siphon-deployment/manifest.json`.
+
 ## General capability audit — multi-rank combat experience
 
 - A damage event now applies every earned veterancy promotion immediately, capped by both native and profile rank limits. Each promotion receives its own rewards and persistent rank key. Partial XP is retained below the cap; unusable surplus is cleared at the cap. Wide intermediate arithmetic prevents XP addition overflow.
