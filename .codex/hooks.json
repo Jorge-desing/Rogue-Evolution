@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/task-context.py\"",
+            "commandWindows": "powershell -NoProfile -Command \"python (Join-Path (git rev-parse --show-toplevel) .codex/task-context.py)\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

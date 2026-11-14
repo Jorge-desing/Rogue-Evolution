@@ -7,6 +7,8 @@ Treat repository documentation as operational context for agents. Write so a new
 
 ### Load task documentation at startup
 
+Codex project hooks supply relevant excerpts before each user prompt when trusted. The table below applies in every client and when a hook is unavailable.
+
 On the first turn of a task, read the README and handoff and open the applicable documents below before implementation or runtime actions. Load all matching rows for cross-area tasks. When the scope changes, load the newly applicable row before working in that area. Use the files in the current checkout and report a missing prerequisite when it affects the next action.
 
 | Task | Open at startup |
