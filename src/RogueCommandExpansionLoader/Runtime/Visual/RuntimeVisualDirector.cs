@@ -307,7 +307,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 _nativeRigRetargetProfile.ResetForReuse();
             }
+            bool wasOnFire = _isOnFireVisualActive;
+            _isOnFireVisualActive = false;
             UpdateHealthAndDamageTransitions(false, 1f);
+            UpdateDamageFire();
+            if (wasOnFire) ApplyProceduralScorch(false);
             RestorePrimaryVisualVariant();
         }
 
@@ -1035,7 +1039,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
                 else
                 {
-                    ApplyProceduralScorch(false);
+                    ApplyProceduralScorch(_isOnFireVisualActive);
                 }
 
                 Transform fuelSocket;
@@ -1051,15 +1055,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 if (!_isCriticalStateActive)
                 {
                     _isCriticalStateActive = true;
-                    if (_authoredDamageFire != null)
-                    {
-                        _authoredDamageFire.Play(true);
-                    }
-                    else
-                    {
-                        Transform fireMount = _socketDamageFire ?? transform;
-                        _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
-                    }
+                    UpdateDamageFire();
 
                     if (_socketTurretPivot != null && !_isTurretJammed)
                     {
@@ -1079,15 +1075,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             {
                 // Health recovered from critical damage
                 _isCriticalStateActive = false;
-                if (_authoredDamageFire != null)
-                {
-                    _authoredDamageFire.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-                }
-                if (_fireVfxInstance != null)
-                {
-                    UnityEngine.Object.Destroy(_fireVfxInstance);
-                    _fireVfxInstance = null;
-                }
+                UpdateDamageFire();
                 if (_socketTurretPivot != null && _isTurretJammed)
                 {
                     _isTurretJammed = false;
@@ -1333,6 +1321,29 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        private void UpdateDamageFire()
+        {
+            bool active = _isCriticalStateActive || _isOnFireVisualActive;
+            if (_authoredDamageFire != null)
+            {
+                if (active && !_authoredDamageFire.isPlaying)
+                    _authoredDamageFire.Play(true);
+                else if (!active)
+                    _authoredDamageFire.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            }
+
+            if (active && _authoredDamageFire == null)
+            {
+                if (_fireVfxInstance == null)
+                    _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(_socketDamageFire ?? transform, _entity);
+            }
+            else if (_fireVfxInstance != null)
+            {
+                UnityEngine.Object.Destroy(_fireVfxInstance);
+                _fireVfxInstance = null;
+            }
+        }
+
         private void UpdateStatusEffectAndStanceReactions()
         {
             if (_entity == null || IsEntityDead()) return;
@@ -1391,6 +1402,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
 
             _isStunnedVisualActive = hasStun;
+            bool fireStatusChanged = _isOnFireVisualActive != hasOnFire;
             _isOnFireVisualActive = hasOnFire;
             _isBoostedVisualActive = hasBoost;
 
@@ -1405,18 +1417,11 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
             }
 
-            if (hasOnFire && !_isCriticalStateActive)
+            if (fireStatusChanged)
             {
-                if (_authoredDamageFire != null && !_authoredDamageFire.isPlaying)
-                {
-                    _authoredDamageFire.Play(true);
-                }
-                else if (_fireVfxInstance == null)
-                {
-                    Transform fireMount = _socketDamageFire ?? transform;
-                    _fireVfxInstance = RuntimeVisualVfxFallback.SpawnDamageFire(fireMount, _entity);
-                }
-                ApplyProceduralScorch(true);
+                UpdateDamageFire();
+                if (hasOnFire || !_isDamagedStateActive || _damagedMeshObject != null)
+                    ApplyProceduralScorch(hasOnFire);
             }
 
             try

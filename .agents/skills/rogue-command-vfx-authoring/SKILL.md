@@ -27,6 +27,8 @@ For Unity particle authoring, read `AGENTS.md`, `docs/research/AGENT-HANDOFF.md`
 
 ## 2. Core Technical Rules & Native Hooks
 
+The runtime director shares one fire source across critical damage and OnFire. It uses the authored fire emitter when present and clears the effect after both causes end or the entity is reused. The fallback is created only when the authored emitter is absent.
+
 1. **Automatic Muzzle Flash Hook & BFS Safeguard (`ShootProjectile`)**:
    - The native engine iterates `firePointsTransform` children at startup.
    - If a child has sub-children, it automatically caches `child.GetChild(0).GetComponent<ParticleSystem>()` and calls `.Play()` upon firing.

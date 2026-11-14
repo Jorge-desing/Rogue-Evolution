@@ -3,6 +3,10 @@
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
 
+## General capability audit — burning effects
+
+- RuntimeVisualDirector now shares one fire effect across critical damage and OnFire, clears it when both causes end or on reuse, and prefers the authored emitter. Release build passed. Steam visual acceptance remains unverified.
+
 ## General capability audit — visual variant lifecycle
 
 Pool reuse also clears health-driven chassis damage, smoke, fire and disabled damage attachments before restoring the primary. It uses the existing repair transitions, without writing gameplay health. Steam appearance and natural reuse still require runtime evidence.
