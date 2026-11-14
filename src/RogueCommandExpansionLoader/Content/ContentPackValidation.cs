@@ -3129,10 +3129,10 @@ namespace RogueCommandExpansionLoader.Content
                 Add(diagnostics, "unit-gathering.rate-invalid", path + ".gatherRate",
                     "Gather rate must be finite and non-negative.");
             }
-            if (gathering.carryCapacity < 0)
+            if (gathering.carryCapacity < 0 || gathering.carryCapacity > 16777216)
             {
                 Add(diagnostics, "unit-gathering.capacity-invalid", path + ".carryCapacity",
-                    "Carry capacity must be non-negative.");
+                    "Carry capacity must be between 0 and 16777216 for exact native Single storage.");
             }
             if (!IsFiniteSingle(gathering.gatherRange) || gathering.gatherRange < 0)
             {

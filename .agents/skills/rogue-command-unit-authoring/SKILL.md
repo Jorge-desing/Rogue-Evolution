@@ -59,6 +59,8 @@ $$\text{customBalance} > \text{raw balanceOverrides} > \text{positive finite mov
 
 When adding or altering runtime mechanics, update all 4 layers simultaneously: Schema $\rightarrow$ DTO/Clone $\rightarrow$ Validation $\rightarrow$ Runtime Loader.
 
+Native crystal harvesters now map positive `resourceGathering.gatherRate` to row `maxArmor` and `carryCapacity` to `gainCreditsAmount`, after the final row's Harvester role is resolved. Raw row overrides and customBalance win. Crystal/Crystals are the supported native resource names; other resource types and `gatherRange` remain descriptive. This does not add a Harvest action to a prefab that lacks it. Cargo capacity is capped at 2^24 for exact native Single integer storage; zero preserves the template default.
+
 | Mechanic Field | Sub-Properties & Types | Range & Constraints | Behavior & ChangeableValue Mapping |
 |---|---|---|---|
 | `shieldRegeneration` | `delay` (float), `rate` (float) | Nonnegative floats | Regenerates shield charges out of combat |

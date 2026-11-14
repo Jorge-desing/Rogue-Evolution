@@ -3170,7 +3170,8 @@
         },
         "carryCapacity": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 16777216
         },
         "gatherRange": {
           "type": "number",

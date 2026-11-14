@@ -2,6 +2,14 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — structured native crystal gathering
+
+- Connected positive resourceGathering.gatherRate/carryCapacity to native Harvester row maxArmor/gainCreditsAmount after role resolution, preserving raw/custom balance precedence. Native Harvest.Update consumes these values for extraction and cargo while retaining its crystal depletion, movement and refinery delivery state machine. No passive credit loop or Harvest action is synthesized.
+- resourceType Crystal/Crystals is supported (case-insensitive); other categories and gatherRange remain descriptive. Zero retains template values. Cargo is bounded at 2^24 for exact Single integer storage. Mapping does not affect non-Harvester armor/credit stats.
+- Static evidence: `artifacts/general-capability-audit/gathering-native/Harvest.cs`; rechecked game 1.0.9 / assembly SHA d2da384df3318e7ac52db58eb13699ec483790b469effa46205de716825e543b / MVID db0e9462-128d-4296-9900-de18b4bd0c00. The serialized crystalsPerSecond field is unused by native Harvest.Update.
+- Release/harness builds: zero warnings/errors. Full C# harness: 589 passed, zero failed, one file-symlink-privilege skip; mapper coverage checks rate/cargo, role safety, precedence and unknown resources. Full Python all-mode: 768 tests, successful true, 30.05 seconds. Logs under `artifacts/general-capability-audit/gathering-*`. Local evidence only; actual harvesting in Steam remains unverified.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/gathering-deployment/manifest.json`.
+
 ## General capability audit — restore visual detail queries for mod instances
 
 - Fixed standalone surface/material/quality censuses: mod ownership now comes from the product EntityId namespace, independently of the numeric UniqueEntityId used as the instance key. Registered mod units again receive material binding and bounded mesh-color detail queries. Multiple instances of one product retain distinct numeric keys.

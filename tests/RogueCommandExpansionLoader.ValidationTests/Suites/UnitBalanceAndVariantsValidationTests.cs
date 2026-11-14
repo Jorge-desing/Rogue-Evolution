@@ -16,6 +16,38 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetUnitBalanceAndVariantsValidationTests() => new (string Name, Action Run)[]
     {
+    ("structured gathering configures native harvester rate and cargo while preserving explicit balance", () =>
+    {
+        var row = new GatheringBalanceRow { roles = UnitRole.Harvester, maxArmor = 15f, gainCreditsAmount = 50f };
+        var unit = new ContentUnitDefinition
+        {
+            resourceGathering = new ContentUnitResourceGatheringDefinition
+            {
+                resourceType = "Crystals", gatherRate = 25f, carryCapacity = 120
+            }
+        };
+        UnitResourceGatheringMapper.ApplyToRow(row, unit);
+        if (row.maxArmor != 25f || row.gainCreditsAmount != 120f)
+            throw new InvalidOperationException("Native Harvest rate and cargo were not set on its registered row.");
+        row.roles = UnitRole.Tank;
+        row.maxArmor = 15f;
+        row.gainCreditsAmount = 50f;
+        UnitResourceGatheringMapper.ApplyToRow(row, unit);
+        if (row.maxArmor != 15f || row.gainCreditsAmount != 50f)
+            throw new InvalidOperationException("Gathering defaults changed a non-harvester's armor or credits.");
+        row.roles = UnitRole.Harvester;
+        unit.balanceOverrides = new[] { new ContentBalanceOverride { name = "maxArmor", value = "15" } };
+        unit.customBalance = new Dictionary<string, double> { ["GainCreditsAmount"] = 50d };
+        UnitResourceGatheringMapper.ApplyToRow(row, unit);
+        if (row.maxArmor != 15f || row.gainCreditsAmount != 50f)
+            throw new InvalidOperationException("Structured gathering overrode explicit raw/custom balance.");
+        unit.balanceOverrides = null;
+        unit.customBalance = null;
+        unit.resourceGathering.resourceType = "unsupported-resource";
+        UnitResourceGatheringMapper.ApplyToRow(row, unit);
+        if (row.maxArmor != 15f || row.gainCreditsAmount != 50f)
+            throw new InvalidOperationException("Unknown resource was silently turned into crystal harvesting.");
+    }),
     ("customBalance schema matches per-unit row fields and storage types", () =>
     {
         using JsonDocument schemaDocument = JsonDocument.Parse(File.ReadAllText(
@@ -1412,4 +1444,11 @@ internal static partial class ValidationTestRunner
         }
     }),
     };
+
+    private sealed class GatheringBalanceRow
+    {
+        public UnitRole roles;
+        public float maxArmor;
+        public float gainCreditsAmount;
+    }
 }

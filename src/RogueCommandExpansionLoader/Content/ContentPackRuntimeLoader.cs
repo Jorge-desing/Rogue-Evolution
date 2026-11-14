@@ -5554,6 +5554,7 @@ namespace RogueCommandExpansionLoader.Content
                     }
                 }
             }
+            UnitResourceGatheringMapper.ApplyToRow(row, unit);
         }
 
         private void ApplyStructuredProductionBuildingParameters(
