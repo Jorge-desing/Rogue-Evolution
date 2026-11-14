@@ -684,6 +684,12 @@ namespace RogueCommandExpansionLoader.Content
             if (unit.productionQueue != null)
             {
                 AddStructuredDefault(parameters, unit, "ProductionDuration", unit.productionQueue.buildTime);
+                if (unit.productionQueue.resourceCost > 0f && !Single.IsInfinity(unit.productionQueue.resourceCost))
+                {
+                    double cost = Math.Max(1d, Math.Min(MaximumContiguousSingleExactInteger,
+                        Math.Round(unit.productionQueue.resourceCost)));
+                    AddStructuredDefault(parameters, unit, "Cost", cost);
+                }
             }
 
             if (unit.movement != null)

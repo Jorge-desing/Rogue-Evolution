@@ -559,6 +559,16 @@ internal static partial class ValidationTestRunner
         unit.customBalance["SightRadius"] = 6d;
         if (UnitBalanceOverrideMapper.CreateCustomBalance(unit)["SightRadius"] != 6d)
             throw new InvalidOperationException("Custom sight radius must retain precedence.");
+
+        unit.productionQueue.resourceCost = 42.6f;
+        if (UnitBalanceOverrideMapper.CreateCustomBalance(unit)["Cost"] != 43d)
+            throw new InvalidOperationException("Structured production cost must configure whole native credits.");
+        unit.balanceOverrides = [new ContentBalanceOverride { name = "cost", value = "20" }];
+        if (UnitBalanceOverrideMapper.CreateCustomBalance(unit).ContainsKey("Cost"))
+            throw new InvalidOperationException("Explicit native cost must retain precedence.");
+        unit.customBalance["Cost"] = 10d;
+        if (UnitBalanceOverrideMapper.CreateCustomBalance(unit)["Cost"] != 10d)
+            throw new InvalidOperationException("Custom cost must retain precedence.");
     }),
     ("balance overrides exclude units without registered entity rows", () =>
     {

@@ -55,6 +55,15 @@ class ExportBalanceTableTests(unittest.TestCase):
         unit["customBalance"]["SightRadius"] = 6
         self.assertEqual(6, EXPORT.export_balance_table(pack)[0]["SightRadius"])
 
+        unit["productionQueue"]["resourceCost"] = 42.6
+        del unit["customBalance"]["Cost"]
+        unit["balanceOverrides"] = []
+        self.assertEqual(43, EXPORT.export_balance_table(pack)[0]["Cost"])
+        unit["balanceOverrides"] = [{"name": "cost", "value": "20"}]
+        self.assertEqual(20, EXPORT.export_balance_table(pack)[0]["Cost"])
+        unit["customBalance"]["Cost"] = 10
+        self.assertEqual(10, EXPORT.export_balance_table(pack)[0]["Cost"])
+
     def test_raw_override_parsed(self) -> None:
         pack = _valid_pack()
         unit = pack["units"][0]

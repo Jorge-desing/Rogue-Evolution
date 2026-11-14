@@ -142,6 +142,10 @@ def export_balance_table(pack: dict) -> list[dict[str, Any]]:
         build_time = _parse_number(queue.get("buildTime"))
         if build_time is not None and 0 < build_time < float("inf") and "ProductionDuration" not in row:
             row["ProductionDuration"] = build_time
+        resource_cost = _parse_number(queue.get("resourceCost"))
+        if resource_cost is not None and 0 < resource_cost < float("inf") and "Cost" not in row:
+            native_cost = struct.unpack("<f", struct.pack("<f", min(resource_cost, 16777216)))[0]
+            row["Cost"] = max(1, round(native_cost))
 
         detection = _as_dict(unit.get("detection"))
         detection_range = _parse_number(detection.get("detectionRange"))
