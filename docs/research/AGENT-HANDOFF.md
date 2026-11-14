@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Taunt target eligibility (2026-11-14)
+
+Taunt now limits forced native attack orders and its target cap to live hostile units with enabled attacks. Buildings and non-attacking units are skipped. Release built cleanly, RuntimeAndDiagnostics passed 241/241 (`artifacts/general-capability-audit/taunt-targets/runtime.log`), and the game-closed deployment backup/hash manifest is `artifacts/general-capability-audit/taunt-targets-deployment-20261114145637/manifest.json`. Verify actual retargeting and duration in an authorized Steam run.
+
+
 ## Dynamic support faction selection (2026-11-14)
 
 Dynamic command auras and friendly tactical pulses now use the same ally-faction selection as passive support; Shockwave still uses native hostility. Test fixture hostility now matches native Player/AI-only hostility. Release built cleanly and RuntimeAndDiagnostics passed 241/241 (`artifacts/general-capability-audit/dynamic-support-factions/runtime.log`). DLL deployed with game closed and backup/hash manifest at `artifacts/general-capability-audit/dynamic-support-deployment-20261114145435/manifest.json`. Verify neutral exclusion and hostile Shockwave in an authorized Steam run.

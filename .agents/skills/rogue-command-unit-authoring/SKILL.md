@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Taunt pulses target only living hostile units whose native attack is enabled; buildings and units unable to attack do not consume the target cap or receive forced attack orders. Steam behavior remains unverified.
+
 Dynamic command auras and friendly tactical pulses also require matching Player/AI factions; neutral units are excluded. Shockwave continues to select native enemies. Runtime acceptance remains pending.
 
 Healing, passive auras, synergies and command pulses identify allies by the native Player/AI controller faction; neutral entities do not receive ally effects. Enemy aura selection continues to use native hostility. Steam behavior remains unverified.

@@ -3369,7 +3369,8 @@ namespace RogueCommandExpansionLoader.Runtime
             int tauntedCount = 0;
             foreach (object candidate in entities)
             {
-                if (candidate == null || !IsEntityAlive(candidate) || !IsEnemy(self, candidate))
+                if (candidate == null || !IsEntityAlive(candidate) || !IsEnemy(self, candidate) ||
+                    !(candidate is EntityController enemy) || !enemy.IsUnit || !enemy.CanAttackAndIsAttackEnabled)
                 {
                     continue;
                 }
