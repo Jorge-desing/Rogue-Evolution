@@ -31,6 +31,13 @@ class ExportBalanceTableTests(unittest.TestCase):
         self.assertEqual(55, rows[0]["Cost"])
         self.assertEqual(200, rows[0]["MaxHealth"])
 
+        unit["productionQueue"] = {"buildTime": 12.5}
+        self.assertEqual(12.5, EXPORT.export_balance_table(pack)[0]["ProductionDuration"])
+        unit["balanceOverrides"].append({"name": "productionDuration", "value": "7"})
+        self.assertEqual(7, EXPORT.export_balance_table(pack)[0]["ProductionDuration"])
+        unit["customBalance"]["ProductionDuration"] = 3
+        self.assertEqual(3, EXPORT.export_balance_table(pack)[0]["ProductionDuration"])
+
     def test_raw_override_parsed(self) -> None:
         pack = _valid_pack()
         unit = pack["units"][0]

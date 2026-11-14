@@ -528,6 +528,17 @@ internal static partial class ValidationTestRunner
         {
             throw new InvalidOperationException("Explicit customBalance.MoveSpeed must remain available to override the raw row value.");
         }
+
+        unit.productionQueue = new ContentUnitProductionQueueDefinition { buildTime = 12.5f };
+        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (mapped["ProductionDuration"] != 12.5d)
+            throw new InvalidOperationException("Structured build time must configure the produced unit's native duration.");
+        unit.balanceOverrides = [new ContentBalanceOverride { name = "productionDuration", value = "7" }];
+        if (UnitBalanceOverrideMapper.CreateCustomBalance(unit).ContainsKey("ProductionDuration"))
+            throw new InvalidOperationException("Explicit native production duration must override the structured default.");
+        unit.customBalance["ProductionDuration"] = 3d;
+        if (UnitBalanceOverrideMapper.CreateCustomBalance(unit)["ProductionDuration"] != 3d)
+            throw new InvalidOperationException("Custom production duration must remain authoritative.");
     }),
     ("balance overrides exclude units without registered entity rows", () =>
     {

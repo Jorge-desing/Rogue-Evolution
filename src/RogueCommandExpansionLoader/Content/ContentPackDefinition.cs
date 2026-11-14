@@ -681,6 +681,13 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
+            if (unit.productionQueue != null && unit.productionQueue.buildTime > 0f &&
+                !Single.IsInfinity(unit.productionQueue.buildTime) &&
+                !parameters.ContainsKey("ProductionDuration") && !HasExplicitRowOverride(unit, "productionDuration"))
+            {
+                parameters.Add("ProductionDuration", unit.productionQueue.buildTime);
+            }
+
             // Apply only a positive structured speed. A zero in this DTO is
             // indistinguishable from an omitted value; explicit zero belongs in the
             // native balanceOverrides list. Explicit raw row overrides take priority.

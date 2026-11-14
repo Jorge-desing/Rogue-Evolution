@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Positive `productionQueue.buildTime` supplies the product's native ProductionDuration in seconds through the shared balance mapper. An explicit customBalance.ProductionDuration or raw productionDuration override takes priority. Zero retains the template duration. The factory reads its produced unit's duration through the native production pipeline; queueSize, resourceCost and productionPriority retain their existing contracts.
+
 Authoritative guide for creating and reviewing modded units, balance variants, factory pairings, and reward pool bindings.
 
 ---

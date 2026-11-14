@@ -137,6 +137,11 @@ def export_balance_table(pack: dict) -> list[dict[str, Any]]:
                 num = _parse_number(value)
                 if num is not None:
                     row[column] = num
+        queue = _as_dict(unit.get("productionQueue"))
+        build_time = _parse_number(queue.get("buildTime"))
+        if build_time is not None and 0 < build_time < float("inf") and "ProductionDuration" not in row:
+            row["ProductionDuration"] = build_time
+
         # 4. movement.moveSpeed si es positivo y no está en customBalance.
         movement = unit.get("movement")
         if isinstance(movement, dict):
