@@ -45,6 +45,8 @@ The census exposes `value` as a number for sliders. Inspect `controlType`, `minV
 
 ## Battlefield orders
 
+Native `Self` skills always dispatch through `ActiveSkillWithoutTarget`, including requests containing target arguments. This runs the native self-activation conditions and reports `Self` with the caster's coordinates.
+
 An active-skill order with `targetEntityKeyId` resolves that entity's current position for native `TargetOrigin.ChosenLocation` skills and dispatches `ActiveSkillAtPosition`. The result reports `Position` mode and the chosen coordinates. Entity-targeted skills retain their native target command. The location is sampled at dispatch, so subsequent target motion can move it outside the effect.
 
 For active skills, the unit observation provides `hasActiveSkill`, `currentMana`, `skillManaCost`, `skillManaAvailable`, and `skillActivationQueued`. Wait for an existing skill with sufficient mana and no queued activation, then issue `diagnostics_order_active_skill` with its native target arguments. Retain the unit and scene expectations in the wait. Native target geometry and command execution determine whether the skill takes effect. Read the resulting mana, queued activation and target state before planning another cast.

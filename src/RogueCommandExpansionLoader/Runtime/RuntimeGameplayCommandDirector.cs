@@ -2102,7 +2102,14 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
 
-                if (!string.IsNullOrWhiteSpace(targetEntityKeyId))
+                if (caster.SkillInfo != null && caster.SkillInfo.targetOrigin == TargetOrigin.Self)
+                {
+                    skillCmd = EntityCommand.ActiveSkillWithoutTarget();
+                    mode = "Self";
+                    tx = caster.Position.x;
+                    tz = caster.Position.z;
+                }
+                else if (!string.IsNullOrWhiteSpace(targetEntityKeyId))
 
                 {
 
