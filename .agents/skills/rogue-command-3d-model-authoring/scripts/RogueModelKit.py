@@ -7801,6 +7801,30 @@ def apply_weighted_normals(
     return obj
 
 
+def _import_tools_module(module_name: str) -> Any | None:
+    """Import a sibling module under `tools/` whether invoked from `tools/` or the skill scripts copy."""
+    import importlib
+    import sys as _sys
+
+    here = Path(__file__).resolve()
+    candidates = [here.parent]
+    for parent in here.parents:
+        tdir = parent / "tools"
+        if (tdir / f"{module_name}.py").is_file():
+            candidates.append(tdir)
+            break
+    for tdir in candidates:
+        if (tdir / f"{module_name}.py").is_file():
+            tstr = str(tdir)
+            if tstr not in _sys.path:
+                _sys.path.insert(0, tstr)
+            try:
+                return importlib.import_module(module_name)
+            except Exception:
+                return None
+    return None
+
+
 def batch_and_join_by_material(
     objects: Sequence[bpy.types.Object],
     prefix: str = "Unit",
@@ -7815,6 +7839,8 @@ def batch_and_join_by_material(
     profile_path: Path | None = None,
     scene_id: str | None = None,
     allow_uncalibrated_geometry: bool = False,
+    apply_form_hierarchy: bool = True,
+    functional_role: str = "",
 ) -> list[bpy.types.Object]:
     """Combines modular kitbashed objects by material into unified meshes.
 
@@ -7830,6 +7856,14 @@ def batch_and_join_by_material(
         print("[model-build] Ignoring retired face-budget argument; no geometry ceiling is applied.")
     if not allow_uncalibrated_geometry:
         enforce_face_budget_before_export(objects, prefix, asset_id=asset_id, profile_path=profile_path, scene_id=scene_id)
+    if apply_form_hierarchy:
+        _fei = _import_tools_module("functional_engineering_integration")
+        if _fei is not None:
+            _fei.apply_form_hierarchy_prepass_bpy(
+                objects,
+                role=functional_role,
+                enable_taubin_fairing=None,
+            )
     material_groups: Dict[bpy.types.Material | None, list[bpy.types.Object]] = {}
     preserved_objects: list[bpy.types.Object] = []
     # Rigged sample overlays are consumed as material batches under the
@@ -8114,8 +8148,11 @@ def generate_lod_chain(
     smooth_angle_deg: float = 38.0,
     weighted_normals: bool = True,
     lod_name_first: bool = False,
+    simplify_backend: str = "decimate",
 ) -> Dict[str, list[bpy.types.Object]]:
     """Generate LOD geometry at ratios from a calibrated allocation or explicit scoped policy."""
+    if simplify_backend not in ("decimate", "qem"):
+        raise ValueError(f"{prefix}: simplify_backend must be 'decimate' or 'qem', got {simplify_backend!r}")
     if not lod_levels:
         raise ValueError(f"{prefix}: pass LOD ratios derived from its calibrated geometry profile")
     lod_names = [name for name, _ in lod_levels]
@@ -8123,6 +8160,7 @@ def generate_lod_chain(
         raise ValueError(f"{prefix}: the authored LOD chain requires LOD0, LOD1, and LOD2")
     if any(not math.isfinite(ratio) or ratio <= 0.0 or ratio > 1.0 for _, ratio in lod_levels):
         raise ValueError(f"{prefix}: LOD ratios must be within (0, 1]")
+    _mga = _import_tools_module("mesh_geometry_algorithms") if simplify_backend == "qem" else None
     lod_dict: Dict[str, list[bpy.types.Object]] = {}
 
     for lod_name, ratio in lod_levels:
@@ -8143,10 +8181,18 @@ def generate_lod_chain(
             bpy.context.collection.objects.link(dup)
 
             if ratio < 0.99:
-                mod = dup.modifiers.new(f"Decimate_{lod_name}", "DECIMATE")
-                mod.ratio = ratio
-                mod.delimit = {"NORMAL", "MATERIAL"}
-                _apply_modifier_fast(dup, mod.name)
+                if (
+                    simplify_backend == "qem"
+                    and _mga is not None
+                    and getattr(dup.data, "shape_keys", None) is None
+                    and not any(m.type == "ARMATURE" for m in dup.modifiers)
+                ):
+                    _mga.apply_qem_simplify_bpy(dup, ratio=ratio, boundary_weight=10.0, preserve_attributes=True)
+                else:
+                    mod = dup.modifiers.new(f"Decimate_{lod_name}", "DECIMATE")
+                    mod.ratio = ratio
+                    mod.delimit = {"NORMAL", "MATERIAL"}
+                    _apply_modifier_fast(dup, mod.name)
 
             if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
                 if ratio < 0.99 or not getattr(dup.data, "has_custom_normals", False):
@@ -12669,6 +12715,10 @@ def bake_pbr_texture_atlas(
     output_dir: Path,
     resolution: int = 1024,
     palette: FactionPalette | None = None,
+    dilate_px: int = 8,
+    detail_normal_path: Path | None = None,
+    detail_strength: float | None = None,
+    apply_pbr_algorithms: bool = True,
 ) -> dict[str, Path]:
     """Bakes unified PBR texture maps (Albedo, MetallicGloss, Normal, Emission) for atlas meshes."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -12690,6 +12740,10 @@ def bake_pbr_texture_atlas(
             output_dir,
             resolution,
             maps,
+            dilate_px=dilate_px,
+            detail_normal_path=detail_normal_path,
+            detail_strength=detail_strength,
+            apply_pbr_algorithms=apply_pbr_algorithms,
         )
     finally:
         _restore_cycles_bake_settings(scene, prev_engine, prev_cycles)
@@ -12702,6 +12756,11 @@ def _bake_pbr_texture_atlas_impl(
     output_dir: Path,
     resolution: int,
     maps: dict[str, Path],
+    *,
+    dilate_px: int = 8,
+    detail_normal_path: Path | None = None,
+    detail_strength: float | None = None,
+    apply_pbr_algorithms: bool = True,
 ) -> dict[str, Path]:
 
     # Unity expects OpenGL tangent-space normals (+X +Y +Z). Make that explicit and give the
@@ -12786,6 +12845,16 @@ def _bake_pbr_texture_atlas_impl(
     img_albedo.file_format = "PNG"
     img_albedo.save()
     maps["albedo"] = albedo_path
+
+    albedo_alpha_mask = None
+    if apply_pbr_algorithms and int(dilate_px) > 0:
+        try:
+            import numpy as _np
+            _alb_pix = _np.empty(resolution * resolution * 4, dtype=_np.float32)
+            img_albedo.pixels.foreach_get(_alb_pix)
+            albedo_alpha_mask = _alb_pix[3::4].reshape(resolution, resolution)
+        except Exception as _mask_exc:
+            print(f"Warning: Atlas UV alpha extraction skipped: {_mask_exc}")
 
     # 2. Bake Emission
     set_bake_target(img_emission)
@@ -12906,6 +12975,29 @@ def _bake_pbr_texture_atlas_impl(
                 b_node = mat.node_tree.nodes.get("BakeTarget")
                 if b_node:
                     mat.node_tree.nodes.remove(b_node)
+
+    if apply_pbr_algorithms and maps:
+        _fei = _import_tools_module("functional_engineering_integration")
+        if _fei is not None:
+            resolved_strength = (
+                float(detail_strength)
+                if detail_strength is not None
+                else (0.25 if (detail_normal_path is not None or int(resolution) >= 512) else 0.0)
+            )
+            _fei.postprocess_level1_atlas_maps(
+                maps,
+                albedo_alpha_mask=albedo_alpha_mask,
+                flip_mask_y=True,
+                dilate_px=int(dilate_px),
+                detail_normal_path=detail_normal_path,
+                detail_strength=resolved_strength,
+                bpy_images={
+                    "albedo": img_albedo,
+                    "emission": img_emission,
+                    "normal": img_normal,
+                    "metallic_gloss": img_metallic,
+                },
+            )
 
     return maps
 
@@ -16615,6 +16707,10 @@ class RogueVehicleBuilder:
         wreckage_severity: str | None = None,
         structural_wear_mask: bool = False,
         unity_batch_names: bool = False,
+        functional_role: str = "",
+        lod_simplify_backend: str = "decimate",
+        atlas_detail_strength: float | None = None,
+        atlas_detail_normal_path: Path | None = None,
     ) -> Dict[str, Any]:
         """Runs diagnostics, smart UV unwrapping, preview rendering, batching, and FBX export."""
         if target_budget is not None:
@@ -16685,16 +16781,38 @@ class RogueVehicleBuilder:
         if include_locators and not self.locator_sockets:
             self.add_unity_locators()
 
-        # 6. Procedural multi-channel vertex shading & cavity AO
+        # 6. Form Hierarchy pre-pass & procedural multi-channel vertex shading / functional soot
+        _fei = _import_tools_module("functional_engineering_integration")
+        _fe_prepass = (
+            _fei.apply_form_hierarchy_prepass_bpy(self.objects, role=functional_role, enable_taubin_fairing=None)
+            if _fei is not None
+            else {}
+        )
         effective_wear = wear_level or self.wear_level
+        exhausts = [e for e in (self.exhaust_l, self.exhaust_r) if e is not None]
+        _soot_info = (
+            _fei.resolve_level1_soot_anchors(
+                self.objects,
+                role=functional_role,
+                sockets=self.locator_sockets,
+                exhaust_locs=exhausts if exhausts else None,
+                muzzle_loc=self.gun_pivot,
+                soot_intensity=soot_intensity,
+            )
+            if _fei is not None
+            else {
+                "exhaust_locs": exhausts if exhausts else None,
+                "muzzle_loc": self.gun_pivot,
+                "soot_intensity": soot_intensity,
+            }
+        )
         if effective_wear and effective_wear != "none":
-            exhausts = [e for e in (self.exhaust_l, self.exhaust_r) if e is not None]
             bake_advanced_vertex_shading(
                 self.objects,
                 wear_level=effective_wear,
-                soot_intensity=soot_intensity,
-                exhaust_locs=exhausts if exhausts else None,
-                muzzle_loc=self.gun_pivot,
+                soot_intensity=float(_soot_info["soot_intensity"]),
+                exhaust_locs=_soot_info["exhaust_locs"] or None,
+                muzzle_loc=_soot_info["muzzle_loc"],
                 structural_wear_mask=structural_wear_mask,
             )
         elif bake_vertex_dirt:
@@ -16776,8 +16894,22 @@ class RogueVehicleBuilder:
             asset_id=self.name,
             profile_path=budget_profile_path,
             scene_id=budget_scene_id,
+            apply_form_hierarchy=False,
+            functional_role=functional_role,
         )
         diagnostics["weighted_normals"] = weighted_normals
+        if _fei is not None:
+            fe_summary = _fei.apply_canonical_two_level_mesh_pass_bpy(
+                batched_objects,
+                role=functional_role,
+                enable_taubin_fairing=False,
+                optimize_vertex_cache=True,
+            )
+            if _fe_prepass:
+                fe_summary["taubinFairingObjects"] = list(_fe_prepass.get("taubinFairingObjects", []))
+                fe_summary["formHierarchyCounts"] = dict(_fe_prepass.get("formHierarchyCounts", {}))
+            fe_summary["sootAnchors"] = _soot_info
+            diagnostics["functional_engineering"] = fe_summary
 
         # 10. Texture Atlas Baking & Single-Material Export
         effective_bake_atlas = bake_atlas or (self.camo and self.camo != "none")
@@ -16785,7 +16917,9 @@ class RogueVehicleBuilder:
             tex_dir = fbx_path.parent / "Textures"
             tex_maps = bake_pbr_texture_atlas(
                 batched_objects, self.name, tex_dir,
-                resolution=atlas_resolution, palette=self.palette
+                resolution=atlas_resolution, palette=self.palette,
+                detail_normal_path=atlas_detail_normal_path,
+                detail_strength=atlas_detail_strength,
             )
             diagnostics["texture_maps"] = {k: str(v) for k, v in tex_maps.items()}
             if single_material_atlas:
@@ -16810,7 +16944,17 @@ class RogueVehicleBuilder:
                 smooth_by_angle=smooth_by_angle,
                 smooth_angle_deg=smooth_angle_deg,
                 weighted_normals=weighted_normals,
+                simplify_backend=lod_simplify_backend,
             )
+            if _fei is not None:
+                for _lod_name, _lod_objs in lod_dict.items():
+                    if _lod_name != "LOD0":
+                        _fei.apply_canonical_two_level_mesh_pass_bpy(
+                            _lod_objs,
+                            role=functional_role,
+                            enable_taubin_fairing=False,
+                            optimize_vertex_cache=True,
+                        )
             diagnostics["lod_levels"] = {k: len(v) for k, v in lod_dict.items()}
             diagnostics["lod_screen_thresholds"] = {
                 row["lod"]: row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]
@@ -17708,6 +17852,10 @@ class RogueStructureBuilder:
         target_budget: int | None = None,
         budget_profile_path: Path | None = None,
         budget_scene_id: str | None = None,
+        functional_role: str = "",
+        lod_simplify_backend: str = "decimate",
+        atlas_detail_strength: float | None = None,
+        atlas_detail_normal_path: Path | None = None,
     ) -> dict[str, Any]:
         if target_budget is not None:
             print("[model-build] Ignoring retired target_budget; no geometry ceiling is applied.")
@@ -17746,17 +17894,39 @@ class RogueStructureBuilder:
         blend_path.parent.mkdir(parents=True, exist_ok=True)
         fbx_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Procedural multi-channel vertex shading & cavity AO for structures
+        # Form Hierarchy pre-pass & procedural multi-channel vertex shading / functional soot
+        _fei = _import_tools_module("functional_engineering_integration")
+        _fe_prepass = (
+            _fei.apply_form_hierarchy_prepass_bpy(self.objects, role=functional_role, enable_taubin_fairing=None)
+            if _fei is not None
+            else {}
+        )
+        s_muzzles = [pos for name, pos in self.sockets.items() if "Muzzle" in name]
+        s_exhausts = [pos for name, pos in self.sockets.items() if any(k in name for k in ("Exhaust", "Chimney", "Smoke", "Vent"))]
+        muz_pos = s_muzzles[0] if s_muzzles else None
+        _soot_info = (
+            _fei.resolve_level1_soot_anchors(
+                self.objects,
+                role=functional_role,
+                sockets=self.locator_sockets,
+                exhaust_locs=s_exhausts if s_exhausts else None,
+                muzzle_loc=muz_pos,
+                soot_intensity=soot_intensity,
+            )
+            if _fei is not None
+            else {
+                "exhaust_locs": s_exhausts if s_exhausts else None,
+                "muzzle_loc": muz_pos,
+                "soot_intensity": soot_intensity,
+            }
+        )
         if bake_vertex_shading and wear_level and wear_level != "none":
-            s_muzzles = [pos for name, pos in self.sockets.items() if "Muzzle" in name]
-            s_exhausts = [pos for name, pos in self.sockets.items() if any(k in name for k in ("Exhaust", "Chimney", "Smoke", "Vent"))]
-            muz_pos = s_muzzles[0] if s_muzzles else None
             bake_advanced_vertex_shading(
                 self.objects,
                 wear_level=wear_level,
-                soot_intensity=soot_intensity,
-                exhaust_locs=s_exhausts if s_exhausts else None,
-                muzzle_loc=muz_pos,
+                soot_intensity=float(_soot_info["soot_intensity"]),
+                exhaust_locs=_soot_info["exhaust_locs"] or None,
+                muzzle_loc=_soot_info["muzzle_loc"],
                 structural_wear_mask=structural_wear_mask,
             )
 
@@ -17782,8 +17952,22 @@ class RogueStructureBuilder:
             asset_id=self.name,
             profile_path=budget_profile_path,
             scene_id=budget_scene_id,
+            apply_form_hierarchy=False,
+            functional_role=functional_role,
         )
         diagnostics["weighted_normals"] = weighted_normals
+        if _fei is not None:
+            fe_summary = _fei.apply_canonical_two_level_mesh_pass_bpy(
+                batched_objects,
+                role=functional_role,
+                enable_taubin_fairing=False,
+                optimize_vertex_cache=True,
+            )
+            if _fe_prepass:
+                fe_summary["taubinFairingObjects"] = list(_fe_prepass.get("taubinFairingObjects", []))
+                fe_summary["formHierarchyCounts"] = dict(_fe_prepass.get("formHierarchyCounts", {}))
+            fe_summary["sootAnchors"] = _soot_info
+            diagnostics["functional_engineering"] = fe_summary
 
         if bake_atlas or single_material_atlas or (self.palette.camo and self.palette.camo != "none"):
             texture_dir = fbx_path.parent / "Textures"
@@ -17793,6 +17977,8 @@ class RogueStructureBuilder:
                 texture_dir,
                 resolution=atlas_resolution,
                 palette=self.palette,
+                detail_normal_path=atlas_detail_normal_path,
+                detail_strength=atlas_detail_strength,
             )
             diagnostics["texture_maps"] = {key: str(path) for key, path in texture_maps.items()}
             if single_material_atlas:
@@ -17829,7 +18015,17 @@ class RogueStructureBuilder:
                 smooth_by_angle=smooth_by_angle,
                 smooth_angle_deg=smooth_angle_deg,
                 weighted_normals=weighted_normals,
+                simplify_backend=lod_simplify_backend,
             )
+            if _fei is not None:
+                for _lod_name, _lod_objs in lod_dict.items():
+                    if _lod_name != "LOD0":
+                        _fei.apply_canonical_two_level_mesh_pass_bpy(
+                            _lod_objs,
+                            role=functional_role,
+                            enable_taubin_fairing=False,
+                            optimize_vertex_cache=True,
+                        )
             diagnostics["lod_levels"] = {k: len(v) for k, v in lod_dict.items()}
             diagnostics["lod_screen_thresholds"] = {
                 row["lod"]: row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]

@@ -20,8 +20,16 @@ from pathlib import Path
 from typing import Iterable
 
 import numpy as np
-from PIL import Image
-from scipy import ndimage
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None  # type: ignore[assignment]
+
+try:
+    from scipy import ndimage
+except ImportError:
+    ndimage = None  # type: ignore[assignment]
 
 MIN_ROUGHNESS = 0.04
 MAX_SMOOTHNESS_F = 1.0 - MIN_ROUGHNESS
@@ -37,6 +45,81 @@ def validate_detail_strength(value: object) -> float:
     return strength
 
 
+def _convolve2d_3x3(arr: np.ndarray, kernel: np.ndarray, mode: str) -> np.ndarray:
+    """Exact 3x3 convolution matching ``scipy.ndimage.convolve`` without requiring SciPy."""
+    if ndimage is not None:
+        return ndimage.convolve(arr, kernel, mode=mode)
+    pad_mode = "wrap" if mode == "wrap" else "edge"
+    k = np.flip(np.asarray(kernel, dtype=np.float32))
+    padded = np.pad(np.asarray(arr, dtype=np.float32), ((1, 1), (1, 1)), mode=pad_mode)
+    h, w = arr.shape
+    out = np.zeros((h, w), dtype=np.float32)
+    for dy in range(3):
+        for dx in range(3):
+            wgt = float(k[dy, dx])
+            if wgt != 0.0:
+                out += wgt * padded[dy : dy + h, dx : dx + w]
+    return out
+
+
+def _compute_uv_dilation_map_numpy(
+    valid: np.ndarray,
+    max_distance: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Exact separable Euclidean Voronoi dilation map using pure NumPy."""
+    r = int(max_distance)
+    h, w = valid.shape
+    inf = r * r * 4 + 1024
+
+    row_d2 = np.where(valid, 0, inf).astype(np.int32)
+    row_x = np.broadcast_to(np.arange(w, dtype=np.int32)[None, :], (h, w)).copy()
+
+    for dx in range(-r, r + 1):
+        if dx == 0:
+            continue
+        dx2 = dx * dx
+        if dx > 0:
+            src_slice = slice(dx, w)
+            dst_slice = slice(0, w - dx)
+            src_coords = np.arange(dx, w, dtype=np.int32)
+        else:
+            k = -dx
+            src_slice = slice(0, w - k)
+            dst_slice = slice(k, w)
+            src_coords = np.arange(0, w - k, dtype=np.int32)
+        hit = valid[:, src_slice] & (dx2 < row_d2[:, dst_slice])
+        if np.any(hit):
+            row_d2[:, dst_slice][hit] = dx2
+            row_x[:, dst_slice][hit] = np.broadcast_to(src_coords[None, :], hit.shape)[hit]
+
+    best_d2 = row_d2.copy()
+    best_x = row_x.copy()
+    best_y = np.broadcast_to(np.arange(h, dtype=np.int32)[:, None], (h, w)).copy()
+
+    for dy in range(-r, r + 1):
+        if dy == 0:
+            continue
+        dy2 = dy * dy
+        if dy > 0:
+            src_slice = slice(dy, h)
+            dst_slice = slice(0, h - dy)
+            src_y = np.arange(dy, h, dtype=np.int32)
+        else:
+            k = -dy
+            src_slice = slice(0, h - k)
+            dst_slice = slice(k, h)
+            src_y = np.arange(0, h - k, dtype=np.int32)
+        cand = row_d2[src_slice, :] + dy2
+        better = cand < best_d2[dst_slice, :]
+        if np.any(better):
+            best_d2[dst_slice, :][better] = cand[better]
+            best_x[dst_slice, :][better] = row_x[src_slice, :][better]
+            best_y[dst_slice, :][better] = np.broadcast_to(src_y[:, None], better.shape)[better]
+
+    fill_mask = (~valid) & (best_d2 <= r * r)
+    return fill_mask, best_y, best_x
+
+
 def compute_uv_dilation_map(
     mask: np.ndarray,
     max_distance: int = 16,
@@ -47,9 +130,11 @@ def compute_uv_dilation_map(
     valid = np.asarray(mask, dtype=bool)
     if np.all(valid) or not np.any(valid):
         return None
-    distances, indices = ndimage.distance_transform_edt(~valid, return_indices=True)
-    fill_mask = (~valid) & (distances <= float(max_distance))
-    return fill_mask, indices[0], indices[1]
+    if ndimage is not None:
+        distances, indices = ndimage.distance_transform_edt(~valid, return_indices=True)
+        fill_mask = (~valid) & (distances <= float(max_distance))
+        return fill_mask, indices[0], indices[1]
+    return _compute_uv_dilation_map_numpy(valid, max_distance)
 
 
 def apply_uv_dilation_map(
@@ -182,8 +267,8 @@ def height_to_normal_scharr(
     kx = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]], dtype=np.float32) / 32.0
     ky = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]], dtype=np.float32) / 32.0
 
-    dx = ndimage.convolve(h, kx, mode=mode) * float(strength) * (h.shape[1] / 64.0)
-    dy = ndimage.convolve(h, ky, mode=mode) * float(strength) * (h.shape[0] / 64.0)
+    dx = _convolve2d_3x3(h, kx, mode=mode) * float(strength) * (h.shape[1] / 64.0)
+    dy = _convolve2d_3x3(h, ky, mode=mode) * float(strength) * (h.shape[0] / 64.0)
 
     normals = np.stack([-dx, dy, np.ones_like(dx)], axis=-1)
     return _encode_normal_rgb(normals, as_uint8=as_uint8)
@@ -199,7 +284,7 @@ def height_to_curvature_cavity(
     mode = "wrap" if tileable else "nearest"
     lap_kernel = np.array([[0.25, 0.5, 0.25], [0.5, -3.0, 0.5], [0.25, 0.5, 0.25]], dtype=np.float32)
     # Negative Laplacian at peaks/convex ridges -> positive convexity
-    convexity = -ndimage.convolve(h, lap_kernel, mode=mode) * float(gain)
+    convexity = -_convolve2d_3x3(h, lap_kernel, mode=mode) * float(gain)
     edge_wear = np.clip(convexity, 0.0, 1.0)
     cavity_ao = np.clip(1.0 + np.minimum(convexity, 0.0), 0.0, 1.0)
     return edge_wear.astype(np.float32), cavity_ao.astype(np.float32)
@@ -371,8 +456,8 @@ def normal_to_curvature_cavity(
     mode = "wrap" if tileable else "nearest"
     kx = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]], dtype=np.float32) / 32.0
     ky = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]], dtype=np.float32) / 32.0
-    dnx_dx = ndimage.convolve(n[..., 0], kx, mode=mode)
-    dny_dy = ndimage.convolve(n[..., 1], ky, mode=mode)
+    dnx_dx = _convolve2d_3x3(n[..., 0], kx, mode=mode)
+    dny_dy = _convolve2d_3x3(n[..., 1], ky, mode=mode)
     # In OpenGL tangent normal maps, +nx tilts right and +ny tilts up; positive divergence = convex ridge
     div = (dnx_dx - dny_dy) * float(gain)
     edge_wear = np.clip(div, 0.0, 1.0).astype(np.float32)

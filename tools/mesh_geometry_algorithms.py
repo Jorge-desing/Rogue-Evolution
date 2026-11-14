@@ -47,17 +47,20 @@ def _compute_vertex_normals(vertices: np.ndarray, faces: np.ndarray) -> np.ndarr
 
 
 def _find_boundary_vertices(faces: np.ndarray, num_vertices: int) -> np.ndarray:
-    edge_counts: dict[tuple[int, int], int] = defaultdict(int)
-    for f in faces:
-        a, b, c = int(f[0]), int(f[1]), int(f[2])
-        for u, v in ((a, b), (b, c), (c, a)):
-            key = (u, v) if u < v else (v, u)
-            edge_counts[key] += 1
+    tris = np.asarray(faces, dtype=np.int64)
     boundary = np.zeros(num_vertices, dtype=bool)
-    for (u, v), count in edge_counts.items():
-        if count == 1:
-            boundary[u] = True
-            boundary[v] = True
+    if num_vertices == 0 or len(tris) == 0:
+        return boundary
+    edges = np.vstack([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
+    edges = np.sort(edges, axis=1)
+    valid = edges[:, 0] != edges[:, 1]
+    if not np.any(valid):
+        return boundary
+    unique_edges, counts = np.unique(edges[valid], axis=0, return_counts=True)
+    b_edges = unique_edges[counts == 1]
+    if len(b_edges) > 0:
+        boundary[b_edges[:, 0]] = True
+        boundary[b_edges[:, 1]] = True
     return boundary
 
 
@@ -76,23 +79,38 @@ def taubin_smooth(
     if n == 0 or len(tris) == 0 or iterations <= 0:
         return verts
 
-    neighbors: list[set[int]] = [set() for _ in range(n)]
-    for f in tris:
-        a, b, c = int(f[0]), int(f[1]), int(f[2])
-        neighbors[a].update((b, c))
-        neighbors[b].update((a, c))
-        neighbors[c].update((a, b))
+    edges = np.vstack([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
+    edges = np.sort(edges, axis=1)
+    valid = edges[:, 0] != edges[:, 1]
+    if not np.any(valid):
+        return verts
+    unique_edges, counts = np.unique(edges[valid], axis=0, return_counts=True)
 
-    boundary = _find_boundary_vertices(tris, n) if preserve_boundary else np.zeros(n, dtype=bool)
+    boundary = np.zeros(n, dtype=bool)
+    if preserve_boundary:
+        b_edges = unique_edges[counts == 1]
+        if len(b_edges) > 0:
+            boundary[b_edges[:, 0]] = True
+            boundary[b_edges[:, 1]] = True
+
+    u = unique_edges[:, 0]
+    v = unique_edges[:, 1]
+    deg = np.zeros(n, dtype=np.int64)
+    np.add.at(deg, u, 1)
+    np.add.at(deg, v, 1)
+    active = (~boundary) & (deg > 0)
+    if not np.any(active):
+        return verts
+    inv_deg = np.zeros(n, dtype=np.float64)
+    inv_deg[active] = 1.0 / deg[active]
 
     def _laplacian_step(pts: np.ndarray, factor: float) -> np.ndarray:
+        nbr_sum = np.zeros((n, 3), dtype=np.float64)
+        np.add.at(nbr_sum, u, pts[v])
+        np.add.at(nbr_sum, v, pts[u])
         nxt = pts.copy()
-        for idx in range(n):
-            if boundary[idx] or not neighbors[idx]:
-                continue
-            nbr_idx = list(neighbors[idx])
-            avg = pts[nbr_idx].mean(axis=0)
-            nxt[idx] = pts[idx] + factor * (avg - pts[idx])
+        avg = nbr_sum[active] * inv_deg[active, None]
+        nxt[active] = pts[active] + factor * (avg - pts[active])
         return nxt
 
     for _ in range(iterations):
@@ -565,6 +583,39 @@ def extract_mesh_arrays_bpy(obj: Any) -> tuple[np.ndarray, np.ndarray]:
     return verts, tris
 
 
+def _chunked_argmin_dist(query_pts: np.ndarray, ref_pts: np.ndarray, chunk_size: int = 256) -> np.ndarray:
+    if len(query_pts) == 0 or len(ref_pts) == 0:
+        return np.zeros(len(query_pts), dtype=np.int64)
+    out = np.empty(len(query_pts), dtype=np.int64)
+    ref64 = np.asarray(ref_pts, dtype=np.float64)
+    q64 = np.asarray(query_pts, dtype=np.float64)
+    for start in range(0, len(q64), chunk_size):
+        chunk = q64[start : start + chunk_size]
+        diff = chunk[:, None, :] - ref64[None, :, :]
+        out[start : start + chunk_size] = np.argmin(np.sum(diff * diff, axis=2), axis=1)
+    return out
+
+
+def _project_barycentric_batch(pts: np.ndarray, a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+    v0 = b - a
+    v1 = c - a
+    v2 = pts - a
+    d00 = np.einsum("ij,ij->i", v0, v0)
+    d01 = np.einsum("ij,ij->i", v0, v1)
+    d11 = np.einsum("ij,ij->i", v1, v1)
+    d20 = np.einsum("ij,ij->i", v2, v0)
+    d21 = np.einsum("ij,ij->i", v2, v1)
+    denom = d00 * d11 - d01 * d01
+    safe = np.abs(denom) > 1e-12
+    v = np.where(safe, (d11 * d20 - d01 * d21) / np.where(safe, denom, 1.0), 1.0 / 3.0)
+    w = np.where(safe, (d00 * d21 - d01 * d20) / np.where(safe, denom, 1.0), 1.0 / 3.0)
+    u = 1.0 - v - w
+    weights = np.clip(np.stack([u, v, w], axis=1), 0.0, 1.0)
+    sums = weights.sum(axis=1, keepdims=True)
+    weights = np.where(sums > 1e-12, weights / np.maximum(sums, 1e-12), 1.0 / 3.0)
+    return weights
+
+
 def apply_taubin_smooth_bpy(
     obj: Any,
     iterations: int = 6,
@@ -577,8 +628,8 @@ def apply_taubin_smooth_bpy(
     smoothed = taubin_smooth(
         verts, tris, iterations=iterations, lam=lam, mu=mu, preserve_boundary=preserve_boundary
     )
-    for idx, v in enumerate(obj.data.vertices):
-        v.co = (float(smoothed[idx, 0]), float(smoothed[idx, 1]), float(smoothed[idx, 2]))
+    if len(smoothed) > 0 and len(smoothed) == len(obj.data.vertices):
+        obj.data.vertices.foreach_set("co", np.asarray(smoothed, dtype=np.float32).ravel())
     obj.data.update()
     return smoothed
 
@@ -587,16 +638,149 @@ def apply_qem_simplify_bpy(
     obj: Any,
     ratio: float = 0.5,
     boundary_weight: float = 10.0,
+    preserve_attributes: bool = True,
 ) -> tuple[int, int]:
-    """Simplify a Blender mesh object in-place using Garland-Heckbert QEM decimation."""
+    """Simplify a Blender mesh object in-place using Garland-Heckbert QEM decimation,
+    optionally transferring materials, polygon shading, Color RGBA, and UV layers.
+    """
+    mesh = obj.data
+    if preserve_attributes and len(mesh.polygons) > 0 and (
+        len(mesh.loops) != len(mesh.polygons) * 3 or any(len(p.vertices) != 3 for p in mesh.polygons)
+    ):
+        import bmesh
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        bm.to_mesh(mesh)
+        bm.free()
+        mesh.update()
+
     verts, tris = extract_mesh_arrays_bpy(obj)
     orig_count = len(tris)
     target = max(4, int(round(orig_count * max(0.05, min(1.0, float(ratio))))))
+
+    saved_materials = list(mesh.materials) if preserve_attributes else []
+    old_n_polys = len(mesh.polygons)
+    old_n_loops = len(mesh.loops)
+    old_n_verts = len(verts)
+
+    tri_polys = old_n_polys > 0 and old_n_loops == old_n_polys * 3
+    old_mat_indices = None
+    old_smooth_flags = None
+    old_face_centroids = None
+    old_uv_snapshots: list[tuple[str, bool, np.ndarray]] = []
+    old_color_snapshots: list[tuple[str, str, str, bool, np.ndarray]] = []
+
+    if preserve_attributes and old_n_verts > 0 and len(tris) > 0:
+        old_tris_v = tris
+        if tri_polys:
+            old_mat_indices = np.empty(old_n_polys, dtype=np.int32)
+            mesh.polygons.foreach_get("material_index", old_mat_indices)
+            old_smooth_flags = np.empty(old_n_polys, dtype=bool)
+            mesh.polygons.foreach_get("use_smooth", old_smooth_flags)
+            loop_verts = np.empty(old_n_loops, dtype=np.int32)
+            mesh.loops.foreach_get("vertex_index", loop_verts)
+            old_tris_v = loop_verts.reshape(old_n_polys, 3).astype(np.int64)
+        else:
+            old_mat_indices = np.zeros(len(tris), dtype=np.int32)
+            old_smooth_flags = np.ones(len(tris), dtype=bool)
+
+        old_face_centroids = verts[old_tris_v].mean(axis=1)
+
+        if tri_polys:
+            for uv_layer in mesh.uv_layers:
+                uv_flat = np.empty(old_n_loops * 2, dtype=np.float32)
+                uv_layer.data.foreach_get("uv", uv_flat)
+                old_uv_snapshots.append(
+                    (uv_layer.name, bool(uv_layer.active_render), uv_flat.reshape(old_n_polys, 3, 2))
+                )
+
+        active_color_name = (
+            mesh.color_attributes.active_color.name if mesh.color_attributes.active_color else None
+        )
+        for attr in mesh.color_attributes:
+            if attr.domain == "CORNER" and tri_polys:
+                c_flat = np.empty(old_n_loops * 4, dtype=np.float32)
+                attr.data.foreach_get("color", c_flat)
+                c_corner = c_flat.reshape(-1, 4)
+                lv = loop_verts
+                v_sum = np.zeros((old_n_verts, 4), dtype=np.float64)
+                v_cnt = np.zeros(old_n_verts, dtype=np.int64)
+                np.add.at(v_sum, lv, c_corner)
+                np.add.at(v_cnt, lv, 1)
+                v_col = np.where(v_cnt[:, None] > 0, v_sum / np.maximum(v_cnt[:, None], 1), 1.0).astype(np.float32)
+                old_color_snapshots.append(
+                    (attr.name, attr.data_type, attr.domain, attr.name == active_color_name, v_col)
+                )
+            elif attr.domain == "POINT":
+                c_flat = np.empty(old_n_verts * 4, dtype=np.float32)
+                attr.data.foreach_get("color", c_flat)
+                old_color_snapshots.append(
+                    (attr.name, attr.data_type, attr.domain, attr.name == active_color_name, c_flat.reshape(old_n_verts, 4))
+                )
+
     new_verts, new_faces = qem_simplify(verts, tris, target_faces=target, boundary_weight=boundary_weight)
-    mesh = obj.data
     mesh.clear_geometry()
     mesh.from_pydata(new_verts.tolist(), [], new_faces.tolist())
     mesh.update()
+
+    if preserve_attributes and len(new_faces) > 0 and len(new_verts) > 0:
+        if len(mesh.materials) == 0 and saved_materials:
+            for mat in saved_materials:
+                mesh.materials.append(mat)
+
+        n_new_faces = len(mesh.polygons)
+        n_new_loops = len(mesh.loops)
+        n_new_verts = len(mesh.vertices)
+
+        if old_face_centroids is not None and len(old_face_centroids) > 0:
+            new_face_centroids = new_verts[new_faces].mean(axis=1)
+            nearest_old_face = _chunked_argmin_dist(new_face_centroids, old_face_centroids)
+            if old_mat_indices is not None and n_new_faces == len(new_faces):
+                new_mats = old_mat_indices[nearest_old_face]
+                mesh.polygons.foreach_set("material_index", np.asarray(new_mats, dtype=np.int32))
+            if old_smooth_flags is not None and n_new_faces == len(new_faces):
+                new_smooth = old_smooth_flags[nearest_old_face]
+                mesh.polygons.foreach_set("use_smooth", np.asarray(new_smooth, dtype=bool))
+
+            if old_uv_snapshots and n_new_loops == n_new_faces * 3:
+                ref_tris = old_tris_v[nearest_old_face]
+                ref_a = verts[ref_tris[:, 0]]
+                ref_b = verts[ref_tris[:, 1]]
+                ref_c = verts[ref_tris[:, 2]]
+                corner_weights = [
+                    _project_barycentric_batch(new_verts[new_faces[:, k]], ref_a, ref_b, ref_c)
+                    for k in range(3)
+                ]
+                for uv_name, is_active, old_uvs in old_uv_snapshots:
+                    uv_layer = mesh.uv_layers.new(name=uv_name)
+                    uv_layer.active_render = is_active
+                    ref_uv = old_uvs[nearest_old_face]
+                    new_uv = np.empty((n_new_faces, 3, 2), dtype=np.float32)
+                    for k in range(3):
+                        w = corner_weights[k][:, :, None]
+                        new_uv[:, k, :] = np.sum(ref_uv * w, axis=1).astype(np.float32)
+                    uv_layer.data.foreach_set("uv", new_uv.ravel())
+
+        if old_color_snapshots and n_new_verts == len(new_verts):
+            nearest_old_vert = _chunked_argmin_dist(new_verts, verts)
+            new_loop_verts = np.empty(n_new_loops, dtype=np.int32)
+            mesh.loops.foreach_get("vertex_index", new_loop_verts)
+            for cname, dtype, domain, is_active, v_col in old_color_snapshots:
+                try:
+                    new_attr = mesh.color_attributes.new(name=cname, type=dtype, domain=domain)
+                except Exception:
+                    new_attr = mesh.color_attributes.new(name=cname, type="FLOAT_COLOR", domain=domain)
+                mapped_v_col = v_col[nearest_old_vert]
+                if domain == "CORNER":
+                    new_attr.data.foreach_set("color", mapped_v_col[new_loop_verts].ravel())
+                else:
+                    new_attr.data.foreach_set("color", mapped_v_col.ravel())
+                if is_active:
+                    mesh.color_attributes.active_color = new_attr
+
+        mesh.update()
+
     return orig_count, len(new_faces)
 
 

@@ -705,11 +705,21 @@ def prepare_module_export_geometry(
     armor_materials: list[bpy.types.Material],
     *,
     allow_uncalibrated_geometry: bool = False,
+    prepass_out: dict[str, Any] | None = None,
 ) -> list[bpy.types.Object]:
     """Apply the shared in-memory export preparation for production and staging."""
     for obj in created:
         ensure_uv(obj)
-    soot_profile = fei.resolve_functional_soot_profile(entry, created)
+    role = entry.get("visualEngineeringRole", "")
+    prepass = fei.apply_form_hierarchy_prepass_bpy(
+        created,
+        role=role,
+        entry_or_role=entry,
+        enable_taubin_fairing=None,
+    )
+    if prepass_out is not None:
+        prepass_out.update(prepass)
+    soot_profile = prepass["sootProfile"]
     rmk.bake_advanced_vertex_shading(
         created,
         wear_level="field_tested",
@@ -727,12 +737,13 @@ def prepare_module_export_geometry(
         unity_batch_names=True,
         asset_id=entry["moduleName"],
         allow_uncalibrated_geometry=allow_uncalibrated_geometry,
+        apply_form_hierarchy=False,
     )
     if not combined:
         raise RuntimeError(f"Material batching produced no meshes for {entry['variantId']}")
     fei.apply_canonical_two_level_mesh_pass_bpy(
         combined,
-        role=entry.get("visualEngineeringRole", ""),
+        role=role,
         enable_taubin_fairing=False,
         optimize_vertex_cache=True,
     )
@@ -857,8 +868,13 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
                     entry["moduleName"],
                     asset_id=entry["moduleName"],
                 )
+            prepass_info: dict[str, Any] = {}
             combined = prepare_module_export_geometry(
-                entry, created, armor_materials, allow_uncalibrated_geometry=uncalibrated_build
+                entry,
+                created,
+                armor_materials,
+                allow_uncalibrated_geometry=uncalibrated_build,
+                prepass_out=prepass_info,
             )
             place_in_collection(combined, module_collection)
             source_triangles = rmk.count_mesh_triangles(combined)
@@ -887,13 +903,18 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
                 faces = sum(len(obj.data.polygons) for obj in lod_objects if obj.type == "MESH")
                 triangles = rmk.count_mesh_triangles(lod_objects)
                 lod_stats[lod_name] = {"blenderFaces": faces, "unityTriangles": triangles}
-            entry["meshQuality"] = fei.apply_canonical_two_level_mesh_pass_bpy(
+            mesh_quality = fei.apply_canonical_two_level_mesh_pass_bpy(
                 combined,
                 role=entry.get("visualEngineeringRole", ""),
                 enable_taubin_fairing=False,
                 optimize_vertex_cache=False,
                 assume_cache_optimized=True,
             )
+            if prepass_info:
+                mesh_quality["taubinFairingObjects"] = list(prepass_info.get("taubinFairingObjects", []))
+                mesh_quality["formHierarchyCounts"] = dict(prepass_info.get("formHierarchyCounts", {}))
+                mesh_quality["sootProfile"] = prepass_info.get("sootProfile")
+            entry["meshQuality"] = mesh_quality
             entry["lodScreenHeights"] = (
                 transition_heights if asset_budget is None else
                 [row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]]

@@ -900,11 +900,11 @@ def apply_level1_functional_engineering_pass(
     builder: Any,
     *,
     role: str = "",
-    enable_taubin_fairing: bool = False,
+    enable_taubin_fairing: bool | None = None,
     optimize_vertex_cache: bool = True,
 ) -> dict[str, Any]:
-    """Run Form Hierarchy fairing (cast housings), Forsyth vertex-cache optimization,
-    and topology + Vertex-Wear RGBA audit on a Level 1 primary chassis builder.
+    """Run Form Hierarchy fairing (auto on primary_cast when enable_taubin_fairing=None),
+    Forsyth vertex-cache optimization, and topology + Vertex-Wear RGBA audit on a Level 1 chassis.
     """
     tools_dir = str(REPO_ROOT / "tools")
     if tools_dir not in sys.path:

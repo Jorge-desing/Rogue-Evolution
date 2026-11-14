@@ -63,7 +63,27 @@ CAST_FORM_NAME_TOKENS = (
 FACETED_PROTECTED_TOKENS = (
     "Armor", "Plate", "Bracket", "Turret", "Trunnion", "Hatch", "ERA", "Bolt", "Rivet",
     "Weld", "Flange", "Track", "Wheel", "Barrel", "Muzzle", "Louver", "Grille", "COLLIDER",
+    "Fastener", "Seat", "Stay", "Brace", "Gusset", "Strap", "Latch", "Hinge", "Pin",
+    "Keepers", "Collar",
 )
+
+
+def _object_supports_taubin_fairing(obj: Any, role: str, *, min_vertices: int = 24) -> bool:
+    if obj is None or getattr(obj, "type", None) != "MESH" or "_COLLIDER" in obj.name:
+        return False
+    mesh = getattr(obj, "data", None)
+    if mesh is None or len(mesh.polygons) == 0 or len(mesh.vertices) < min_vertices:
+        return False
+    if getattr(mesh, "shape_keys", None) is not None:
+        return False
+    if any(getattr(m, "type", None) == "ARMATURE" for m in getattr(obj, "modifiers", ())):
+        return False
+    try:
+        if obj.get("_rcl_fe_taubin_applied"):
+            return False
+    except Exception:
+        pass
+    return classify_form_hierarchy(obj.name, role=role) == "primary_cast"
 
 
 def get_role_engineering_spec(role: str) -> FunctionalRoleEngineeringSpec:
@@ -144,20 +164,171 @@ def resolve_functional_soot_profile(
     return {"soot_intensity": 0.0, "exhaust_locs": [], "muzzle_loc": None, "role": role}
 
 
+def apply_form_hierarchy_prepass_bpy(
+    objects: Sequence[Any],
+    *,
+    role: str = "",
+    entry_or_role: Mapping[str, Any] | str | None = None,
+    enable_taubin_fairing: bool | None = None,
+    min_vertices: int = 24,
+) -> dict[str, Any]:
+    """Run Form Hierarchy classification, volume-preserving cast Taubin fairing, and soot
+    resolution BEFORE vertex-wear baking and material batching merge part names away.
+    """
+    resolved_role = (
+        entry_or_role.get("visualEngineeringRole", role)
+        if isinstance(entry_or_role, Mapping)
+        else (str(entry_or_role) if entry_or_role is not None else role)
+    )
+    spec = get_role_engineering_spec(resolved_role)
+    taubin_applied: list[str] = []
+    counts = {"primary_cast": 0, "primary_faceted": 0, "secondary_mechanism": 0}
+
+    for obj in objects:
+        if obj is None or getattr(obj, "type", None) != "MESH" or "_COLLIDER" in obj.name:
+            continue
+        mesh = getattr(obj, "data", None)
+        if mesh is None or len(mesh.polygons) == 0:
+            continue
+        form_class = classify_form_hierarchy(obj.name, role=resolved_role)
+        counts[form_class] = counts.get(form_class, 0) + 1
+
+        if form_class != "primary_cast":
+            continue
+        try:
+            already_applied = bool(obj.get("_rcl_fe_taubin_applied"))
+        except Exception:
+            already_applied = False
+        if already_applied:
+            continue
+
+        should_smooth = (
+            _object_supports_taubin_fairing(obj, resolved_role, min_vertices=min_vertices)
+            if enable_taubin_fairing is None
+            else (bool(enable_taubin_fairing) and _object_supports_taubin_fairing(obj, resolved_role, min_vertices=4))
+        )
+        if should_smooth:
+            mga.apply_taubin_smooth_bpy(
+                obj, iterations=2, lam=0.35, mu=-0.37, preserve_boundary=True
+            )
+            taubin_applied.append(obj.name)
+            try:
+                obj["_rcl_fe_taubin_applied"] = True
+            except Exception:
+                pass
+
+    soot_profile = resolve_functional_soot_profile(entry_or_role or resolved_role, objects)
+    return {
+        "role": resolved_role,
+        "formTier": spec.form_tier,
+        "taubinFairingObjects": taubin_applied,
+        "formHierarchyCounts": counts,
+        "sootProfile": soot_profile,
+    }
+
+
+def _extract_world_point(item: Any) -> tuple[float, float, float] | None:
+    if item is None:
+        return None
+    if hasattr(item, "matrix_world"):
+        pos = item.matrix_world.translation
+        return (float(pos.x), float(pos.y), float(pos.z))
+    if isinstance(item, (tuple, list)) and len(item) >= 3:
+        return (float(item[0]), float(item[1]), float(item[2]))
+    return None
+
+
+def resolve_level1_soot_anchors(
+    objects: Sequence[Any],
+    *,
+    role: str = "",
+    sockets: Sequence[Any] | Mapping[str, Any] | None = None,
+    exhaust_locs: Sequence[Any] | None = None,
+    muzzle_loc: Any = None,
+    soot_intensity: float | None = None,
+) -> dict[str, Any]:
+    """Discover Level 1 functional thermal/muzzle soot anchors from canonical sockets and part names."""
+    resolved_exhaust: list[tuple[float, float, float]] = []
+    for loc in exhaust_locs or ():
+        pt = _extract_world_point(loc)
+        if pt is not None:
+            resolved_exhaust.append(pt)
+    resolved_muzzle = _extract_world_point(muzzle_loc)
+    discovered_from: list[str] = []
+
+    socket_items: list[tuple[str, Any]] = []
+    if isinstance(sockets, Mapping):
+        socket_items = [(str(k), v) for k, v in sockets.items()]
+    elif sockets is not None:
+        socket_items = [(str(getattr(s, "name", "")), s) for s in sockets]
+
+    muzzle_tokens = ("Socket_Muzzle", "FirePoint", "Socket_WeaponAudio", "Muzzle", "Barrel")
+    exhaust_tokens = ("Socket_EngineAudio", "Socket_DamageSmoke", "Exhaust", "Chimney", "Vent", "Smokestack", "Thruster")
+
+    def _add_unique_exhaust(pt: tuple[float, float, float]) -> bool:
+        for ex in resolved_exhaust:
+            if (ex[0] - pt[0]) ** 2 + (ex[1] - pt[1]) ** 2 + (ex[2] - pt[2]) ** 2 < 1e-6:
+                return False
+        resolved_exhaust.append(pt)
+        return True
+
+    for sname, sval in socket_items:
+        pt = _extract_world_point(sval)
+        if pt is None:
+            continue
+        if any(tok in sname for tok in muzzle_tokens) and resolved_muzzle is None:
+            resolved_muzzle = pt
+            discovered_from.append(f"socket:{sname}")
+        elif any(tok in sname for tok in exhaust_tokens):
+            if _add_unique_exhaust(pt):
+                discovered_from.append(f"socket:{sname}")
+
+    if resolved_muzzle is None or not resolved_exhaust:
+        for obj in objects:
+            if obj is None or getattr(obj, "type", None) != "MESH" or "_COLLIDER" in obj.name:
+                continue
+            b = _compute_objects_world_bounds([obj])
+            if b is None:
+                continue
+            bmin, bmax = b
+            center = 0.5 * (bmin + bmax)
+            if resolved_muzzle is None and any(tok in obj.name for tok in ("Muzzle", "Barrel")):
+                resolved_muzzle = (float(center[0]), float(bmax[1]), float(center[2]))
+                discovered_from.append(f"mesh:{obj.name}")
+            elif not resolved_exhaust and any(tok in obj.name for tok in exhaust_tokens):
+                pt = (float(center[0]), float(center[1]), float(center[2]))
+                if _add_unique_exhaust(pt):
+                    discovered_from.append(f"mesh:{obj.name}")
+
+    spec = get_role_engineering_spec(role)
+    resolved_intensity = float(soot_intensity) if soot_intensity is not None else float(spec.soot_intensity)
+    if soot_intensity is None and resolved_intensity <= 0.0 and (resolved_muzzle is not None or resolved_exhaust):
+        resolved_intensity = 0.30
+
+    return {
+        "role": role,
+        "soot_intensity": resolved_intensity,
+        "exhaust_locs": resolved_exhaust,
+        "muzzle_loc": resolved_muzzle,
+        "discoveredFrom": discovered_from,
+    }
+
+
 def apply_canonical_two_level_mesh_pass_bpy(
     objects: Sequence[Any],
     *,
     role: str = "",
-    enable_taubin_fairing: bool = False,
+    enable_taubin_fairing: bool | None = None,
     optimize_vertex_cache: bool = True,
     cache_size: int = 32,
     assume_cache_optimized: bool = False,
 ) -> dict[str, Any]:
-    """Run Form Hierarchy fairing (optional cast shells), Forsyth vertex-cache reordering,
-    and topology + Vertex-Wear RGBA auditing across a list of Blender mesh objects.
+    """Run Form Hierarchy fairing (auto on primary_cast when enable_taubin_fairing=None),
+    Forsyth vertex-cache reordering, and topology + Vertex-Wear RGBA auditing.
     """
     per_object: list[dict[str, Any]] = []
     taubin_applied: list[str] = []
+    counts = {"primary_cast": 0, "primary_faceted": 0, "secondary_mechanism": 0}
     for obj in objects:
         if obj is None or getattr(obj, "type", None) != "MESH" or "_COLLIDER" in obj.name:
             continue
@@ -165,11 +336,21 @@ def apply_canonical_two_level_mesh_pass_bpy(
             continue
 
         form_class = classify_form_hierarchy(obj.name, role=role)
-        if enable_taubin_fairing and form_class == "primary_cast":
+        counts[form_class] = counts.get(form_class, 0) + 1
+        should_taubin = (
+            _object_supports_taubin_fairing(obj, role, min_vertices=24)
+            if enable_taubin_fairing is None
+            else (bool(enable_taubin_fairing) and _object_supports_taubin_fairing(obj, role, min_vertices=4))
+        )
+        if should_taubin:
             mga.apply_taubin_smooth_bpy(
                 obj, iterations=2, lam=0.35, mu=-0.37, preserve_boundary=True
             )
             taubin_applied.append(obj.name)
+            try:
+                obj["_rcl_fe_taubin_applied"] = True
+            except Exception:
+                pass
 
         metrics_before = mga.audit_blender_object_metrics_bpy(
             obj,
@@ -195,6 +376,7 @@ def apply_canonical_two_level_mesh_pass_bpy(
     return {
         "role": role,
         "taubinFairingObjects": taubin_applied,
+        "formHierarchyCounts": counts,
         "objectCount": len(per_object),
         "totalTriangles": sum(r["triangleCount"] for r in per_object),
         "maxNonManifoldEdges": max((r["nonManifoldEdges"] for r in per_object), default=0),
@@ -204,6 +386,22 @@ def apply_canonical_two_level_mesh_pass_bpy(
     }
 
 
+def _bilinear_resize_rgb_numpy(arr: np.ndarray, out_h: int, out_w: int) -> np.ndarray:
+    sh, sw = arr.shape[:2]
+    y = np.linspace(0.0, max(sh - 1, 0), out_h, dtype=np.float32)
+    x = np.linspace(0.0, max(sw - 1, 0), out_w, dtype=np.float32)
+    y0 = np.floor(y).astype(np.int32)
+    x0 = np.floor(x).astype(np.int32)
+    y1 = np.minimum(y0 + 1, sh - 1)
+    x1 = np.minimum(x0 + 1, sw - 1)
+    wy = (y - y0)[:, None, None]
+    wx = (x - x0)[None, :, None]
+    src = arr.astype(np.float32)
+    top = src[y0[:, None], x0[None, :]] * (1.0 - wx) + src[y0[:, None], x1[None, :]] * wx
+    bot = src[y1[:, None], x0[None, :]] * (1.0 - wx) + src[y1[:, None], x1[None, :]] * wx
+    return np.clip(np.round(top * (1.0 - wy) + bot * wy), 0, 255).astype(np.uint8)
+
+
 def compose_normals_rnm_rgb(
     base_rgb: np.ndarray,
     detail_rgb: np.ndarray,
@@ -211,7 +409,10 @@ def compose_normals_rnm_rgb(
     detail_strength: float = 0.35,
 ) -> np.ndarray:
     """Tile/fit ``detail_rgb`` in memory and blend onto ``base_rgb`` via RNM."""
-    from PIL import Image
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = None
     try:
         from tools import pbr_texture_algorithms as pbr_algo
     except ImportError:
@@ -235,11 +436,13 @@ def compose_normals_rnm_rgb(
         dh, dw = det_arr.shape[:2]
         if dh <= bh and dw <= bw and (bh % dh == 0) and (bw % dw == 0):
             det_arr = np.tile(det_arr, (bh // dh, bw // dw, 1))
-        else:
+        elif Image is not None:
             det_arr = np.asarray(
                 Image.fromarray(det_arr, "RGB").resize((bw, bh), Image.Resampling.BILINEAR),
                 dtype=np.uint8,
             )
+        else:
+            det_arr = _bilinear_resize_rgb_numpy(det_arr, bh, bw)
 
     return pbr_algo.blend_normals_rnm(base_arr, det_arr, detail_strength=strength)
 
@@ -268,4 +471,183 @@ def compose_canonical_pbr_detail(
         "outputNormal": str(output_normal_path),
         "detailStrength": float(detail_strength),
         "resolution": [int(blended.shape[1]), int(blended.shape[0])],
+    }
+
+
+def _load_detail_normal_rgb(
+    candidate_paths: Sequence[Path],
+    base_h: int,
+    base_w: int,
+    pbr_algo: Any,
+    *,
+    use_bpy: bool,
+) -> tuple[np.ndarray | None, str]:
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = None
+
+    for cand in candidate_paths:
+        if not cand.exists():
+            continue
+        if Image is not None:
+            with Image.open(cand) as det_im:
+                return np.asarray(det_im.convert("RGB"), dtype=np.uint8), str(cand)
+        if use_bpy:
+            import bpy
+
+            existing = {id(im) for im in bpy.data.images}
+            img = bpy.data.images.load(str(cand), check_existing=True)
+            is_new = id(img) not in existing
+            try:
+                try:
+                    img.colorspace_settings.name = "Non-Color"
+                except Exception:
+                    pass
+                w, h = int(img.size[0]), int(img.size[1])
+                buf = np.empty(w * h * 4, dtype=np.float32)
+                img.pixels.foreach_get(buf)
+                arr_top_down = np.flipud(buf.reshape(h, w, 4))[..., :3]
+                return np.clip(np.round(arr_top_down * 255.0), 0, 255).astype(np.uint8), str(cand)
+            finally:
+                if is_new and img.users == 0:
+                    bpy.data.images.remove(img)
+
+    detail_size = min(256, int(base_h), int(base_w))
+    if detail_size >= 16:
+        h_field = pbr_algo.synthesize_periodic_fbm(detail_size, seed=42, octaves=4)
+        return (
+            pbr_algo.height_to_normal_scharr(h_field, strength=1.5, tileable=True, as_uint8=True),
+            "synthetic_periodic_fbm_scharr",
+        )
+    return None, "none"
+
+
+def postprocess_level1_atlas_maps(
+    maps: Mapping[str, Path | str],
+    *,
+    albedo_alpha_mask: np.ndarray | None = None,
+    flip_mask_y: bool = False,
+    dilate_px: int = 8,
+    detail_normal_path: Path | str | None = None,
+    detail_strength: float = 0.25,
+    compress_level: int = 1,
+    bpy_images: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Post-process Level 1 Cycles atlas maps using Euclidean Voronoi UV-island dilation
+    and Reoriented Normal Mapping (RNM) micro-detail composition. Works with PIL on PNGs or
+    directly in memory on Blender ``bpy.data.images``.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        Image = None
+    try:
+        from tools import pbr_texture_algorithms as pbr_algo
+    except ImportError:
+        import pbr_texture_algorithms as pbr_algo
+
+    dilated_maps: list[str] = []
+    dilation_applied = False
+    modified_bpy_keys: set[str] = set()
+
+    mask: np.ndarray | None = None
+    dilation_map = None
+    if int(dilate_px) > 0 and albedo_alpha_mask is not None:
+        mask = np.asarray(albedo_alpha_mask) > 0.05
+        if flip_mask_y:
+            mask = np.flipud(mask)
+        if mask.ndim == 2 and 0 < int(mask.sum()) < mask.size:
+            dilation_map = pbr_algo.compute_uv_dilation_map(mask, max_distance=int(dilate_px))
+
+    if dilation_map is not None:
+        fill_mask, nearest_y, nearest_x = dilation_map
+        dilation_applied = True
+        if bpy_images:
+            for key, img in bpy_images.items():
+                if img is None:
+                    continue
+                w, h = int(img.size[0]), int(img.size[1])
+                if (h, w) != mask.shape:
+                    continue
+                buf = np.empty(w * h * 4, dtype=np.float32)
+                img.pixels.foreach_get(buf)
+                arr_td = np.flipud(buf.reshape(h, w, 4))
+                dilated_td = pbr_algo.apply_uv_dilation_map(arr_td, fill_mask, nearest_y, nearest_x)
+                img.pixels.foreach_set(np.flipud(dilated_td).ravel())
+                modified_bpy_keys.add(str(key))
+                dilated_maps.append(str(key))
+        elif Image is not None:
+            for key, raw_path in maps.items():
+                p = Path(raw_path)
+                if not p.exists():
+                    continue
+                with Image.open(p) as im:
+                    mode = im.mode if im.mode in ("RGB", "RGBA") else "RGB"
+                    arr = np.asarray(im.convert(mode), dtype=np.uint8)
+                if arr.shape[:2] != mask.shape:
+                    continue
+                dilated = pbr_algo.apply_uv_dilation_map(arr, fill_mask, nearest_y, nearest_x)
+                Image.fromarray(dilated, mode).save(p, format="PNG", compress_level=compress_level)
+                dilated_maps.append(str(key))
+
+    rnm_composed = False
+    detail_source = "none"
+    strength = pbr_algo.validate_detail_strength(float(detail_strength)) if detail_strength > 0.0 else 0.0
+    candidate_paths: list[Path] = []
+    if detail_normal_path is not None:
+        candidate_paths.append(Path(detail_normal_path))
+    candidate_paths.append(
+        Path(__file__).resolve().parents[1]
+        / "unity"
+        / "RogueCommandAssetAuthoring"
+        / "Assets"
+        / "RogueCommandExpansionSample"
+        / "Textures"
+        / "Detail"
+        / "RCL_SteelMicroDetail_Normal.png"
+    )
+
+    normal_bpy = bpy_images.get("normal") if bpy_images else None
+    if normal_bpy is not None and strength > 0.0:
+        nw, nh = int(normal_bpy.size[0]), int(normal_bpy.size[1])
+        buf = np.empty(nw * nh * 4, dtype=np.float32)
+        normal_bpy.pixels.foreach_get(buf)
+        arr4_td = np.flipud(buf.reshape(nh, nw, 4)).copy()
+        base_rgb = np.clip(np.round(arr4_td[..., :3] * 255.0), 0, 255).astype(np.uint8)
+        resolved_detail, detail_source = _load_detail_normal_rgb(
+            candidate_paths, nh, nw, pbr_algo, use_bpy=True
+        )
+        if resolved_detail is not None:
+            blended = compose_normals_rnm_rgb(base_rgb, resolved_detail, detail_strength=strength)
+            arr4_td[..., :3] = blended.astype(np.float32) / 255.0
+            normal_bpy.pixels.foreach_set(np.flipud(arr4_td).ravel())
+            modified_bpy_keys.add("normal")
+            rnm_composed = True
+    elif Image is not None and strength > 0.0 and maps.get("normal") is not None:
+        normal_path = Path(maps["normal"])
+        if normal_path.exists():
+            with Image.open(normal_path) as base_im:
+                base_rgb = np.asarray(base_im.convert("RGB"), dtype=np.uint8)
+            resolved_detail, detail_source = _load_detail_normal_rgb(
+                candidate_paths, int(base_rgb.shape[0]), int(base_rgb.shape[1]), pbr_algo, use_bpy=False
+            )
+            if resolved_detail is not None:
+                blended = compose_normals_rnm_rgb(base_rgb, resolved_detail, detail_strength=strength)
+                Image.fromarray(blended, "RGB").save(normal_path, format="PNG", compress_level=compress_level)
+                rnm_composed = True
+
+    if bpy_images:
+        for key in sorted(modified_bpy_keys):
+            img = bpy_images.get(key)
+            if img is not None:
+                img.save()
+
+    return {
+        "dilationApplied": dilation_applied,
+        "dilatedMaps": dilated_maps,
+        "dilatePx": int(dilate_px),
+        "rnmComposed": rnm_composed,
+        "detailSource": detail_source,
+        "detailStrength": float(strength),
     }
