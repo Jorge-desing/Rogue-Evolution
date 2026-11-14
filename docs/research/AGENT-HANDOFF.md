@@ -6,6 +6,8 @@ This handoff is for the next agent. Start with the latest relevant entry, then v
 
 Squad support scores healable health and repairable armor deficits. Support orders approach their assigned ally and use native Heal or RepairArmor within four world units. Release and 70 tactical checks passed locally. Steam execution remains unverified.
 
+Support movement refresh replaces the current tagged approach while preserving pending native commands. Arrival stops that approach, releases its lease and applies treatment. Direct treatment consumes a dispatch slot and leaves existing unrelated order ownership intact.
+
 ## Overlapping coordinated AI profiles
 
 Dispatch preserves an active coordinated order whose native tag matches a lease held by another active profile. Once the order finishes or changes, the guard no longer blocks dispatch. Release and 70 tactical checks passed locally. Steam execution remains unverified.

@@ -4348,11 +4348,29 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("SquadOperationsDirectorAiModule did not dispatch support engineer to damaged harvester.");
             }
 
+            aiEngineer.CurrentPlayerCommandName = EntityCommand.Command.Move;
+            aiEngineer.Position = new UnityEngine.Vector3(33f, 0f, 30f);
+            damagedHarvester.Position += new UnityEngine.Vector3(2f, 0f, 0f);
+            UnityEngine.Time.time += 2f;
+            composite.Tick();
+            if (aiEngineer.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand ||
+                aiEngineer.LastExecutedCommand?.command != EntityCommand.Command.Move ||
+                aiEngineer.LastExecutedCommand.Value.destination.x != damagedHarvester.Position.x)
+            {
+                throw new InvalidOperationException("A drifting patient must update the current support move without enqueuing it again.");
+            }
+
             aiEngineer.Position = damagedHarvester.Position;
             UnityEngine.Time.time += 2f;
             composite.Tick();
             if (damagedHarvester.CurrentHealth != 47f || damagedHarvester.CurrentArmor != 8f)
                 throw new InvalidOperationException("A support engineer in range must heal and repair the assigned ally.");
+
+            if (aiEngineer.LastExecutedCommand?.command != EntityCommand.Command.Stop ||
+                aiEngineer.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand)
+            {
+                throw new InvalidOperationException("Arrival must release only the current support move.");
+            }
 
             RogueCommandExpansionLoader.Runtime.Ai.AiArchitectureCensus census =
                 RogueCommandExpansionLoader.Runtime.Ai.RuntimeAiArchitectureCensus.Current();

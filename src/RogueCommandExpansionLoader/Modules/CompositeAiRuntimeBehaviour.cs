@@ -403,7 +403,10 @@ namespace RogueCommandExpansionLoader.Modules
                 retargetHysteresisMultiplier: DefaultRetargetHysteresisMultiplier,
                 maxDispatchesPerTick: DefaultMaxArbitratedDispatchesPerTick,
                 proposals: _proposalBuffer,
-                tryDispatch: DispatchApprovedProposal);
+                tryDispatch: DispatchApprovedProposal,
+                keepsNativeOrder: proposal => proposal.Category != AiIntentCategory.SupportLogistics ||
+                    (_battlefieldCollector.TryResolveAiEntity(proposal.UnitId, out EntityController unit) &&
+                     unit != null && unit.CurrentCommandIsTaggedWith(proposal.CommandTag)));
         }
 
         private bool DispatchApprovedProposal(AiIntentProposal proposal)
@@ -430,6 +433,8 @@ namespace RogueCommandExpansionLoader.Modules
                 }
 
                 EntityCommand command;
+                EntityController.CommandProcessingType processingType =
+                    EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand;
                 if (proposal.Category == AiIntentCategory.SurvivalKite)
                 {
                     command = EntityCommand.Move(
@@ -455,12 +460,23 @@ namespace RogueCommandExpansionLoader.Modules
 
                     if (WithinHorizontalRange(unit.Position, patient.Position, 16f))
                     {
+                        if (unit.CurrentCommandIsTaggedWith(proposal.CommandTag))
+                        {
+                            unit.ExecuteCommand(EntityCommand.Stop(),
+                                EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+                            _arbiterState.ReleaseLease(proposal.UnitId);
+                        }
+
                         if (heal) patient.Heal(unit.HealAmount1, unit);
                         if (repair) patient.RepairArmor(6f, unit, false);
                         return true;
                     }
 
                     command = EntityCommand.Move(patient.Position);
+                    if (unit.CurrentCommandIsTaggedWith(proposal.CommandTag))
+                    {
+                        processingType = EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand;
+                    }
                 }
                 else if (proposal.Category == AiIntentCategory.TacticalSkill)
                 {
@@ -548,7 +564,7 @@ namespace RogueCommandExpansionLoader.Modules
                 }
 
                 command.tag = proposal.CommandTag;
-                unit.ExecuteCommand(command, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                unit.ExecuteCommand(command, processingType);
                 return true;
             }
             catch

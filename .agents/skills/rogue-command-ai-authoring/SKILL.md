@@ -210,3 +210,5 @@ Idle-only coordinated proposals require a live DoNothing command and a successfu
 When coordinated profiles overlap, dispatch preserves an active command whose native tag matches another active profile lease. Idle units and units whose current tag differs can receive a new proposal. Profiles retain their own arbiters and dispatch budgets.
 
 Squad support uses SupportLogistics intents with a live ally target. Positive HealAmount1 enables health recovery and engineering enables six points of armor repair per accepted in-range support action. The range is four world units. The scorer skips deficits the specialist cannot treat.
+
+When a coordinated specialist updates its tagged approach, replace the current move with native current-command cancellation to preserve pending commands. On arrival, stop the tagged approach and release its lease before treating the ally. A treatment with no active tagged order consumes the dispatch slot without taking an order lease.

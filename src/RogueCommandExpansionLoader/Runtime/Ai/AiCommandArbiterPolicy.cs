@@ -157,7 +157,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             float retargetHysteresisMultiplier,
             int maxDispatchesPerTick,
             IReadOnlyList<AiIntentProposal> proposals,
-            Func<AiIntentProposal, bool> tryDispatch = null)
+            Func<AiIntentProposal, bool> tryDispatch = null,
+            Func<AiIntentProposal, bool> keepsNativeOrder = null)
         {
             if (state == null)
             {
@@ -239,6 +240,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
 
                 approved.Add(candidate);
                 dispatchedUnits.Add(unitId);
+                if (keepsNativeOrder != null && !keepsNativeOrder(candidate)) continue;
+
                 state.SetLease(unitId, new AiCommandArbiterState.UnitLease
                 {
                     ModuleId = candidate.ModuleId,
