@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using RogueCommandExpansionLoader.Content;
 using UnityEngine;
 
@@ -110,6 +111,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static readonly Dictionary<int, int> _entityCombatXp =
             new Dictionary<int, int>();
+
+        private static readonly ConditionalWeakTable<object, object> _paidKillRewards =
+            new ConditionalWeakTable<object, object>();
 
         private static readonly Dictionary<int, float> _nativeAiSkillLogicalLastChecks =
             new Dictionary<int, float>();
@@ -695,6 +699,10 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static void ClearProfiles()
         {
+            lock (_paidKillRewards)
+            {
+                _paidKillRewards.Clear();
+            }
             lock (_profiles)
             {
                 _profiles.Clear();
@@ -1351,6 +1359,10 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static void OnBattlefieldRegistryReset()
         {
+            lock (_paidKillRewards)
+            {
+                _paidKillRewards.Clear();
+            }
             lock (_entityCombatXp)
             {
                 _entityCombatXp.Clear();
@@ -1918,6 +1930,13 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 EnsureReflection(entityObj.GetType());
                 int combatExperienceKey = GetCombatExperienceKey(entityObj);
+                if (IsEntityAlive(entityObj))
+                {
+                    lock (_paidKillRewards)
+                    {
+                        _paidKillRewards.Remove(entityObj);
+                    }
+                }
                 RevertBaselineStatusEffects(entityObj, combatExperienceKey);
                 RevertTimedStatusEffects(entityObj, combatExperienceKey);
                 RevertCommandLinks(entityObj);
@@ -1975,6 +1994,19 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        private static bool TryClaimKillRewards(object targetObj)
+        {
+            lock (_paidKillRewards)
+            {
+                if (_paidKillRewards.TryGetValue(targetObj, out _))
+                {
+                    return false;
+                }
+                _paidKillRewards.Add(targetObj, new object());
+                return true;
+            }
+        }
+
         public static void OnEntityDealtDamage(object targetObj, float amount, object originatorObj)
         {
             if (targetObj == null || originatorObj == null || amount <= 0f)
@@ -1987,6 +2019,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 EnsureReflection(originatorObj.GetType());
                 float targetHealth = ReadFloatProperty(_currentHealthProperty, targetObj, 1f);
                 bool targetKilled = targetHealth <= 0f || ReadBoolProperty(_destroyStartedProperty, targetObj);
+                bool payKillRewards = targetKilled &&
+                    ReadBoolProperty(_isControlledByPlayerProperty, originatorObj) &&
+                    IsEnemy(originatorObj, targetObj) && TryClaimKillRewards(targetObj);
 
                 string originatorId = ReadEntityId(originatorObj);
                 UnitRuntimeMechanicsProfile profile = null;
@@ -2179,7 +2214,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     }
 
                     // 3. ExperienceReward on kill (when attacker has ExperienceReward)
-                    if (targetKilled && profile.ExperienceReward != null && profile.ExperienceReward.experienceAmount > 0 &&
+                    if (payKillRewards && profile.ExperienceReward != null && profile.ExperienceReward.experienceAmount > 0 &&
                         ReadBoolProperty(_isControlledByPlayerProperty, originatorObj) &&
                         IsEnemy(originatorObj, targetObj))
                     {
@@ -2310,7 +2345,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 // 5. Target bounty reward when killed by a player unit
-                if (targetKilled && ReadBoolProperty(_isControlledByPlayerProperty, originatorObj) &&
+                if (payKillRewards && ReadBoolProperty(_isControlledByPlayerProperty, originatorObj) &&
                     IsEnemy(originatorObj, targetObj))
                 {
                     string targetId = ReadEntityId(targetObj);

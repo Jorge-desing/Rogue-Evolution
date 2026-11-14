@@ -3478,11 +3478,26 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("Expected Synergy pulse to apply +25% ArmorProtection SpecificValueChange to escort.");
             }
 
+            RuntimeUnitMechanicsDirector.RegisterProfile(enemy.EntityId, new UnitRuntimeMechanicsProfile
+            {
+                ExperienceReward = new ContentUnitExperienceRewardDefinition { experienceAmount = 7 }
+            });
             RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 50f, commander);
             if (!Bank.Deposits.Any(d => d.Account == "Player" && Math.Abs(d.Amount - 30f) < 0.01f))
             {
                 throw new InvalidOperationException("Expected ExperienceReward on kill to deposit 30 crystals into Player account.");
             }
+            int rewardedCount = Bank.Deposits.Count;
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 50f, commander);
+            if (Bank.Deposits.Count != rewardedCount)
+                throw new InvalidOperationException("Repeated notifications of the same kill must pay its reward once.");
+            enemy.CurrentHealth = 100f;
+            enemy.DestroyHasBeenStarted = false;
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(enemy);
+            enemy.CurrentHealth = 0f;
+            RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 50f, commander);
+            if (Bank.Deposits.Count != rewardedCount + 2)
+                throw new InvalidOperationException("A reused target must be able to award a reward for its new life.");
         }
         finally
         {
