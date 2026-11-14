@@ -59,9 +59,10 @@ ACTIVE_UNIT_WAVE2_PROFILES = {
         "hull_width": 2.55, "hull_length": 3.55, "deck_z": 1.38, "ground_clearance": 0.06,
     },
     "SkirmishStrikeBike": {
-        "features": {"coaming"},
+        "features": {"coaming", "lifting"},
         "hull_width": 0.96, "hull_length": 1.60, "deck_z": 1.22, "ground_clearance": 0.03,
         "coamings": [((0.0, -0.13, 0.78), (0.69, 0.65), "BatteryCollar")],
+        "lift_corners": [(-0.22, 0.28, 0.88), (0.22, 0.28, 0.88), (-0.22, -0.32, 0.84), (0.22, -0.32, 0.84)],
     },
     "SurgeArcTank": {
         "features": {"towing", "lifting", "suspension"},
@@ -70,9 +71,10 @@ ACTIVE_UNIT_WAVE2_PROFILES = {
         "wheel_centers": [(-0.91, -0.82, 0.34), (-0.91, -0.41, 0.34), (-0.91, 0.0, 0.34), (-0.91, 0.41, 0.34), (-0.91, 0.82, 0.34), (0.91, -0.82, 0.34), (0.91, -0.41, 0.34), (0.91, 0.0, 0.34), (0.91, 0.41, 0.34), (0.91, 0.82, 0.34)],
     },
     "TidebreakerHovercraft": {
-        "features": {"hover"},
+        "features": {"hover", "lifting", "towing"},
         "hull_width": 2.60, "hull_length": 3.40, "deck_z": 1.25, "ground_clearance": 0.42,
         "hover": {"prefix": "TidebreakerHovercraftHover", "width": 2.60, "length": 3.40, "float_height": 0.42},
+        "lift_corners": [(-0.88, 1.05, 1.02), (0.88, 1.05, 1.02), (-0.88, -1.05, 1.02), (0.88, -1.05, 1.02)],
     },
     "SalvageHauler": {
         "features": {"towing", "lifting", "suspension"},
@@ -370,14 +372,39 @@ ACTIVE_UNIT_REALISM_PROFILES = {
 
 
 
+_PREFIX_ALIASES: dict[str, tuple[str, ...]] = {
+    "SandlanceScout": ("SandlanceScout", "Scout"),
+    "Scout": ("SandlanceScout", "Scout"),
+    "SkirmishStrikeBike": ("SkirmishStrikeBike", "StrikeBike"),
+    "StrikeBike": ("SkirmishStrikeBike", "StrikeBike"),
+    "ColossusSiegePlatform": ("ColossusSiegePlatform", "Colossus"),
+    "Colossus": ("ColossusSiegePlatform", "Colossus"),
+    "AtlasCraneMech": ("AtlasCraneMech", "Atlas"),
+    "Atlas": ("AtlasCraneMech", "Atlas"),
+    "BastionSiegeMech": ("BastionSiegeMech", "Bastion"),
+    "Bastion": ("BastionSiegeMech", "Bastion"),
+}
+
+
+def _candidate_prefixes(prefix: str) -> tuple[str, ...]:
+    return _PREFIX_ALIASES.get(prefix, (prefix,))
+
+
 def _object_exists(name: str) -> bool:
-    return bpy.data.objects.get(name) is not None
+    if bpy.data.objects.get(name) is not None:
+        return True
+    for base, aliases in _PREFIX_ALIASES.items():
+        if name.startswith(base):
+            suffix = name[len(base):]
+            return any(bpy.data.objects.get(cand + suffix) is not None for cand in aliases)
+    return False
 
 
 def _object_with_tokens(prefix: str, tokens: tuple[str, ...]):
     lowered = tuple(token.lower() for token in tokens)
+    candidates = _candidate_prefixes(prefix)
     for obj in bpy.context.scene.objects:
-        if obj.name.startswith(prefix) and all(token in obj.name.lower() for token in lowered):
+        if any(obj.name.startswith(cand) for cand in candidates) and all(token in obj.name.lower() for token in lowered):
             return obj
     return None
 
@@ -564,24 +591,32 @@ def _add_wave34_smoke_brackets(prefix: str, profile: Mapping[str, object], armor
     return result
 
 
+def _find_aliased_object(prefix: str, suffix: str):
+    for cand in _candidate_prefixes(prefix):
+        obj = bpy.data.objects.get(cand + suffix)
+        if obj is not None:
+            return obj
+    return None
+
+
 def _add_wave34_leg_mounts(prefix: str, armor, gunmetal) -> list:
     result = []
     for side, tag in ((-1, "L"), (1, "R")):
-        hip = bpy.data.objects.get(f"{prefix}Leg_HipJoint_{tag}")
+        hip = _find_aliased_object(prefix, f"Leg_HipJoint_{tag}")
         if hip is not None and not _object_exists(f"{prefix}Leg_HipFlange_{tag}"):
             result.append(rmk.make_cylinder(
                 f"{prefix}Leg_HipFlange_{tag}", 0.22, 0.06,
                 hip.matrix_world.translation - Vector((side * 0.06, 0.0, 0.0)),
                 armor, rotation=(0.0, math.radians(90.0), 0.0), vertices=10, bevel=0.012,
             ))
-        shin = bpy.data.objects.get(f"{prefix}Leg_ShinArmor_{tag}")
+        shin = _find_aliased_object(prefix, f"Leg_ShinArmor_{tag}")
         if shin is not None and not _object_exists(f"{prefix}Leg_CalfArmor_{tag}"):
             result.append(rmk.make_box(
                 f"{prefix}Leg_CalfArmor_{tag}", (0.18, 0.16, 0.28),
                 shin.matrix_world.translation - Vector((0.0, 0.08, 0.0)),
                 armor, bevel=0.02, rotation=tuple(shin.rotation_euler),
             ))
-        ankle = bpy.data.objects.get(f"{prefix}Leg_AnkleJoint_{tag}")
+        ankle = _find_aliased_object(prefix, f"Leg_AnkleJoint_{tag}")
         if ankle is not None and not _object_exists(f"{prefix}Leg_AnkleClevis_{tag}"):
             result.append(rmk.make_box(
                 f"{prefix}Leg_AnkleClevis_{tag}", (0.16, 0.18, 0.10),
@@ -593,7 +628,7 @@ def _add_wave34_leg_mounts(prefix: str, armor, gunmetal) -> list:
 
 def _add_wave34_gussets(prefix: str, profile: Mapping[str, object], armor) -> list:
     locations = profile.get("gusset_locations", [])
-    if not locations or any(obj.name.startswith(f"{prefix}Armor_Gusset_") for obj in bpy.context.scene.objects):
+    if not locations or _has_object(prefix, "Armor_Gusset_"):
         return []
     return rmk.make_interlocking_armor_gusset(
         f"{prefix}Armor", locations=locations,
@@ -798,6 +833,488 @@ def apply_realism_details(
     return result
 
 
+ACTIVE_UNIT_WAVE14_ARCHETYPE_PROFILES: dict[str, dict[str, object]] = {
+    "ArcLanceWalker": {
+        "pistons": [
+            ("Leg_HipActuator_L", (-0.42, -0.08, 1.32), (-0.54, 0.08, 0.88), 0.038, 0.024),
+            ("Leg_HipActuator_R", (0.42, -0.08, 1.32), (0.54, 0.08, 0.88), 0.038, 0.024),
+            ("Leg_AnkleDamper_L", (-0.52, -0.06, 0.72), (-0.52, -0.10, 0.28), 0.032, 0.020),
+            ("Leg_AnkleDamper_R", (0.52, -0.06, 0.72), (0.52, -0.10, 0.28), 0.032, 0.020),
+        ],
+        "cables": [
+            ("Weapon_LancePowerCable_L", (-0.36, -0.24, 1.72), (-0.52, 0.22, 1.56), 0.06, 0.020),
+            ("Weapon_LancePowerCable_R", (0.36, -0.24, 1.72), (0.52, 0.22, 1.56), 0.06, 0.020),
+        ],
+        "greeble_vents": (1.10, 1.00, 1.74, (0.0, -0.18, 0.0)),
+        "weld_seams": [
+            ("Armor_WeldSeam_ChestL", (-0.44, 0.34, 1.52), (-0.44, -0.28, 1.52)),
+            ("Armor_WeldSeam_ChestR", (0.44, 0.34, 1.52), (0.44, -0.28, 1.52)),
+            ("Armor_WeldSeam_Sternum", (-0.32, 0.42, 1.62), (0.32, 0.42, 1.62)),
+        ],
+    },
+    "IroncladWalker": {
+        "pistons": [
+            ("Leg_HipActuator_L", (-0.44, -0.06, 1.24), (-0.52, 0.08, 0.82), 0.038, 0.024),
+            ("Leg_HipActuator_R", (0.44, -0.06, 1.24), (0.52, 0.08, 0.82), 0.038, 0.024),
+        ],
+        "ammo_chutes": [
+            ("Weapon_GatlingFeedChute_L", (-0.44, -0.24, 1.80), (-0.64, 0.06, 1.58), 0.11, 0.038, 0.06, -0.04),
+            ("Weapon_GatlingFeedChute_R", (0.44, -0.24, 1.80), (0.64, 0.06, 1.58), 0.11, 0.038, 0.06, 0.04),
+        ],
+        "greeble_vents": (0.86, 0.94, 1.98, (0.0, -0.12, 0.0)),
+        "weld_seams": [
+            ("Armor_WeldSeam_TorsoL", (-0.46, 0.36, 1.72), (-0.46, -0.28, 1.72)),
+            ("Armor_WeldSeam_TorsoR", (0.46, 0.36, 1.72), (0.46, -0.28, 1.72)),
+            ("Armor_WeldSeam_Glacis", (-0.36, 0.46, 1.84), (0.36, 0.46, 1.84)),
+        ],
+    },
+    "AtlasCraneMech": {
+        "pistons": [
+            ("Leg_HipActuator_L", (-0.48, -0.08, 1.38), (-0.58, 0.10, 0.92), 0.042, 0.026),
+            ("Leg_HipActuator_R", (0.48, -0.08, 1.38), (0.58, 0.10, 0.92), 0.042, 0.026),
+            ("Turret_BoomLiftCylinder_L", (-0.28, -0.18, 1.92), (-0.28, 0.28, 2.28), 0.044, 0.028),
+            ("Turret_BoomLiftCylinder_R", (0.28, -0.18, 1.92), (0.28, 0.28, 2.28), 0.044, 0.028),
+        ],
+        "cables": [
+            ("Turret_CraneHydraulicHose_L", (-0.42, -0.26, 1.78), (-0.48, 0.24, 2.02), 0.07, 0.022),
+            ("Turret_CraneHydraulicHose_R", (0.42, -0.26, 1.78), (0.48, 0.24, 2.02), 0.07, 0.022),
+        ],
+        "greeble_vents": (1.05, 1.10, 1.86, (0.0, -0.15, 0.0)),
+        "weld_seams": [
+            ("Armor_WeldSeam_TorsoL", (-0.52, 0.38, 1.68), (-0.52, -0.34, 1.68)),
+            ("Armor_WeldSeam_TorsoR", (0.52, 0.38, 1.68), (0.52, -0.34, 1.68)),
+            ("Armor_WeldSeam_Breastplate", (-0.38, 0.44, 1.78), (0.38, 0.44, 1.78)),
+        ],
+    },
+    "BastionSiegeMech": {
+        "pistons": [
+            ("Turret_RecoilRecuperator_L", (-0.48, -0.12, 2.18), (-0.48, 0.62, 2.22), 0.052, 0.034),
+            ("Turret_RecoilRecuperator_R", (0.48, -0.12, 2.18), (0.48, 0.62, 2.22), 0.052, 0.034),
+            ("Armor_CarapaceDamper_L", (-0.82, -0.45, 1.54), (-1.18, -0.45, 1.18), 0.046, 0.030),
+            ("Armor_CarapaceDamper_R", (0.82, -0.45, 1.54), (1.18, -0.45, 1.18), 0.046, 0.030),
+        ],
+        "cables": [
+            ("Turret_SiegeFeederConduit_L", (-0.64, -0.58, 1.76), (-0.56, 0.14, 2.04), 0.08, 0.026),
+            ("Turret_SiegeFeederConduit_R", (0.64, -0.58, 1.76), (0.56, 0.14, 2.04), 0.08, 0.026),
+        ],
+        "greeble_vents": (1.80, 1.70, 1.72, (0.0, -0.25, 0.0)),
+        "weld_seams": [
+            ("Armor_WeldSeam_CarapaceL", (-0.88, 0.65, 1.62), (-0.88, -0.65, 1.62)),
+            ("Armor_WeldSeam_CarapaceR", (0.88, 0.65, 1.62), (0.88, -0.65, 1.62)),
+            ("Armor_WeldSeam_Glacis", (-0.68, 0.86, 1.56), (0.68, 0.86, 1.56)),
+        ],
+    },
+    "SkirmishStrikeBike": {
+        "pistons": [
+            ("Chassis_ForkDamper_L", (-0.16, 0.56, 0.86), (-0.16, 0.78, 0.38), 0.030, 0.020),
+            ("Chassis_ForkDamper_R", (0.16, 0.56, 0.86), (0.16, 0.78, 0.38), 0.030, 0.020),
+            ("Chassis_RearMonoShock", (0.0, -0.22, 0.72), (0.0, -0.62, 0.42), 0.036, 0.022),
+        ],
+        "ammo_chutes": [
+            ("Weapon_TwinGunChute_L", (-0.22, 0.12, 0.78), (-0.26, 0.52, 0.74), 0.075, 0.028, 0.04, -0.02),
+            ("Weapon_TwinGunChute_R", (0.22, 0.12, 0.78), (0.26, 0.52, 0.74), 0.075, 0.028, 0.04, 0.02),
+        ],
+        "radiators": (1.40, 0.68, 0.64, 4),
+        "bike_hardware": True,
+        "weld_seams": [
+            ("Armor_WeldSeam_CowlingL", (-0.24, 0.58, 0.84), (-0.24, -0.32, 0.76)),
+            ("Armor_WeldSeam_CowlingR", (0.24, 0.58, 0.84), (0.24, -0.32, 0.76)),
+            ("Armor_WeldSeam_NoseSpine", (0.0, 0.82, 0.78), (0.0, 0.24, 0.94)),
+        ],
+    },
+    "TidebreakerHovercraft": {
+        "pistons": [
+            ("Hover_VaneActuator_L", (-0.68, -1.52, 1.18), (-0.56, -1.96, 1.12), 0.034, 0.022),
+            ("Hover_VaneActuator_R", (0.68, -1.52, 1.18), (0.56, -1.96, 1.12), 0.034, 0.022),
+        ],
+        "cables": [
+            ("Hover_PlenumFeedHose_L", (-0.86, 0.45, 0.72), (-0.86, -0.85, 0.76), 0.06, 0.024),
+            ("Hover_PlenumFeedHose_R", (0.86, 0.45, 0.72), (0.86, -0.85, 0.76), 0.06, 0.024),
+        ],
+        "greeble_vents": (2.80, 2.00, 1.06, (0.0, -0.30, 0.0)),
+        "glacis_rib": ((0.0, 1.72, 0.88), 1.45, 0.07, 0.06, 22.0),
+        "hover_thrusters": True,
+        "weld_seams": [
+            ("Armor_WeldSeam_DeckL", (-0.98, 1.45, 0.92), (-0.98, -1.45, 0.92)),
+            ("Armor_WeldSeam_DeckR", (0.98, 1.45, 0.92), (0.98, -1.45, 0.92)),
+            ("Armor_WeldSeam_BowGlacis", (-0.72, 1.82, 0.82), (0.72, 1.82, 0.82)),
+        ],
+    },
+    "ColossusSiegePlatform": {
+        "pistons": [
+            ("Turret_MortarRecuperator_L", (-0.42, -0.25, 1.48), (-0.42, 0.85, 1.56), 0.050, 0.032),
+            ("Turret_MortarRecuperator_R", (0.42, -0.25, 1.48), (0.42, 0.85, 1.56), 0.050, 0.032),
+        ],
+        "earth_spade": ((0.0, -1.38, 0.46), 1.38, 0.34),
+        "commander_sight": ((0.38, -0.35, 1.62), (0.24, 0.24, 0.26)),
+        "glacis_rib": ((0.0, 1.32, 0.84), 1.32, 0.07, 0.06, 20.0),
+        "weld_seams": [
+            ("Armor_WeldSeam_CasemateL", (-0.82, 0.95, 1.18), (-0.82, -1.05, 1.18)),
+            ("Armor_WeldSeam_CasemateR", (0.82, 0.95, 1.18), (0.82, -1.05, 1.18)),
+            ("Armor_WeldSeam_Glacis", (-0.68, 1.38, 0.88), (0.68, 1.38, 0.88)),
+        ],
+    },
+    "SurgeArcTank": {
+        "pistons": [
+            ("Turret_ArcCoilStabilizer_L", (-0.38, -0.22, 1.18), (-0.32, 0.48, 1.26), 0.038, 0.024),
+            ("Turret_ArcCoilStabilizer_R", (0.38, -0.22, 1.18), (0.32, 0.48, 1.26), 0.038, 0.024),
+        ],
+        "cables": [
+            ("Turret_CapacitorBusCable_L", (-0.56, -0.68, 0.96), (-0.42, 0.12, 1.18), 0.07, 0.024),
+            ("Turret_CapacitorBusCable_R", (0.56, -0.68, 0.96), (0.42, 0.12, 1.18), 0.07, 0.024),
+        ],
+        "radiators": (2.20, 1.56, 0.88, 5),
+        "glacis_rib": ((0.0, 1.12, 0.78), 1.08, 0.06, 0.05, 22.0),
+        "weld_seams": [
+            ("Armor_WeldSeam_SponsonL", (-0.68, 0.92, 0.88), (-0.68, -0.92, 0.88)),
+            ("Armor_WeldSeam_SponsonR", (0.68, 0.92, 0.88), (0.68, -0.92, 0.88)),
+            ("Armor_WeldSeam_Glacis", (-0.54, 1.16, 0.76), (0.54, 1.16, 0.76)),
+        ],
+    },
+    "SandlanceScout": {
+        "commander_sight": ((0.26, -0.18, 1.38), (0.22, 0.22, 0.24)),
+        "stowage_basket": ((0.0, -0.86, 1.14), (0.86, 0.30, 0.18)),
+        "glacis_rib": ((0.0, 0.98, 0.74), 1.04, 0.06, 0.05, 24.0),
+        "greeble_vents": (2.10, 1.56, 0.86, (0.0, -0.22, 0.0)),
+        "weld_seams": [
+            ("Armor_WeldSeam_HullL", (-0.66, 0.84, 0.84), (-0.66, -0.84, 0.84)),
+            ("Armor_WeldSeam_HullR", (0.66, 0.84, 0.84), (0.66, -0.84, 0.84)),
+            ("Armor_WeldSeam_Glacis", (-0.52, 1.04, 0.72), (0.52, 1.04, 0.72)),
+        ],
+    },
+    "FieldMedicRover": {
+        "nanite_dispenser": ((0.0, -0.48, 1.18), 0.55, 0.10, 0.32, 1.12),
+        "commander_sight": ((0.0, 0.42, 1.48), (0.22, 0.22, 0.24)),
+        "glacis_rib": ((0.0, 1.24, 0.82), 1.08, 0.06, 0.05, 20.0),
+        "greeble_vents": (2.20, 1.62, 0.98, (0.0, -0.20, 0.0)),
+        "weld_seams": [
+            ("Armor_WeldSeam_CabinL", (-0.68, 0.88, 0.98), (-0.68, -0.96, 0.98)),
+            ("Armor_WeldSeam_CabinR", (0.68, 0.88, 0.98), (0.68, -0.96, 0.98)),
+            ("Armor_WeldSeam_Nose", (-0.52, 1.28, 0.84), (0.52, 1.28, 0.84)),
+        ],
+    },
+    "OverlordCommandHQ": {
+        "commander_sight": ((-0.34, 0.28, 1.88), (0.26, 0.26, 0.28)),
+        "stowage_basket": ((0.0, -1.62, 1.34), (1.06, 0.36, 0.22)),
+        "radiators": (3.20, 1.92, 1.14, 6),
+        "cables": [
+            ("Armor_CommandUmbilical_L", (-0.72, -0.88, 1.28), (-0.48, 0.12, 1.64), 0.08, 0.024),
+            ("Armor_CommandUmbilical_R", (0.72, -0.88, 1.28), (0.48, 0.12, 1.64), 0.08, 0.024),
+        ],
+        "weld_seams": [
+            ("Armor_WeldSeam_CitadelL", (-0.82, 1.25, 1.18), (-0.82, -1.35, 1.18)),
+            ("Armor_WeldSeam_CitadelR", (0.82, 1.25, 1.18), (0.82, -1.35, 1.18)),
+            ("Armor_WeldSeam_Prow", (-0.66, 1.58, 1.04), (0.66, 1.58, 1.04)),
+        ],
+    },
+    "SkyguardSAM": {
+        "pistons": [
+            ("Turret_LauncherElevCylinder_L", (-0.38, -0.42, 1.18), (-0.38, 0.14, 1.68), 0.042, 0.026),
+            ("Turret_LauncherElevCylinder_R", (0.38, -0.42, 1.18), (0.38, 0.14, 1.68), 0.042, 0.026),
+        ],
+        "stowage_basket": ((0.0, -1.38, 1.12), (0.92, 0.32, 0.18)),
+        "greeble_vents": (2.40, 1.68, 0.96, (0.0, -0.25, 0.0)),
+        "weld_seams": [
+            ("Armor_WeldSeam_DeckL", (-0.72, 1.05, 0.94), (-0.72, -1.15, 0.94)),
+            ("Armor_WeldSeam_DeckR", (0.72, 1.05, 0.94), (0.72, -1.15, 0.94)),
+            ("Armor_WeldSeam_Glacis", (-0.56, 1.32, 0.84), (0.56, 1.32, 0.84)),
+        ],
+    },
+    "SalvageHauler": {
+        "pistons": [
+            ("Turret_CraneLiftCylinder_L", (-0.42, -0.18, 1.16), (-0.42, 0.42, 1.58), 0.044, 0.028),
+            ("Turret_CraneLiftCylinder_R", (0.42, -0.18, 1.16), (0.42, 0.42, 1.58), 0.044, 0.028),
+        ],
+        "cables": [
+            ("Turret_WinchHydraulicLine_L", (-0.58, -0.72, 1.12), (-0.46, 0.22, 1.44), 0.07, 0.024),
+            ("Turret_WinchHydraulicLine_R", (0.58, -0.72, 1.12), (0.46, 0.22, 1.44), 0.07, 0.024),
+        ],
+        "stowage_basket": ((0.0, -1.42, 1.14), (1.02, 0.34, 0.20)),
+        "weld_seams": [
+            ("Armor_WeldSeam_BedL", (-0.84, 1.10, 0.96), (-0.84, -1.20, 0.96)),
+            ("Armor_WeldSeam_BedR", (0.84, 1.10, 0.96), (0.84, -1.20, 0.96)),
+            ("Armor_WeldSeam_Bumper", (-0.64, 1.48, 0.82), (0.64, 1.48, 0.82)),
+        ],
+    },
+    "SentinelRelay": {
+        "pistons": [
+            ("Sensor_MastStayCylinder_L", (-0.42, -0.72, 1.14), (-0.12, -0.72, 1.68), 0.032, 0.020),
+            ("Sensor_MastStayCylinder_R", (0.42, -0.72, 1.14), (0.12, -0.72, 1.68), 0.032, 0.020),
+        ],
+        "cables": [
+            ("Sensor_WaveguideFeeder_L", (-0.36, -0.32, 1.16), (-0.10, -0.68, 1.58), 0.06, 0.020),
+            ("Sensor_WaveguideFeeder_R", (0.36, -0.32, 1.16), (0.10, -0.68, 1.58), 0.06, 0.020),
+        ],
+        "radiators": (2.10, 1.52, 0.96, 4),
+        "weld_seams": [
+            ("Armor_WeldSeam_BayL", (-0.56, 0.65, 0.96), (-0.56, -1.05, 0.96)),
+            ("Armor_WeldSeam_BayR", (0.56, 0.65, 0.96), (0.56, -1.05, 0.96)),
+            ("Armor_WeldSeam_Cowl", (-0.44, 0.78, 1.02), (0.44, 0.78, 1.02)),
+        ],
+    },
+    "CommandRelay": {
+        "pistons": [
+            ("CommsMast_MastElevStrut_L", (-0.44, -1.35, 1.24), (-0.18, -1.35, 1.78), 0.034, 0.022),
+            ("CommsMast_MastElevStrut_R", (0.44, -1.35, 1.24), (0.18, -1.35, 1.78), 0.034, 0.022),
+        ],
+        "cables": [
+            ("CommsMast_C2FeederConduit_L", (-0.48, -0.45, 1.28), (-0.24, -1.28, 1.64), 0.07, 0.022),
+            ("CommsMast_C2FeederConduit_R", (0.48, -0.45, 1.28), (0.24, -1.28, 1.64), 0.07, 0.022),
+        ],
+        "radiators": (2.50, 1.68, 1.04, 5),
+        "weld_seams": [
+            ("Armor_WeldSeam_ShelterL", (-0.64, 1.10, 1.02), (-0.64, -1.40, 1.02)),
+            ("Armor_WeldSeam_ShelterR", (0.64, 1.10, 1.02), (0.64, -1.40, 1.02)),
+            ("Armor_WeldSeam_CabFront", (-0.48, 1.48, 0.98), (0.48, 1.48, 0.98)),
+        ],
+    },
+    "ArachnidHexapod": {
+        "pistons": [
+            ("Piston_Quad_Coxa_FL", (-0.82, 0.72, 1.14), (-1.28, 1.02, 0.96), 0.036, 0.022),
+            ("Piston_Quad_Coxa_FR", (0.82, 0.72, 1.14), (1.28, 1.02, 0.96), 0.036, 0.022),
+            ("Piston_Quad_Coxa_ML", (-0.88, 0.00, 1.12), (-1.36, 0.00, 0.92), 0.036, 0.022),
+            ("Piston_Quad_Coxa_MR", (0.88, 0.00, 1.12), (1.36, 0.00, 0.92), 0.036, 0.022),
+            ("Piston_Quad_Coxa_RL", (-0.82, -0.72, 1.14), (-1.28, -1.02, 0.96), 0.036, 0.022),
+            ("Piston_Quad_Coxa_RR", (0.82, -0.72, 1.14), (1.28, -1.02, 0.96), 0.036, 0.022),
+        ],
+        "cables": [
+            ("Armor_BioPlasmaConduit_L", (-0.54, -0.68, 1.32), (-0.42, 0.62, 1.24), 0.07, 0.024),
+            ("Armor_BioPlasmaConduit_R", (0.54, -0.68, 1.32), (0.42, 0.62, 1.24), 0.07, 0.024),
+        ],
+        "weld_seams": [
+            ("Armor_WeldSeam_CarapaceL", (-0.68, 0.82, 1.26), (-0.68, -0.82, 1.26)),
+            ("Armor_WeldSeam_CarapaceR", (0.68, 0.82, 1.26), (0.68, -0.82, 1.26)),
+            ("Armor_WeldSeam_MandibleBridge", (-0.46, 0.96, 1.14), (0.46, 0.96, 1.14)),
+        ],
+    },
+}
+
+
+def apply_wave14_archetype_details(
+    unit_name: str,
+    objects: list | None = None,
+    materials: Mapping[str, object] | None = None,
+    object_prefix: str | None = None,
+) -> list:
+    """Add Wave 14 archetype-specific mechanical engineering assemblies to non-flagship units."""
+    if unit_name not in ACTIVE_UNIT_WAVE14_ARCHETYPE_PROFILES:
+        return []
+    profile = ACTIVE_UNIT_WAVE14_ARCHETYPE_PROFILES[unit_name]
+    prefix = object_prefix or unit_name
+    armor = _resolve_material(materials, "armor", (0.18, 0.24, 0.28))
+    gunmetal = _resolve_material(materials, "gunmetal", (0.07, 0.09, 0.11))
+    warning = _resolve_material(materials, "warning", (0.85, 0.28, 0.04))
+    tread = _resolve_material(materials, "tread", (0.035, 0.04, 0.045))
+    result = []
+
+    for suffix, start_pt, end_pt, outer_r, inner_r in profile.get("pistons", []):
+        if not _has_object(prefix, suffix):
+            result.extend(rmk.make_telescopic_piston_assembly(
+                f"{prefix}{suffix}",
+                start_point=start_pt,
+                end_point=end_pt,
+                outer_radius=float(outer_r),
+                inner_radius=float(inner_r),
+                stroke_ratio=0.55,
+                housing_mat=gunmetal,
+                rod_mat=armor,
+                seal_mat=tread,
+                accent_mat=warning,
+            ))
+
+    for suffix, start_pt, end_pt, width, thickness, sag, bow in profile.get("ammo_chutes", []):
+        if not _has_object(prefix, suffix):
+            result.extend(rmk.make_ammo_belt_chute_assembly(
+                f"{prefix}{suffix}",
+                start_point=start_pt,
+                end_point=end_pt,
+                chute_width=float(width),
+                chute_thickness=float(thickness),
+                sag=float(sag),
+                lateral_bow=float(bow),
+                link_count=7,
+                hopper_mat=armor,
+                chute_mat=gunmetal,
+                brass_mat=warning,
+            ))
+
+    for suffix, start_pt, end_pt, sag, radius in profile.get("cables", []):
+        if not _has_object(prefix, suffix):
+            result.extend(rmk.make_catenary_cable_assembly(
+                f"{prefix}{suffix}",
+                start_point=start_pt,
+                end_point=end_pt,
+                sag=float(sag),
+                radius=float(radius),
+                segments=8,
+                sides=8,
+                clamp_count=2,
+                hose_mat=tread,
+                coupler_mat=gunmetal,
+                accent_mat=warning,
+            ))
+
+    greeble_cfg = profile.get("greeble_vents")
+    if greeble_cfg is not None and not _has_object(prefix, "Greeble_LouverVent_"):
+        h_len, h_wid, d_z, d_center = greeble_cfg
+        result.extend(rmk.make_bmesh_hull_greebles(
+            prefix,
+            hull_length=float(h_len),
+            hull_width=float(h_wid),
+            deck_z=float(d_z),
+            deck_center=d_center,
+            armor_mat=armor,
+            metal_mat=gunmetal,
+            accent_mat=warning,
+            include_lugs=False,
+            include_vents=True,
+        ))
+
+    rad_cfg = profile.get("radiators")
+    if rad_cfg is not None and not _has_object(prefix, "Thermal_RadiatorShroud_"):
+        h_len, h_wid, d_z, f_cnt = rad_cfg
+        result.extend(rmk.make_thermal_radiator_assembly(
+            f"{prefix}Thermal",
+            hull_length=float(h_len),
+            hull_width=float(h_wid),
+            deck_z=float(d_z),
+            fin_count=int(f_cnt),
+            housing_mat=armor,
+            fin_mat=gunmetal,
+            glow_mat=warning,
+            pipe_mat=gunmetal,
+        ))
+
+    spade_cfg = profile.get("earth_spade")
+    if spade_cfg is not None and not _has_object(prefix, "Chassis_RecoilSpade_"):
+        loc, sp_w, sp_d = spade_cfg
+        result.extend(rmk.make_recoil_earth_spade_assembly(
+            f"{prefix}Chassis_RecoilSpade",
+            location=loc,
+            width=float(sp_w),
+            depth=float(sp_d),
+            deployed=False,
+            blade_mat=armor,
+            strut_mat=gunmetal,
+            ram_mat=gunmetal,
+            rod_mat=warning,
+        ))
+
+    sight_cfg = profile.get("commander_sight")
+    if sight_cfg is not None and not _has_object(prefix, "Sensor_PanoramicSight_"):
+        loc, sz = sight_cfg
+        result.extend(rmk.make_panoramic_commander_sight(
+            f"{prefix}Sensor_PanoramicSight",
+            location=loc,
+            size=sz,
+            armor_mat=armor,
+            lens_mat=warning,
+            metal_mat=gunmetal,
+        ))
+
+    basket_cfg = profile.get("stowage_basket")
+    if basket_cfg is not None and not _has_object(prefix, "Armor_StowageBasket_"):
+        loc, sz = basket_cfg
+        result.extend(rmk.make_bustle_stowage_basket(
+            f"{prefix}Armor_StowageBasket",
+            location=loc,
+            size=sz,
+            rail_radius=0.016,
+            frame_mat=gunmetal,
+            mesh_mat=armor,
+        ))
+
+    rib_cfg = profile.get("glacis_rib")
+    if rib_cfg is not None and not _has_object(prefix, "Armor_SplashRib_"):
+        loc, r_w, r_d, r_h, r_ang = rib_cfg
+        result.extend(rmk.make_glacis_splash_rib(
+            f"{prefix}Armor_SplashRib",
+            location=loc,
+            width=float(r_w),
+            depth=float(r_d),
+            height=float(r_h),
+            sweep_angle_deg=float(r_ang),
+            material=armor,
+        ))
+
+    nanite_cfg = profile.get("nanite_dispenser")
+    if nanite_cfg is not None and not _has_object(prefix, "Support_NaniteDispenser_"):
+        loc, sc, c_rad, c_h, sp_x = nanite_cfg
+        result.extend(rmk.make_nanite_repair_dispenser_assembly(
+            f"{prefix}Support_NaniteDispenser",
+            location=loc,
+            scale=float(sc),
+            canister_radius=float(c_rad),
+            canister_height=float(c_h),
+            spacing_x=float(sp_x),
+            canister_mat=armor,
+            frame_mat=gunmetal,
+            glow_mat=warning,
+            hose_mat=tread,
+        ))
+
+    if profile.get("bike_hardware") and not _has_object(prefix, "Chassis_BrakeRotor_"):
+        result.extend([
+            rmk.make_cylinder(
+                f"{prefix}Chassis_BrakeRotor_F", 0.16, 0.018,
+                (-0.08, 0.78, 0.36), gunmetal,
+                rotation=(0.0, math.radians(90.0), 0.0), vertices=14, bevel=0.003,
+            ),
+            rmk.make_cylinder(
+                f"{prefix}Chassis_BrakeRotor_R", 0.16, 0.018,
+                (0.08, -0.78, 0.36), gunmetal,
+                rotation=(0.0, math.radians(90.0), 0.0), vertices=14, bevel=0.003,
+            ),
+            rmk.make_box(
+                f"{prefix}Chassis_BrakeCaliper_F", (0.042, 0.085, 0.065),
+                (-0.09, 0.68, 0.44), warning, bevel=0.006,
+            ),
+            rmk.make_box(
+                f"{prefix}Chassis_BrakeCaliper_R", (0.042, 0.085, 0.065),
+                (0.09, -0.68, 0.44), warning, bevel=0.006,
+            ),
+            rmk.make_box(
+                f"{prefix}Chassis_ForkClamp_Upper", (0.36, 0.09, 0.036),
+                (0.0, 0.54, 0.84), armor, bevel=0.006,
+            ),
+            rmk.make_box(
+                f"{prefix}Chassis_ForkClamp_Lower", (0.36, 0.09, 0.036),
+                (0.0, 0.62, 0.68), armor, bevel=0.006,
+            ),
+        ])
+
+    if profile.get("hover_thrusters") and not _has_object(prefix, "Hover_ThrustShroud_"):
+        for side, tag in ((-1, "L"), (1, "R")):
+            sx = side * 0.58
+            result.extend([
+                rmk.make_box(
+                    f"{prefix}Hover_ThrustShroud_{tag}", (0.42, 0.32, 0.38),
+                    (sx, -1.92, 1.14), armor, bevel=0.018,
+                ),
+                rmk.make_box(
+                    f"{prefix}Hover_RudderVane_{tag}_Inner", (0.026, 0.28, 0.32),
+                    (sx - side * 0.08, -2.04, 1.14), gunmetal, bevel=0.004,
+                ),
+                rmk.make_box(
+                    f"{prefix}Hover_RudderVane_{tag}_Outer", (0.026, 0.28, 0.32),
+                    (sx + side * 0.08, -2.04, 1.14), gunmetal, bevel=0.004,
+                ),
+            ])
+
+    for seam_suffix, start_pt, end_pt in profile.get("weld_seams", []):
+        if not _has_object(prefix, seam_suffix):
+            result.append(rmk.make_weld_seam_bead(
+                f"{prefix}{seam_suffix}",
+                start=start_pt,
+                end=end_pt,
+                radius=0.015,
+                bead_spacing=0.048,
+                material=gunmetal,
+            ))
+
+    return result
+
+
 def apply_wave34_details(
     unit_name: str,
     objects: list | None = None,
@@ -837,11 +1354,18 @@ def apply_wave34_details(
         result.extend(_add_wave34_gussets(prefix, profile, armor))
     if unit_name in ACTIVE_UNIT_REALISM_PROFILES:
         result.extend(apply_realism_details(unit_name, objects=objects, materials=materials, object_prefix=object_prefix))
+    if unit_name in ACTIVE_UNIT_WAVE14_ARCHETYPE_PROFILES:
+        result.extend(apply_wave14_archetype_details(unit_name, objects=objects, materials=materials, object_prefix=object_prefix))
     return result
 
 
 def _has_object(prefix: str, suffix: str) -> bool:
-    return any(obj.name.startswith(prefix + suffix) for obj in bpy.context.scene.objects)
+    candidates = _candidate_prefixes(prefix)
+    return any(
+        obj.name.startswith(cand + suffix)
+        for cand in candidates
+        for obj in bpy.context.scene.objects
+    )
 
 
 def _resolve_material(materials: Mapping[str, object] | None, key: str, fallback_color: tuple[float, float, float]):
@@ -850,13 +1374,17 @@ def _resolve_material(materials: Mapping[str, object] | None, key: str, fallback
     tokens = {
         "armor": ("primaryarmor", "armor", "primary"),
         "gunmetal": ("gunmetal", "metal", "wheelrim", "rim"),
-        "warning": ("warning", "amber", "accent", "signal"),
-        "tread": ("tread", "rubber"),
+        "warning": ("warning", "amber", "accent", "signal", "orange", "hazard", "emissive"),
+        "tread": ("tread", "rubber", "tire", "gunmetal", "metal"),
     }[key]
-    for material in bpy.data.materials:
-        name = material.name.lower().replace("_", "")
-        if any(token in name for token in tokens):
-            return material
+    scene_mats = [m for m in bpy.data.materials if not m.name.endswith("AuthoringDetail") and not m.name.lower().startswith("preview")]
+    for token in tokens:
+        for material in scene_mats:
+            name = material.name.lower().replace("_", "")
+            if token in name:
+                return material
+    if scene_mats:
+        return scene_mats[0]
     return rmk.make_material(f"{key.title()}AuthoringDetail", fallback_color, metallic=0.55, roughness=0.42)
 
 

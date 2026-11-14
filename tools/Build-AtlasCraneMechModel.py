@@ -100,6 +100,30 @@ def build_model() -> None:
         if bpy.data.objects.get(socket_name) is None:
             raise ValueError(f"Expected existing canonical socket {socket_name} in authored source")
 
+    detail_objs = list(apply_wave2_details(
+        UNIT_NAME,
+        objects=meshes,
+        object_prefix="AtlasCraneMech",
+    ))
+    detail_objs.extend(apply_wave34_details(
+        UNIT_NAME,
+        objects=meshes + detail_objs,
+        object_prefix="AtlasCraneMech",
+    ))
+    for detail in detail_objs:
+        if detail.type == "MESH" and not detail.vertex_groups:
+            target_bone = "Bone_TurretYaw" if any(k in detail.name for k in ("AccessHatch", "TrunnionBracket", "Turret_")) else "Bone_Hull"
+            if target_bone not in armature.data.bones:
+                target_bone = "Bone_Hull"
+            vg = detail.vertex_groups.new(name=target_bone)
+            vg.add(list(range(len(detail.data.vertices))), 1.0, "REPLACE")
+            detail.parent = armature
+            mod = next((m for m in detail.modifiers if m.type == "ARMATURE"), None) or detail.modifiers.new(name="Armature", type="ARMATURE")
+            mod.object = armature
+        if detail not in meshes:
+            meshes.append(detail)
+    _validate_rigid_weights(meshes, armature)
+
     missing_vertex_color = [
         obj for obj in meshes
         if obj.type == "MESH" and obj.data.color_attributes.get("Color") is None
@@ -113,30 +137,6 @@ def build_model() -> None:
             muzzle_loc=socket_positions["Socket_MuzzlePrimary"],
             structural_wear_mask=True,
         )
-
-    detail_objs = list(apply_wave2_details(
-        UNIT_NAME,
-        objects=meshes,
-        object_prefix="AtlasCraneMech",
-    ))
-    detail_objs.extend(apply_wave34_details(
-        UNIT_NAME,
-        objects=meshes + detail_objs,
-        object_prefix="AtlasCraneMech",
-    ))
-    for detail in detail_objs:
-        if detail.type == "MESH" and not detail.vertex_groups:
-            target_bone = "Bone_TurretYaw" if any(k in detail.name for k in ("AccessHatch", "TrunnionBracket")) else "Bone_Hull"
-            if target_bone not in armature.data.bones:
-                target_bone = "Bone_Hull"
-            vg = detail.vertex_groups.new(name=target_bone)
-            vg.add(list(range(len(detail.data.vertices))), 1.0, "REPLACE")
-            detail.parent = armature
-            mod = next((m for m in detail.modifiers if m.type == "ARMATURE"), None) or detail.modifiers.new(name="Armature", type="ARMATURE")
-            mod.object = armature
-        if detail not in meshes:
-            meshes.append(detail)
-    _validate_rigid_weights(meshes, armature)
     create_canonical_hardpoint_sockets(UNIT_NAME)
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))

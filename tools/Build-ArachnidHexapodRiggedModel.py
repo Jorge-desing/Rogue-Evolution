@@ -11,6 +11,7 @@ import bpy
 import RogueModelKit as rmk
 from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
 from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 from mathutils import Vector
 
 UNIT_NAME = "ArachnidHexapod"
@@ -188,6 +189,8 @@ def build_arachnid_hexapod_rigged_model() -> None:
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
+    apply_wave2_details(UNIT_NAME)
+    apply_wave34_details(UNIT_NAME)
     meshes = [
         obj for obj in bpy.context.scene.objects
         if obj.type == "MESH" and not obj.name.lower().startswith("preview")

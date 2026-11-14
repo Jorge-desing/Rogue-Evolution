@@ -58,7 +58,7 @@ def parse_unity_build_log(
     fatal_lines = _unique(fatal_lines)
 
     success_marker = bool(
-        re.search(r"(?:SUCCESS! Built|TARGETED_[A-Z_]+_OK:|Built (?:seven|from|the) )", text)
+        re.search(r"(?:SUCCESS! Built|TARGETED_[A-Z_]+_OK:|Built (?:seven|from|the|\d+ visual-only modules)|Validated \d+ unit prefabs)", text)
     )
     batchmode_completed = (
         "Batchmode quit successfully" in text
@@ -168,7 +168,10 @@ def audit_build(log_path: Path, bundle_paths: list[Path]) -> dict[str, Any]:
     """Audit one Unity log and zero or more bundles."""
     if not log_path.is_file():
         raise FileNotFoundError(log_path)
-    from audit_unity_bundle import audit_bundle
+    try:
+        from tools.audit_unity_bundle import audit_bundle
+    except ImportError:
+        from audit_unity_bundle import audit_bundle
 
     bundle_reports: list[dict[str, Any]] = []
     for bundle_path in bundle_paths:

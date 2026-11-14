@@ -82,8 +82,6 @@ def build_model() -> None:
         fire_end_frame=15, death_end_frame=45,
     )
     _validate_root_motion(armature, actions["Walk"])
-    rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
-    _validate_rigid_weights(meshes, armature)
 
     socket_positions = {
         name: Vector(bpy.data.objects[name].location)
@@ -97,6 +95,19 @@ def build_model() -> None:
     for socket_name in socket_positions:
         if bpy.data.objects.get(socket_name) is None:
             raise ValueError(f"Expected existing canonical socket {socket_name} in authored source")
+
+    meshes.extend(apply_wave2_details(
+        UNIT_NAME,
+        objects=meshes,
+        object_prefix=UNIT_NAME,
+    ))
+    meshes.extend(apply_wave34_details(
+        UNIT_NAME,
+        objects=meshes,
+        object_prefix=UNIT_NAME,
+    ))
+    rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
+    _validate_rigid_weights(meshes, armature)
 
     missing_vertex_color = [
         obj for obj in meshes
@@ -112,17 +123,6 @@ def build_model() -> None:
             structural_wear_mask=True,
         )
 
-    meshes.extend(apply_wave2_details(
-        UNIT_NAME,
-        objects=meshes,
-        object_prefix="Bastion",
-    ))
-    meshes.extend(apply_wave34_details(
-        UNIT_NAME,
-        objects=meshes,
-        object_prefix="Bastion",
-    ))
-    rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
     create_canonical_hardpoint_sockets(UNIT_NAME)
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))

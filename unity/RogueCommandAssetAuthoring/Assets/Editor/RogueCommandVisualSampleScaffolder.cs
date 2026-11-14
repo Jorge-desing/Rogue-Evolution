@@ -424,6 +424,7 @@ namespace RogueCommandExpansion.Authoring
                         Transform modelTransform = GetUniqueNamedTransform(prefabContents, unitNames[i] + "Model", false);
                         GameObject modelObject = modelTransform != null ? modelTransform.gameObject : prefabContents;
                         int transformCountBefore = prefabContents.GetComponentsInChildren<Transform>(true).Length;
+                        bool materialUpdated = EnsureAllRenderersUsePrefabVertexWearMaterial(prefabContents);
                         VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, modelObject);
                         if (String.Equals(unitNames[i], "BulwarkSiegeTank", StringComparison.Ordinal))
                         {
@@ -433,7 +434,8 @@ namespace RogueCommandExpansion.Authoring
                             eraSocket.localScale = Vector3.one;
                         }
                         int transformCountAfter = prefabContents.GetComponentsInChildren<Transform>(true).Length;
-                        if (transformCountAfter != transformCountBefore ||
+                        if (materialUpdated ||
+                            transformCountAfter != transformCountBefore ||
                             String.Equals(unitNames[i], "BulwarkSiegeTank", StringComparison.Ordinal))
                         {
                             bool saved;
@@ -525,6 +527,71 @@ namespace RogueCommandExpansion.Authoring
                 seenPositions.Add(socket.localPosition);
             }
             Debug.Log("[CanonicalLevelOneVisuals] Validated " + prefabPath + ".");
+        }
+
+        private static bool EnsureAllRenderersUsePrefabVertexWearMaterial(GameObject prefab)
+        {
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            Material canonicalMat = null;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer r = renderers[i];
+                if (r == null || r is ParticleSystemRenderer ||
+                    r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    r.name.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                Material[] mats = r.sharedMaterials;
+                if (mats == null) continue;
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    if (mats[m] != null && mats[m].shader != null &&
+                        String.Equals(mats[m].shader.name, VertexWearShaderName, StringComparison.Ordinal))
+                    {
+                        canonicalMat = mats[m];
+                        break;
+                    }
+                }
+                if (canonicalMat != null) break;
+            }
+            if (canonicalMat == null) return false;
+
+            bool changed = false;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer r = renderers[i];
+                if (r == null || r is ParticleSystemRenderer ||
+                    r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    r.name.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                if (!(r is MeshRenderer) && !(r is SkinnedMeshRenderer)) continue;
+                Material[] mats = r.sharedMaterials;
+                if (mats == null || mats.Length == 0)
+                {
+                    r.sharedMaterials = new[] { canonicalMat };
+                    changed = true;
+                    continue;
+                }
+                bool slotChanged = false;
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    if (mats[m] == null || mats[m].shader == null ||
+                        !String.Equals(mats[m].shader.name, VertexWearShaderName, StringComparison.Ordinal))
+                    {
+                        mats[m] = canonicalMat;
+                        slotChanged = true;
+                    }
+                }
+                if (slotChanged)
+                {
+                    r.sharedMaterials = mats;
+                    changed = true;
+                }
+            }
+            return changed;
         }
 
         private static void ValidateLevelOnePbrAndLodContract(GameObject prefab, string prefabPath, string assetName)

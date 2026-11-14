@@ -18,6 +18,7 @@ from CanonicalUnitHardpoints import (
     create_canonical_hardpoint_sockets,
     get_canonical_hardpoint_socket_positions,
 )
+from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 from mathutils import Vector
 
 UNIT_NAME = "SandlanceScout"
@@ -66,6 +67,8 @@ def build_model():
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
+    apply_wave2_details(UNIT_NAME)
+    apply_wave34_details(UNIT_NAME)
     meshes = [
         obj for obj in bpy.context.scene.objects
         if obj.type == "MESH" and not obj.name.lower().startswith("preview")
