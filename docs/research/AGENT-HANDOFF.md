@@ -3,6 +3,10 @@
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
 
+## General capability audit — AI field repair
+
+- Support repair now assigns friendly targets with missing armor even at full health. Assignment excludes self and native hostile targets. The module retains its health threshold for health-based selection, range and assignment cap. Release build is local evidence. Resolve the active stage/module binding before any live acceptance.
+
 ## General capability audit — burning effects
 
 Turret tracking now treats Stun and critical damage independently. Repair restores the pre-damage pivot rotation. Reuse clears Stun presentation. Release build and deployment evidence are local; natural recovery in Steam remains unverified.

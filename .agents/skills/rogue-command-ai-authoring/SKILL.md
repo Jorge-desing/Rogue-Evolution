@@ -29,6 +29,8 @@ Use this skill when implementing an AI profile, adding a compiled module, or con
 
 ## 2. AI Layering & Decision Frameworks
 
+Support repair considers missing armor even when health is above the configured health threshold. Dispatch excludes the repairer itself and native hostile targets.
+
 1. **Decide** (FSM / Behavior Tree / Utility Scorer) $\rightarrow$ Intent & Target
 2. **Path** (NavMesh / Bounded A*) $\rightarrow$ Waypoints (timer-gated repaths, never every frame)
 3. **Steer** (`EntityController` movement forces) $\rightarrow$ Motion ($\Delta\text{pos} \cdot dt$)

@@ -188,6 +188,7 @@ namespace RogueCommandExpansionLoader.Modules
                     for (int j = 0; j < damagedCandidates.Count; j++)
                     {
                         EntityController target = damagedCandidates[j];
+                        if (target == repairer || repairer.IsEnemy(target)) continue;
                         int currentAssigned = 0;
                         assignedCounts.TryGetValue(target.UniqueEntityId, out currentAssigned);
                         if (currentAssigned >= _settings.MaxAssignedRepairersPerTarget)
@@ -275,7 +276,7 @@ namespace RogueCommandExpansionLoader.Modules
                 }
 
                 float healthRatio = candidate.CurrentHealth / candidate.MaxHealth;
-                return healthRatio < _settings.HealthThresholdRatio;
+                return healthRatio < _settings.HealthThresholdRatio || candidate.DeltaArmor > 0.01f;
             }
 
             public void OnDestroyed()
