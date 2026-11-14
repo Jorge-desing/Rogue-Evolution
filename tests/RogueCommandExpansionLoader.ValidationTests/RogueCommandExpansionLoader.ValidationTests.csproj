@@ -182,6 +182,8 @@
              Link="Runtime/RuntimeUnitAiBehaviorPolicy.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeFactionColorResolver.cs"
              Link="Runtime/Visual/RuntimeFactionColorResolver.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/WeaponShotFeedbackTracker.cs"
+             Link="Runtime/Visual/WeaponShotFeedbackTracker.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiUnitSnapshot.cs"
              Link="Runtime/Ai/AiUnitSnapshot.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiHazardZoneSnapshot.cs"

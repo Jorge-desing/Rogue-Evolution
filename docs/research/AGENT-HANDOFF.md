@@ -2,6 +2,12 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — first-shot visual feedback
+
+- Automatic weapon feedback now tracks initialization separately from the native negative idle shot timestamp. After bind captures the current clock, the first subsequent shot (including timestamp zero) triggers recoil/fire feedback. Pool reuse re-primes without replaying old shots; unchanged or invalid clocks do not trigger effects.
+- Native EntityAttack uses `_timeOfLastShot = float.MinValue`; rechecked pinned game version/SHA-256/MVID. Release/harness builds: zero warnings/errors. RuntimeAndDiagnostics: 224/228; first-shot, subsequent-shot, idle, invalid samples and reuse tracker cases pass. Full RuntimeVisualDirector is not compiled into the harness, so actual weapon animation/VFX remains build/static evidence pending Steam. The same four visual census failures remain; full suite is not green.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/first-shot-deployment/manifest.json`.
+
 ## General capability audit — native faction tint for masked visuals
 
 - RuntimeVisualDirector now resolves the native EntityFactory Player/Ai/AiBuilding resource material color into masked `_TeamColor` on initialization/reuse. Uses the shader's actual Color property `Color_72ECFA4B`, not stale `_BaseColor` data. Per-renderer blocks preserve shared materials; explicit non-white variant tints take precedence. White/reset restores faction tint. Neutral/unavailable material resources preserve authored baseline.

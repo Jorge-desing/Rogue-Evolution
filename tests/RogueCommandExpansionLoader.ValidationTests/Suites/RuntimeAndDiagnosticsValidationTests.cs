@@ -3361,6 +3361,19 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("native shot feedback includes the first shot after a negative idle clock and resets on reuse", () =>
+    {
+        var tracker = new WeaponShotFeedbackTracker();
+        if (tracker.Observe(float.MinValue) || tracker.Observe(float.MinValue))
+            throw new InvalidOperationException("An idle native shot clock generated firing feedback.");
+        if (!tracker.Observe(0f) || tracker.Observe(0f) || !tracker.Observe(1f))
+            throw new InvalidOperationException("First or subsequent shot did not produce exactly one feedback transition.");
+        tracker.Reset();
+        if (tracker.Observe(1f) || tracker.Observe(float.MinValue) || !tracker.Observe(0f))
+            throw new InvalidOperationException("Reuse replayed an old shot or lost the first shot of the next life.");
+        if (tracker.Observe(float.NaN) || tracker.Observe(float.PositiveInfinity) || tracker.Observe(0f))
+            throw new InvalidOperationException("Invalid samples corrupted the last real shot timestamp.");
+    }),
     ("faction tint resolves native player AI and AI-building materials without guessing neutral colors", () =>
     {
         var saved = new Dictionary<string, UnityEngine.Object>(Resources.LoadedResourcesForTest);

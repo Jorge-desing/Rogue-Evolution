@@ -148,7 +148,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private static FieldInfo _movementSoundAudioSourceField;
         private static FieldInfo _shotSoundAudioSourceField;
 
-        private float _lastShotTimestamp = -1f;
+        private WeaponShotFeedbackTracker _shotFeedbackTracker;
 
         public static void AttachIfApplicable(object entityObj)
         {
@@ -253,6 +253,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
 
             CacheReflectionAccess();
+            _shotFeedbackTracker.Reset();
+            UpdateAutomaticWeaponFeedback();
             _audioBindingStartedAt = Time.unscaledTime;
             RestorePrimaryVisualVariant();
             ApplyColorTintToRenderers(_activeColorTint ?? new Color(1f, 1f, 1f, 1f));
@@ -282,7 +284,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _deathVisualRetirementRemainingSeconds = 0f;
             _isMoving = false;
             _movementAnimationHoldRemainingSeconds = 0f;
-            _lastShotTimestamp = -1f;
+            _shotFeedbackTracker.Reset();
+            UpdateAutomaticWeaponFeedback();
             _lastVelocity = Vector3.zero;
             _lastAcceleration = Vector3.zero;
             _hasLastPosition = false;
@@ -939,13 +942,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 if (attackObj != null)
                 {
                     float shotTime = (float)_timeOfLastShotField.GetValue(attackObj);
-                    if (_lastShotTimestamp < 0f)
+                    if (_shotFeedbackTracker.Observe(shotTime))
                     {
-                        _lastShotTimestamp = shotTime;
-                    }
-                    else if (shotTime > _lastShotTimestamp)
-                    {
-                        _lastShotTimestamp = shotTime;
                         TriggerWeaponFeedback();
                     }
                 }
