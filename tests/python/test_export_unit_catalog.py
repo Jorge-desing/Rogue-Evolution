@@ -1,5 +1,6 @@
 """Tests del exportador de catálogo de unidades."""
 from __future__ import annotations
+import json
 import unittest
 from tests.python.helpers import load_tool_module
 
@@ -22,6 +23,7 @@ class ExportUnitCatalogTests(unittest.TestCase):
         report = EC.export_unit_catalog(pack)
         self.assertEqual(len(pack["units"]), report["unitCount"])
         self.assertTrue(all("id" in u for u in report["units"]))
+        json.dumps(report)
 
     def test_stage_mapping(self):
         pack = _valid_pack()
@@ -33,11 +35,6 @@ class ExportUnitCatalogTests(unittest.TestCase):
         entry = next(u for u in report["units"] if u["id"] == uid)
         self.assertIn("ns:stage-x", entry["stages"])
 
-    def test_json_serializable(self):
-        import json
-        pack = _valid_pack()
-        report = EC.export_unit_catalog(pack)
-        json.dumps(report)
 
 
 if __name__ == "__main__":

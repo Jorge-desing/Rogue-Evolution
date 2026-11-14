@@ -120,3 +120,5 @@ For registry tests, an exact ID-filtered entry lookup used to verify product map
 An earlier successful `row["unitId"]` value assertion already establishes the key exists in that same row; preserve its value check when removing the redundant membership check.
 
 The scaffold statistics localization and AI-module assertions share one `pack_stats` call on the same generated input; retain both independent output checks.
+
+Unit-catalog scaffold count and JSON-serializability checks share one exported report; keep both checks when consolidating their identical input scenario.

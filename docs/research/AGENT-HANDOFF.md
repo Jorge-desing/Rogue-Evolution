@@ -1,5 +1,9 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Unit catalog duplicate scenario
+
+- Consolidated `ExportUnitCatalogTests.test_json_serializable` into `test_counts_units`: both exported the same scaffold. Count, ID and JSON serialization checks remain. Isolated mock mutations to count and an unserializable report value both fail the retained test. Full before/after reports: `artifacts/test-dedup-current/after-stats.json` and `after-catalog.json`.
+
 ## 2026-11-13 Pack statistics scenario consolidation
 
 - Consolidated `ContentPackStatsTests.test_ai_modules_counted` into `test_localization_stats`, which already called `pack_stats` on the identical generated scaffold. All localization and module assertions remain. Isolated mock mutations of bilingual percentage and AI-module counts each fail the retained test. Full before/after reports: `artifacts/test-dedup-current/after-balance.json` and `after-stats.json`.
