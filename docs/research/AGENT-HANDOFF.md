@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Intermission reward automation
+
+- Added `diagnostics_get_intermission_reward_state` to the explicit read-only state-wait allowlist and schema. Agents can now wait directly for reward/deck postconditions with bounded `maxCards` and consecutive samples, including inside ordered sequences. No reward choice or route mutation is automated implicitly.
+- Runtime skill, automation/intermission references and Antigravity synchronized. Connected MCP schema exposes the new target. Regression covers bounded getter arguments, transient queue state and invalid argument rejection. Full Python acceptance: `artifacts/intermission-automation/full.json`; local validation only, no game run started.
+
 ## 2026-11-13 Stable observations for agent automation
 
 - `automation_wait_for_state` accepts optional `stableSamples` (1–8, default 1). Only consecutive matching reads satisfy the wait; mismatches reset the streak. Existing query errors, timeout and shared sequence budgets still stop execution. Responses expose the required samples and current streak. Sampling does not establish stability between reads.

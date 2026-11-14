@@ -32,3 +32,9 @@ Prefer purpose-built actions over UI clicks for gameplay controls. Use the UI en
 - If the native director cannot enter the requested node, or a transition stalls, stop at that boundary and report the observed state. Follow `docs/research/STEAM-RUNTIME-CONTROL.md` for any documented exceptional transition procedure; do not advance a saved route just to force a different stage/profile.
 
 Preserve the existing profile, save, and tutorial state. Any new-run QA must follow the cloned-profile procedure in `rogue-command-steam-runtime-validation` and the runtime runbook.
+
+## Wait for reward and deck postconditions
+
+Use `automation_wait_for_state` with `tool=diagnostics_get_intermission_reward_state` and bounded `arguments.maxCards` after an authorized reward action. Read the current reward report first and use its actual field paths and typed values in `expect`; field names in illustrative fixtures are not runtime contracts. Set `stableSamples=2` for asynchronous panel/queue transitions. The result retains only the latest report and matching streak.
+
+Verify the intended offered ID, queue transition or deck change rather than merely waiting for an Intermission scene. A failed query stops the wait; a missing field remains pending until timeout. Do not treat a missing/truncated card row as proof that an item was consumed. If the action was invoked with an unobserved effect, inspect fresh reward and native-panel state before deciding on any additional mutation. Waiting never chooses, skips, rerolls, buys or advances the route.

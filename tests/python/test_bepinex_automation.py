@@ -59,6 +59,17 @@ class StateWaitTests(unittest.TestCase):
             self.assertEqual("timeout", payload["reason"])
             self.assertEqual(2, payload["consecutiveMatches"])
 
+    def test_reward_wait_forwards_bounds_and_requires_stable_queue_state(self):
+        rows = [{"queue": {"remaining": 1}}, {"queue": {"remaining": 0}}, {"queue": {"remaining": 0}}]
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=[json.dumps(row) for row in rows]) as call:
+            response, payload = self.wait(tool="diagnostics_get_intermission_reward_state", arguments={"maxCards": 16}, expect=[{"path": "/queue/remaining", "equals": 0}], stableSamples=2, timeoutSeconds=2)
+            self.assertFalse(response.get("isError", False))
+            self.assertEqual(3, payload["attempts"])
+            self.assertEqual([mock.call("GetIntermissionRewardStateJson", [16])] * 3, call.call_args_list)
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as call:
+            self.assertTrue(self.wait(tool="diagnostics_get_intermission_reward_state", arguments={"maxCards": "16"})[0]["isError"])
+            call.assert_not_called()
+
     def test_missing_and_type_mismatch_timeout(self):
         for row in ({}, {"ready": 1}, {"ready": "true"}):
             with self.subTest(row=row), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(row)):

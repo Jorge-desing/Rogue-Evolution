@@ -55,7 +55,7 @@ Use the live index rather than treating this table as exhaustive. `diagnostics_g
 
 ## Agent automation
 
-Discover → observe → act → wait/verify → decide the next step. **Required:** Read [Automation](references/automation.md) before using sequences, state waits or recovery. Use `automation_wait_for_state` for bounded read-only conditions instead of fixed delays; use native action validation for every mutation. State waits can require `stableSamples` consecutive matches (1–8); choose multiple samples for transient UI readiness and inspect the returned streak on timeout. Session/lock tools coordinate cooperating agents only; advisory locks do not enforce exclusion.
+Discover → observe → act → wait/verify → decide the next step. **Required:** Read [Automation](references/automation.md) before using sequences, state waits or recovery. Use `automation_wait_for_state` for bounded read-only conditions instead of fixed delays; use native action validation for every mutation. Intermission reward/deck queries are permitted read-only state-wait targets; see the intermission reference for postcondition selection. State waits can require `stableSamples` consecutive matches (1–8); choose multiple samples for transient UI readiness and inspect the returned streak on timeout. Session/lock tools coordinate cooperating agents only; advisory locks do not enforce exclusion.
 
 ## Live runtime workflow
 

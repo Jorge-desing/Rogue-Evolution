@@ -860,6 +860,7 @@ WAIT_STATE_TOOLS = frozenset({
     "diagnostics_get_runtime_control_surface", "diagnostics_get_ui_accessibility_census",
     "diagnostics_get_intermission_native_panel_state", "diagnostics_get_intermission_census",
     "diagnostics_get_navigator_state", "diagnostics_get_game_time_scale",
+    "diagnostics_get_intermission_reward_state",
 })
 
 
