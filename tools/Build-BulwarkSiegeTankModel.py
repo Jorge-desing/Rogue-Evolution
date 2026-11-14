@@ -14,6 +14,7 @@ from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_detai
 from bulwark_radiator_vent_recipe import apply_bulwark_radiator_vent
 from bulwark_contact_repair_recipe import apply_bulwark_contact_repairs
 from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 
 UNIT_NAME = "BulwarkSiegeTank"
@@ -100,6 +101,7 @@ def build_bulwark_siege_tank_model() -> None:
     firepoint = bpy.data.objects.get("FirePoint_0")
     if firepoint is None or firepoint.type != "EMPTY" or firepoint.parent != bpy.data.objects.get("Socket_MuzzlePrimary"):
         raise ValueError("Existing FirePoint_0 must remain nested under Socket_MuzzlePrimary")
+    create_canonical_hardpoint_sockets(UNIT_NAME)
     sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
 
     # Backfill the RGBA vertex-wear contract (R cavity AO, G structural edge

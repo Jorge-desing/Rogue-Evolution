@@ -17,6 +17,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 import RogueModelKit as rmk
 from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
@@ -122,6 +123,7 @@ def build_model() -> None:
         object_prefix="Bastion",
     ))
     rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
+    create_canonical_hardpoint_sockets(UNIT_NAME)
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 
@@ -132,6 +134,7 @@ def build_model() -> None:
     rmk.create_single_material_atlas_model(
         batched_meshes, prefix=UNIT_NAME, texture_maps=atlas_maps, output_fbx_path=ATLAS_FBX_PATH,
     )
+    create_canonical_hardpoint_sockets(UNIT_NAME)
     sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
     rmk.export_unity_fbx(
         FBX_PATH, list(batched_meshes) + [armature] + sockets,

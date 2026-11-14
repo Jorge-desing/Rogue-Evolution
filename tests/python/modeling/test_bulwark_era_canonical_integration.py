@@ -27,7 +27,7 @@ CURRENT_BULWARK_FBX = (
     REPO_ROOT
     / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx"
 )
-CURRENT_BULWARK_FBX_SHA256 = "039dd86280858c351ea76fd09b43088a7cff129d64b47055d5d60fb521c56cbb"
+CURRENT_BULWARK_FBX_SHA256 = "7a7bbf693bf63b8cb131d1c428b466f3f5dfa5a6d68502f89a0f1c2be2d809e5"
 
 
 class BulwarkEraCanonicalIntegrationTests(unittest.TestCase):

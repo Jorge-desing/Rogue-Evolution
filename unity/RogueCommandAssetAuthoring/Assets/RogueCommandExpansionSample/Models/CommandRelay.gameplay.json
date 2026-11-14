@@ -12,7 +12,7 @@
       1.561
     ],
     "size": [
-      2.424,
+      2.314,
       3.98,
       3.122
     ]
@@ -177,8 +177,8 @@
     "Socket_Hardpoint_ERA": {
       "position": [
         0.0,
-        0.55,
-        1.42
+        1.15,
+        1.22
       ],
       "forward": [
         0.0,
@@ -188,9 +188,9 @@
     },
     "Socket_Hardpoint_APS": {
       "position": [
-        0.35,
-        -0.2,
-        1.72
+        0.42,
+        -0.25,
+        2.02
       ],
       "forward": [
         0.0,
@@ -200,9 +200,9 @@
     },
     "Socket_Hardpoint_Sponsons": {
       "position": [
-        0.95,
-        0.0,
-        0.45
+        1.06,
+        -0.15,
+        0.82
       ],
       "forward": [
         0.0,
@@ -212,9 +212,9 @@
     },
     "Socket_Hardpoint_FuelDrums": {
       "position": [
-        0.0,
-        -1.25,
-        0.4
+        0.76,
+        -1.58,
+        0.78
       ],
       "forward": [
         0.0,

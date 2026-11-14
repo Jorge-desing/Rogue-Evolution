@@ -128,11 +128,13 @@ class IroncladWalkerAssetContractTests(unittest.TestCase):
 
     def test_ironclad_batch_materials_have_no_null_pbr_texture_bindings(self) -> None:
         materials = [material for material in self.bundle["materials"] if material["name"].startswith("Ironclad")]
-        self.assertEqual(len(materials), 5)
-        for material in materials:
-            with self.subTest(material=material["name"]):
-                texture_bindings = {entry["property"]: entry["path_id"] for entry in material["textures"]}
-                self.assertEqual(texture_bindings.get("_BaseMap"), 0)
+        self.assertEqual(len(materials), 1)
+        material = materials[0]
+        self.assertEqual(material["name"], "IroncladWalker_PBR")
+        texture_bindings = {entry["property"]: entry["path_id"] for entry in material["textures"]}
+        for required_prop in ("_BaseMap", "_MetallicGlossMap", "_BumpMap", "_EmissionMap", "_DetailBumpMap"):
+            with self.subTest(property=required_prop):
+                self.assertNotEqual(texture_bindings.get(required_prop, 0), 0)
 
     def test_shader_base_color_multiplies_vertex_color(self) -> None:
         shader = SHADER_PATH.read_text(encoding="utf-8")

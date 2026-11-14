@@ -97,8 +97,13 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
             "ArachnidHexapodJoint_MidKneeAxle_R": "Bone_Shin_MR",
         }
         temporary_objects = []
+        stashed_originals = []
         try:
-            for name in expected:
+            for idx, name in enumerate(expected):
+                existing = bpy.data.objects.get(name)
+                if existing is not None:
+                    existing.name = f"__rig_test_stash_{idx}_{name}"
+                    stashed_originals.append((existing, name))
                 mesh = bpy.data.meshes.new(name + "_Mesh")
                 mesh.from_pydata(
                     ((0.0, 0.0, 0.0), (0.05, 0.0, 0.0), (0.0, 0.05, 0.0)),
@@ -128,6 +133,8 @@ class ArachnidHexapodBlenderRigContractTests(unittest.TestCase):
                 bpy.data.objects.remove(obj, do_unlink=True)
                 if mesh.users == 0:
                     bpy.data.meshes.remove(mesh)
+            for existing, original_name in stashed_originals:
+                existing.name = original_name
 
     def test_leg_attachments_do_not_bind_to_idle_hull(self) -> None:
         """Leg hardware must not inherit the hull's stationary breathing curve."""

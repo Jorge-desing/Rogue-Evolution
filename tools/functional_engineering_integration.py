@@ -641,7 +641,62 @@ def postprocess_level1_atlas_maps(
         for key in sorted(modified_bpy_keys):
             img = bpy_images.get(key)
             if img is not None:
-                img.save()
+                try:
+                    img.save()
+                except RuntimeError:
+                    target_path = Path(maps[key]) if maps and key in maps else Path(img.filepath_raw or img.filepath)
+                    if not str(target_path):
+                        raise
+                    import os
+                    import struct
+                    import threading
+                    import time
+                    import zlib
+
+                    w, h = int(img.size[0]), int(img.size[1])
+                    buf = np.empty(w * h * 4, dtype=np.float32)
+                    img.pixels.foreach_get(buf)
+                    rgba = np.clip(np.round(np.flipud(buf.reshape(h, w, 4)) * 255.0), 0, 255).astype(np.uint8)
+                    keep_alpha = key in {"Metallic", "MetallicGloss", "Roughness"}
+                    tmp_path = target_path.with_name(f"{target_path.stem}.{os.getpid()}.{threading.get_ident()}.tmp.png")
+                    try:
+                        if Image is not None:
+                            mode = "RGBA" if keep_alpha else "RGB"
+                            arr = rgba if keep_alpha else rgba[..., :3]
+                            Image.fromarray(arr, mode).save(tmp_path, format="PNG", compress_level=compress_level)
+                        else:
+                            channels = 4 if keep_alpha else 3
+                            color_type = 6 if keep_alpha else 2
+                            arr = rgba if keep_alpha else np.ascontiguousarray(rgba[..., :3])
+                            rows = np.concatenate(
+                                [np.zeros((h, 1), dtype=np.uint8), arr.reshape(h, w * channels)],
+                                axis=1,
+                            )
+                            raw = zlib.compress(rows.tobytes(), level=max(0, min(9, int(compress_level))))
+
+                            def _chunk(tag: bytes, payload: bytes) -> bytes:
+                                crc = zlib.crc32(tag)
+                                crc = zlib.crc32(payload, crc) & 0xFFFFFFFF
+                                return struct.pack(">I", len(payload)) + tag + payload + struct.pack(">I", crc)
+
+                            ihdr = struct.pack(">IIBBBBB", w, h, 8, color_type, 0, 0, 0)
+                            png_bytes = b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", raw) + _chunk(b"IEND", b"")
+                            tmp_path.write_bytes(png_bytes)
+
+                        for attempt in range(5):
+                            try:
+                                os.replace(tmp_path, target_path)
+                                break
+                            except PermissionError:
+                                if attempt == 4:
+                                    raise
+                                time.sleep(0.05 * (attempt + 1))
+                    finally:
+                        if tmp_path.exists():
+                            try:
+                                tmp_path.unlink()
+                            except OSError:
+                                pass
 
     return {
         "dilationApplied": dilation_applied,

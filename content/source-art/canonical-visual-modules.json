@@ -37,11 +37,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 32,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 2384,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5314,
-        "meanAcmrAfter": 0.5314,
+        "meanAcmrBefore": 0.5309,
+        "meanAcmrAfter": 0.5309,
         "objects": [
           {
             "objectName": "RCLModule_scout_tank_gunmetal_chassis_era_Batch_RCLModuleMateri",
@@ -49,8 +54,8 @@
             "triangleCount": 2000,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.542,
-            "acmrAfter": 0.542,
+            "acmrBefore": 0.541,
+            "acmrAfter": 0.541,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -79,7 +84,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -126,11 +137,16 @@
       "meshQuality": {
         "role": "fuel_jerrycan_carrier",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 38,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 2848,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5444,
-        "meanAcmrAfter": 0.5444,
+        "meanAcmrBefore": 0.5447,
+        "meanAcmrAfter": 0.5447,
         "objects": [
           {
             "objectName": "RCLModule_scout_tank_gunmetal_chassis_fueldrums_Batch_RCLModule",
@@ -138,8 +154,8 @@
             "triangleCount": 2628,
             "degenerateTriangles": 32,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5422,
-            "acmrAfter": 0.5422,
+            "acmrBefore": 0.543,
+            "acmrAfter": 0.543,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -186,7 +202,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "fuel_jerrycan_carrier"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -233,11 +255,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 32,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 2384,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5307,
-        "meanAcmrAfter": 0.5307,
+        "meanAcmrBefore": 0.5312,
+        "meanAcmrAfter": 0.5312,
         "objects": [
           {
             "objectName": "RCLModule_scout_tank_desert_camo_era_Batch_RCLModuleMaterial__d",
@@ -245,8 +272,8 @@
             "triangleCount": 2000,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5405,
-            "acmrAfter": 0.5405,
+            "acmrBefore": 0.5415,
+            "acmrAfter": 0.5415,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -275,7 +302,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -321,7 +354,14 @@
       "texturePrefix": "RCLModule_desert_camo",
       "meshQuality": {
         "role": "auxiliary_power_generator",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_scout_tank_desert_camo_sponsons_CowlBody"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 1,
+          "primary_faceted": 7,
+          "secondary_mechanism": 11
+        },
         "objectCount": 2,
         "totalTriangles": 1444,
         "maxNonManifoldEdges": 0,
@@ -341,7 +381,7 @@
               "rMin": 0.25,
               "rMax": 0.571,
               "gMax": 0.753,
-              "bMax": 0.223,
+              "bMax": 0.209,
               "aMin": 0.0,
               "aMax": 0.0
             }
@@ -358,13 +398,25 @@
             "vertexWearRgba": {
               "rMin": 0.25,
               "rMax": 0.571,
-              "gMax": 0.753,
-              "bMax": 0.198,
+              "gMax": 0.799,
+              "bMax": 0.195,
               "aMin": 1.0,
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.5,
+          "exhaust_locs": [
+            [
+              0.029529845342040062,
+              -0.32934635877609253,
+              0.008500004187226295
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "auxiliary_power_generator"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -411,11 +463,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 42,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 2672,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5437,
-        "meanAcmrAfter": 0.5437,
+        "meanAcmrBefore": 0.5444,
+        "meanAcmrAfter": 0.5444,
         "objects": [
           {
             "objectName": "RCLModule_scout_tank_longshot_sniper_camo_era_Batch_RCLModuleMa",
@@ -423,8 +480,8 @@
             "triangleCount": 2188,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.542,
-            "acmrAfter": 0.542,
+            "acmrBefore": 0.5434,
+            "acmrAfter": 0.5434,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.246,
@@ -453,7 +510,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -499,7 +562,15 @@
       "texturePrefix": "RCLModule_longshot_sniper_camo",
       "meshQuality": {
         "role": "aps_sensor_suite",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_scout_tank_longshot_sniper_camo_aps_RadomeGasket_v2",
+          "RCLModule_scout_tank_longshot_sniper_camo_aps_RadomeLiftingEye"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 2,
+          "primary_faceted": 8,
+          "secondary_mechanism": 23
+        },
         "objectCount": 3,
         "totalTriangles": 3112,
         "maxNonManifoldEdges": 0,
@@ -560,7 +631,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "aps_sensor_suite"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -607,6 +684,11 @@
       "meshQuality": {
         "role": "heavy_flak_battery",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 6,
+          "secondary_mechanism": 19
+        },
         "objectCount": 3,
         "totalTriangles": 2480,
         "maxNonManifoldEdges": 0,
@@ -667,7 +749,17 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.62,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            0.1604999997653067,
+            0.6278918478637934,
+            0.15151366591453552
+          ],
+          "role": "heavy_flak_battery"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -714,11 +806,16 @@
       "meshQuality": {
         "role": "excavation_drill",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 9,
+          "secondary_mechanism": 31
+        },
         "objectCount": 3,
         "totalTriangles": 2400,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5463,
-        "meanAcmrAfter": 0.5463,
+        "meanAcmrBefore": 0.5471,
+        "meanAcmrAfter": 0.5471,
         "objects": [
           {
             "objectName": "RCLModule_heavy_artillery_subterranean_mole_borer_Batch_RCLModu",
@@ -726,8 +823,8 @@
             "triangleCount": 1684,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.538,
-            "acmrAfter": 0.538,
+            "acmrBefore": 0.5404,
+            "acmrAfter": 0.5404,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -774,7 +871,17 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.35,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            0.0,
+            2.2351741790771484e-08,
+            0.0045000058598816395
+          ],
+          "role": "excavation_drill"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -821,11 +928,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 41,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 2588,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5466,
-        "meanAcmrAfter": 0.5466,
+        "meanAcmrBefore": 0.548,
+        "meanAcmrAfter": 0.548,
         "objects": [
           {
             "objectName": "RCLModule_heavy_artillery_martian_iron_rust_era_Batch_RCLModule",
@@ -833,8 +945,8 @@
             "triangleCount": 1484,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5458,
-            "acmrAfter": 0.5458,
+            "acmrBefore": 0.5465,
+            "acmrAfter": 0.5465,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -851,8 +963,8 @@
             "triangleCount": 576,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5486,
-            "acmrAfter": 0.5486,
+            "acmrBefore": 0.5521,
+            "acmrAfter": 0.5521,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.223,
@@ -881,7 +993,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -928,11 +1046,16 @@
       "meshQuality": {
         "role": "recoil_anchor",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 1,
+          "secondary_mechanism": 9
+        },
         "objectCount": 3,
         "totalTriangles": 844,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5494,
-        "meanAcmrAfter": 0.5494,
+        "meanAcmrBefore": 0.5488,
+        "meanAcmrAfter": 0.5488,
         "objects": [
           {
             "objectName": "RCLModule_heavy_artillery_martian_iron_rust_sponsons_Batch_RCLM",
@@ -958,8 +1081,8 @@
             "triangleCount": 544,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5441,
-            "acmrAfter": 0.5441,
+            "acmrBefore": 0.5423,
+            "acmrAfter": 0.5423,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -988,7 +1111,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "recoil_anchor"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1035,11 +1164,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 32,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 2384,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5307,
-        "meanAcmrAfter": 0.5307,
+        "meanAcmrBefore": 0.5312,
+        "meanAcmrAfter": 0.5312,
         "objects": [
           {
             "objectName": "RCLModule_heavy_artillery_battleship_tungsten_era_Batch_RCLModu",
@@ -1047,8 +1181,8 @@
             "triangleCount": 2000,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5405,
-            "acmrAfter": 0.5405,
+            "acmrBefore": 0.5415,
+            "acmrAfter": 0.5415,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -1077,7 +1211,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1124,6 +1264,11 @@
       "meshQuality": {
         "role": "heavy_flak_battery",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 2,
+          "secondary_mechanism": 16
+        },
         "objectCount": 3,
         "totalTriangles": 1656,
         "maxNonManifoldEdges": 0,
@@ -1184,7 +1329,17 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.62,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            0.14499999675899744,
+            0.6037257183343172,
+            0.1435021199285984
+          ],
+          "role": "heavy_flak_battery"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1231,11 +1386,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 42,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 3360,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5369,
-        "meanAcmrAfter": 0.5369,
+        "meanAcmrBefore": 0.535,
+        "meanAcmrAfter": 0.535,
         "objects": [
           {
             "objectName": "RCLModule_assault_walker_plasma_cinder_ablative_era_Batch_RCLMo",
@@ -1243,8 +1403,8 @@
             "triangleCount": 1120,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5393,
-            "acmrAfter": 0.5393,
+            "acmrBefore": 0.5348,
+            "acmrAfter": 0.5348,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -1261,8 +1421,8 @@
             "triangleCount": 952,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5326,
-            "acmrAfter": 0.5326,
+            "acmrBefore": 0.5336,
+            "acmrAfter": 0.5336,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.275,
@@ -1279,8 +1439,8 @@
             "triangleCount": 1288,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5388,
-            "acmrAfter": 0.5388,
+            "acmrBefore": 0.5365,
+            "acmrAfter": 0.5365,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.323,
@@ -1291,7 +1451,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1338,11 +1504,16 @@
       "meshQuality": {
         "role": "excavation_drill",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 10
+        },
         "objectCount": 3,
         "totalTriangles": 1300,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5537,
-        "meanAcmrAfter": 0.5537,
+        "meanAcmrBefore": 0.5575,
+        "meanAcmrAfter": 0.5575,
         "objects": [
           {
             "objectName": "RCLModule_assault_walker_plasma_cinder_ablative_sponsons_Batch_",
@@ -1350,8 +1521,8 @@
             "triangleCount": 352,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5426,
-            "acmrAfter": 0.5426,
+            "acmrBefore": 0.554,
+            "acmrAfter": 0.554,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -1398,7 +1569,17 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.35,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            0.0,
+            2.2351741790771484e-08,
+            0.0
+          ],
+          "role": "excavation_drill"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1445,11 +1626,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 41,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 2588,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5466,
-        "meanAcmrAfter": 0.5466,
+        "meanAcmrBefore": 0.548,
+        "meanAcmrAfter": 0.548,
         "objects": [
           {
             "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_era_Batch_RCLM",
@@ -1457,8 +1643,8 @@
             "triangleCount": 1484,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5458,
-            "acmrAfter": 0.5458,
+            "acmrBefore": 0.5465,
+            "acmrAfter": 0.5465,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -1475,8 +1661,8 @@
             "triangleCount": 576,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5486,
-            "acmrAfter": 0.5486,
+            "acmrBefore": 0.5521,
+            "acmrAfter": 0.5521,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.223,
@@ -1505,7 +1691,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1551,12 +1743,38 @@
       "texturePrefix": "RCLModule_orbital_drop_pod_cermet",
       "meshQuality": {
         "role": "aps_phase_shield",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_InterfaceB",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_IsolatorSt",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_IsolatorS",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_Isolator",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_Isolato",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_StealthNac",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_StealthChe",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_StealthCh",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_FocusingLe",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_FieldStabi",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_FieldStab",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_FieldSta",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_MagneticCo",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_MagneticC",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_PowerCondu",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_ConduitFit",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_CryoLine_L",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_PowerCond",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_ConduitFi",
+          "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_CryoLine_R"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 20,
+          "primary_faceted": 4,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 2528,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5446,
-        "meanAcmrAfter": 0.5446,
+        "meanAcmrBefore": 0.5477,
+        "meanAcmrAfter": 0.5477,
         "objects": [
           {
             "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_Batch_RCLM",
@@ -1564,13 +1782,13 @@
             "triangleCount": 1388,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5432,
-            "acmrAfter": 0.5432,
+            "acmrBefore": 0.5403,
+            "acmrAfter": 0.5403,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
               "rMax": 0.584,
-              "gMax": 0.839,
+              "gMax": 1.0,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
@@ -1580,15 +1798,15 @@
             "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_Batch_RCL",
             "formClass": "primary_cast",
             "triangleCount": 652,
-            "degenerateTriangles": 32,
+            "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5475,
-            "acmrAfter": 0.5475,
+            "acmrBefore": 0.5598,
+            "acmrAfter": 0.5598,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.27,
-              "rMax": 0.584,
-              "gMax": 0.863,
+              "rMin": 0.22,
+              "rMax": 0.591,
+              "gMax": 1.0,
               "bMax": 0.0,
               "aMin": 1.0,
               "aMax": 1.0
@@ -1606,13 +1824,19 @@
             "vertexWearRgba": {
               "rMin": 0.309,
               "rMax": 0.546,
-              "gMax": 0.753,
+              "gMax": 0.896,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "aps_phase_shield"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1659,6 +1883,11 @@
       "meshQuality": {
         "role": "docking_clamp",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 1,
+          "secondary_mechanism": 20
+        },
         "objectCount": 3,
         "totalTriangles": 2008,
         "maxNonManifoldEdges": 0,
@@ -1719,7 +1948,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "docking_clamp"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1766,11 +2001,16 @@
       "meshQuality": {
         "role": "aps_sensor_suite",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 33
+        },
         "objectCount": 3,
         "totalTriangles": 2756,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.541,
-        "meanAcmrAfter": 0.541,
+        "meanAcmrBefore": 0.5422,
+        "meanAcmrAfter": 0.5422,
         "objects": [
           {
             "objectName": "RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_ap",
@@ -1778,8 +2018,8 @@
             "triangleCount": 2540,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5484,
-            "acmrAfter": 0.5484,
+            "acmrBefore": 0.552,
+            "acmrAfter": 0.552,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -1826,7 +2066,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "aps_sensor_suite"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1873,11 +2119,16 @@
       "meshQuality": {
         "role": "thermal_radiator",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 124
+        },
         "objectCount": 2,
         "totalTriangles": 8284,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.4928,
-        "meanAcmrAfter": 0.4928,
+        "meanAcmrBefore": 0.4925,
+        "meanAcmrAfter": 0.4925,
         "objects": [
           {
             "objectName": "RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_sp",
@@ -1903,8 +2154,8 @@
             "triangleCount": 8076,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5336,
-            "acmrAfter": 0.5336,
+            "acmrBefore": 0.5331,
+            "acmrAfter": 0.5331,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -1915,7 +2166,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.38,
+          "exhaust_locs": [
+            [
+              0.013055048882961273,
+              -0.05472498945891857,
+              0.14310203935019672
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "thermal_radiator"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -1962,11 +2225,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 42,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 3360,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5369,
-        "meanAcmrAfter": 0.5369,
+        "meanAcmrBefore": 0.535,
+        "meanAcmrAfter": 0.535,
         "objects": [
           {
             "objectName": "RCLModule_bastion_siege_mech_cryo_glacier_camo_era_Batch_RCLMod",
@@ -1974,8 +2242,8 @@
             "triangleCount": 1120,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5393,
-            "acmrAfter": 0.5393,
+            "acmrBefore": 0.5348,
+            "acmrAfter": 0.5348,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -1992,8 +2260,8 @@
             "triangleCount": 952,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5326,
-            "acmrAfter": 0.5326,
+            "acmrBefore": 0.5336,
+            "acmrAfter": 0.5336,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.275,
@@ -2010,8 +2278,8 @@
             "triangleCount": 1288,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5388,
-            "acmrAfter": 0.5388,
+            "acmrBefore": 0.5365,
+            "acmrAfter": 0.5365,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.323,
@@ -2022,7 +2290,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2069,11 +2343,16 @@
       "meshQuality": {
         "role": "thermal_radiator",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 128
+        },
         "objectCount": 3,
         "totalTriangles": 6654,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5434,
-        "meanAcmrAfter": 0.5434,
+        "meanAcmrBefore": 0.5431,
+        "meanAcmrAfter": 0.5431,
         "objects": [
           {
             "objectName": "RCLModule_bastion_siege_mech_cryo_glacier_camo_sponsons_Batch_R",
@@ -2099,8 +2378,8 @@
             "triangleCount": 6148,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5439,
-            "acmrAfter": 0.5439,
+            "acmrBefore": 0.5431,
+            "acmrAfter": 0.5431,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -2129,7 +2408,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.38,
+          "exhaust_locs": [
+            [
+              0.0,
+              -0.020124990725889802,
+              0.14000000059604645
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "thermal_radiator"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2176,11 +2467,16 @@
       "meshQuality": {
         "role": "aps_magnetic_shield",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 25
+        },
         "objectCount": 3,
         "totalTriangles": 2016,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5518,
-        "meanAcmrAfter": 0.5518,
+        "meanAcmrBefore": 0.5515,
+        "meanAcmrAfter": 0.5515,
         "objects": [
           {
             "objectName": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_aps_Batch_RCL",
@@ -2224,8 +2520,8 @@
             "triangleCount": 964,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5716,
-            "acmrAfter": 0.5716,
+            "acmrBefore": 0.5705,
+            "acmrAfter": 0.5705,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.305,
@@ -2236,7 +2532,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "aps_magnetic_shield"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2282,12 +2584,35 @@
       "texturePrefix": "RCLModule_pulsar_magnetic_shield",
       "meshQuality": {
         "role": "repair_dispenser",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Disp",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Shut",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Shu",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Nani",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Nan",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Na",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_N",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Dis",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Nozz",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Di",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Noz",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_D",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_No",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Flui",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Flu",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Tele",
+          "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Stat"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 17,
+          "primary_faceted": 0,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 1720,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5417,
-        "meanAcmrAfter": 0.5417,
+        "meanAcmrBefore": 0.54,
+        "meanAcmrAfter": 0.54,
         "objects": [
           {
             "objectName": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Batc",
@@ -2295,13 +2620,13 @@
             "triangleCount": 204,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5392,
-            "acmrAfter": 0.5392,
+            "acmrBefore": 0.5294,
+            "acmrAfter": 0.5294,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.238,
-              "rMax": 0.982,
-              "gMax": 0.991,
+              "rMin": 0.209,
+              "rMax": 1.0,
+              "gMax": 1.0,
               "bMax": 0.0,
               "aMin": 1.0,
               "aMax": 1.0
@@ -2313,13 +2638,13 @@
             "triangleCount": 856,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5421,
-            "acmrAfter": 0.5421,
+            "acmrBefore": 0.5467,
+            "acmrAfter": 0.5467,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.328,
-              "rMax": 0.956,
-              "gMax": 0.753,
+              "rMin": 0.323,
+              "rMax": 0.905,
+              "gMax": 0.991,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
@@ -2337,13 +2662,19 @@
             "vertexWearRgba": {
               "rMin": 0.352,
               "rMax": 0.956,
-              "gMax": 0.913,
+              "gMax": 0.982,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "repair_dispenser"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2389,12 +2720,21 @@
       "texturePrefix": "RCLModule_stealth_void_composite",
       "meshQuality": {
         "role": "aps_countermeasure_suite",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_arachnid_hexapod_stealth_void_composite_aps_RadomeEmi",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_aps_RadomeEm",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_aps_RadomeE"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 3,
+          "primary_faceted": 0,
+          "secondary_mechanism": 20
+        },
         "objectCount": 3,
         "totalTriangles": 1960,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.549,
-        "meanAcmrAfter": 0.549,
+        "meanAcmrBefore": 0.5483,
+        "meanAcmrAfter": 0.5483,
         "objects": [
           {
             "objectName": "RCLModule_arachnid_hexapod_stealth_void_composite_aps_Batch_RCL",
@@ -2420,8 +2760,8 @@
             "triangleCount": 1060,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5462,
-            "acmrAfter": 0.5462,
+            "acmrBefore": 0.5443,
+            "acmrAfter": 0.5443,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.319,
@@ -2444,13 +2784,23 @@
             "vertexWearRgba": {
               "rMin": 0.352,
               "rMax": 1.0,
-              "gMax": 0.753,
+              "gMax": 0.947,
               "bMax": 0.262,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.32,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            0.0,
+            0.11999999731779099,
+            0.20275000296533108
+          ],
+          "role": "aps_countermeasure_suite"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2496,12 +2846,38 @@
       "texturePrefix": "RCLModule_stealth_void_composite",
       "meshQuality": {
         "role": "repair_dispenser",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_PodH",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Iris",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Iri",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Ir",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_I",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Nani",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Insp",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Nan",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Ins",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Disp",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Indu",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Dis",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Ind",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Di",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_In",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_D",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Micr",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Phas",
+          "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Diag"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 20,
+          "primary_faceted": 0,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 1440,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.544,
-        "meanAcmrAfter": 0.544,
+        "meanAcmrBefore": 0.5433,
+        "meanAcmrAfter": 0.5433,
         "objects": [
           {
             "objectName": "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Batc",
@@ -2514,8 +2890,8 @@
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
-              "rMax": 0.982,
-              "gMax": 0.753,
+              "rMax": 1.0,
+              "gMax": 0.922,
               "bMax": 0.0,
               "aMin": 1.0,
               "aMax": 1.0
@@ -2531,9 +2907,9 @@
             "acmrAfter": 0.5425,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.292,
-              "rMax": 0.956,
-              "gMax": 0.753,
+              "rMin": 0.279,
+              "rMax": 1.0,
+              "gMax": 1.0,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
@@ -2545,19 +2921,25 @@
             "triangleCount": 500,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.546,
-            "acmrAfter": 0.546,
+            "acmrBefore": 0.544,
+            "acmrAfter": 0.544,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.371,
-              "rMax": 0.617,
-              "gMax": 0.753,
+              "rMin": 0.376,
+              "rMax": 0.624,
+              "gMax": 0.982,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "repair_dispenser"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2603,7 +2985,16 @@
       "texturePrefix": "RCLModule_solar_gold_radiator",
       "meshQuality": {
         "role": "thermal_radiator",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_overlord_command_hq_solar_gold_radiator_BallisticCowl",
+          "RCLModule_overlord_command_hq_solar_gold_radiator_CowlDeflector",
+          "RCLModule_overlord_command_hq_solar_gold_radiator_CowlDeflecto"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 3,
+          "primary_faceted": 13,
+          "secondary_mechanism": 5
+        },
         "objectCount": 3,
         "totalTriangles": 1372,
         "maxNonManifoldEdges": 0,
@@ -2620,10 +3011,10 @@
             "acmrAfter": 0.5378,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.25,
-              "rMax": 0.982,
-              "gMax": 0.982,
-              "bMax": 0.087,
+              "rMin": 0.235,
+              "rMax": 1.0,
+              "gMax": 1.0,
+              "bMax": 0.122,
               "aMin": 1.0,
               "aMax": 1.0
             }
@@ -2664,7 +3055,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.38,
+          "exhaust_locs": [
+            [
+              0.001084837131202221,
+              -1.1473894119262695e-06,
+              0.4424999877810478
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "thermal_radiator"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2711,11 +3114,16 @@
       "meshQuality": {
         "role": "aps_countermeasure_suite",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 12,
+          "secondary_mechanism": 28
+        },
         "objectCount": 3,
         "totalTriangles": 3712,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5439,
-        "meanAcmrAfter": 0.5439,
+        "meanAcmrBefore": 0.5414,
+        "meanAcmrAfter": 0.5414,
         "objects": [
           {
             "objectName": "RCLModule_skirmish_bike_cyber_nanoweave_Batch_RCLModuleMaterial",
@@ -2723,8 +3131,8 @@
             "triangleCount": 780,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5462,
-            "acmrAfter": 0.5462,
+            "acmrBefore": 0.541,
+            "acmrAfter": 0.541,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -2741,8 +3149,8 @@
             "triangleCount": 2840,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5419,
-            "acmrAfter": 0.5419,
+            "acmrBefore": 0.5398,
+            "acmrAfter": 0.5398,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -2771,7 +3179,17 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.32,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            0.0,
+            0.10999999940395355,
+            0.11385567486286163
+          ],
+          "role": "aps_countermeasure_suite"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2818,11 +3236,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 48,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 3576,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5323,
-        "meanAcmrAfter": 0.5323,
+        "meanAcmrBefore": 0.5315,
+        "meanAcmrAfter": 0.5315,
         "objects": [
           {
             "objectName": "RCLModule_skirmish_bike_cerberus_white_ceramic_Batch_RCLModuleM",
@@ -2830,8 +3253,8 @@
             "triangleCount": 3000,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5437,
-            "acmrAfter": 0.5437,
+            "acmrBefore": 0.5423,
+            "acmrAfter": 0.5423,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -2860,7 +3283,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -2907,11 +3336,16 @@
       "meshQuality": {
         "role": "thermal_radiator",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 22
+        },
         "objectCount": 3,
         "totalTriangles": 1736,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5429,
-        "meanAcmrAfter": 0.5429,
+        "meanAcmrBefore": 0.5418,
+        "meanAcmrAfter": 0.5418,
         "objects": [
           {
             "objectName": "RCLModule_surge_tank_ion_thruster_titanium_grate_sponsons_Batch",
@@ -2955,8 +3389,8 @@
             "triangleCount": 584,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5445,
-            "acmrAfter": 0.5445,
+            "acmrBefore": 0.5411,
+            "acmrAfter": 0.5411,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.301,
@@ -2967,7 +3401,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.38,
+          "exhaust_locs": [
+            [
+              0.007958821952342987,
+              0.0,
+              0.3799999952316284
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "thermal_radiator"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3013,12 +3459,52 @@
       "texturePrefix": "RCLModule_ion_thruster_titanium_grate",
       "meshQuality": {
         "role": "fuel_drum_pair",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Moun",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Mou",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Mo",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_M",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Skid",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Corn",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Ski",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Cor",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Fuel",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Roll",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Rol",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Bung",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Vent",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_TieD",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Stra",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Tie",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Str",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Fue",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Ro",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_R",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Bun",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Ven",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Ti",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_St",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_T",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_S",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Tran",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Valv",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Brai",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Val",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Bra",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Jett",
+          "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Jet"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 34,
+          "primary_faceted": 0,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 2480,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.544,
-        "meanAcmrAfter": 0.544,
+        "meanAcmrBefore": 0.5456,
+        "meanAcmrAfter": 0.5456,
         "objects": [
           {
             "objectName": "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Batc",
@@ -3026,13 +3512,13 @@
             "triangleCount": 1912,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5439,
-            "acmrAfter": 0.5439,
+            "acmrBefore": 0.5465,
+            "acmrAfter": 0.5465,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.25,
-              "rMax": 0.521,
-              "gMax": 0.753,
+              "rMin": 0.202,
+              "rMax": 0.539,
+              "gMax": 1.0,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
@@ -3044,13 +3530,13 @@
             "triangleCount": 248,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5444,
-            "acmrAfter": 0.5444,
+            "acmrBefore": 0.5403,
+            "acmrAfter": 0.5403,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
-              "rMax": 0.503,
-              "gMax": 0.753,
+              "rMax": 0.521,
+              "gMax": 0.973,
               "bMax": 0.0,
               "aMin": 1.0,
               "aMax": 1.0
@@ -3062,19 +3548,25 @@
             "triangleCount": 320,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5437,
-            "acmrAfter": 0.5437,
+            "acmrBefore": 0.55,
+            "acmrAfter": 0.55,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.376,
+              "rMin": 0.361,
               "rMax": 0.515,
-              "gMax": 0.753,
+              "gMax": 0.88,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "fuel_drum_pair"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3121,11 +3613,16 @@
       "meshQuality": {
         "role": "plasma_containment",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 29,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 2892,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5605,
-        "meanAcmrAfter": 0.5605,
+        "meanAcmrBefore": 0.562,
+        "meanAcmrAfter": 0.562,
         "objects": [
           {
             "objectName": "RCLModule_surge_tank_antimatter_containment_lattice_Batch_RCLMo",
@@ -3133,8 +3630,8 @@
             "triangleCount": 328,
             "degenerateTriangles": 4,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5915,
-            "acmrAfter": 0.5915,
+            "acmrBefore": 0.5945,
+            "acmrAfter": 0.5945,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -3151,8 +3648,8 @@
             "triangleCount": 1888,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5487,
-            "acmrAfter": 0.5487,
+            "acmrBefore": 0.5471,
+            "acmrAfter": 0.5471,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -3169,8 +3666,8 @@
             "triangleCount": 676,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5414,
-            "acmrAfter": 0.5414,
+            "acmrBefore": 0.5444,
+            "acmrAfter": 0.5444,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.371,
@@ -3181,7 +3678,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.18,
+          "exhaust_locs": [
+            [
+              0.0,
+              0.0,
+              0.5119435042142868
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "plasma_containment"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3228,11 +3737,16 @@
       "meshQuality": {
         "role": "thermal_radiator",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 16
+        },
         "objectCount": 3,
         "totalTriangles": 1280,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5493,
-        "meanAcmrAfter": 0.5493,
+        "meanAcmrBefore": 0.5505,
+        "meanAcmrAfter": 0.5505,
         "objects": [
           {
             "objectName": "RCLModule_tidebreaker_skirmisher_tachyon_warp_radiator_Batch_RC",
@@ -3258,8 +3772,8 @@
             "triangleCount": 580,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5362,
-            "acmrAfter": 0.5362,
+            "acmrBefore": 0.5397,
+            "acmrAfter": 0.5397,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.296,
@@ -3288,7 +3802,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.38,
+          "exhaust_locs": [
+            [
+              0.00717669352889061,
+              0.0,
+              0.36000001430511475
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "thermal_radiator"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3335,11 +3861,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 43,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 3140,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.541,
-        "meanAcmrAfter": 0.541,
+        "meanAcmrBefore": 0.5411,
+        "meanAcmrAfter": 0.5411,
         "objects": [
           {
             "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_era_Batch_RC",
@@ -3347,8 +3878,8 @@
             "triangleCount": 1544,
             "degenerateTriangles": 8,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5402,
-            "acmrAfter": 0.5402,
+            "acmrBefore": 0.5408,
+            "acmrAfter": 0.5408,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -3365,8 +3896,8 @@
             "triangleCount": 952,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5378,
-            "acmrAfter": 0.5378,
+            "acmrBefore": 0.542,
+            "acmrAfter": 0.542,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.262,
@@ -3383,8 +3914,8 @@
             "triangleCount": 644,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.545,
-            "acmrAfter": 0.545,
+            "acmrBefore": 0.5404,
+            "acmrAfter": 0.5404,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.323,
@@ -3395,7 +3926,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3442,6 +3979,11 @@
       "meshQuality": {
         "role": "docking_clamp",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 19
+        },
         "objectCount": 3,
         "totalTriangles": 1316,
         "maxNonManifoldEdges": 0,
@@ -3502,7 +4044,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "docking_clamp"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3549,11 +4097,16 @@
       "meshQuality": {
         "role": "ordnance_carrier",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 29
+        },
         "objectCount": 3,
         "totalTriangles": 2524,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5418,
-        "meanAcmrAfter": 0.5418,
+        "meanAcmrBefore": 0.541,
+        "meanAcmrAfter": 0.541,
         "objects": [
           {
             "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_fueldrums_B",
@@ -3561,8 +4114,8 @@
             "triangleCount": 960,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5417,
-            "acmrAfter": 0.5417,
+            "acmrBefore": 0.5385,
+            "acmrAfter": 0.5385,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -3597,8 +4150,8 @@
             "triangleCount": 1148,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5427,
-            "acmrAfter": 0.5427,
+            "acmrBefore": 0.5436,
+            "acmrAfter": 0.5436,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.323,
@@ -3609,7 +4162,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.45,
+          "exhaust_locs": [
+            [
+              0.0,
+              -0.4345000069588423,
+              0.1929999957792461
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "ordnance_carrier"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3656,11 +4221,16 @@
       "meshQuality": {
         "role": "utility_sponson",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 24,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 1816,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5524,
-        "meanAcmrAfter": 0.5524,
+        "meanAcmrBefore": 0.5526,
+        "meanAcmrAfter": 0.5526,
         "objects": [
           {
             "objectName": "RCLModule_salvage_hauler_hazard_industrial_sponsons_Batch_RCLMo",
@@ -3686,8 +4256,8 @@
             "triangleCount": 1300,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5438,
-            "acmrAfter": 0.5438,
+            "acmrBefore": 0.5446,
+            "acmrAfter": 0.5446,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -3716,7 +4286,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "utility_sponson"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3763,6 +4339,11 @@
       "meshQuality": {
         "role": "fuel_jerrycan_carrier",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 43,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 2564,
         "maxNonManifoldEdges": 0,
@@ -3823,7 +4404,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "fuel_jerrycan_carrier"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3870,11 +4457,16 @@
       "meshQuality": {
         "role": "field_engineering_crane",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 25
+        },
         "objectCount": 3,
         "totalTriangles": 1876,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5386,
-        "meanAcmrAfter": 0.5386,
+        "meanAcmrBefore": 0.539,
+        "meanAcmrAfter": 0.539,
         "objects": [
           {
             "objectName": "RCLModule_salvage_hauler_minefield_ordnance_carrier_sponsons_Ba",
@@ -3882,8 +4474,8 @@
             "triangleCount": 1084,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5397,
-            "acmrAfter": 0.5397,
+            "acmrBefore": 0.5406,
+            "acmrAfter": 0.5406,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -3900,8 +4492,8 @@
             "triangleCount": 380,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5421,
-            "acmrAfter": 0.5421,
+            "acmrBefore": 0.5447,
+            "acmrAfter": 0.5447,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -3918,8 +4510,8 @@
             "triangleCount": 412,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.534,
-            "acmrAfter": 0.534,
+            "acmrBefore": 0.5316,
+            "acmrAfter": 0.5316,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -3930,7 +4522,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "field_engineering_crane"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -3977,6 +4575,11 @@
       "meshQuality": {
         "role": "ordnance_carrier",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 43
+        },
         "objectCount": 3,
         "totalTriangles": 4724,
         "maxNonManifoldEdges": 0,
@@ -4037,7 +4640,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.45,
+          "exhaust_locs": [
+            [
+              -0.007275731302797794,
+              -0.3800000250339508,
+              0.18235777178779244
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "ordnance_carrier"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4083,12 +4698,33 @@
       "texturePrefix": "RCLModule_solar_flare_radiation_shield",
       "meshQuality": {
         "role": "aps_phase_shield",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Stealth",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_ChinePl",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_ChineP",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Photoni",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Collima",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Collim",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Colli",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_ArcNeed",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_ArcNee",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_ArcNe",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_ArcN",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_HeliumH",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Helium",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Diagnos",
+          "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Coaxial"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 15,
+          "primary_faceted": 0,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 1668,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5575,
-        "meanAcmrAfter": 0.5575,
+        "meanAcmrBefore": 0.5627,
+        "meanAcmrAfter": 0.5627,
         "objects": [
           {
             "objectName": "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Batch_R",
@@ -4096,13 +4732,13 @@
             "triangleCount": 344,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5901,
-            "acmrAfter": 0.5901,
+            "acmrBefore": 0.6017,
+            "acmrAfter": 0.6017,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.25,
+              "rMin": 0.22,
               "rMax": 0.597,
-              "gMax": 0.753,
+              "gMax": 0.913,
               "bMax": 0.0,
               "aMin": 1.0,
               "aMax": 1.0
@@ -4120,7 +4756,7 @@
             "vertexWearRgba": {
               "rMin": 0.235,
               "rMax": 0.617,
-              "gMax": 0.839,
+              "gMax": 1.0,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
@@ -4132,19 +4768,25 @@
             "triangleCount": 504,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5397,
-            "acmrAfter": 0.5397,
+            "acmrBefore": 0.5437,
+            "acmrAfter": 0.5437,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.27,
+              "rMin": 0.266,
               "rMax": 0.61,
-              "gMax": 0.753,
+              "gMax": 0.982,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "aps_phase_shield"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4191,11 +4833,16 @@
       "meshQuality": {
         "role": "heavy_flak_battery",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 31
+        },
         "objectCount": 3,
         "totalTriangles": 2456,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5473,
-        "meanAcmrAfter": 0.5473,
+        "meanAcmrBefore": 0.5483,
+        "meanAcmrAfter": 0.5483,
         "objects": [
           {
             "objectName": "RCLModule_skyguard_sam_solar_flare_radiation_shield_sponsons_Ba",
@@ -4239,8 +4886,8 @@
             "triangleCount": 1296,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5556,
-            "acmrAfter": 0.5556,
+            "acmrBefore": 0.5586,
+            "acmrAfter": 0.5586,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -4251,7 +4898,17 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.62,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            0.0,
+            2.0489096641540527e-08,
+            0.12480761297047138
+          ],
+          "role": "heavy_flak_battery"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4297,7 +4954,15 @@
       "texturePrefix": "RCLModule_longshot_sniper_camo",
       "meshQuality": {
         "role": "aps_sensor_suite",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_skyguard_sam_longshot_sniper_camo_aps_RadomeGasket_v2",
+          "RCLModule_skyguard_sam_longshot_sniper_camo_aps_RadomeLiftingEy"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 2,
+          "primary_faceted": 8,
+          "secondary_mechanism": 23
+        },
         "objectCount": 3,
         "totalTriangles": 3112,
         "maxNonManifoldEdges": 0,
@@ -4358,7 +5023,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "aps_sensor_suite"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4405,11 +5076,16 @@
       "meshQuality": {
         "role": "heavy_flak_battery",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 18,
+          "secondary_mechanism": 12
+        },
         "objectCount": 3,
         "totalTriangles": 2580,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5585,
-        "meanAcmrAfter": 0.5585,
+        "meanAcmrBefore": 0.5572,
+        "meanAcmrAfter": 0.5572,
         "objects": [
           {
             "objectName": "RCLModule_skyguard_sam_longshot_sniper_camo_sponsons_Batch_RCLM",
@@ -4435,8 +5111,8 @@
             "triangleCount": 256,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5469,
-            "acmrAfter": 0.5469,
+            "acmrBefore": 0.543,
+            "acmrAfter": 0.543,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -4465,7 +5141,17 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.62,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            -0.014000002527609468,
+            1.955777406692505e-08,
+            0.1337406225502491
+          ],
+          "role": "heavy_flak_battery"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4512,11 +5198,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 80,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 5960,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5313,
-        "meanAcmrAfter": 0.5313,
+        "meanAcmrBefore": 0.532,
+        "meanAcmrAfter": 0.532,
         "objects": [
           {
             "objectName": "RCLModule_bulwark_siege_tank_battleship_tungsten_Batch_RCLModul",
@@ -4524,8 +5215,8 @@
             "triangleCount": 5000,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5418,
-            "acmrAfter": 0.5418,
+            "acmrBefore": 0.5432,
+            "acmrAfter": 0.5432,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.376,
@@ -4554,7 +5245,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4601,11 +5298,16 @@
       "meshQuality": {
         "role": "ordnance_carrier",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 60
+        },
         "objectCount": 3,
         "totalTriangles": 6304,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5524,
-        "meanAcmrAfter": 0.5524,
+        "meanAcmrBefore": 0.5522,
+        "meanAcmrAfter": 0.5522,
         "objects": [
           {
             "objectName": "RCLModule_bulwark_siege_tank_minefield_ordnance_carrier_Batch_R",
@@ -4613,8 +5315,8 @@
             "triangleCount": 4648,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5643,
-            "acmrAfter": 0.5643,
+            "acmrBefore": 0.565,
+            "acmrAfter": 0.565,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.231,
@@ -4649,8 +5351,8 @@
             "triangleCount": 1392,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5474,
-            "acmrAfter": 0.5474,
+            "acmrBefore": 0.546,
+            "acmrAfter": 0.546,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.356,
@@ -4661,7 +5363,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.45,
+          "exhaust_locs": [
+            [
+              -0.009945280849933624,
+              -0.40000003576278687,
+              0.1916966480202973
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "ordnance_carrier"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4708,11 +5422,16 @@
       "meshQuality": {
         "role": "plasma_containment",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 37,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 3020,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5496,
-        "meanAcmrAfter": 0.5496,
+        "meanAcmrBefore": 0.5501,
+        "meanAcmrAfter": 0.5501,
         "objects": [
           {
             "objectName": "RCLModule_arc_lance_walker_plasma_arc_containment_Batch_RCLModu",
@@ -4756,8 +5475,8 @@
             "triangleCount": 624,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5417,
-            "acmrAfter": 0.5417,
+            "acmrBefore": 0.5433,
+            "acmrAfter": 0.5433,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.371,
@@ -4768,7 +5487,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.18,
+          "exhaust_locs": [
+            [
+              0.00025000772438943386,
+              0.0,
+              0.4896303666755557
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "plasma_containment"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4814,12 +5545,36 @@
       "texturePrefix": "RCLModule_nanite_repair_chitin",
       "meshQuality": {
         "role": "repair_dispenser",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_field_medic_rover_nanite_repair_chitin_GimbalRootBase",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_DirectDriveTur",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_ArticulatedArm",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_ElbowPivotJoin",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_ProjectorHeadC",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_EmitterNozzleC",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_CollimationTor",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_CollimationTo",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_FeedstockCartr",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_FeedstockLevel",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_FeedstockCart",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_FeedstockLeve",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_LidarReconstru",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_SapphireOptica",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_HeatPipeRadiat",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_HeatPipeRadia",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_HeatPipeRadi",
+          "RCLModule_field_medic_rover_nanite_repair_chitin_HeatPipeRad"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 18,
+          "primary_faceted": 0,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 1296,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5471,
-        "meanAcmrAfter": 0.5471,
+        "meanAcmrBefore": 0.5432,
+        "meanAcmrAfter": 0.5432,
         "objects": [
           {
             "objectName": "RCLModule_field_medic_rover_nanite_repair_chitin_Batch_RCLModul",
@@ -4833,7 +5588,7 @@
             "vertexWearRgba": {
               "rMin": 0.25,
               "rMax": 0.982,
-              "gMax": 0.753,
+              "gMax": 0.93,
               "bMax": 0.0,
               "aMin": 1.0,
               "aMax": 1.0
@@ -4845,13 +5600,13 @@
             "triangleCount": 784,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.551,
-            "acmrAfter": 0.551,
+            "acmrBefore": 0.5421,
+            "acmrAfter": 0.5421,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
-              "rMax": 1.0,
-              "gMax": 0.753,
+              "rMax": 0.991,
+              "gMax": 0.982,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
@@ -4863,19 +5618,25 @@
             "triangleCount": 380,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5447,
-            "acmrAfter": 0.5447,
+            "acmrBefore": 0.5421,
+            "acmrAfter": 0.5421,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.352,
               "rMax": 1.0,
-              "gMax": 0.753,
+              "gMax": 0.973,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "repair_dispenser"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -4921,12 +5682,21 @@
       "texturePrefix": "RCLModule_stealth_void_composite",
       "meshQuality": {
         "role": "aps_countermeasure_suite",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_sentinel_relay_stealth_void_composite_RadomeEmissionR",
+          "RCLModule_sentinel_relay_stealth_void_composite_RadomeEmission",
+          "RCLModule_sentinel_relay_stealth_void_composite_RadomeEmissio"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 3,
+          "primary_faceted": 0,
+          "secondary_mechanism": 20
+        },
         "objectCount": 3,
         "totalTriangles": 1960,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.549,
-        "meanAcmrAfter": 0.549,
+        "meanAcmrBefore": 0.5483,
+        "meanAcmrAfter": 0.5483,
         "objects": [
           {
             "objectName": "RCLModule_sentinel_relay_stealth_void_composite_Batch_RCLModule",
@@ -4952,8 +5722,8 @@
             "triangleCount": 1060,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5462,
-            "acmrAfter": 0.5462,
+            "acmrBefore": 0.5443,
+            "acmrAfter": 0.5443,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.319,
@@ -4976,13 +5746,23 @@
             "vertexWearRgba": {
               "rMin": 0.352,
               "rMax": 1.0,
-              "gMax": 0.753,
+              "gMax": 0.947,
               "bMax": 0.262,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.32,
+          "exhaust_locs": [],
+          "muzzle_loc": [
+            0.0,
+            0.11999999731779099,
+            0.20275000296533108
+          ],
+          "role": "aps_countermeasure_suite"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5029,11 +5809,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 32,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 2384,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5307,
-        "meanAcmrAfter": 0.5307,
+        "meanAcmrBefore": 0.5312,
+        "meanAcmrAfter": 0.5312,
         "objects": [
           {
             "objectName": "RCLModule_sentinel_relay_beryllium_mirror_hull_era_Batch_RCLMod",
@@ -5041,8 +5826,8 @@
             "triangleCount": 2000,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5405,
-            "acmrAfter": 0.5405,
+            "acmrBefore": 0.5415,
+            "acmrAfter": 0.5415,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -5071,7 +5856,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5118,11 +5909,16 @@
       "meshQuality": {
         "role": "utility_sponson",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 250,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 17452,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5291,
-        "meanAcmrAfter": 0.5291,
+        "meanAcmrBefore": 0.5347,
+        "meanAcmrAfter": 0.5347,
         "objects": [
           {
             "objectName": "RCLModule_sentinel_relay_beryllium_mirror_hull_sponsons_Batch_R",
@@ -5130,8 +5926,8 @@
             "triangleCount": 200,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.525,
-            "acmrAfter": 0.525,
+            "acmrBefore": 0.535,
+            "acmrAfter": 0.535,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.202,
@@ -5148,8 +5944,8 @@
             "triangleCount": 17252,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5332,
-            "acmrAfter": 0.5332,
+            "acmrBefore": 0.5343,
+            "acmrAfter": 0.5343,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -5160,7 +5956,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "utility_sponson"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5207,11 +6009,16 @@
       "meshQuality": {
         "role": "power_containment",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 18,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 3072,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5634,
-        "meanAcmrAfter": 0.5634,
+        "meanAcmrBefore": 0.5637,
+        "meanAcmrAfter": 0.5637,
         "objects": [
           {
             "objectName": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_sponsons_Ba",
@@ -5237,8 +6044,8 @@
             "triangleCount": 2064,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5533,
-            "acmrAfter": 0.5533,
+            "acmrBefore": 0.5543,
+            "acmrAfter": 0.5543,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.202,
@@ -5267,7 +6074,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.14,
+          "exhaust_locs": [
+            [
+              0.0,
+              0.016000003553926945,
+              0.3219999857246876
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "power_containment"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5314,11 +6133,16 @@
       "meshQuality": {
         "role": "ordnance_carrier",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 0,
+          "secondary_mechanism": 30
+        },
         "objectCount": 3,
         "totalTriangles": 3120,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5378,
-        "meanAcmrAfter": 0.5378,
+        "meanAcmrBefore": 0.5432,
+        "meanAcmrAfter": 0.5432,
         "objects": [
           {
             "objectName": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_fueldrums_B",
@@ -5326,8 +6150,8 @@
             "triangleCount": 464,
             "degenerateTriangles": 12,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5366,
-            "acmrAfter": 0.5366,
+            "acmrBefore": 0.5409,
+            "acmrAfter": 0.5409,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.202,
@@ -5344,8 +6168,8 @@
             "triangleCount": 1416,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5438,
-            "acmrAfter": 0.5438,
+            "acmrBefore": 0.5452,
+            "acmrAfter": 0.5452,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.27,
@@ -5362,8 +6186,8 @@
             "triangleCount": 1240,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5331,
-            "acmrAfter": 0.5331,
+            "acmrBefore": 0.5435,
+            "acmrAfter": 0.5435,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.292,
@@ -5374,7 +6198,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.45,
+          "exhaust_locs": [
+            [
+              0.0,
+              -0.3800000250339508,
+              0.09700000379234552
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "ordnance_carrier"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5420,12 +6256,38 @@
       "texturePrefix": "RCLModule_cryogenic_fuel_shroud",
       "meshQuality": {
         "role": "fuel_drum_pair",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_CompositeBulkh",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_DecouplingLatc",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_DecouplingLat",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_DecouplingLa",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_DecouplingL",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_FusionFuelCell",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_EquatorialRing",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_MliBlanketCap_",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_OledTelemetryP",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_FusionFuelCel",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_EquatorialRin",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_MliBlanketCap",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_OledTelemetry",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_CryoTransferBr",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_RuptureDisc_-1",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_RuptureDisc_1.",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_BoilOffNozzle_",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_FrostDeflector",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_BoilOffNozzle",
+          "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_FrostDeflecto"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 20,
+          "primary_faceted": 0,
+          "secondary_mechanism": 0
+        },
         "objectCount": 3,
         "totalTriangles": 2288,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5722,
-        "meanAcmrAfter": 0.5722,
+        "meanAcmrBefore": 0.5741,
+        "meanAcmrAfter": 0.5741,
         "objects": [
           {
             "objectName": "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_Batch_RCLModul",
@@ -5433,13 +6295,13 @@
             "triangleCount": 980,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.6112,
-            "acmrAfter": 0.6112,
+            "acmrBefore": 0.6051,
+            "acmrAfter": 0.6051,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.25,
+              "rMin": 0.202,
               "rMax": 0.429,
-              "gMax": 0.753,
+              "gMax": 1.0,
               "bMax": 0.0,
               "aMin": 1.0,
               "aMax": 1.0
@@ -5451,13 +6313,13 @@
             "triangleCount": 700,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5429,
-            "acmrAfter": 0.5429,
+            "acmrBefore": 0.5414,
+            "acmrAfter": 0.5414,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.25,
+              "rMin": 0.202,
               "rMax": 0.44,
-              "gMax": 0.799,
+              "gMax": 1.0,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
@@ -5469,19 +6331,25 @@
             "triangleCount": 608,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5625,
-            "acmrAfter": 0.5625,
+            "acmrBefore": 0.5757,
+            "acmrAfter": 0.5757,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
               "rMax": 0.434,
-              "gMax": 0.753,
+              "gMax": 0.922,
               "bMax": 0.0,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "fuel_drum_pair"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5528,11 +6396,16 @@
       "meshQuality": {
         "role": "armor_cassette",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 48,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 3576,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5323,
-        "meanAcmrAfter": 0.5323,
+        "meanAcmrBefore": 0.5315,
+        "meanAcmrAfter": 0.5315,
         "objects": [
           {
             "objectName": "RCLModule_command_relay_beryllium_mirror_hull_era_Batch_RCLModu",
@@ -5540,8 +6413,8 @@
             "triangleCount": 3000,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5437,
-            "acmrAfter": 0.5437,
+            "acmrBefore": 0.5423,
+            "acmrAfter": 0.5423,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -5570,7 +6443,13 @@
               "aMax": 1.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "armor_cassette"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5617,11 +6496,16 @@
       "meshQuality": {
         "role": "power_containment",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 89,
+          "secondary_mechanism": 0
+        },
         "objectCount": 2,
         "totalTriangles": 6524,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5378,
-        "meanAcmrAfter": 0.5378,
+        "meanAcmrBefore": 0.5366,
+        "meanAcmrAfter": 0.5366,
         "objects": [
           {
             "objectName": "RCLModule_command_relay_beryllium_mirror_hull_sponsons_Batch_RC",
@@ -5647,8 +6531,8 @@
             "triangleCount": 6420,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5372,
-            "acmrAfter": 0.5372,
+            "acmrBefore": 0.5347,
+            "acmrAfter": 0.5347,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
@@ -5659,7 +6543,19 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.14,
+          "exhaust_locs": [
+            [
+              0.0,
+              -0.08029998186975718,
+              0.14000000059604645
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "power_containment"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5706,11 +6602,16 @@
       "meshQuality": {
         "role": "aps_sensor_suite",
         "taubinFairingObjects": [],
+        "formHierarchyCounts": {
+          "primary_cast": 0,
+          "primary_faceted": 5,
+          "secondary_mechanism": 8
+        },
         "objectCount": 3,
         "totalTriangles": 1064,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5524,
-        "meanAcmrAfter": 0.5524,
+        "meanAcmrBefore": 0.5557,
+        "meanAcmrAfter": 0.5557,
         "objects": [
           {
             "objectName": "RCLModule_command_relay_cyber_nanoweave_aps_Batch_RCLModuleMate",
@@ -5754,8 +6655,8 @@
             "triangleCount": 300,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5267,
-            "acmrAfter": 0.5267,
+            "acmrBefore": 0.5367,
+            "acmrAfter": 0.5367,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.376,
@@ -5766,7 +6667,13 @@
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.0,
+          "exhaust_locs": [],
+          "muzzle_loc": null,
+          "role": "aps_sensor_suite"
+        }
       },
       "lodScreenHeights": [
         0.6,
@@ -5812,12 +6719,23 @@
       "texturePrefix": "RCLModule_cyber_nanoweave",
       "meshQuality": {
         "role": "thermal_radiator",
-        "taubinFairingObjects": [],
+        "taubinFairingObjects": [
+          "RCLModule_command_relay_cyber_nanoweave_sponsons_CowlShell_v2",
+          "RCLModule_command_relay_cyber_nanoweave_sponsons_CowlDeflector_",
+          "RCLModule_command_relay_cyber_nanoweave_sponsons_CowlDeflector",
+          "RCLModule_command_relay_cyber_nanoweave_sponsons_AuxFanCowl_1",
+          "RCLModule_command_relay_cyber_nanoweave_sponsons_AuxFanCowl_2"
+        ],
+        "formHierarchyCounts": {
+          "primary_cast": 5,
+          "primary_faceted": 5,
+          "secondary_mechanism": 15
+        },
         "objectCount": 3,
         "totalTriangles": 1852,
         "maxNonManifoldEdges": 0,
-        "meanAcmrBefore": 0.5434,
-        "meanAcmrAfter": 0.5434,
+        "meanAcmrBefore": 0.5431,
+        "meanAcmrAfter": 0.5431,
         "objects": [
           {
             "objectName": "RCLModule_command_relay_cyber_nanoweave_sponsons_Batch_RCLModul",
@@ -5825,14 +6743,14 @@
             "triangleCount": 600,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.54,
-            "acmrAfter": 0.54,
+            "acmrBefore": 0.5383,
+            "acmrAfter": 0.5383,
             "hasUvMap": true,
             "vertexWearRgba": {
-              "rMin": 0.25,
-              "rMax": 0.982,
-              "gMax": 0.991,
-              "bMax": 0.08,
+              "rMin": 0.235,
+              "rMax": 1.0,
+              "gMax": 1.0,
+              "bMax": 0.114,
               "aMin": 1.0,
               "aMax": 1.0
             }
@@ -5843,14 +6761,14 @@
             "triangleCount": 1164,
             "degenerateTriangles": 0,
             "nonManifoldEdges": 0,
-            "acmrBefore": 0.5447,
-            "acmrAfter": 0.5447,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
             "hasUvMap": true,
             "vertexWearRgba": {
               "rMin": 0.25,
               "rMax": 0.973,
-              "gMax": 0.753,
-              "bMax": 0.114,
+              "gMax": 0.956,
+              "bMax": 0.12,
               "aMin": 0.0,
               "aMax": 0.0
             }
@@ -5868,12 +6786,24 @@
               "rMin": 0.342,
               "rMax": 0.956,
               "gMax": 0.753,
-              "bMax": 0.093,
+              "bMax": 0.095,
               "aMin": 0.0,
               "aMax": 0.0
             }
           }
-        ]
+        ],
+        "sootProfile": {
+          "soot_intensity": 0.38,
+          "exhaust_locs": [
+            [
+              0.001568458043038845,
+              -6.407499313354492e-07,
+              0.46749998815357685
+            ]
+          ],
+          "muzzle_loc": null,
+          "role": "thermal_radiator"
+        }
       },
       "lodScreenHeights": [
         0.6,

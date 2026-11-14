@@ -355,6 +355,158 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
+        internal static void SetupCompanionLodGroup(
+            GameObject root,
+            GameObject modelInstance,
+            string unitName,
+            Material sharedMaterial = null)
+        {
+            if (root == null || modelInstance == null || string.IsNullOrWhiteSpace(unitName))
+            {
+                throw new ArgumentException("SetupCompanionLodGroup requires valid root, modelInstance, and unitName.");
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string repositoryRoot = Path.GetFullPath(Path.Combine(projectRoot, "..", ".."));
+            float[] transitions = ModelGeometryBudgetProfile.GetLodTransitions(repositoryRoot, unitName);
+
+            string lodChildName = unitName + "LODGeometry";
+            var staleChildren = new List<GameObject>();
+            for (int i = 0; i < root.transform.childCount; i++)
+            {
+                Transform child = root.transform.GetChild(i);
+                if (child != null && string.Equals(child.name, lodChildName, StringComparison.OrdinalIgnoreCase))
+                {
+                    staleChildren.Add(child.gameObject);
+                }
+            }
+            for (int i = 0; i < staleChildren.Count; i++)
+            {
+                UnityEngine.Object.DestroyImmediate(staleChildren[i]);
+            }
+
+            Renderer[] existingLod0;
+            Renderer[] existingLod1;
+            Renderer[] existingLod2;
+            string unusedReason;
+            bool modelAlreadyHasAllLods = TryGetLodRendererGroups(
+                modelInstance, out existingLod0, out existingLod1, out existingLod2, out unusedReason) &&
+                existingLod2.Length > 0;
+
+            GameObject lodInstance = null;
+            if (!modelAlreadyHasAllLods)
+            {
+                string lodAssetPath = ModelFolder + "/" + unitName + "_LODs.fbx";
+                AssetDatabase.ImportAsset(lodAssetPath, ImportAssetOptions.ForceSynchronousImport);
+                bool modelHasSkinned = modelInstance.GetComponentsInChildren<SkinnedMeshRenderer>(true).Length > 0;
+                ModelImporter lodImporter = AssetImporter.GetAtPath(lodAssetPath) as ModelImporter;
+                if (lodImporter != null)
+                {
+                    bool changed = false;
+                    if (lodImporter.isReadable) { lodImporter.isReadable = false; changed = true; }
+                    if (modelHasSkinned && lodImporter.animationType != ModelImporterAnimationType.Generic)
+                    {
+                        lodImporter.animationType = ModelImporterAnimationType.Generic;
+                        lodImporter.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
+                        changed = true;
+                    }
+                    if (changed) lodImporter.SaveAndReimport();
+                }
+
+                GameObject lodAsset = AssetDatabase.LoadAssetAtPath<GameObject>(lodAssetPath);
+                if (lodAsset == null)
+                {
+                    throw new FileNotFoundException(
+                        "Profile-driven LOD FBX is missing for " + unitName + ": " + lodAssetPath, lodAssetPath);
+                }
+
+                lodInstance = UnityEngine.Object.Instantiate(lodAsset);
+                if (lodInstance == null)
+                {
+                    throw new InvalidOperationException("Failed to instantiate LOD FBX for " + unitName + ": " + lodAssetPath);
+                }
+
+                lodInstance.name = lodChildName;
+                lodInstance.transform.SetParent(root.transform, false);
+                lodInstance.transform.localPosition = Vector3.zero;
+                lodInstance.transform.localRotation = Quaternion.identity;
+                lodInstance.transform.localScale = Vector3.one;
+
+                // Companion *_LODs.fbx carries duplicate canonical socket empties exported from
+                // Blender; strip those empty nodes so unique socket lookup on the unit prefab
+                // resolves exclusively against the primary Model hierarchy.
+                var duplicateSockets = new List<GameObject>();
+                Transform[] lodTransforms = lodInstance.GetComponentsInChildren<Transform>(true);
+                for (int i = 0; i < lodTransforms.Length; i++)
+                {
+                    Transform t = lodTransforms[i];
+                    if (t == null || t == lodInstance.transform) continue;
+                    if ((t.name.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase) ||
+                         t.name.StartsWith("FirePoint_", StringComparison.OrdinalIgnoreCase)) &&
+                        t.GetComponent<Renderer>() == null)
+                    {
+                        duplicateSockets.Add(t.gameObject);
+                    }
+                }
+                for (int i = 0; i < duplicateSockets.Count; i++)
+                {
+                    if (duplicateSockets[i] != null)
+                    {
+                        UnityEngine.Object.DestroyImmediate(duplicateSockets[i]);
+                    }
+                }
+
+                Material materialToAssign = sharedMaterial;
+                if (materialToAssign == null)
+                {
+                    Renderer[] primaryRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                    for (int i = 0; i < primaryRenderers.Length && materialToAssign == null; i++)
+                    {
+                        Renderer r = primaryRenderers[i];
+                        if (r == null || r is ParticleSystemRenderer ||
+                            r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            continue;
+                        }
+                        Material[] sharedMats = r.sharedMaterials;
+                        for (int m = 0; m < sharedMats.Length; m++)
+                        {
+                            if (sharedMats[m] != null)
+                            {
+                                materialToAssign = sharedMats[m];
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                Renderer[] lodRenderers = lodInstance.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < lodRenderers.Length; i++)
+                {
+                    Renderer r = lodRenderers[i];
+                    if (r == null) continue;
+                    if (r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        r.enabled = false;
+                        continue;
+                    }
+                    if (r is ParticleSystemRenderer || r.name.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    if (materialToAssign != null)
+                    {
+                        int slotCount = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                        var slots = new Material[slotCount];
+                        for (int s = 0; s < slotCount; s++) slots[s] = materialToAssign;
+                        r.sharedMaterials = slots;
+                    }
+                }
+            }
+
+            SetupLodGroupIfAvailable(root, modelInstance, lodInstance, transitions);
+        }
+
         private static void SetupLodGroupIfAvailable(
             GameObject root,
             GameObject modelInstance,

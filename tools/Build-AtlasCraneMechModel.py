@@ -16,6 +16,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 import RogueModelKit as rmk
 from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
@@ -49,6 +50,10 @@ def build_model() -> None:
     if len(armatures) != 1:
         raise ValueError(f"AtlasCraneMech: expected exactly one armature, found {len(armatures)}")
     armature = armatures[0]
+    # Remove any legacy mis-prefixed duplicate detail objects before validation.
+    for stale in list(bpy.data.objects):
+        if stale.name.startswith("AtlasArmor_"):
+            bpy.data.objects.remove(stale, do_unlink=True)
     meshes = [
         obj for obj in bpy.context.scene.objects
         if obj.type == "MESH" and not obj.name.lower().startswith("preview")
@@ -109,16 +114,30 @@ def build_model() -> None:
             structural_wear_mask=True,
         )
 
-    meshes.extend(apply_wave2_details(
+    detail_objs = list(apply_wave2_details(
         UNIT_NAME,
         objects=meshes,
-        object_prefix="Atlas",
+        object_prefix="AtlasCraneMech",
     ))
-    meshes.extend(apply_wave34_details(
+    detail_objs.extend(apply_wave34_details(
         UNIT_NAME,
-        objects=meshes,
-        object_prefix="Atlas",
+        objects=meshes + detail_objs,
+        object_prefix="AtlasCraneMech",
     ))
+    for detail in detail_objs:
+        if detail.type == "MESH" and not detail.vertex_groups:
+            target_bone = "Bone_TurretYaw" if any(k in detail.name for k in ("AccessHatch", "TrunnionBracket")) else "Bone_Hull"
+            if target_bone not in armature.data.bones:
+                target_bone = "Bone_Hull"
+            vg = detail.vertex_groups.new(name=target_bone)
+            vg.add(list(range(len(detail.data.vertices))), 1.0, "REPLACE")
+            detail.parent = armature
+            mod = next((m for m in detail.modifiers if m.type == "ARMATURE"), None) or detail.modifiers.new(name="Armature", type="ARMATURE")
+            mod.object = armature
+        if detail not in meshes:
+            meshes.append(detail)
+    _validate_rigid_weights(meshes, armature)
+    create_canonical_hardpoint_sockets(UNIT_NAME)
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
 
@@ -129,6 +148,7 @@ def build_model() -> None:
     rmk.create_single_material_atlas_model(
         batched_meshes, prefix=UNIT_NAME, texture_maps=atlas_maps, output_fbx_path=ATLAS_FBX_PATH,
     )
+    create_canonical_hardpoint_sockets(UNIT_NAME)
     sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
     rmk.export_unity_fbx(
         FBX_PATH, list(batched_meshes) + [armature] + sockets,

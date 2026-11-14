@@ -254,6 +254,13 @@ namespace RogueCommandExpansion.Authoring
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
 
+                string foundryPrefab = BulwarkFoundryBuilder.BuildPrefab(repoRoot);
+                if (!string.IsNullOrEmpty(foundryPrefab))
+                {
+                    builtPrefabs.Add(foundryPrefab);
+                    builtAssets.Add(foundryPrefab);
+                }
+
                 // 3. Build AssetBundles
                 string packBundlesDir = Path.GetFullPath(Path.Combine(
                     repoRoot, "content", "packs", "tactical-operations", "bundles"));
@@ -551,6 +558,17 @@ namespace RogueCommandExpansion.Authoring
 
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 EnsureAdditionalTacticalSockets(root, modelInstance, spec);
+                VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(root, modelInstance);
+                if (string.Equals(spec.UnitName, "BulwarkSiegeTank", StringComparison.Ordinal))
+                {
+                    Transform eraSocket = FindTransformRecursive(root.transform, "Socket_Hardpoint_ERA");
+                    if (eraSocket != null)
+                    {
+                        eraSocket.localPosition = Vector3.zero;
+                        eraSocket.localRotation = Quaternion.identity;
+                        eraSocket.localScale = Vector3.one;
+                    }
+                }
                 if (spec.IsWalker)
                 {
                     RogueCommandVisualSampleScaffolder.EnsureCanonicalWalkerSockets(root, modelInstance, false);
@@ -584,6 +602,8 @@ namespace RogueCommandExpansion.Authoring
                         " Animator present but invalid (avatar=" + (animator.avatar != null ? animator.avatar.isValid.ToString() : "null") +
                         ", controller=" + (animator.runtimeAnimatorController != null ? "present" : "missing") + ").");
                 }
+
+                VehiclePrefabBuilder.SetupCompanionLodGroup(root, modelInstance, spec.UnitName, pbrMat);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, spec.PrefabPath, out success);
@@ -707,9 +727,11 @@ namespace RogueCommandExpansion.Authoring
             string[] canonicalSockets = new[]
             {
                 "Socket_MuzzlePrimary","Socket_EngineAudio","Socket_WeaponAudio",
-                "Socket_DamageSmoke","Socket_DamageFire"
+                "Socket_DamageSmoke","Socket_DamageFire",
+                "Socket_Hardpoint_ERA","Socket_Hardpoint_APS","Socket_Hardpoint_Sponsons","Socket_Hardpoint_FuelDrums"
             };
             var duplicateWarnings = new List<string>();
+            var missingHardpoints = new List<string>();
             foreach (string socketName in canonicalSockets)
             {
                 int count = 0;
@@ -718,10 +740,25 @@ namespace RogueCommandExpansion.Authoring
                     if (t != null && string.Equals(t.name, socketName, StringComparison.OrdinalIgnoreCase)) count++;
                 }
                 if (count > 1) duplicateWarnings.Add(socketName + " x" + count);
+                if (count == 0 && socketName.StartsWith("Socket_Hardpoint_", StringComparison.Ordinal))
+                {
+                    missingHardpoints.Add(socketName);
+                }
+            }
+            if (missingHardpoints.Count > 0)
+            {
+                throw new InvalidDataException(unitName + " prefab is missing canonical hardpoints: " + string.Join(", ", missingHardpoints.ToArray()));
+            }
+            if (duplicateWarnings.Count > 0)
+            {
+                throw new InvalidDataException(unitName + " prefab has duplicate canonical sockets: " + string.Join(", ", duplicateWarnings.ToArray()));
+            }
+            if (prefab.GetComponent<LODGroup>() == null)
+            {
+                throw new InvalidDataException(unitName + " prefab is missing required LODGroup.");
             }
             Debug.Log("[TacticalOperationsScaffolder] " + unitName + " prefab OK: renderers=" + renderers.Length +
-                " (enabled " + enabledRenderers + "), animator=" + animatorState +
-                (duplicateWarnings.Count > 0 ? ", DUPLICATE SOCKETS: " + string.Join(", ", duplicateWarnings.ToArray()) : ""));
+                " (enabled " + enabledRenderers + "), animator=" + animatorState + ", LODGroup=present");
         }
 
         private static void NormalizeEmptyUnityYamlStrings(string assetRelativePath)
@@ -850,6 +887,9 @@ namespace RogueCommandExpansion.Authoring
             mat.SetFloat("_Metallic", 1.0f);
             mat.SetFloat("_Smoothness", 1.0f);
             mat.SetFloat("_BumpScale", 1.0f);
+            mat.SetFloat("_AoStrength", 1.0f);
+            mat.SetFloat("_WearStrength", 0.25f);
+            mat.SetFloat("_SootStrength", 1.0f);
             mat.SetColor("_BaseColor", Color.white);
             mat.SetColor("_EmissionColor", Color.white);
             mat.SetColor("_TeamColor", Color.white);

@@ -178,3 +178,9 @@ Run [Rogue Command PBR Texture Validation](../rogue-command-pbr-texture-validati
 ## Bulwark foundry material
 
 `content/source-art/bulwarkfoundry-material.ptex` reproduces the four 2048px maps. Its compact amber emission mask is reserved for warning-light UVs; the ordinary surfaces use a non-emissive atlas region. The output passed technical checks, but the Blender preview is not evidence of in-game lighting.
+
+## Hybrid Material Maker 1.7 + UV-Region Level 1 Composer (2026-11-14)
+
+- **`tools/Export-MaterialMakerRawPresets.ps1` + `tools/extract_level1_uv_regions.py` + `tools/build_canonical_level1_textures.py`**: Produces 2048×2048 4-map PBR atlases for all 18 Level 1 units and 3 factories by combining cached Material Maker 1.7 tile exports (`artifacts/level1-mm-cache/<preset>/`) with per-material FBX UV triangle rasterization (`[1..7]` semantic zones: primary/light armor, gunmetal, treads/tires, wheel metal, warning enamel, selective HDR emissive optics).
+- **Token-boundary region classification:** `extract_level1_uv_regions.py` splits CamelCase/underscored material names into whole tokens before classifying regions so substrings like `"rim"` inside `"PrimaryArmor"` do not misclassify armor as wheel metal (`REGION_WHEEL_METAL`).
+- **Gutter & Windows write safety:** `compose_hybrid_scalar_maps` fills unmapped gutter RGB with muted gunmetal base at `alpha=0` so Voronoi `dilate_px=8` prevents dark-void mip seams and preserves `[30, 240]` sRGB albedo plausibility even on dark obsidian/singularity hulls (`GravitasBreaker`). `pack_material_maker_pbr.save_png` writes to PID/TID-unique `.tmp` files and atomically swaps via `os.replace` to avoid Windows `Errno 22` overwrite lock errors.

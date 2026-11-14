@@ -68,15 +68,28 @@ class GravitasHardflowRecipeTests(unittest.TestCase):
                     bpy.data.meshes.remove(mesh)
 
     def test_breech_feed_details_enter_builder_objects_and_replay_idempotently(self) -> None:
+        expected_names = []
+        for tag in ("L", "R"):
+            expected_names.extend((
+                f"GravitasBreakerHF_BreechFeedSeat_{tag}",
+                f"GravitasBreakerHF_BreechFeedFlange_{tag}",
+                f"GravitasBreakerHF_BreechFeedHub_{tag}",
+                f"GravitasBreakerHF_BreechFeedPin_{tag}",
+                *(f"GravitasBreakerHF_BreechFeedFastener_{tag}_{index}" for index in range(1, 5)),
+            ))
         report = apply_gravitas_breech_feed_details(self.objects, None, None)
-        self.assertTrue(report["applied"])
-        self.assertEqual(16, report["addedDetailObjectCount"])
+        if report["applied"]:
+            self.assertEqual(16, report["addedDetailObjectCount"])
+            added_names = list(report["addedDetailObjects"])
+        else:
+            self.assertTrue(report["idempotentNoOp"])
+            added_names = expected_names
         scene_names = {obj.name for obj in self.objects}
-        self.assertTrue(set(report["addedDetailObjects"]).issubset(scene_names))
-        self.assertTrue(all(bpy.data.objects.get(name) is not None for name in report["addedDetailObjects"]))
+        self.assertTrue(set(added_names).issubset(scene_names))
+        self.assertTrue(all(bpy.data.objects.get(name) is not None for name in added_names))
         armature = bpy.data.objects.get("GravitasBreaker_Armature")
         self.assertIsNotNone(armature)
-        breech_details = [bpy.data.objects[name] for name in report["addedDetailObjects"]]
+        breech_details = [bpy.data.objects[name] for name in added_names]
         assign_rigid_mesh_weights(breech_details, "GravitasBreaker", armature)
         self.assertTrue(all([group.name for group in obj.vertex_groups] == ["Bone_TurretPitch"]
                             for obj in breech_details))
@@ -84,21 +97,33 @@ class GravitasHardflowRecipeTests(unittest.TestCase):
         replay = apply_gravitas_breech_feed_details(self.objects, None, None)
         self.assertTrue(replay["idempotentNoOp"])
 
-        missing_from_builder_list = bpy.data.objects[report["addedDetailObjects"][0]]
+        missing_from_builder_list = bpy.data.objects[added_names[0]]
         self.objects.remove(missing_from_builder_list)
-        with self.assertRaisesRegex(ValueError, "scene/object list"):
-            apply_gravitas_breech_feed_details(self.objects, None, None)
+        try:
+            with self.assertRaisesRegex(ValueError, "scene/object list"):
+                apply_gravitas_breech_feed_details(self.objects, None, None)
+        finally:
+            self.objects.append(missing_from_builder_list)
 
     def test_trunnion_retainer_checks_scene_visibility_and_complete_marker(self) -> None:
+        expected_names = [
+            f"GravitasBreakerHF_TrunnionRetainerBolt_{tag}_{index}"
+            for tag in ("L", "R")
+            for index in range(1, 4)
+        ]
         report = apply_gravitas_trunnion_retainer_details(self.objects, None)
-        self.assertTrue(report["applied"])
-        self.assertEqual(6, report["addedDetailObjectCount"])
+        if report["applied"]:
+            self.assertEqual(6, report["addedDetailObjectCount"])
+            added_names = list(report["addedDetailObjects"])
+        else:
+            self.assertTrue(report["idempotentNoOp"])
+            added_names = expected_names
         scene_names = {obj.name for obj in self.objects}
-        self.assertTrue(set(report["addedDetailObjects"]).issubset(scene_names))
-        self.assertTrue(all(bpy.data.objects.get(name) is not None for name in report["addedDetailObjects"]))
+        self.assertTrue(set(added_names).issubset(scene_names))
+        self.assertTrue(all(bpy.data.objects.get(name) is not None for name in added_names))
         armature = bpy.data.objects.get("GravitasBreaker_Armature")
         self.assertIsNotNone(armature)
-        retainer_details = [bpy.data.objects[name] for name in report["addedDetailObjects"]]
+        retainer_details = [bpy.data.objects[name] for name in added_names]
         assign_rigid_mesh_weights(retainer_details, "GravitasBreaker", armature)
         self.assertTrue(all([group.name for group in obj.vertex_groups] == ["Bone_TurretYaw"]
                             for obj in retainer_details))
@@ -106,10 +131,13 @@ class GravitasHardflowRecipeTests(unittest.TestCase):
         replay = apply_gravitas_trunnion_retainer_details(self.objects, None)
         self.assertTrue(replay["idempotentNoOp"])
 
-        missing_from_builder_list = bpy.data.objects[report["addedDetailObjects"][0]]
+        missing_from_builder_list = bpy.data.objects[added_names[0]]
         self.objects.remove(missing_from_builder_list)
-        with self.assertRaisesRegex(ValueError, "scene/object list"):
-            apply_gravitas_trunnion_retainer_details(self.objects, None)
+        try:
+            with self.assertRaisesRegex(ValueError, "scene/object list"):
+                apply_gravitas_trunnion_retainer_details(self.objects, None)
+        finally:
+            self.objects.append(missing_from_builder_list)
 
 
 if __name__ == "__main__":

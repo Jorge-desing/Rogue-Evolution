@@ -151,8 +151,14 @@ if (Test-Path -LiteralPath $lockPath) {
     throw "Unity returned but left a project lock file after refreshing Level 1 visuals; inspect $lockPath."
 }
 $levelOneLog = Get-Content -LiteralPath $levelOneLogPath -Raw
-if ($levelOneLog -notmatch "Refreshed 4 Level 1 prefab hierarchies and validated four unique canonical hardpoints on each; existing animator and visual hierarchies were preserved\.") {
-    throw "Unity exited without validating all four Level 1 prefabs and their hardpoints. Log: $levelOneLogPath"
+$levelOneMatch = [System.Text.RegularExpressions.Regex]::Match(
+    $levelOneLog,
+    "Validated (?<units>\d+) unit prefabs and (?<factories>\d+) factory prefabs with LODGroup, Material Maker VehiclePBR_VertexWear \+ steel micro-detail, and four unique canonical hardpoints per unit\."
+)
+if (-not $levelOneMatch.Success -or
+    [int]$levelOneMatch.Groups["units"].Value -lt 18 -or
+    [int]$levelOneMatch.Groups["factories"].Value -lt 3) {
+    throw "Unity exited without validating all 18 unit prefabs and 3 factory prefabs for Level 1 canonical parity. Log: $levelOneLogPath"
 }
 
 $unityArguments = @(

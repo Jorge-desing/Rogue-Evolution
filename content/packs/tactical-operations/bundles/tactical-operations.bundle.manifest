@@ -1,15 +1,15 @@
 ManifestFileVersion: 0
-CRC: 1168748805
+CRC: 2494654290
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: c7b5c55138c8ce8d0ebeeafd12178f13
+    Hash: 4cb7c06b82f081eb54dc69ba348de02c
   TypeTreeHash:
     serializedVersion: 2
-    Hash: 8aa938aebb77982e2dc7121e50cd4789
+    Hash: eee773523e4792de9626b659691fe46f
   IncrementalBuildHash:
     serializedVersion: 2
-    Hash: c7b5c55138c8ce8d0ebeeafd12178f13
+    Hash: 4cb7c06b82f081eb54dc69ba348de02c
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -46,35 +46,55 @@ ClassTypes:
   Script: {instanceID: 0}
 - Class: 199
   Script: {instanceID: 0}
+- Class: 205
+  Script: {instanceID: 0}
 - Class: 213
   Script: {instanceID: 0}
 SerializeReferenceClassIdentifiers: []
 Assets:
-- Assets/TacticalOperations/TidebreakerHovercraftCard.png
-- Assets/TacticalOperations/Prefabs/TidebreakerHovercraftVisual.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_sentinel_relay_stealth_void_composite.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_bulwark_siege_tank_battleship_tungsten.prefab
 - Assets/TacticalOperations/SalvageHaulerCard.png
-- Assets/TacticalOperations/CommandRelayCard.png
-- Assets/TacticalOperations/Materials/CommandRelay_PBR.mat
-- Assets/TacticalOperations/Materials/SalvageHauler_PBR.mat
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_arc_lance_walker_plasma_arc_containment.prefab
 - Assets/TacticalOperations/Prefabs/BulwarkSiegeTankVisual.prefab
-- Assets/TacticalOperations/Prefabs/SalvageHaulerVisual.prefab
-- Assets/TacticalOperations/Materials/ArcLanceWalker_PBR.mat
-- Assets/TacticalOperations/Materials/FieldMedicRover_PBR.mat
-- Assets/TacticalOperations/Materials/GravitasBreaker_PBR.mat
-- Assets/TacticalOperations/Materials/SentinelRelay_PBR.mat
-- Assets/TacticalOperations/Prefabs/GravitasBreakerVisual.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_command_relay_cyber_nanoweave_aps.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_sentinel_relay_beryllium_mirror_hull_sponsons.prefab
 - Assets/TacticalOperations/fieldmedicrovercard.png
 - Assets/TacticalOperations/Prefabs/ArcLanceWalkerVisual.prefab
-- Assets/TacticalOperations/bulwarksiegetankcard.png
-- Assets/TacticalOperations/GravitasBreakerCard.png
-- Assets/TacticalOperations/Prefabs/FieldMedicRoverVisual.prefab
-- Assets/TacticalOperations/SkyguardSAMCard.png
-- Assets/TacticalOperations/Prefabs/SentinelRelayVisual.prefab
-- Assets/TacticalOperations/Materials/TidebreakerHovercraft_PBR.mat
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_command_relay_beryllium_mirror_hull_sponsons.prefab
 - Assets/TacticalOperations/Prefabs/CommandRelayVisual.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skyguard_sam_longshot_sniper_camo_aps.prefab
+- Assets/TacticalOperations/Prefabs/SentinelRelayVisual.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_field_medic_rover_nanite_repair_chitin.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_bulwark_siege_tank_minefield_ordnance_carrier.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_salvage_hauler_hazard_industrial_sponsons.prefab
 - Assets/TacticalOperations/SentinelRelayCard.png
 - Assets/TacticalOperations/Prefabs/SkyguardSAMVisual.prefab
 - Assets/TacticalOperations/arclancewalkercard.png
-- Assets/TacticalOperations/Materials/BulwarkSiegeTank_PBR.mat
-- Assets/TacticalOperations/Materials/SkyguardSAM_PBR.mat
+- Assets/TacticalOperations/Prefabs/BulwarkFoundryVisual.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_sentinel_relay_beryllium_mirror_hull_era.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_tidebreaker_skirmisher_tachyon_warp_radiator.prefab
+- Assets/TacticalOperations/TidebreakerHovercraftCard.png
+- Assets/TacticalOperations/Prefabs/TidebreakerHovercraftVisual.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skyguard_sam_solar_flare_radiation_shield_sponsons.prefab
+- Assets/TacticalOperations/CommandRelayCard.png
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_salvage_hauler_minefield_ordnance_carrier_fueldrums.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_era.prefab
+- Assets/TacticalOperations/Prefabs/SalvageHaulerVisual.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_command_relay_cyber_nanoweave_sponsons.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skyguard_sam_longshot_sniper_camo_sponsons.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_salvage_hauler_hazard_industrial_fueldrums.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skyguard_sam_solar_flare_radiation_shield_aps.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_sponsons.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_fueldrums.prefab
+- Assets/TacticalOperations/Prefabs/GravitasBreakerVisual.prefab
+- Assets/TacticalOperations/bulwarksiegetankcard.png
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_salvage_hauler_minefield_ordnance_carrier_sponsons.prefab
+- Assets/TacticalOperations/Prefabs/FieldMedicRoverVisual.prefab
+- Assets/TacticalOperations/SkyguardSAMCard.png
+- Assets/TacticalOperations/GravitasBreakerCard.png
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_gravitas_breaker_cryogenic_fuel_shroud.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_sponsons.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_command_relay_beryllium_mirror_hull_era.prefab
+- Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_fueldrums.prefab
 Dependencies: []

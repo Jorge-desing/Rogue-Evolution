@@ -7684,8 +7684,17 @@ def create_unity_locator_sockets(
         r_loc = Vector(turret_loc) + Vector((-0.25, -0.30, 0.45))
         _add_empty("Socket_RadarMast", r_loc)
 
-    # 10. Modular Hardpoints
-    hp_dict = dict(hardpoints) if hardpoints else {}
+    # 10. Modular Hardpoints (prefer authoritative CanonicalUnitHardpoints when registered)
+    hp_dict: Dict[str, Any] = {}
+    canonical_hp_mod = _import_tools_module("CanonicalUnitHardpoints")
+    if canonical_hp_mod is not None:
+        registered = getattr(canonical_hp_mod, "HARDPOINT_POSITIONS_BY_UNIT", {})
+        if name_prefix in registered:
+            for full_socket_name, pos in registered[name_prefix].items():
+                slot_short = full_socket_name.removeprefix("Socket_Hardpoint_")
+                hp_dict[slot_short] = Vector(pos)
+    if hardpoints:
+        hp_dict.update(hardpoints)
     if include_default_hardpoints:
         if "ERA" not in hp_dict:
             hp_dict["ERA"] = (Vector(turret_loc) + Vector((0.0, 0.40, 0.10))) if turret_loc is not None else Vector((0.0, 0.80, 0.50))

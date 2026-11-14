@@ -10,6 +10,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 import RogueModelKit as rmk
 from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 
 UNIT_NAME = "ArachnidHexapod"
@@ -278,6 +279,7 @@ def build_arachnid_hexapod_rigged_model() -> None:
             _sock.empty_display_size = 0.1
             bpy.context.collection.objects.link(_sock)
             _sock.location = _loc
+    create_canonical_hardpoint_sockets(UNIT_NAME)
     sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
     rmk.export_unity_fbx(
         FBX_PATH,

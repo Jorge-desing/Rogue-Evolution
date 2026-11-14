@@ -8,10 +8,12 @@ import unittest
 from pathlib import Path
 
 from PIL import Image
+import numpy as np
 
 from tests.python.helpers import load_tool_module
 
 PACKER = load_tool_module("pack_material_maker_pbr")
+HYBRID = load_tool_module("build_canonical_level1_textures")
 
 
 class MaterialMakerPbrPackingTests(unittest.TestCase):
@@ -76,6 +78,61 @@ class MaterialMakerPbrPackingTests(unittest.TestCase):
             report = json.loads((root / "out" / "Hull_pack-report.json").read_text(encoding="utf-8"))
             self.assertLess(report["stats"]["Normal"]["lengthError"], 0.02)
             self.assertFalse(any("unit length" in w for w in report["warnings"]))
+
+    def test_hybrid_uv_region_composer_preserves_semantic_pbr_zones(self) -> None:
+        triangles = np.array(
+            [
+                [0.05, 0.55, 0.45, 0.55, 0.25, 0.95],  # primary armor (top-left)
+                [0.55, 0.55, 0.95, 0.55, 0.75, 0.95],  # gunmetal (top-right)
+                [0.05, 0.05, 0.45, 0.05, 0.25, 0.45],  # tread (bottom-left)
+                [0.55, 0.05, 0.95, 0.05, 0.75, 0.45],  # emissive (bottom-right)
+            ],
+            dtype=np.float32,
+        )
+        regions = np.array(
+            [
+                HYBRID.REGION_PRIMARY_ARMOR,
+                HYBRID.REGION_GUNMETAL,
+                HYBRID.REGION_TREAD,
+                HYBRID.REGION_EMISSIVE,
+            ],
+            dtype=np.uint8,
+        )
+        mask = HYBRID.rasterize_uv_region_mask(triangles, regions, resolution=64)
+        self.assertEqual(mask.shape, (64, 64))
+        self.assertGreater(int(np.count_nonzero(mask == HYBRID.REGION_PRIMARY_ARMOR)), 100)
+        self.assertGreater(int(np.count_nonzero(mask == HYBRID.REGION_GUNMETAL)), 100)
+        self.assertGreater(int(np.count_nonzero(mask == HYBRID.REGION_TREAD)), 100)
+        self.assertGreater(int(np.count_nonzero(mask == HYBRID.REGION_EMISSIVE)), 100)
+
+        primary_tiles = {
+            "Albedo": np.full((64, 64, 3), 120, dtype=np.uint8),
+            "Metallic": np.full((64, 64), 240, dtype=np.uint8),
+            "Roughness": np.full((64, 64), 80, dtype=np.uint8),
+            "Normal": np.tile(np.array([128, 128, 255], dtype=np.uint8), (64, 64, 1)),
+            "Emission": np.zeros((64, 64, 3), dtype=np.uint8),
+        }
+        gunmetal_tiles = {
+            "Albedo": np.full((64, 64, 3), 75, dtype=np.uint8),
+            "Metallic": np.full((64, 64), 245, dtype=np.uint8),
+            "Roughness": np.full((64, 64), 90, dtype=np.uint8),
+            "Normal": np.tile(np.array([128, 128, 255], dtype=np.uint8), (64, 64, 1)),
+            "Emission": np.zeros((64, 64, 3), dtype=np.uint8),
+        }
+        composed = HYBRID.compose_hybrid_scalar_maps(
+            mask,
+            primary_tiles,
+            gunmetal_tiles,
+            primary_tint_rgb=(72, 110, 145),
+            warning_rgb=(226, 148, 28),
+            emissive_rgb=(30, 220, 255),
+        )
+        tread_mask = mask == HYBRID.REGION_TREAD
+        emissive_mask = mask == HYBRID.REGION_EMISSIVE
+        self.assertEqual(int(np.max(composed["Metallic"][tread_mask])), 0)
+        self.assertGreater(int(np.min(composed["Roughness"][tread_mask])), 170)
+        self.assertGreater(int(np.mean(composed["Emission"][emissive_mask, 2])), 200)
+        self.assertEqual(int(np.max(composed["Emission"][tread_mask])), 0)
 
 
 if __name__ == "__main__":

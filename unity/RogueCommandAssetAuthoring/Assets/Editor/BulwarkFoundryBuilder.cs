@@ -79,9 +79,15 @@ namespace RogueCommandExpansion.Authoring
             if (shader == null) throw new InvalidDataException("Foundry shader missing.");
             Material mat=AssetDatabase.LoadAssetAtPath<Material>(MaterialPath);
             if (mat == null) { mat=new Material(shader); AssetDatabase.CreateAsset(mat,MaterialPath); }
+            const string detailPath = "Assets/RogueCommandExpansionSample/Textures/Detail/RCL_SteelMicroDetail_Normal.png";
+            AssetDatabase.ImportAsset(detailPath, ImportAssetOptions.ForceUpdate);
+            Texture2D detail = AssetDatabase.LoadAssetAtPath<Texture2D>(detailPath);
+            if (detail == null) throw new FileNotFoundException("Shared steel micro-detail normal missing.", detailPath);
             mat.shader=shader; mat.SetTexture("_BaseMap",albedo); mat.SetTexture("_MetallicGlossMap",metallic);
             mat.SetTexture("_BumpMap",normal); mat.SetTexture("_EmissionMap",emission);
+            mat.SetTexture("_DetailBumpMap", detail); mat.SetFloat("_DetailBumpScale", 0.5f); mat.SetFloat("_DetailTiling", 16f);
             mat.SetFloat("_GlossMapScale",1); mat.SetFloat("_Metallic",1); mat.SetFloat("_Smoothness",1);
+            mat.SetFloat("_AoStrength",1); mat.SetFloat("_WearStrength",0.25f); mat.SetFloat("_SootStrength",1);
             mat.SetColor("_BaseColor",Color.white); mat.SetColor("_EmissionColor",Color.white); mat.SetColor("_TeamColor",Color.white);
             mat.EnableKeyword("_METALLICSPECGLOSSMAP"); mat.EnableKeyword("_NORMALMAP"); mat.EnableKeyword("_EMISSION");
             mat.enableInstancing=true; EditorUtility.SetDirty(mat);

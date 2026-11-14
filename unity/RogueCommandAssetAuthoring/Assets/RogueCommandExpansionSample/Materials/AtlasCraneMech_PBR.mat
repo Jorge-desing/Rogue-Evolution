@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-8126085066722801653
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 5
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: AtlasCraneMech_PBR
+  m_Shader: {fileID: 4800000, guid: e8f12a39bc544062a7810df345c829e1, type: 3}
+  m_ValidKeywords:
+  - _EMISSION
+  - _METALLICSPECGLOSSMAP
+  - _NORMALMAP
+  m_InvalidKeywords: []
+  m_LightmapFlags: 1
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 5377ca251efafdf4fbdbd06b902c977e, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _BumpMap:
+        m_Texture: {fileID: 2800000, guid: 2c449b6adf7011745979580cf9e542ac, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _DetailBumpMap:
+        m_Texture: {fileID: 2800000, guid: e37cb784c3b2d934baa00b61528dc6b9, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _EmissionMap:
+        m_Texture: {fileID: 2800000, guid: 9917749179c991040bfe1c8047753691, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MetallicGlossMap:
+        m_Texture: {fileID: 2800000, guid: 00f4222ff2d906b4d93128c405d0d153, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AeroSheenIntensity: 0.35
+    - _AlphaClip: 0
+    - _AoStrength: 1
+    - _BumpScale: 1
+    - _CreviceDustIntensity: 0.5
+    - _Cull: 2
+    - _Cutoff: 0.5
+    - _DetailBumpScale: 0.5
+    - _DetailTiling: 16
+    - _GlossMapScale: 1
+    - _Metallic: 1
+    - _MudAmount: 0.4
+    - _MudHeight: 0.55
+    - _MudSmoothness: 0.2
+    - _Smoothness: 1
+    - _SootStrength: 1
+    - _Surface: 0
+    - _ThermalTemperingIntensity: 0.75
+    - _WearStrength: 0.25
+    - _WeldBeadScale: 24
+    - _WeldBeadStrength: 0.6
+    - _WeldBeadWidth: 0.12
+    - _ZenithBleach: 0.35
+    m_Colors:
+    - _AeroSheenTint: {r: 0.78, g: 0.88, b: 1, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _MudColor: {r: 0.28, g: 0.22, b: 0.16, a: 1}
+    - _TeamColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []

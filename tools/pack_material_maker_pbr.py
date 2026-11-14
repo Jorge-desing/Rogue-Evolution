@@ -132,6 +132,11 @@ def require_map(directory: Path, prefix: str, suffix: str) -> Path:
     return path
 
 
+import os
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
 def save_png(
     image: Image.Image,
     destination: Path,
@@ -146,10 +151,26 @@ def save_png(
     if compress_level < 0 or compress_level > 9:
         raise ValueError(f"PNG compression level must be from 0 through 9; got {compress_level}.")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if optimize_png:
-        image.save(destination, format="PNG", optimize=True)
-    else:
-        image.save(destination, format="PNG", compress_level=compress_level)
+    tmp_path = destination.with_name(f".{destination.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        if optimize_png:
+            image.save(tmp_path, format="PNG", optimize=True)
+        else:
+            image.save(tmp_path, format="PNG", compress_level=compress_level)
+        for attempt in range(5):
+            try:
+                os.replace(tmp_path, destination)
+                return
+            except OSError:
+                if attempt == 4:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def _build_emission_image(source: Path) -> Image.Image:

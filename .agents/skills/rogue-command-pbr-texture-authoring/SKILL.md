@@ -64,8 +64,9 @@ Use [compatible texture recipes](references/compatible-texture-recipes.md) when 
 
 List the model and maps changed, the authoring application/version, channel packing, output paths, and checks performed. Label evidence as static inspection, local Unity import/build, or in-game runtime. A successful bake or bundle build does not prove the final in-game appearance.
 
-## Level 2 Module PBR Application
+## Level 2 Module PBR Application & Level 1 Hybrid Atlas Pipeline
 
 - Reuse the canonical preset material set assigned to each module in `content/source-art/canonical-visual-modules.json`; read current module/preset coverage from the manifest rather than relying on a historical count. Do not create duplicate texture sets unless the manifest maps a module to a genuinely new preset.
+- For all 18 Level 1 units and 3 factories, `tools/build_canonical_level1_textures.py` (`python -m tools.build_canonical_level1_textures [--skip-mm-export] ...`) modulates Material Maker 1.7 raw tiles against Blender-extracted per-material UV region masks (`tools/extract_level1_uv_regions.py`), then calls `pack_material_maker_pbr.pack_maps` (`--detail-normal .../RCL_SteelMicroDetail_Normal.png`, `dilate_px=8`) and `audit_material_maker_output --workflow urp` to write `<Asset>_{Albedo,MetallicGloss,Normal,Emission}.png` under `Models/Textures/`.
 - Module meshes keep the RGBA vertex-wear contract on the FBX `Color` attribute, separate from the four texture maps. Keep Albedo/Emission sRGB, MetallicGloss linear with metallic in R and smoothness in A, and Normal as a normal map; the module builder verifies the imported material and mesh data.
-- Use `tools/Build-CanonicalVisualModuleTextures.ps1` for the current procedural batch and keep Material Maker mesh/material exports out of Unity.
+- Use `tools/Build-CanonicalVisualModuleTextures.ps1` for the current Level 2 procedural batch and keep Material Maker mesh/material exports out of Unity.

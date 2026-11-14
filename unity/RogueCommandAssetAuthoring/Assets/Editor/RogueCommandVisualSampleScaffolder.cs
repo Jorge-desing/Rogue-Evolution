@@ -50,10 +50,13 @@ namespace RogueCommandExpansion.Authoring
         private const string OverlordCommandHQFactoryVisualPrefabPath =
             AssetRoot + "/VisualOnly/Prefabs/OverlordCommandHQFactoryVisual.prefab";
         private const string ArachnidHexapodModelPath = AssetRoot + "/Models/ArachnidHexapod.fbx";
+        private const string ArachnidHexapodFactoryModelPath = AssetRoot + "/Models/ArachnidHexapodFactory.fbx";
         private const string OverlordCommandHQModelPath = AssetRoot + "/Models/OverlordCommandHQ.fbx";
+        private const string OverlordCommandHQFactoryModelPath = AssetRoot + "/Models/OverlordCommandHQFactory.fbx";
         private const string ArachnidHexapodCardSpritePath = AssetRoot + "/ArachnidHexapodCard.png";
         private const string OverlordCommandHQCardSpritePath = AssetRoot + "/OverlordCommandHQCard.png";
         private const string MaterialRoot = AssetRoot + "/Materials";
+        private const string DetailBumpMapPath = AssetRoot + "/Textures/Detail/RCL_SteelMicroDetail_Normal.png";
         private const string VertexWearShaderName = "RogueCommand/VehiclePBR_VertexWear";
         private const float FactoryNewWearStrength = 0.25f;
         private const string RenderingRoot = AssetRoot + "/Rendering";
@@ -274,6 +277,7 @@ namespace RogueCommandExpansion.Authoring
                 ValidateRiggedWalkerSources(projectRoot);
                 EnsureUrpAuthoringPipeline();
 
+                ConfigureSamplePbrTextureImports();
                 string prefabPath = CreateSampleVisual();
                 ImportCardSprite(CardSpritePath);
                 string bikePrefabPath = CreateSkirmishBikeVisual();
@@ -290,9 +294,10 @@ namespace RogueCommandExpansion.Authoring
                 ImportCardSprite(SurgeArcTankCardSpritePath);
                 ImportCardSprite(ArachnidHexapodCardSpritePath);
                 ImportCardSprite(OverlordCommandHQCardSpritePath);
-                ConfigureArachnidOverlordPbrTextureImports();
                 RefreshRiggedPbrPrefabAnimator("ArachnidHexapod", ArachnidHexapodModelPath, ArachnidHexapodVisualPrefabPath);
                 RefreshRiggedPbrPrefabAnimator("OverlordCommandHQ", OverlordCommandHQModelPath, OverlordCommandHQVisualPrefabPath);
+                RefreshFactoryPbrPrefab("ArachnidHexapodFactory", ArachnidHexapodFactoryModelPath, ArachnidHexapodFactoryVisualPrefabPath);
+                RefreshFactoryPbrPrefab("OverlordCommandHQFactory", OverlordCommandHQFactoryModelPath, OverlordCommandHQFactoryVisualPrefabPath);
                 string outputPath = Path.GetFullPath(Path.Combine(projectRoot, BundleOutputPath));
                 Directory.CreateDirectory(outputPath);
 
@@ -382,45 +387,107 @@ namespace RogueCommandExpansion.Authoring
                 ValidateRiggedWalkerSources(projectRoot);
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-                string[] prefabPaths = { PrefabPath, BikePrefabPath, ColossusPrefabPath, SurgeArcTankPrefabPath };
-                string[] modelNames = { "SandlanceScout", "SkirmishStrikeBike", "ColossusSiegePlatform", "SurgeArcTank" };
-                for (int i = 0; i < prefabPaths.Length; i++)
+                string[] unitPrefabPaths =
                 {
-                    GameObject prefabContents = PrefabUtility.LoadPrefabContents(prefabPaths[i]);
+                    PrefabPath, BikePrefabPath, ColossusPrefabPath, IroncladPrefabPath,
+                    AtlasCraneMechPrefabPath, BastionSiegeMechPrefabPath, SurgeArcTankPrefabPath,
+                    ArachnidHexapodVisualPrefabPath, OverlordCommandHQVisualPrefabPath,
+                    TacticalOperationsPackScaffolder.TidebreakerPrefabPath,
+                    TacticalOperationsPackScaffolder.SalvageHaulerPrefabPath,
+                    TacticalOperationsPackScaffolder.SkyguardSAMPrefabPath,
+                    TacticalOperationsPackScaffolder.BulwarkSiegeTankPrefabPath,
+                    TacticalOperationsPackScaffolder.ArcLanceWalkerPrefabPath,
+                    TacticalOperationsPackScaffolder.FieldMedicRoverPrefabPath,
+                    TacticalOperationsPackScaffolder.SentinelRelayPrefabPath,
+                    TacticalOperationsPackScaffolder.GravitasBreakerPrefabPath,
+                    TacticalOperationsPackScaffolder.CommandRelayPrefabPath
+                };
+                string[] unitNames =
+                {
+                    "SandlanceScout", "SkirmishStrikeBike", "ColossusSiegePlatform", "IroncladWalker",
+                    "AtlasCraneMech", "BastionSiegeMech", "SurgeArcTank",
+                    "ArachnidHexapod", "OverlordCommandHQ",
+                    "TidebreakerHovercraft", "SalvageHauler", "SkyguardSAM",
+                    "BulwarkSiegeTank", "ArcLanceWalker", "FieldMedicRover",
+                    "SentinelRelay", "GravitasBreaker", "CommandRelay"
+                };
+                for (int i = 0; i < unitPrefabPaths.Length; i++)
+                {
+                    GameObject prefabContents = PrefabUtility.LoadPrefabContents(unitPrefabPaths[i]);
                     if (prefabContents == null)
                     {
-                        throw new FileNotFoundException("Level 1 visual prefab could not be loaded: " + prefabPaths[i]);
+                        throw new FileNotFoundException("Level 1 visual prefab could not be loaded: " + unitPrefabPaths[i]);
                     }
 
                     try
                     {
-                        Transform model = GetUniqueNamedTransform(prefabContents, modelNames[i] + "Model", true);
+                        Transform modelTransform = GetUniqueNamedTransform(prefabContents, unitNames[i] + "Model", false);
+                        GameObject modelObject = modelTransform != null ? modelTransform.gameObject : prefabContents;
                         int transformCountBefore = prefabContents.GetComponentsInChildren<Transform>(true).Length;
-                        VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, model.gameObject);
+                        VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, modelObject);
+                        if (String.Equals(unitNames[i], "BulwarkSiegeTank", StringComparison.Ordinal))
+                        {
+                            Transform eraSocket = GetUniqueNamedTransform(prefabContents, "Socket_Hardpoint_ERA", true);
+                            eraSocket.localPosition = Vector3.zero;
+                            eraSocket.localRotation = Quaternion.identity;
+                            eraSocket.localScale = Vector3.one;
+                        }
                         int transformCountAfter = prefabContents.GetComponentsInChildren<Transform>(true).Length;
-                        if (transformCountAfter != transformCountBefore)
+                        if (transformCountAfter != transformCountBefore ||
+                            String.Equals(unitNames[i], "BulwarkSiegeTank", StringComparison.Ordinal))
                         {
                             bool saved;
-                            PrefabUtility.SaveAsPrefabAsset(prefabContents, prefabPaths[i], out saved);
+                            PrefabUtility.SaveAsPrefabAsset(prefabContents, unitPrefabPaths[i], out saved);
                             if (!saved)
                             {
-                                throw new InvalidOperationException("Unity could not save canonical hardpoint fallbacks to " + prefabPaths[i] + ".");
+                                throw new InvalidOperationException("Unity could not save canonical hardpoint updates to " + unitPrefabPaths[i] + ".");
                             }
-                            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, prefabPaths[i])));
+                            NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, unitPrefabPaths[i])));
                         }
 
-                        ValidateCanonicalModuleHardpoints(prefabContents, prefabPaths[i]);
+                        ValidateCanonicalModuleHardpoints(prefabContents, unitPrefabPaths[i]);
+                        ValidateLevelOnePbrAndLodContract(prefabContents, unitPrefabPaths[i], unitNames[i]);
                     }
                     finally
                     {
                         PrefabUtility.UnloadPrefabContents(prefabContents);
                     }
                 }
+
+                string[] factoryPrefabPaths =
+                {
+                    ArachnidHexapodFactoryVisualPrefabPath,
+                    OverlordCommandHQFactoryVisualPrefabPath,
+                    "Assets/TacticalOperations/Prefabs/BulwarkFoundryVisual.prefab"
+                };
+                string[] factoryNames =
+                {
+                    "ArachnidHexapodFactory",
+                    "OverlordCommandHQFactory",
+                    "BulwarkFoundry"
+                };
+                for (int i = 0; i < factoryPrefabPaths.Length; i++)
+                {
+                    GameObject prefabContents = PrefabUtility.LoadPrefabContents(factoryPrefabPaths[i]);
+                    if (prefabContents == null)
+                    {
+                        throw new FileNotFoundException("Level 1 factory prefab could not be loaded: " + factoryPrefabPaths[i]);
+                    }
+                    try
+                    {
+                        ValidateLevelOnePbrAndLodContract(prefabContents, factoryPrefabPaths[i], factoryNames[i]);
+                    }
+                    finally
+                    {
+                        PrefabUtility.UnloadPrefabContents(prefabContents);
+                    }
+                }
+
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
-                Debug.Log("[CanonicalLevelOneVisuals] Refreshed " + prefabPaths.Length +
-                    " Level 1 prefab hierarchies and validated four unique canonical hardpoints on each; existing animator and visual hierarchies were preserved.");
+                Debug.Log("[CanonicalLevelOneVisuals] Validated " + unitPrefabPaths.Length + " unit prefabs and " +
+                    factoryPrefabPaths.Length + " factory prefabs with LODGroup, Material Maker VehiclePBR_VertexWear + steel micro-detail, and four unique canonical hardpoints per unit.");
                 if (Application.isBatchMode)
                 {
                     EditorApplication.Exit(0);
@@ -443,11 +510,73 @@ namespace RogueCommandExpansion.Authoring
         private static void ValidateCanonicalModuleHardpoints(GameObject prefab, string prefabPath)
         {
             string[] slots = { "ERA", "APS", "Sponsons", "FuelDrums" };
+            var seenPositions = new List<Vector3>();
             for (int i = 0; i < slots.Length; i++)
             {
-                GetUniqueNamedTransform(prefab, "Socket_Hardpoint_" + slots[i], true);
+                Transform socket = GetUniqueNamedTransform(prefab, "Socket_Hardpoint_" + slots[i], true);
+                for (int j = 0; j < seenPositions.Count; j++)
+                {
+                    if (Vector3.Distance(seenPositions[j], socket.localPosition) < 0.05f)
+                    {
+                        throw new InvalidDataException("Duplicate/overlapping hardpoint socket position for Socket_Hardpoint_" +
+                            slots[i] + " in " + prefabPath + ": " + socket.localPosition);
+                    }
+                }
+                seenPositions.Add(socket.localPosition);
             }
             Debug.Log("[CanonicalLevelOneVisuals] Validated " + prefabPath + ".");
+        }
+
+        private static void ValidateLevelOnePbrAndLodContract(GameObject prefab, string prefabPath, string assetName)
+        {
+            LODGroup lodGroup = prefab.GetComponent<LODGroup>();
+            if (lodGroup == null || lodGroup.lodCount < 3)
+            {
+                throw new InvalidDataException(assetName + " prefab is missing a 3-tier LODGroup: " + prefabPath);
+            }
+
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
+            int checkedMaterials = 0;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer r = renderers[i];
+                if (r == null || r is ParticleSystemRenderer ||
+                    r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    r.name.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                if (!(r is MeshRenderer) && !(r is SkinnedMeshRenderer)) continue;
+
+                Material[] mats = r.sharedMaterials;
+                if (mats == null || mats.Length == 0)
+                {
+                    throw new InvalidDataException(assetName + " renderer '" + r.name + "' has no material in " + prefabPath);
+                }
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    Material mat = mats[m];
+                    if (mat == null || mat.shader == null ||
+                        !String.Equals(mat.shader.name, VertexWearShaderName, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException(assetName + " material on '" + r.name + "' must use " + VertexWearShaderName + ".");
+                    }
+                    ValidatePbrMaterialTexture(mat, "_BaseMap", true, assetName, "Albedo");
+                    ValidatePbrMaterialTexture(mat, "_MetallicGlossMap", true, assetName, "MetallicGloss");
+                    ValidatePbrMaterialTexture(mat, "_BumpMap", true, assetName, "Normal");
+                    ValidatePbrMaterialTexture(mat, "_EmissionMap", true, assetName, "Emission");
+                    Texture detail = mat.HasProperty("_DetailBumpMap") ? mat.GetTexture("_DetailBumpMap") : null;
+                    if (detail == null)
+                    {
+                        throw new InvalidDataException(assetName + " material on '" + r.name + "' is missing _DetailBumpMap (steel micro-detail normal).");
+                    }
+                    checkedMaterials++;
+                }
+            }
+            if (checkedMaterials == 0)
+            {
+                throw new InvalidDataException(assetName + " prefab has no validated mesh materials: " + prefabPath);
+            }
         }
 
         // Targeted recovery/build entry point. This consumes already-authored prefabs and
@@ -591,13 +720,35 @@ namespace RogueCommandExpansion.Authoring
 
         private static void ConfigureArachnidOverlordPbrTextureImports()
         {
+            ConfigureSamplePbrTextureImports();
+        }
+
+        private static void ConfigureSamplePbrTextureImports()
+        {
             string[] modelNames =
             {
+                "SandlanceScout",
+                "SkirmishStrikeBike",
+                "ColossusSiegePlatform",
+                "IroncladWalker",
+                "AtlasCraneMech",
+                "BastionSiegeMech",
+                "SurgeArcTank",
                 "ArachnidHexapod",
                 "OverlordCommandHQ",
                 "ArachnidHexapodFactory",
                 "OverlordCommandHQFactory"
             };
+
+            AssetDatabase.ImportAsset(DetailBumpMapPath, ImportAssetOptions.ForceUpdate);
+            TextureImporter detailImporter = AssetImporter.GetAtPath(DetailBumpMapPath) as TextureImporter;
+            if (detailImporter != null && (detailImporter.textureType != TextureImporterType.NormalMap || detailImporter.sRGBTexture))
+            {
+                detailImporter.textureType = TextureImporterType.NormalMap;
+                detailImporter.sRGBTexture = false;
+                detailImporter.mipmapEnabled = true;
+                detailImporter.SaveAndReimport();
+            }
 
             for (int i = 0; i < modelNames.Length; i++)
             {
@@ -610,6 +761,98 @@ namespace RogueCommandExpansion.Authoring
                     false, false, modelNames[i] + " normal");
                 ConfigurePbrTextureImporter(textureRoot + "_Emission.png", TextureImporterType.Default,
                     true, false, modelNames[i] + " emission");
+            }
+        }
+
+        private static Material CreateUnifiedSamplePbrMaterial(string unitName)
+        {
+            Shader shader = Shader.Find(VertexWearShaderName);
+            if (shader == null)
+            {
+                throw new InvalidOperationException("Shader '" + VertexWearShaderName + "' not found.");
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, MaterialRoot)));
+
+            string textureRoot = AssetRoot + "/Models/Textures/" + unitName;
+            ConfigurePbrTextureImporter(textureRoot + "_Albedo.png", TextureImporterType.Default, true, true, unitName + " albedo");
+            ConfigurePbrTextureImporter(textureRoot + "_MetallicGloss.png", TextureImporterType.Default, false, true, unitName + " MetallicGloss");
+            ConfigurePbrTextureImporter(textureRoot + "_Normal.png", TextureImporterType.NormalMap, false, false, unitName + " normal");
+            ConfigurePbrTextureImporter(textureRoot + "_Emission.png", TextureImporterType.Default, true, false, unitName + " emission");
+
+            AssetDatabase.ImportAsset(DetailBumpMapPath, ImportAssetOptions.ForceUpdate);
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(textureRoot + "_Albedo.png");
+            Texture2D metallicGloss = AssetDatabase.LoadAssetAtPath<Texture2D>(textureRoot + "_MetallicGloss.png");
+            Texture2D normal = AssetDatabase.LoadAssetAtPath<Texture2D>(textureRoot + "_Normal.png");
+            Texture2D emission = AssetDatabase.LoadAssetAtPath<Texture2D>(textureRoot + "_Emission.png");
+            Texture2D detail = AssetDatabase.LoadAssetAtPath<Texture2D>(DetailBumpMapPath);
+            if (albedo == null || metallicGloss == null || normal == null || emission == null)
+            {
+                throw new FileNotFoundException("One or more Material Maker PBR textures missing for " + unitName + " under " + textureRoot);
+            }
+            if (detail == null)
+            {
+                throw new FileNotFoundException("Shared steel micro-detail normal is missing: " + DetailBumpMapPath);
+            }
+
+            string matPath = MaterialRoot + "/" + unitName + "_PBR.mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (mat == null)
+            {
+                mat = new Material(shader);
+                mat.name = unitName + "_PBR";
+                AssetDatabase.CreateAsset(mat, matPath);
+            }
+            else
+            {
+                mat.shader = shader;
+            }
+
+            mat.SetTexture("_BaseMap", albedo);
+            mat.SetTexture("_MetallicGlossMap", metallicGloss);
+            mat.SetTexture("_BumpMap", normal);
+            mat.SetTexture("_EmissionMap", emission);
+            mat.SetTexture("_DetailBumpMap", detail);
+            mat.SetFloat("_DetailBumpScale", 0.5f);
+            mat.SetFloat("_DetailTiling", 16.0f);
+            mat.SetFloat("_GlossMapScale", 1.0f);
+            mat.SetFloat("_Metallic", 1.0f);
+            mat.SetFloat("_Smoothness", 1.0f);
+            mat.SetFloat("_BumpScale", 1.0f);
+            mat.SetFloat("_AoStrength", 1.0f);
+            mat.SetFloat("_WearStrength", FactoryNewWearStrength);
+            mat.SetFloat("_SootStrength", 1.0f);
+            mat.SetColor("_BaseColor", Color.white);
+            mat.SetColor("_EmissionColor", Color.white);
+            mat.SetColor("_TeamColor", Color.white);
+            mat.EnableKeyword("_METALLICSPECGLOSSMAP");
+            mat.EnableKeyword("_NORMALMAP");
+            mat.EnableKeyword("_EMISSION");
+            mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+            mat.enableInstancing = true;
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        private static void AssignUnifiedPbrMaterial(GameObject target, Material pbrMaterial)
+        {
+            if (target == null || pbrMaterial == null) return;
+            Renderer[] renderers = target.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer r = renderers[i];
+                if (r == null || r is ParticleSystemRenderer ||
+                    r.name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    r.name.EndsWith("_ShieldBubble", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                if (!(r is MeshRenderer) && !(r is SkinnedMeshRenderer)) continue;
+                int slotCount = r.sharedMaterials != null && r.sharedMaterials.Length > 0 ? r.sharedMaterials.Length : 1;
+                var slots = new Material[slotCount];
+                for (int s = 0; s < slotCount; s++) slots[s] = pbrMaterial;
+                r.sharedMaterials = slots;
             }
         }
 
@@ -1891,7 +2134,47 @@ namespace RogueCommandExpansion.Authoring
 
             try
             {
+                Material unifiedPbr = CreateUnifiedSamplePbrMaterial(unitName);
                 ReplaceRiggedModelFromSource(instance, modelAsset, unitName);
+                Transform modelTransform = GetUniqueNamedTransform(instance, unitName + "Model", false);
+                GameObject modelObject = modelTransform != null ? modelTransform.gameObject : instance;
+                if (modelObject != instance)
+                {
+                    var modelSocketNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (Transform child in modelObject.GetComponentsInChildren<Transform>(true))
+                    {
+                        if (child != null &&
+                            (child.name.StartsWith("Socket_", StringComparison.OrdinalIgnoreCase) ||
+                             child.name.StartsWith("FirePoint_", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            modelSocketNames.Add(child.name);
+                        }
+                    }
+
+                    var staleSockets = new List<GameObject>();
+                    foreach (Transform t in instance.GetComponentsInChildren<Transform>(true))
+                    {
+                        if (t == null || t == instance.transform || t.IsChildOf(modelObject.transform))
+                        {
+                            continue;
+                        }
+                        if (modelSocketNames.Contains(t.name) &&
+                            t.GetComponent<Renderer>() == null &&
+                            t.GetComponent<AudioSource>() == null &&
+                            t.GetComponent<ParticleSystem>() == null)
+                        {
+                            staleSockets.Add(t.gameObject);
+                        }
+                    }
+                    for (int i = 0; i < staleSockets.Count; i++)
+                    {
+                        if (staleSockets[i] != null)
+                        {
+                            UnityEngine.Object.DestroyImmediate(staleSockets[i]);
+                        }
+                    }
+                }
+                AssignUnifiedPbrMaterial(modelObject, unifiedPbr);
                 VehiclePrefabBuilder.SetupAnimatorIfAvailable(
                     instance, instance, modelAsset, unitName, preferWalkForMovement: true);
                 Animator animator = instance.GetComponent<Animator>();
@@ -1905,6 +2188,8 @@ namespace RogueCommandExpansion.Authoring
                 animator.applyRootMotion = false;
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(instance, instance);
                 EnsureTurretAndRadarSockets(instance, instance, requireTurret: true);
+                VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(instance, modelObject);
+                VehiclePrefabBuilder.SetupCompanionLodGroup(instance, modelObject, unitName, unifiedPbr);
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(instance, prefabPath, out success);
                 if (!success)
@@ -1912,11 +2197,85 @@ namespace RogueCommandExpansion.Authoring
                     throw new InvalidOperationException("Unity could not save refreshed " + prefabPath + ".");
                 }
                 ValidateSavedPrefab(prefabPath, unitName);
-                Debug.Log("[RogueCommandVisualSampleScaffolder] Refreshed body-driven Animator graph for " + unitName + ".");
+                Debug.Log("[RogueCommandVisualSampleScaffolder] Refreshed body-driven Animator graph, LODGroup, and PBR material for " + unitName + ".");
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(instance);
+            }
+        }
+
+        private static void RefreshFactoryPbrPrefab(
+            string unitName,
+            string modelPath,
+            string prefabPath)
+        {
+            string effectiveModelPath = ResolveEffectiveModelPath(unitName, modelPath);
+            GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(effectiveModelPath);
+            if (modelAsset == null)
+            {
+                throw new FileNotFoundException("Factory FBX is missing for " + unitName + ": " + effectiveModelPath, effectiveModelPath);
+            }
+
+            Material unifiedPbr = CreateUnifiedSamplePbrMaterial(unitName);
+            var root = new GameObject(unitName + "Visual");
+            try
+            {
+                GameObject modelInstance = PrefabUtility.InstantiatePrefab(modelAsset) as GameObject;
+                if (modelInstance == null) modelInstance = UnityEngine.Object.Instantiate(modelAsset);
+                if (modelInstance == null)
+                {
+                    throw new InvalidOperationException("Unity could not instantiate factory model " + unitName + ".");
+                }
+                modelInstance.name = unitName + "Model";
+                modelInstance.transform.SetParent(root.transform, false);
+                modelInstance.transform.localPosition = Vector3.zero;
+                modelInstance.transform.localRotation = Quaternion.identity;
+                modelInstance.transform.localScale = Vector3.one;
+
+                Renderer[] allRenderers = modelInstance.GetComponentsInChildren<Renderer>(true);
+                for (int i = 0; i < allRenderers.Length; i++)
+                {
+                    if (allRenderers[i].name.IndexOf("_COLLIDER", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        allRenderers[i].enabled = false;
+                        MeshFilter mf = allRenderers[i].GetComponent<MeshFilter>();
+                        if (mf != null && mf.sharedMesh != null)
+                        {
+                            BoxCollider bc = allRenderers[i].GetComponent<BoxCollider>();
+                            if (bc == null) bc = allRenderers[i].gameObject.AddComponent<BoxCollider>();
+                            bc.center = mf.sharedMesh.bounds.center;
+                            bc.size = mf.sharedMesh.bounds.size;
+                        }
+                    }
+                }
+
+                AssignUnifiedPbrMaterial(modelInstance, unifiedPbr);
+                Animator[] importedAnimators = modelInstance.GetComponentsInChildren<Animator>(true);
+                for (int i = 0; i < importedAnimators.Length; i++)
+                {
+                    if (importedAnimators[i] != null) UnityEngine.Object.DestroyImmediate(importedAnimators[i]);
+                }
+
+                VehiclePrefabBuilder.SetupCompanionLodGroup(root, modelInstance, unitName, unifiedPbr);
+
+                string directory = Path.GetDirectoryName(prefabPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+                    Directory.CreateDirectory(Path.GetFullPath(Path.Combine(projectRoot, directory)));
+                }
+                bool success;
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Unity could not save refreshed factory prefab " + prefabPath + ".");
+                }
+                ValidateSavedPrefab(prefabPath, unitName);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
             }
         }
 
@@ -2156,7 +2515,7 @@ namespace RogueCommandExpansion.Authoring
                     "Import the rigged " + unitName + " FBX before building the sample bundle.", effectiveModelPath);
             }
 
-            Dictionary<string, Material> materials = createMaterials();
+            Material unifiedPbr = CreateUnifiedSamplePbrMaterial(unitName);
             var root = new GameObject(unitName + "Visual");
             try
             {
@@ -2171,7 +2530,7 @@ namespace RogueCommandExpansion.Authoring
                 modelInstance.transform.localPosition = Vector3.zero;
                 modelInstance.transform.localRotation = Quaternion.identity;
                 modelInstance.transform.localScale = Vector3.one;
-                assignMaterials(modelInstance, materials);
+                AssignUnifiedPbrMaterial(modelInstance, unifiedPbr);
 
                 VehiclePrefabBuilder.EnsureCanonicalVfxSockets(root, modelInstance);
                 EnsureTurretAndRadarSockets(root, modelInstance, hasTurretOrRadar);
@@ -2182,6 +2541,7 @@ namespace RogueCommandExpansion.Authoring
                     configureAdditionalComponents(root);
                 }
                 SetupRiggedAnimatorOrThrow(root, modelInstance, modelAsset, unitName, true);
+                VehiclePrefabBuilder.SetupCompanionLodGroup(root, modelInstance, unitName, unifiedPbr);
 
                 bool success;
                 PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out success);
@@ -2278,16 +2638,28 @@ namespace RogueCommandExpansion.Authoring
                     "OverlordCommandHQVisual", "overlordcommandhqcard.png", "OverlordCommandHQCard", 0, "Overlord Command HQ");
                 ValidateVisualBundleAssets(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
                     "OverlordCommandHQFactoryVisual", null, null, 0, "Overlord Command HQ Factory");
-                // PBR validation skipped: ArachnidHexapod is now a rigged model.
-                // ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodvisual.prefab",
-                //     "ArachnidHexapodVisual", "Arachnid Hexapod");
-                // ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
-                //     "ArachnidHexapodFactoryVisual", "Arachnid Hexapod Factory");
-                // PBR validation skipped: OverlordCommandHQ is now a rigged model.
-                // ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqvisual.prefab",
-                //     "OverlordCommandHQVisual", "Overlord Command HQ");
-                // ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
-                //     "OverlordCommandHQFactoryVisual", "Overlord Command HQ Factory");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "scouttankvisual.prefab",
+                    "ScoutTankVisual", "Sandlance Scout");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "skirmishbikevisual.prefab",
+                    "SkirmishBikeVisual", "Skirmish Strike Bike");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "colossussiegevisual.prefab",
+                    "ColossusSiegeVisual", "Colossus Siege Platform");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "ironcladwalkervisual.prefab",
+                    "IroncladWalkerVisual", "Ironclad Walker");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "atlascranemechvisual.prefab",
+                    "AtlasCraneMechVisual", "Atlas Crane Mech");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "bastionsiegemechvisual.prefab",
+                    "BastionSiegeMechVisual", "Bastion Siege Mech");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "surgearctankvisual.prefab",
+                    "SurgeArcTankVisual", "Surge Arc Tank");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodvisual.prefab",
+                    "ArachnidHexapodVisual", "Arachnid Hexapod");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "arachnidhexapodfactoryvisual.prefab",
+                    "ArachnidHexapodFactoryVisual", "Arachnid Hexapod Factory");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqvisual.prefab",
+                    "OverlordCommandHQVisual", "Overlord Command HQ");
+                ValidatePbrVisualBundlePrefab(bundle, assetNames, "overlordcommandhqfactoryvisual.prefab",
+                    "OverlordCommandHQFactoryVisual", "Overlord Command HQ Factory");
             }
             finally
             {
@@ -2396,6 +2768,11 @@ namespace RogueCommandExpansion.Authoring
                             "' has a missing material.");
                     }
                 }
+            }
+
+            if (prefab.GetComponent<LODGroup>() == null)
+            {
+                throw new InvalidDataException(visualLabel + " PBR prefab is missing required LODGroup.");
             }
 
             Component[] components = prefab.GetComponentsInChildren<Component>(true);
@@ -2628,6 +3005,11 @@ namespace RogueCommandExpansion.Authoring
                 }
             }
 
+            if (prefab.GetComponent<LODGroup>() == null)
+            {
+                throw new InvalidDataException(visualLabel + " PBR prefab is missing required LODGroup.");
+            }
+
             Component[] components = prefab.GetComponentsInChildren<Component>(true);
             for (int i = 0; i < components.Length; i++)
             {
@@ -2651,6 +3033,11 @@ namespace RogueCommandExpansion.Authoring
             if (prefab == null || !String.Equals(prefab.name, prefabName, StringComparison.Ordinal))
             {
                 throw new InvalidDataException(visualLabel + " PBR prefab could not be loaded from the bundle.");
+            }
+
+            if (prefab.GetComponent<LODGroup>() == null)
+            {
+                throw new InvalidDataException(visualLabel + " PBR prefab is missing required LODGroup.");
             }
 
             Component[] components = prefab.GetComponentsInChildren<Component>(true);
@@ -2711,6 +3098,11 @@ namespace RogueCommandExpansion.Authoring
                     ValidatePbrMaterialTexture(material, "_MetallicGlossMap", true, visualLabel, "MetallicGloss");
                     ValidatePbrMaterialTexture(material, "_BumpMap", true, visualLabel, "Normal");
                     ValidatePbrMaterialTexture(material, "_EmissionMap", true, visualLabel, "Emission");
+                    Texture detailMap = material.HasProperty("_DetailBumpMap") ? material.GetTexture("_DetailBumpMap") : null;
+                    if (detailMap == null)
+                    {
+                        throw new InvalidDataException(visualLabel + " material is missing _DetailBumpMap (steel micro-detail normal).");
+                    }
                     if (!material.IsKeywordEnabled("_METALLICSPECGLOSSMAP") ||
                         !material.IsKeywordEnabled("_NORMALMAP") || !material.IsKeywordEnabled("_EMISSION"))
                     {

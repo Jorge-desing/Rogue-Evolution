@@ -10,6 +10,7 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 import bpy
 import RogueModelKit as rmk
 from VisualModelAuthoringSupport import validate_rigid_weights, validate_root_motion
+from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 
 UNIT_NAME = "OverlordCommandHQ"
@@ -82,6 +83,7 @@ def build_overlord_command_hq_model() -> None:
     firepoint = bpy.data.objects.get("FirePoint_0")
     if firepoint is None or firepoint.type != "EMPTY" or firepoint.parent != bpy.data.objects.get("Socket_MuzzlePrimary"):
         raise ValueError("Existing FirePoint_0 must remain nested under Socket_MuzzlePrimary")
+    create_canonical_hardpoint_sockets(UNIT_NAME)
     sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
 
     # Backfill the RGBA vertex-wear contract (R cavity AO, G structural edge

@@ -63,7 +63,7 @@ Material:
     - _SootStrength: 1
     - _Surface: 0
     - _ThermalTemperingIntensity: 0.75
-    - _WearStrength: 1
+    - _WearStrength: 0.25
     - _WeldBeadScale: 24
     - _WeldBeadStrength: 0.6
     - _WeldBeadWidth: 0.12

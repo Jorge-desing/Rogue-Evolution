@@ -32,7 +32,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailBumpMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: e37cb784c3b2d934baa00b61528dc6b9, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EmissionMap:
@@ -63,7 +63,7 @@ Material:
     - _SootStrength: 1
     - _Surface: 0
     - _ThermalTemperingIntensity: 0.75
-    - _WearStrength: 1
+    - _WearStrength: 0.25
     - _WeldBeadScale: 24
     - _WeldBeadStrength: 0.6
     - _WeldBeadWidth: 0.12
