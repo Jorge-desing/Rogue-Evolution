@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import math
 import os
 import signal
 import subprocess
@@ -165,6 +166,12 @@ def run_process(command: list[str], output: Path, timeout: float) -> dict:
         if not output.exists():
             return {'successful': False, 'error': 'Worker exited without a report', 'exitCode': process.returncode, 'log': str(log), 'wallSeconds': time.perf_counter() - started}
         report = json.loads(output.read_text(encoding='utf-8'))
+        if not isinstance(report, dict) or type(report.get('successful')) is not bool:
+            return {'successful': False, 'error': 'Invalid worker report: expected an object with a boolean successful field',
+                    'exitCode': process.returncode, 'log': str(log), 'wallSeconds': time.perf_counter() - started}
+        if report['successful'] and (type(report.get('testsRun')) is not int or report['testsRun'] < 1):
+            return {'successful': False, 'error': 'Invalid worker report: successful worker ran no tests',
+                    'exitCode': process.returncode, 'log': str(log), 'wallSeconds': time.perf_counter() - started}
         report.update(exitCode=process.returncode, wallSeconds=time.perf_counter() - started, log=str(log))
         report['successful'] = report['successful'] and process.returncode == 0
         return report
@@ -183,8 +190,8 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.worker:
         return worker(args.worker, args.output)
-    if args.timeout <= 0:
-        parser.error('--timeout must be positive')
+    if not math.isfinite(args.timeout) or args.timeout <= 0:
+        parser.error('--timeout must be finite and positive')
     if not 1 <= args.jobs <= 4:
         parser.error('--jobs must be in [1, 4]')
     args.output = args.output.resolve()
@@ -197,7 +204,7 @@ def main(argv=None) -> int:
         return 1
     reports = []
     script = str(Path(__file__).resolve())
-    if args.mode in ('all', 'unit'):
+    if args.mode in ('all', 'unit') and groups['unit']:
         if args.jobs == 1:
             shards, exclusive = [groups['unit']], []
         else:
@@ -224,7 +231,9 @@ def main(argv=None) -> int:
             command = [str(args.blender), '--background', '--factory-startup', '--python-exit-code', '1', '--python', script, '--', '--output', str(destination), '--worker', module]
             reports.append({'group': 'blender', 'modules': [module], **run_process(command, destination, args.timeout)})
     report = {'mode': args.mode, 'jobs': args.jobs, 'moduleInventory': groups, 'groups': reports,
-              'wallSeconds': time.perf_counter() - started, 'successful': all(r['successful'] for r in reports)}
+              'wallSeconds': time.perf_counter() - started, 'successful': bool(reports) and all(r['successful'] for r in reports)}
+    if not reports:
+        report['error'] = 'No test modules selected'
     args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding='utf-8')
     print(json.dumps({'successful': report['successful'], 'wallSeconds': report['wallSeconds'], 'report': str(args.output)}))
     return 0 if report['successful'] else 1

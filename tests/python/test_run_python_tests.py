@@ -66,6 +66,25 @@ class RunnerTests(unittest.TestCase):
             report = runner.run_process([sys.executable, '-c', 'raise SystemExit(0)'], path, 3)
             self.assertFalse(report['successful'])  # cannot reuse stale report
 
+    def test_worker_rejects_invalid_or_empty_success_reports(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'worker.json'
+            for raw in ('[]', '{"successful":"false"}', '{"successful":true,"testsRun":0}'):
+                with self.subTest(raw=raw):
+                    command = [sys.executable, '-c', "from pathlib import Path; import sys; Path(sys.argv[1]).write_text(sys.argv[2])", str(path), raw]
+                    report = runner.run_process(command, path, 3)
+                    self.assertFalse(report['successful'])
+                    self.assertEqual(0, report['exitCode'])
+                    self.assertTrue(Path(report['log']).is_file())
+
+    def test_empty_inventory_records_failure_in_each_mode(self):
+        with tempfile.TemporaryDirectory() as temp, mock.patch.object(runner, 'inventory', return_value={'unit': [], 'blender': []}):
+            out = Path(temp) / 'report.json'
+            for mode in ('all', 'unit', 'blender'):
+                with self.subTest(mode=mode):
+                    self.assertEqual(1, runner.main(['--mode', mode, '--output', str(out)]))
+                    self.assertEqual('No test modules selected', json.loads(out.read_text())['error'])
+
     def test_worker_records_all_cases_and_fixture_errors(self):
         class Sample(unittest.TestCase):
             def test_ok(self): pass

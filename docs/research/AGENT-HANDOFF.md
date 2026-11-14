@@ -3,6 +3,11 @@
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
 
+## General capability audit — Python acceptance runner
+
+- Fixed false success for empty test selection and malformed worker report shapes. Worker report contract failures are retained in the aggregate report, with the worker log and exit code. The CLI also rejects non-finite timeout values.
+- Verify with `python -m unittest tests.python.test_run_python_tests` and `python -m tools.run_python_tests --output artifacts/general-capability-audit/python-full.json`. This pass validates test infrastructure locally. Continue the general project audit with runtime and authoring integration paths.
+
 ## Agent documentation startup routing
 
 - Start with the task table in [AGENTS.md](../../AGENTS.md) and open all applicable sources before acting. Authoring, loader, pack schema, Steam runtime, visual, and texture entry points now link the applicable skills and identify checks or evidence. The visual guide now reflects the global diagnostic-only geometry policy. Use the [documentation contract](../AGENT-DOCUMENTATION.md) for subsequent edits.
