@@ -300,7 +300,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 return 0f;
             }
 
-            if (!unit.ActiveSkillTargetsSelf && !hasHostileInRange)
+            if ((!unit.ActiveSkillTargetsSelf || unit.ActiveSkillRequiresNearbyHostile) && !hasHostileInRange)
             {
                 return 0f;
             }

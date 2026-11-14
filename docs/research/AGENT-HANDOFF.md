@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Coordinated self-skill activation
+
+EnemiesInRange self skills require a hostile within native sight. The coordinated tactical suite passes 70/70, including the self-cast scoring gate. Steam execution remains unverified.
+
 ## Coordinated native skill range
 
 The battlefield collector uses native skill range and unrestricted location casting rules. Both coordinated directors consume that range. The tactical suite passes 70/70, including a target beyond skill range but inside weapon range. Steam execution remains unverified.

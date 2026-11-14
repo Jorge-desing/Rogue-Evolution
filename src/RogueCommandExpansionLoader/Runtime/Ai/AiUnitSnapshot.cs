@@ -68,6 +68,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public int CurrentTargetId { get; }
         public bool HasReadyActiveSkill { get; }
         public bool ActiveSkillTargetsSelf { get; }
+        public bool ActiveSkillRequiresNearbyHostile { get; }
         public bool ActiveSkillRequiresEngagement { get; }
         public float ActiveSkillRange { get; }
         public int StatusEffectFlags { get; }
@@ -102,7 +103,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             float activeSkillRange = 0f,
             int statusEffectFlags = 0,
             int affixFlags = 0,
-            bool activeSkillRequiresEngagement = false)
+            bool activeSkillRequiresEngagement = false,
+            bool activeSkillRequiresNearbyHostile = false)
         {
             UniqueEntityId = uniqueEntityId;
             EntityId = entityId ?? string.Empty;
@@ -129,6 +131,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             CurrentTargetId = currentTargetId;
             HasReadyActiveSkill = hasReadyActiveSkill;
             ActiveSkillTargetsSelf = activeSkillTargetsSelf;
+            ActiveSkillRequiresNearbyHostile = activeSkillRequiresNearbyHostile;
             ActiveSkillRequiresEngagement = activeSkillRequiresEngagement;
             ActiveSkillRange = Math.Max(0f, SanitizeFloat(activeSkillRange, 0f));
             StatusEffectFlags = statusEffectFlags;

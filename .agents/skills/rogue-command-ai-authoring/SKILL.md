@@ -194,3 +194,5 @@ CombatEngaged requires a living, targetable hostile CurrentAttackTarget within n
 Coordinated tactical skill dispatch reads live SkillInfo and checks mana and queued activation. Self uses the native untargeted command. Entity and location casts require a living, targetable hostile and use its controller or current position, respectively. An invalid target cancels dispatch.
 
 Coordinated targeting reads native SqrSkillRange in world units. SkillRangeIsUnlimited and the native immediate-location override bypass the planning radius. The native command handles final cast geometry.
+
+Coordinated self casts with EnemiesInRange require a hostile within the native sight radius. Self casts with LowHealth or CombatEngaged retain their corresponding readiness gates.

@@ -3599,6 +3599,16 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("Native unrestricted location casting did not reach the hostile.");
             }
+            aiCombat.SkillInfo.targetOrigin = TargetOrigin.Self;
+            aiCombat.SqrSightRadius = 9f;
+            var selfCast = collector.CollectCurrentSnapshot(forceRefresh: true);
+            var selfCaster = selfCast.AiUnits.Single(u => u.UniqueEntityId == 701);
+            if (!selfCaster.ActiveSkillRequiresNearbyHostile || selfCaster.ActiveSkillRange != 3f ||
+                RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreTacticalSkill(selfCaster, false, default) != 0f ||
+                RogueCommandExpansionLoader.Runtime.Ai.TacticalUtilityScorer.ScoreTacticalSkill(selfCaster, true, default) <= 0f)
+            {
+                throw new InvalidOperationException("EnemiesInRange self skills must wait for an enemy within native sight.");
+            }
             if (!capturedCombat.HasQueuedCommands ||
                 Math.Abs(capturedCombat.HealthRatio - 0.75f) > 0.001f ||
                 !aiCombat.IsControlledByAi || aiCombat.IsControlledByPlayer ||

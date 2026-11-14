@@ -299,6 +299,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             bool hasReadySkill = false;
             bool skillTargetsSelf = false;
             float skillRange = 0f;
+            bool skillRequiresNearbyHostile = false;
             try
             {
                 SkillInfo skillInfo = entity.SkillInfo;
@@ -325,7 +326,12 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                         bool unlimited = entity.SkillRangeIsUnlimited ||
                             (skillInfo.targetOrigin == TargetOrigin.ChosenLocation &&
                              entity.activateSkillAtOnceIndependentOfSkillRadius);
-                        skillRange = unlimited ? float.MaxValue : (float)Math.Sqrt(entity.SqrSkillRange);
+                        skillRequiresNearbyHostile = skillTargetsSelf &&
+                            string.Equals(activationTrigger, "EnemiesInRange", StringComparison.OrdinalIgnoreCase);
+                        if (skillRequiresNearbyHostile)
+                            skillRange = (float)Math.Sqrt(entity.SqrSightRadius);
+                        else
+                            skillRange = unlimited ? float.MaxValue : (float)Math.Sqrt(entity.SqrSkillRange);
                     }
                 }
             }
@@ -416,7 +422,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 activeSkillRange: skillRange,
                 statusEffectFlags: statusFlags,
                 affixFlags: affixFlags,
-                activeSkillRequiresEngagement: string.Equals(activationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase));
+                activeSkillRequiresEngagement: string.Equals(activationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase),
+                activeSkillRequiresNearbyHostile: skillRequiresNearbyHostile);
         }
 
         private static bool HasQueuedCommands(EntityController entity)
