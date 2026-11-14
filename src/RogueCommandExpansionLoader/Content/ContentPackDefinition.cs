@@ -717,6 +717,17 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
+            if (unit.weapons != null && unit.weapons.Length > 1 && unit.weapons[1] != null)
+            {
+                ContentUnitWeaponDefinition secondary = unit.weapons[1];
+                AddStructuredDefault(parameters, unit, "Damage2", secondary.damage);
+                if (secondary.fireRate > 0f && !Single.IsInfinity(secondary.fireRate))
+                {
+                    AddStructuredDefault(parameters, unit, "Attack2Cooldown",
+                        Math.Min(Single.MaxValue, 1d / secondary.fireRate));
+                }
+            }
+
             return parameters;
         }
 

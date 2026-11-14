@@ -549,6 +549,10 @@ internal static partial class ValidationTestRunner
         mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
         if (mapped["Damage1"] != 25d || mapped.ContainsKey("Attack1Cooldown"))
             throw new InvalidOperationException("Explicit weapon balance must override primary weapon defaults.");
+        unit.weapons = [unit.weapons[0], new ContentUnitWeaponDefinition { damage = 6f, range = 99f, fireRate = 4f }];
+        mapped = UnitBalanceOverrideMapper.CreateCustomBalance(unit);
+        if (mapped["Damage2"] != 6d || mapped["Attack2Cooldown"] != 0.25d || mapped["WeaponRange"] != 8d)
+            throw new InvalidOperationException("Secondary weapon defaults must configure damage and cadence and preserve shared range.");
 
         unit.detection = new ContentUnitDetectionDefinition { detectionRange = 9.6f };
         if (UnitBalanceOverrideMapper.CreateCustomBalance(unit)["SightRadius"] != 10d)
