@@ -8495,6 +8495,7 @@ def export_unity_fbx(
     scene_id: str | None = None,
     prevalidated_budget: Dict[str, Any] | None = None,
     allow_uncalibrated_export: bool = False,
+    optimize_vertex_cache: bool = True,
 ) -> None:
     """Export FBX with optional authored LODs; no calibration gate is applied."""
     asset_budget = None
@@ -8522,6 +8523,26 @@ def export_unity_fbx(
         raise ValueError("FBX export requires at least one object")
 
     print(f"[model-build] {asset_id or fbx_path.stem}: UNCALIBRATED_USER_AUTHORIZED; no calibration limits applied")
+    if optimize_vertex_cache:
+        try:
+            import sys as _sys
+
+            _tools_dir = str(Path(__file__).resolve().parent)
+            if _tools_dir not in _sys.path:
+                _sys.path.insert(0, _tools_dir)
+            import mesh_geometry_algorithms as _mga
+
+            for obj in model_objects:
+                if (
+                    obj is not None
+                    and obj.type == "MESH"
+                    and "_COLLIDER_" not in obj.name
+                    and getattr(obj.data, "shape_keys", None) is None
+                    and not any(mod.type != "ARMATURE" for mod in obj.modifiers)
+                ):
+                    _mga.apply_forsyth_cache_optimize_bpy(obj, cache_size=32)
+        except ImportError:
+            pass
     fbx_path.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.object.select_all(action="DESELECT")
     for obj in model_objects:

@@ -567,6 +567,9 @@ def apply_forsyth_cache_optimize_bpy(obj: Any, cache_size: int = 32) -> float:
     mesh = obj.data
     if len(mesh.polygons) == 0:
         return 0.0
+    if getattr(mesh, "shape_keys", None) is not None:
+        tris = np.array([poly.vertices[:] for poly in mesh.polygons if len(poly.vertices) == 3], dtype=np.int64)
+        return compute_acmr(tris, cache_size=cache_size) if len(tris) > 0 else 0.0
 
     # Ensure pure triangle topology while preserving UVs, Color RGBA, materials, and weights
     if any(len(poly.vertices) != 3 for poly in mesh.polygons):

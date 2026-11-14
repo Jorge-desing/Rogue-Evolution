@@ -34,6 +34,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_scout_tank_gunmetal_chassis_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_gunmetal_chassis_era.prefab",
       "texturePrefix": "RCLModule_gunmetal_chassis",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 2384,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5314,
+        "meanAcmrAfter": 0.5314,
+        "objects": [
+          {
+            "objectName": "RCLModule_scout_tank_gunmetal_chassis_era_Batch_RCLModuleMateri",
+            "formClass": "primary_faceted",
+            "triangleCount": 2000,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.542,
+            "acmrAfter": 0.542,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.361,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_scout_tank_gunmetal_chassis_era_Batch_RCLModuleMater",
+            "formClass": "primary_faceted",
+            "triangleCount": 384,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5208,
+            "acmrAfter": 0.5208,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.347,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -42,16 +89,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1292,
+          "blenderFaces": 2384,
           "unityTriangles": 2384
         },
         "LOD1": {
-          "blenderFaces": 604,
-          "unityTriangles": 1184
+          "blenderFaces": 1192,
+          "unityTriangles": 1192
         },
         "LOD2": {
-          "blenderFaces": 260,
-          "unityTriangles": 580
+          "blenderFaces": 596,
+          "unityTriangles": 596
         }
       }
     },
@@ -76,6 +123,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_scout_tank_gunmetal_chassis_fueldrums.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_gunmetal_chassis_fueldrums.prefab",
       "texturePrefix": "RCLModule_gunmetal_chassis",
+      "meshQuality": {
+        "role": "fuel_jerrycan_carrier",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2848,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5444,
+        "meanAcmrAfter": 0.5444,
+        "objects": [
+          {
+            "objectName": "RCLModule_scout_tank_gunmetal_chassis_fueldrums_Batch_RCLModule",
+            "formClass": "primary_faceted",
+            "triangleCount": 2628,
+            "degenerateTriangles": 32,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5422,
+            "acmrAfter": 0.5422,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 1.0,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_scout_tank_gunmetal_chassis_fueldrums_Batch_RCLModul",
+            "formClass": "primary_faceted",
+            "triangleCount": 88,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.262,
+              "rMax": 0.799,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_scout_tank_gunmetal_chassis_fueldrums_Batch_RCLModu",
+            "formClass": "primary_faceted",
+            "triangleCount": 132,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.392,
+              "rMax": 0.68,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -84,15 +196,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1552,
+          "blenderFaces": 2848,
           "unityTriangles": 2848
         },
         "LOD1": {
-          "blenderFaces": 886,
+          "blenderFaces": 1424,
           "unityTriangles": 1424
         },
         "LOD2": {
-          "blenderFaces": 403,
+          "blenderFaces": 710,
           "unityTriangles": 710
         }
       }
@@ -118,6 +230,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_scout_tank_desert_camo_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_desert_camo_era.prefab",
       "texturePrefix": "RCLModule_desert_camo",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 2384,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5307,
+        "meanAcmrAfter": 0.5307,
+        "objects": [
+          {
+            "objectName": "RCLModule_scout_tank_desert_camo_era_Batch_RCLModuleMaterial__d",
+            "formClass": "primary_faceted",
+            "triangleCount": 2000,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5405,
+            "acmrAfter": 0.5405,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.361,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_scout_tank_desert_camo_era_Batch_RCLModuleMaterial__",
+            "formClass": "primary_faceted",
+            "triangleCount": 384,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5208,
+            "acmrAfter": 0.5208,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.347,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -126,16 +285,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1292,
+          "blenderFaces": 2384,
           "unityTriangles": 2384
         },
         "LOD1": {
-          "blenderFaces": 604,
-          "unityTriangles": 1184
+          "blenderFaces": 1192,
+          "unityTriangles": 1192
         },
         "LOD2": {
-          "blenderFaces": 261,
-          "unityTriangles": 580
+          "blenderFaces": 596,
+          "unityTriangles": 596
         }
       }
     },
@@ -160,6 +319,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_scout_tank_desert_camo_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_desert_camo_sponsons.prefab",
       "texturePrefix": "RCLModule_desert_camo",
+      "meshQuality": {
+        "role": "auxiliary_power_generator",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 1444,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5441,
+        "meanAcmrAfter": 0.5441,
+        "objects": [
+          {
+            "objectName": "RCLModule_scout_tank_desert_camo_sponsons_Batch_RCLModuleMateri",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1312,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5427,
+            "acmrAfter": 0.5427,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.571,
+              "gMax": 0.753,
+              "bMax": 0.223,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_scout_tank_desert_camo_sponsons_Batch_RCLModuleMater",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 132,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.571,
+              "gMax": 0.753,
+              "bMax": 0.198,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -168,15 +374,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 770,
+          "blenderFaces": 1444,
           "unityTriangles": 1444
         },
         "LOD1": {
-          "blenderFaces": 358,
+          "blenderFaces": 722,
           "unityTriangles": 722
         },
         "LOD2": {
-          "blenderFaces": 167,
+          "blenderFaces": 360,
           "unityTriangles": 360
         }
       }
@@ -202,6 +408,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_scout_tank_longshot_sniper_camo_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_longshot_sniper_camo_era.prefab",
       "texturePrefix": "RCLModule_longshot_sniper_camo",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 2672,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5437,
+        "meanAcmrAfter": 0.5437,
+        "objects": [
+          {
+            "objectName": "RCLModule_scout_tank_longshot_sniper_camo_era_Batch_RCLModuleMa",
+            "formClass": "primary_faceted",
+            "triangleCount": 2188,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.542,
+            "acmrAfter": 0.542,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.246,
+              "rMax": 0.584,
+              "gMax": 0.847,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_scout_tank_longshot_sniper_camo_era_Batch_RCLModuleM",
+            "formClass": "primary_faceted",
+            "triangleCount": 484,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.597,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -210,15 +463,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1496,
+          "blenderFaces": 2672,
           "unityTriangles": 2672
         },
         "LOD1": {
-          "blenderFaces": 726,
+          "blenderFaces": 1336,
           "unityTriangles": 1336
         },
         "LOD2": {
-          "blenderFaces": 366,
+          "blenderFaces": 666,
           "unityTriangles": 666
         }
       }
@@ -244,6 +497,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_scout_tank_longshot_sniper_camo_aps.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_scout_tank_longshot_sniper_camo_aps.prefab",
       "texturePrefix": "RCLModule_longshot_sniper_camo",
+      "meshQuality": {
+        "role": "aps_sensor_suite",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3112,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5462,
+        "meanAcmrAfter": 0.5462,
+        "objects": [
+          {
+            "objectName": "RCLModule_scout_tank_longshot_sniper_camo_aps_Batch_RCLModuleMa",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 2800,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5564,
+            "acmrAfter": 0.5564,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.202,
+              "rMax": 0.665,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_scout_tank_longshot_sniper_camo_aps_Batch_RCLModuleM",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 136,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5368,
+            "acmrAfter": 0.5368,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.27,
+              "rMax": 0.604,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_scout_tank_longshot_sniper_camo_aps_Batch_RCLModule",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 176,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.371,
+              "rMax": 0.591,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -252,15 +570,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1476,
+          "blenderFaces": 3112,
           "unityTriangles": 3112
         },
         "LOD1": {
-          "blenderFaces": 717,
+          "blenderFaces": 1556,
           "unityTriangles": 1556
         },
         "LOD2": {
-          "blenderFaces": 401,
+          "blenderFaces": 778,
           "unityTriangles": 778
         }
       }
@@ -286,6 +604,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_heavy_artillery_tungsten_heavy_flak_plating.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_tungsten_heavy_flak_plating.prefab",
       "texturePrefix": "RCLModule_tungsten_heavy_flak_plating",
+      "meshQuality": {
+        "role": "heavy_flak_battery",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2480,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.549,
+        "meanAcmrAfter": 0.549,
+        "objects": [
+          {
+            "objectName": "RCLModule_heavy_artillery_tungsten_heavy_flak_plating_Batch_RCL",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1920,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5505,
+            "acmrAfter": 0.5505,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.262,
+              "rMax": 0.723,
+              "gMax": 1.0,
+              "bMax": 0.445,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_tungsten_heavy_flak_plating_Batch_RC",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 352,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5483,
+            "acmrAfter": 0.5483,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.723,
+              "gMax": 0.753,
+              "bMax": 0.262,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_tungsten_heavy_flak_plating_Batch_R",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 208,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5481,
+            "acmrAfter": 0.5481,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.356,
+              "rMax": 0.672,
+              "gMax": 0.753,
+              "bMax": 0.011,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -294,15 +677,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1180,
+          "blenderFaces": 2480,
           "unityTriangles": 2480
         },
         "LOD1": {
-          "blenderFaces": 566,
+          "blenderFaces": 1240,
           "unityTriangles": 1240
         },
         "LOD2": {
-          "blenderFaces": 280,
+          "blenderFaces": 620,
           "unityTriangles": 620
         }
       }
@@ -328,6 +711,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_heavy_artillery_subterranean_mole_borer.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_subterranean_mole_borer.prefab",
       "texturePrefix": "RCLModule_subterranean_mole_borer",
+      "meshQuality": {
+        "role": "excavation_drill",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2400,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5463,
+        "meanAcmrAfter": 0.5463,
+        "objects": [
+          {
+            "objectName": "RCLModule_heavy_artillery_subterranean_mole_borer_Batch_RCLModu",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1684,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.538,
+            "acmrAfter": 0.538,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.468,
+              "gMax": 0.807,
+              "bMax": 0.246,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_subterranean_mole_borer_Batch_RCLMod",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 624,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5465,
+            "acmrAfter": 0.5465,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.485,
+              "gMax": 0.753,
+              "bMax": 0.238,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_subterranean_mole_borer_Batch_RCLMo",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 92,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5543,
+            "acmrAfter": 0.5543,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.27,
+              "gMax": 0.753,
+              "bMax": 0.195,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -336,15 +784,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1304,
+          "blenderFaces": 2400,
           "unityTriangles": 2400
         },
         "LOD1": {
-          "blenderFaces": 628,
+          "blenderFaces": 1200,
           "unityTriangles": 1200
         },
         "LOD2": {
-          "blenderFaces": 277,
+          "blenderFaces": 598,
           "unityTriangles": 598
         }
       }
@@ -370,6 +818,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_heavy_artillery_martian_iron_rust_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_martian_iron_rust_era.prefab",
       "texturePrefix": "RCLModule_martian_iron_rust",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2588,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5466,
+        "meanAcmrAfter": 0.5466,
+        "objects": [
+          {
+            "objectName": "RCLModule_heavy_artillery_martian_iron_rust_era_Batch_RCLModule",
+            "formClass": "primary_faceted",
+            "triangleCount": 1484,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5458,
+            "acmrAfter": 0.5458,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.597,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_martian_iron_rust_era_Batch_RCLModul",
+            "formClass": "primary_faceted",
+            "triangleCount": 576,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5486,
+            "acmrAfter": 0.5486,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.527,
+              "gMax": 0.839,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_martian_iron_rust_era_Batch_RCLModu",
+            "formClass": "primary_faceted",
+            "triangleCount": 528,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.631,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -378,15 +891,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1442,
+          "blenderFaces": 2588,
           "unityTriangles": 2588
         },
         "LOD1": {
-          "blenderFaces": 750,
+          "blenderFaces": 1294,
           "unityTriangles": 1294
         },
         "LOD2": {
-          "blenderFaces": 376,
+          "blenderFaces": 646,
           "unityTriangles": 646
         }
       }
@@ -412,6 +925,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_heavy_artillery_martian_iron_rust_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_martian_iron_rust_sponsons.prefab",
       "texturePrefix": "RCLModule_martian_iron_rust",
+      "meshQuality": {
+        "role": "recoil_anchor",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 844,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5494,
+        "meanAcmrAfter": 0.5494,
+        "objects": [
+          {
+            "objectName": "RCLModule_heavy_artillery_martian_iron_rust_sponsons_Batch_RCLM",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 44,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.468,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_martian_iron_rust_sponsons_Batch_RCL",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 544,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5441,
+            "acmrAfter": 0.5441,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.347,
+              "gMax": 0.776,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_martian_iron_rust_sponsons_Batch_RC",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 256,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5586,
+            "acmrAfter": 0.5586,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.356,
+              "gMax": 0.761,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -420,15 +998,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 434,
+          "blenderFaces": 844,
           "unityTriangles": 844
         },
         "LOD1": {
-          "blenderFaces": 258,
+          "blenderFaces": 422,
           "unityTriangles": 422
         },
         "LOD2": {
-          "blenderFaces": 132,
+          "blenderFaces": 210,
           "unityTriangles": 210
         }
       }
@@ -454,6 +1032,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_heavy_artillery_battleship_tungsten_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_battleship_tungsten_era.prefab",
       "texturePrefix": "RCLModule_battleship_tungsten",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 2384,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5307,
+        "meanAcmrAfter": 0.5307,
+        "objects": [
+          {
+            "objectName": "RCLModule_heavy_artillery_battleship_tungsten_era_Batch_RCLModu",
+            "formClass": "primary_faceted",
+            "triangleCount": 2000,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5405,
+            "acmrAfter": 0.5405,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.361,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_battleship_tungsten_era_Batch_RCLMod",
+            "formClass": "primary_faceted",
+            "triangleCount": 384,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5208,
+            "acmrAfter": 0.5208,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.347,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -462,16 +1087,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1292,
+          "blenderFaces": 2384,
           "unityTriangles": 2384
         },
         "LOD1": {
-          "blenderFaces": 604,
-          "unityTriangles": 1184
+          "blenderFaces": 1192,
+          "unityTriangles": 1192
         },
         "LOD2": {
-          "blenderFaces": 261,
-          "unityTriangles": 580
+          "blenderFaces": 596,
+          "unityTriangles": 596
         }
       }
     },
@@ -496,6 +1121,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_heavy_artillery_battleship_tungsten_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_heavy_artillery_battleship_tungsten_sponsons.prefab",
       "texturePrefix": "RCLModule_battleship_tungsten",
+      "meshQuality": {
+        "role": "heavy_flak_battery",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1656,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5556,
+        "meanAcmrAfter": 0.5556,
+        "objects": [
+          {
+            "objectName": "RCLModule_heavy_artillery_battleship_tungsten_sponsons_Batch_RC",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1336,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5576,
+            "acmrAfter": 0.5576,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.262,
+              "rMax": 0.701,
+              "gMax": 1.0,
+              "bMax": 0.456,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_battleship_tungsten_sponsons_Batch_R",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 228,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5439,
+            "acmrAfter": 0.5439,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.687,
+              "gMax": 0.753,
+              "bMax": 0.25,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_heavy_artillery_battleship_tungsten_sponsons_Batch_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 92,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5652,
+            "acmrAfter": 0.5652,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.356,
+              "rMax": 0.644,
+              "gMax": 0.753,
+              "bMax": 0.019,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -504,15 +1194,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 788,
+          "blenderFaces": 1656,
           "unityTriangles": 1656
         },
         "LOD1": {
-          "blenderFaces": 369,
+          "blenderFaces": 828,
           "unityTriangles": 828
         },
         "LOD2": {
-          "blenderFaces": 202,
+          "blenderFaces": 412,
           "unityTriangles": 412
         }
       }
@@ -538,6 +1228,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_assault_walker_plasma_cinder_ablative_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_plasma_cinder_ablative_era.prefab",
       "texturePrefix": "RCLModule_plasma_cinder_ablative",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3360,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5369,
+        "meanAcmrAfter": 0.5369,
+        "objects": [
+          {
+            "objectName": "RCLModule_assault_walker_plasma_cinder_ablative_era_Batch_RCLMo",
+            "formClass": "primary_faceted",
+            "triangleCount": 1120,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5393,
+            "acmrAfter": 0.5393,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.337,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_assault_walker_plasma_cinder_ablative_era_Batch_RCLM",
+            "formClass": "primary_faceted",
+            "triangleCount": 952,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5326,
+            "acmrAfter": 0.5326,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.275,
+              "rMax": 0.328,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_assault_walker_plasma_cinder_ablative_era_Batch_RCL",
+            "formClass": "primary_faceted",
+            "triangleCount": 1288,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5388,
+            "acmrAfter": 0.5388,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.323,
+              "rMax": 0.332,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -546,15 +1301,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1848,
+          "blenderFaces": 3360,
           "unityTriangles": 3360
         },
         "LOD1": {
-          "blenderFaces": 895,
+          "blenderFaces": 1680,
           "unityTriangles": 1680
         },
         "LOD2": {
-          "blenderFaces": 367,
+          "blenderFaces": 840,
           "unityTriangles": 840
         }
       }
@@ -580,6 +1335,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_assault_walker_plasma_cinder_ablative_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_plasma_cinder_ablative_sponsons.prefab",
       "texturePrefix": "RCLModule_plasma_cinder_ablative",
+      "meshQuality": {
+        "role": "excavation_drill",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1300,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5537,
+        "meanAcmrAfter": 0.5537,
+        "objects": [
+          {
+            "objectName": "RCLModule_assault_walker_plasma_cinder_ablative_sponsons_Batch_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 352,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5426,
+            "acmrAfter": 0.5426,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.456,
+              "gMax": 0.753,
+              "bMax": 0.25,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_assault_walker_plasma_cinder_ablative_sponsons_Batch",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 44,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.423,
+              "gMax": 0.753,
+              "bMax": 0.178,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_assault_walker_plasma_cinder_ablative_sponsons_Batc",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 904,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.573,
+            "acmrAfter": 0.573,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.402,
+              "gMax": 0.831,
+              "bMax": 0.188,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -588,15 +1408,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 650,
+          "blenderFaces": 1300,
           "unityTriangles": 1300
         },
         "LOD1": {
-          "blenderFaces": 443,
+          "blenderFaces": 650,
           "unityTriangles": 650
         },
         "LOD2": {
-          "blenderFaces": 245,
+          "blenderFaces": 324,
           "unityTriangles": 324
         }
       }
@@ -622,6 +1442,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_assault_walker_orbital_drop_pod_cermet_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_orbital_drop_pod_cermet_era.prefab",
       "texturePrefix": "RCLModule_orbital_drop_pod_cermet",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2588,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5466,
+        "meanAcmrAfter": 0.5466,
+        "objects": [
+          {
+            "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_era_Batch_RCLM",
+            "formClass": "primary_faceted",
+            "triangleCount": 1484,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5458,
+            "acmrAfter": 0.5458,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.597,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_era_Batch_RCL",
+            "formClass": "primary_faceted",
+            "triangleCount": 576,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5486,
+            "acmrAfter": 0.5486,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.527,
+              "gMax": 0.839,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_era_Batch_RC",
+            "formClass": "primary_faceted",
+            "triangleCount": 528,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.631,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -630,15 +1515,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1442,
+          "blenderFaces": 2588,
           "unityTriangles": 2588
         },
         "LOD1": {
-          "blenderFaces": 750,
+          "blenderFaces": 1294,
           "unityTriangles": 1294
         },
         "LOD2": {
-          "blenderFaces": 376,
+          "blenderFaces": 646,
           "unityTriangles": 646
         }
       }
@@ -664,6 +1549,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_assault_walker_orbital_drop_pod_cermet_aps.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_assault_walker_orbital_drop_pod_cermet_aps.prefab",
       "texturePrefix": "RCLModule_orbital_drop_pod_cermet",
+      "meshQuality": {
+        "role": "aps_phase_shield",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2528,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5446,
+        "meanAcmrAfter": 0.5446,
+        "objects": [
+          {
+            "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_Batch_RCLM",
+            "formClass": "primary_cast",
+            "triangleCount": 1388,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5432,
+            "acmrAfter": 0.5432,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.584,
+              "gMax": 0.839,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_Batch_RCL",
+            "formClass": "primary_cast",
+            "triangleCount": 652,
+            "degenerateTriangles": 32,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5475,
+            "acmrAfter": 0.5475,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.27,
+              "rMax": 0.584,
+              "gMax": 0.863,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_assault_walker_orbital_drop_pod_cermet_aps_Batch_RC",
+            "formClass": "primary_cast",
+            "triangleCount": 488,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.543,
+            "acmrAfter": 0.543,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.309,
+              "rMax": 0.546,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -672,15 +1622,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1328,
+          "blenderFaces": 2528,
           "unityTriangles": 2528
         },
         "LOD1": {
-          "blenderFaces": 617,
+          "blenderFaces": 1264,
           "unityTriangles": 1264
         },
         "LOD2": {
-          "blenderFaces": 412,
+          "blenderFaces": 630,
           "unityTriangles": 630
         }
       }
@@ -706,6 +1656,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_atlas_crane_mech_zero_g_docking_alloy.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_atlas_crane_mech_zero_g_docking_alloy.prefab",
       "texturePrefix": "RCLModule_zero_g_docking_alloy",
+      "meshQuality": {
+        "role": "docking_clamp",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2008,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5439,
+        "meanAcmrAfter": 0.5439,
+        "objects": [
+          {
+            "objectName": "RCLModule_atlas_crane_mech_zero_g_docking_alloy_Batch_RCLModule",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 132,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.468,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_atlas_crane_mech_zero_g_docking_alloy_Batch_RCLModul",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 764,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5366,
+            "acmrAfter": 0.5366,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.497,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_atlas_crane_mech_zero_g_docking_alloy_Batch_RCLModu",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1112,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5495,
+            "acmrAfter": 0.5495,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.509,
+              "gMax": 0.839,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -714,15 +1729,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1016,
+          "blenderFaces": 2008,
           "unityTriangles": 2008
         },
         "LOD1": {
-          "blenderFaces": 552,
+          "blenderFaces": 1004,
           "unityTriangles": 1004
         },
         "LOD2": {
-          "blenderFaces": 353,
+          "blenderFaces": 500,
           "unityTriangles": 500
         }
       }
@@ -748,6 +1763,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_aps.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_stealth_radar_absorbent_ferrite_aps.prefab",
       "texturePrefix": "RCLModule_stealth_radar_absorbent_ferrite",
+      "meshQuality": {
+        "role": "aps_sensor_suite",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2756,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.541,
+        "meanAcmrAfter": 0.541,
+        "objects": [
+          {
+            "objectName": "RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_ap",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 2540,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5484,
+            "acmrAfter": 0.5484,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.723,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_a",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 172,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5291,
+            "acmrAfter": 0.5291,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.296,
+              "rMax": 0.687,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 44,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.371,
+              "rMax": 0.578,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -756,15 +1836,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1392,
+          "blenderFaces": 2756,
           "unityTriangles": 2756
         },
         "LOD1": {
-          "blenderFaces": 596,
+          "blenderFaces": 1378,
           "unityTriangles": 1378
         },
         "LOD2": {
-          "blenderFaces": 344,
+          "blenderFaces": 686,
           "unityTriangles": 686
         }
       }
@@ -790,6 +1870,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_stealth_radar_absorbent_ferrite_sponsons.prefab",
       "texturePrefix": "RCLModule_stealth_radar_absorbent_ferrite",
+      "meshQuality": {
+        "role": "thermal_radiator",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 8284,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.4928,
+        "meanAcmrAfter": 0.4928,
+        "objects": [
+          {
+            "objectName": "RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_sp",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 208,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.4519,
+            "acmrAfter": 0.4519,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.202,
+              "rMax": 0.468,
+              "gMax": 1.0,
+              "bMax": 0.27,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bastion_siege_mech_stealth_radar_absorbent_ferrite_s",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 8076,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5336,
+            "acmrAfter": 0.5336,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.474,
+              "gMax": 0.753,
+              "bMax": 0.332,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -798,16 +1925,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 4612,
+          "blenderFaces": 8284,
           "unityTriangles": 8284
         },
         "LOD1": {
-          "blenderFaces": 2102,
+          "blenderFaces": 4142,
           "unityTriangles": 4142
         },
         "LOD2": {
-          "blenderFaces": 1007,
-          "unityTriangles": 2118
+          "blenderFaces": 2120,
+          "unityTriangles": 2120
         }
       }
     },
@@ -832,6 +1959,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_bastion_siege_mech_cryo_glacier_camo_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_cryo_glacier_camo_era.prefab",
       "texturePrefix": "RCLModule_cryo_glacier_camo",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3360,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5369,
+        "meanAcmrAfter": 0.5369,
+        "objects": [
+          {
+            "objectName": "RCLModule_bastion_siege_mech_cryo_glacier_camo_era_Batch_RCLMod",
+            "formClass": "primary_faceted",
+            "triangleCount": 1120,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5393,
+            "acmrAfter": 0.5393,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.337,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bastion_siege_mech_cryo_glacier_camo_era_Batch_RCLMo",
+            "formClass": "primary_faceted",
+            "triangleCount": 952,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5326,
+            "acmrAfter": 0.5326,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.275,
+              "rMax": 0.328,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bastion_siege_mech_cryo_glacier_camo_era_Batch_RCLM",
+            "formClass": "primary_faceted",
+            "triangleCount": 1288,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5388,
+            "acmrAfter": 0.5388,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.323,
+              "rMax": 0.332,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -840,15 +2032,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1848,
+          "blenderFaces": 3360,
           "unityTriangles": 3360
         },
         "LOD1": {
-          "blenderFaces": 895,
+          "blenderFaces": 1680,
           "unityTriangles": 1680
         },
         "LOD2": {
-          "blenderFaces": 367,
+          "blenderFaces": 840,
           "unityTriangles": 840
         }
       }
@@ -874,6 +2066,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_bastion_siege_mech_cryo_glacier_camo_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bastion_siege_mech_cryo_glacier_camo_sponsons.prefab",
       "texturePrefix": "RCLModule_cryo_glacier_camo",
+      "meshQuality": {
+        "role": "thermal_radiator",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 6654,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5434,
+        "meanAcmrAfter": 0.5434,
+        "objects": [
+          {
+            "objectName": "RCLModule_bastion_siege_mech_cryo_glacier_camo_sponsons_Batch_R",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 418,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5407,
+            "acmrAfter": 0.5407,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.202,
+              "rMax": 0.468,
+              "gMax": 1.0,
+              "bMax": 0.242,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bastion_siege_mech_cryo_glacier_camo_sponsons_Batch_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 6148,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5439,
+            "acmrAfter": 0.5439,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.462,
+              "gMax": 1.0,
+              "bMax": 0.342,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bastion_siege_mech_cryo_glacier_camo_sponsons_Batch",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 88,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.456,
+              "gMax": 0.753,
+              "bMax": 0.153,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -882,16 +2139,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 3720,
+          "blenderFaces": 6654,
           "unityTriangles": 6654
         },
         "LOD1": {
-          "blenderFaces": 1770,
+          "blenderFaces": 3326,
           "unityTriangles": 3326
         },
         "LOD2": {
-          "blenderFaces": 893,
-          "unityTriangles": 1696
+          "blenderFaces": 1690,
+          "unityTriangles": 1690
         }
       }
     },
@@ -916,6 +2173,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_arachnid_hexapod_pulsar_magnetic_shield_aps.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_pulsar_magnetic_shield_aps.prefab",
       "texturePrefix": "RCLModule_pulsar_magnetic_shield",
+      "meshQuality": {
+        "role": "aps_magnetic_shield",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2016,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5518,
+        "meanAcmrAfter": 0.5518,
+        "objects": [
+          {
+            "objectName": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_aps_Batch_RCL",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 244,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5492,
+            "acmrAfter": 0.5492,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.604,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_aps_Batch_RC",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 808,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5347,
+            "acmrAfter": 0.5347,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.292,
+              "rMax": 0.546,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_aps_Batch_R",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 964,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5716,
+            "acmrAfter": 0.5716,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.305,
+              "rMax": 0.631,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -924,15 +2246,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1060,
+          "blenderFaces": 2016,
           "unityTriangles": 2016
         },
         "LOD1": {
-          "blenderFaces": 494,
+          "blenderFaces": 1008,
           "unityTriangles": 1008
         },
         "LOD2": {
-          "blenderFaces": 241,
+          "blenderFaces": 502,
           "unityTriangles": 502
         }
       }
@@ -958,6 +2280,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_pulsar_magnetic_shield_sponsons.prefab",
       "texturePrefix": "RCLModule_pulsar_magnetic_shield",
+      "meshQuality": {
+        "role": "repair_dispenser",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1720,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5417,
+        "meanAcmrAfter": 0.5417,
+        "objects": [
+          {
+            "objectName": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Batc",
+            "formClass": "primary_cast",
+            "triangleCount": 204,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5392,
+            "acmrAfter": 0.5392,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.238,
+              "rMax": 0.982,
+              "gMax": 0.991,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Bat",
+            "formClass": "primary_cast",
+            "triangleCount": 856,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5421,
+            "acmrAfter": 0.5421,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.328,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arachnid_hexapod_pulsar_magnetic_shield_sponsons_Ba",
+            "formClass": "primary_cast",
+            "triangleCount": 660,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5439,
+            "acmrAfter": 0.5439,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.352,
+              "rMax": 0.956,
+              "gMax": 0.913,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -966,15 +2353,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 850,
+          "blenderFaces": 1720,
           "unityTriangles": 1720
         },
         "LOD1": {
-          "blenderFaces": 436,
+          "blenderFaces": 860,
           "unityTriangles": 860
         },
         "LOD2": {
-          "blenderFaces": 249,
+          "blenderFaces": 428,
           "unityTriangles": 428
         }
       }
@@ -1000,6 +2387,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_arachnid_hexapod_stealth_void_composite_aps.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_stealth_void_composite_aps.prefab",
       "texturePrefix": "RCLModule_stealth_void_composite",
+      "meshQuality": {
+        "role": "aps_countermeasure_suite",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1960,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.549,
+        "meanAcmrAfter": 0.549,
+        "objects": [
+          {
+            "objectName": "RCLModule_arachnid_hexapod_stealth_void_composite_aps_Batch_RCL",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 176,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.468,
+              "gMax": 0.753,
+              "bMax": 0.212,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arachnid_hexapod_stealth_void_composite_aps_Batch_RC",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1060,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5462,
+            "acmrAfter": 0.5462,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.319,
+              "rMax": 0.973,
+              "gMax": 0.791,
+              "bMax": 0.235,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arachnid_hexapod_stealth_void_composite_aps_Batch_R",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 724,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5552,
+            "acmrAfter": 0.5552,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.352,
+              "rMax": 1.0,
+              "gMax": 0.753,
+              "bMax": 0.262,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1008,15 +2460,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 992,
+          "blenderFaces": 1960,
           "unityTriangles": 1960
         },
         "LOD1": {
-          "blenderFaces": 486,
+          "blenderFaces": 980,
           "unityTriangles": 980
         },
         "LOD2": {
-          "blenderFaces": 234,
+          "blenderFaces": 488,
           "unityTriangles": 488
         }
       }
@@ -1042,6 +2494,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_arachnid_hexapod_stealth_void_composite_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arachnid_hexapod_stealth_void_composite_sponsons.prefab",
       "texturePrefix": "RCLModule_stealth_void_composite",
+      "meshQuality": {
+        "role": "repair_dispenser",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1440,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.544,
+        "meanAcmrAfter": 0.544,
+        "objects": [
+          {
+            "objectName": "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Batc",
+            "formClass": "primary_cast",
+            "triangleCount": 92,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5435,
+            "acmrAfter": 0.5435,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Bat",
+            "formClass": "primary_cast",
+            "triangleCount": 848,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5425,
+            "acmrAfter": 0.5425,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.292,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arachnid_hexapod_stealth_void_composite_sponsons_Ba",
+            "formClass": "primary_cast",
+            "triangleCount": 500,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.546,
+            "acmrAfter": 0.546,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.371,
+              "rMax": 0.617,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1050,15 +2567,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 676,
+          "blenderFaces": 1440,
           "unityTriangles": 1440
         },
         "LOD1": {
-          "blenderFaces": 356,
+          "blenderFaces": 720,
           "unityTriangles": 720
         },
         "LOD2": {
-          "blenderFaces": 186,
+          "blenderFaces": 358,
           "unityTriangles": 358
         }
       }
@@ -1084,6 +2601,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_overlord_command_hq_solar_gold_radiator.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_overlord_command_hq_solar_gold_radiator.prefab",
       "texturePrefix": "RCLModule_solar_gold_radiator",
+      "meshQuality": {
+        "role": "thermal_radiator",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1372,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.542,
+        "meanAcmrAfter": 0.542,
+        "objects": [
+          {
+            "objectName": "RCLModule_overlord_command_hq_solar_gold_radiator_Batch_RCLModu",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 556,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5378,
+            "acmrAfter": 0.5378,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.982,
+              "bMax": 0.087,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_overlord_command_hq_solar_gold_radiator_Batch_RCLMod",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 728,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5426,
+            "acmrAfter": 0.5426,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.301,
+              "rMax": 0.973,
+              "gMax": 0.753,
+              "bMax": 0.162,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_overlord_command_hq_solar_gold_radiator_Batch_RCLMo",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 88,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.392,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.227,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1092,15 +2674,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 744,
+          "blenderFaces": 1372,
           "unityTriangles": 1372
         },
         "LOD1": {
-          "blenderFaces": 358,
+          "blenderFaces": 686,
           "unityTriangles": 686
         },
         "LOD2": {
-          "blenderFaces": 174,
+          "blenderFaces": 342,
           "unityTriangles": 342
         }
       }
@@ -1126,6 +2708,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skirmish_bike_cyber_nanoweave.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skirmish_bike_cyber_nanoweave.prefab",
       "texturePrefix": "RCLModule_cyber_nanoweave",
+      "meshQuality": {
+        "role": "aps_countermeasure_suite",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3712,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5439,
+        "meanAcmrAfter": 0.5439,
+        "objects": [
+          {
+            "objectName": "RCLModule_skirmish_bike_cyber_nanoweave_Batch_RCLModuleMaterial",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 780,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5462,
+            "acmrAfter": 0.5462,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.617,
+              "gMax": 0.753,
+              "bMax": 0.258,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skirmish_bike_cyber_nanoweave_Batch_RCLModuleMateria",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 2840,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5419,
+            "acmrAfter": 0.5419,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.631,
+              "gMax": 0.753,
+              "bMax": 0.266,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skirmish_bike_cyber_nanoweave_Batch_RCLModuleMateri",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 92,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5435,
+            "acmrAfter": 0.5435,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.381,
+              "rMax": 0.392,
+              "gMax": 0.753,
+              "bMax": 0.153,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1134,15 +2781,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1808,
+          "blenderFaces": 3712,
           "unityTriangles": 3712
         },
         "LOD1": {
-          "blenderFaces": 777,
+          "blenderFaces": 1856,
           "unityTriangles": 1856
         },
         "LOD2": {
-          "blenderFaces": 385,
+          "blenderFaces": 926,
           "unityTriangles": 926
         }
       }
@@ -1168,6 +2815,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skirmish_bike_cerberus_white_ceramic.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skirmish_bike_cerberus_white_ceramic.prefab",
       "texturePrefix": "RCLModule_cerberus_white_ceramic",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 3576,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5323,
+        "meanAcmrAfter": 0.5323,
+        "objects": [
+          {
+            "objectName": "RCLModule_skirmish_bike_cerberus_white_ceramic_Batch_RCLModuleM",
+            "formClass": "primary_faceted",
+            "triangleCount": 3000,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5437,
+            "acmrAfter": 0.5437,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.361,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skirmish_bike_cerberus_white_ceramic_Batch_RCLModule",
+            "formClass": "primary_faceted",
+            "triangleCount": 576,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5208,
+            "acmrAfter": 0.5208,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.347,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1176,16 +2870,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1938,
+          "blenderFaces": 3576,
           "unityTriangles": 3576
         },
         "LOD1": {
-          "blenderFaces": 908,
-          "unityTriangles": 1776
+          "blenderFaces": 1788,
+          "unityTriangles": 1788
         },
         "LOD2": {
-          "blenderFaces": 394,
-          "unityTriangles": 870
+          "blenderFaces": 894,
+          "unityTriangles": 894
         }
       }
     },
@@ -1210,6 +2904,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_surge_tank_ion_thruster_titanium_grate_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_surge_tank_ion_thruster_titanium_grate_sponsons.prefab",
       "texturePrefix": "RCLModule_ion_thruster_titanium_grate",
+      "meshQuality": {
+        "role": "thermal_radiator",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1736,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5429,
+        "meanAcmrAfter": 0.5429,
+        "objects": [
+          {
+            "objectName": "RCLModule_surge_tank_ion_thruster_titanium_grate_sponsons_Batch",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 204,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5441,
+            "acmrAfter": 0.5441,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.991,
+              "bMax": 0.076,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_surge_tank_ion_thruster_titanium_grate_sponsons_Batc",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 948,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5401,
+            "acmrAfter": 0.5401,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.301,
+              "rMax": 0.799,
+              "gMax": 0.753,
+              "bMax": 0.13,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_surge_tank_ion_thruster_titanium_grate_sponsons_Bat",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 584,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5445,
+            "acmrAfter": 0.5445,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.301,
+              "rMax": 0.791,
+              "gMax": 0.753,
+              "bMax": 0.27,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1218,15 +2977,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 926,
+          "blenderFaces": 1736,
           "unityTriangles": 1736
         },
         "LOD1": {
-          "blenderFaces": 496,
+          "blenderFaces": 868,
           "unityTriangles": 868
         },
         "LOD2": {
-          "blenderFaces": 218,
+          "blenderFaces": 432,
           "unityTriangles": 432
         }
       }
@@ -1252,6 +3011,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_surge_tank_ion_thruster_titanium_grate_fueldrums.prefab",
       "texturePrefix": "RCLModule_ion_thruster_titanium_grate",
+      "meshQuality": {
+        "role": "fuel_drum_pair",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2480,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.544,
+        "meanAcmrAfter": 0.544,
+        "objects": [
+          {
+            "objectName": "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Batc",
+            "formClass": "primary_cast",
+            "triangleCount": 1912,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5439,
+            "acmrAfter": 0.5439,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.521,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Bat",
+            "formClass": "primary_cast",
+            "triangleCount": 248,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5444,
+            "acmrAfter": 0.5444,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.503,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_surge_tank_ion_thruster_titanium_grate_fueldrums_Ba",
+            "formClass": "primary_cast",
+            "triangleCount": 320,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5437,
+            "acmrAfter": 0.5437,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.376,
+              "rMax": 0.515,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1260,15 +3084,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1280,
+          "blenderFaces": 2480,
           "unityTriangles": 2480
         },
         "LOD1": {
-          "blenderFaces": 590,
+          "blenderFaces": 1240,
           "unityTriangles": 1240
         },
         "LOD2": {
-          "blenderFaces": 262,
+          "blenderFaces": 620,
           "unityTriangles": 620
         }
       }
@@ -1294,6 +3118,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_surge_tank_antimatter_containment_lattice.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_surge_tank_antimatter_containment_lattice.prefab",
       "texturePrefix": "RCLModule_antimatter_containment_lattice",
+      "meshQuality": {
+        "role": "plasma_containment",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2892,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5605,
+        "meanAcmrAfter": 0.5605,
+        "objects": [
+          {
+            "objectName": "RCLModule_surge_tank_antimatter_containment_lattice_Batch_RCLMo",
+            "formClass": "primary_faceted",
+            "triangleCount": 328,
+            "degenerateTriangles": 4,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5915,
+            "acmrAfter": 0.5915,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.761,
+              "bMax": 0.014,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_surge_tank_antimatter_containment_lattice_Batch_RCLM",
+            "formClass": "primary_faceted",
+            "triangleCount": 1888,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5487,
+            "acmrAfter": 0.5487,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 1.0,
+              "gMax": 0.839,
+              "bMax": 0.082,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_surge_tank_antimatter_containment_lattice_Batch_RCL",
+            "formClass": "primary_faceted",
+            "triangleCount": 676,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5414,
+            "acmrAfter": 0.5414,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.371,
+              "rMax": 0.738,
+              "gMax": 0.753,
+              "bMax": 0.01,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1302,15 +3191,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1508,
+          "blenderFaces": 2892,
           "unityTriangles": 2892
         },
         "LOD1": {
-          "blenderFaces": 817,
+          "blenderFaces": 1446,
           "unityTriangles": 1446
         },
         "LOD2": {
-          "blenderFaces": 439,
+          "blenderFaces": 722,
           "unityTriangles": 722
         }
       }
@@ -1336,6 +3225,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_tidebreaker_skirmisher_tachyon_warp_radiator.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_tachyon_warp_radiator.prefab",
       "texturePrefix": "RCLModule_tachyon_warp_radiator",
+      "meshQuality": {
+        "role": "thermal_radiator",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1280,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5493,
+        "meanAcmrAfter": 0.5493,
+        "objects": [
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_tachyon_warp_radiator_Batch_RC",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 204,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5735,
+            "acmrAfter": 0.5735,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.982,
+              "bMax": 0.087,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_tachyon_warp_radiator_Batch_R",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 580,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5362,
+            "acmrAfter": 0.5362,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.296,
+              "rMax": 0.768,
+              "gMax": 0.753,
+              "bMax": 0.05,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_tachyon_warp_radiator_Batch_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 496,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5383,
+            "acmrAfter": 0.5383,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.301,
+              "rMax": 0.768,
+              "gMax": 0.753,
+              "bMax": 0.266,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1344,15 +3298,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 686,
+          "blenderFaces": 1280,
           "unityTriangles": 1280
         },
         "LOD1": {
-          "blenderFaces": 342,
+          "blenderFaces": 640,
           "unityTriangles": 640
         },
         "LOD2": {
-          "blenderFaces": 155,
+          "blenderFaces": 318,
           "unityTriangles": 318
         }
       }
@@ -1378,6 +3332,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_cryo_glacier_camo_era.prefab",
       "texturePrefix": "RCLModule_cryo_glacier_camo",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3140,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.541,
+        "meanAcmrAfter": 0.541,
+        "objects": [
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_era_Batch_RC",
+            "formClass": "primary_faceted",
+            "triangleCount": 1544,
+            "degenerateTriangles": 8,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5402,
+            "acmrAfter": 0.5402,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.332,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_era_Batch_R",
+            "formClass": "primary_faceted",
+            "triangleCount": 952,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5378,
+            "acmrAfter": 0.5378,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.262,
+              "rMax": 0.332,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_era_Batch_",
+            "formClass": "primary_faceted",
+            "triangleCount": 644,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.545,
+            "acmrAfter": 0.545,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.323,
+              "rMax": 0.337,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1386,15 +3405,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1742,
+          "blenderFaces": 3140,
           "unityTriangles": 3140
         },
         "LOD1": {
-          "blenderFaces": 775,
+          "blenderFaces": 1570,
           "unityTriangles": 1570
         },
         "LOD2": {
-          "blenderFaces": 355,
+          "blenderFaces": 784,
           "unityTriangles": 784
         }
       }
@@ -1420,6 +3439,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_cryo_glacier_camo_sponsons.prefab",
       "texturePrefix": "RCLModule_cryo_glacier_camo",
+      "meshQuality": {
+        "role": "docking_clamp",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1316,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5416,
+        "meanAcmrAfter": 0.5416,
+        "objects": [
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_sponsons_Bat",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1004,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5359,
+            "acmrAfter": 0.5359,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.44,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_sponsons_Ba",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 220,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.319,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_sponsons_B",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 92,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5435,
+            "acmrAfter": 0.5435,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.266,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1428,15 +3512,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 686,
+          "blenderFaces": 1316,
           "unityTriangles": 1316
         },
         "LOD1": {
-          "blenderFaces": 374,
+          "blenderFaces": 658,
           "unityTriangles": 658
         },
         "LOD2": {
-          "blenderFaces": 160,
+          "blenderFaces": 326,
           "unityTriangles": 326
         }
       }
@@ -1462,6 +3546,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_fueldrums.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_tidebreaker_skirmisher_cryo_glacier_camo_fueldrums.prefab",
       "texturePrefix": "RCLModule_cryo_glacier_camo",
+      "meshQuality": {
+        "role": "ordnance_carrier",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2524,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5418,
+        "meanAcmrAfter": 0.5418,
+        "objects": [
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_fueldrums_B",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 960,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5417,
+            "acmrAfter": 0.5417,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.597,
+              "gMax": 0.753,
+              "bMax": 0.381,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_fueldrums_Ba",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 416,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5409,
+            "acmrAfter": 0.5409,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.371,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.328,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_tidebreaker_skirmisher_cryo_glacier_camo_fueldrums_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1148,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5427,
+            "acmrAfter": 0.5427,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.323,
+              "rMax": 0.61,
+              "gMax": 0.753,
+              "bMax": 0.188,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1470,15 +3619,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1132,
+          "blenderFaces": 2524,
           "unityTriangles": 2524
         },
         "LOD1": {
-          "blenderFaces": 535,
+          "blenderFaces": 1262,
           "unityTriangles": 1262
         },
         "LOD2": {
-          "blenderFaces": 320,
+          "blenderFaces": 630,
           "unityTriangles": 630
         }
       }
@@ -1504,6 +3653,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_salvage_hauler_hazard_industrial_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_hazard_industrial_sponsons.prefab",
       "texturePrefix": "RCLModule_hazard_industrial",
+      "meshQuality": {
+        "role": "utility_sponson",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1816,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5524,
+        "meanAcmrAfter": 0.5524,
+        "objects": [
+          {
+            "objectName": "RCLModule_salvage_hauler_hazard_industrial_sponsons_Batch_RCLMo",
+            "formClass": "primary_faceted",
+            "triangleCount": 424,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.559,
+            "acmrAfter": 0.559,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.658,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_salvage_hauler_hazard_industrial_sponsons_Batch_RCLM",
+            "formClass": "primary_faceted",
+            "triangleCount": 1300,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5438,
+            "acmrAfter": 0.5438,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.672,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_salvage_hauler_hazard_industrial_sponsons_Batch_RCL",
+            "formClass": "primary_faceted",
+            "triangleCount": 92,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5543,
+            "acmrAfter": 0.5543,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.392,
+              "rMax": 0.672,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1512,15 +3726,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 978,
+          "blenderFaces": 1816,
           "unityTriangles": 1816
         },
         "LOD1": {
-          "blenderFaces": 518,
+          "blenderFaces": 908,
           "unityTriangles": 908
         },
         "LOD2": {
-          "blenderFaces": 251,
+          "blenderFaces": 452,
           "unityTriangles": 452
         }
       }
@@ -1546,6 +3760,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_salvage_hauler_hazard_industrial_fueldrums.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_hazard_industrial_fueldrums.prefab",
       "texturePrefix": "RCLModule_hazard_industrial",
+      "meshQuality": {
+        "role": "fuel_jerrycan_carrier",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2564,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5404,
+        "meanAcmrAfter": 0.5404,
+        "objects": [
+          {
+            "objectName": "RCLModule_salvage_hauler_hazard_industrial_fueldrums_Batch_RCLM",
+            "formClass": "primary_faceted",
+            "triangleCount": 1708,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5433,
+            "acmrAfter": 0.5433,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_salvage_hauler_hazard_industrial_fueldrums_Batch_RCL",
+            "formClass": "primary_faceted",
+            "triangleCount": 496,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5363,
+            "acmrAfter": 0.5363,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.262,
+              "rMax": 0.956,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_salvage_hauler_hazard_industrial_fueldrums_Batch_RC",
+            "formClass": "primary_faceted",
+            "triangleCount": 360,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5417,
+            "acmrAfter": 0.5417,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.254,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1554,15 +3833,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1434,
+          "blenderFaces": 2564,
           "unityTriangles": 2564
         },
         "LOD1": {
-          "blenderFaces": 717,
+          "blenderFaces": 1282,
           "unityTriangles": 1282
         },
         "LOD2": {
-          "blenderFaces": 311,
+          "blenderFaces": 640,
           "unityTriangles": 640
         }
       }
@@ -1588,6 +3867,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_salvage_hauler_minefield_ordnance_carrier_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_minefield_ordnance_carrier_sponsons.prefab",
       "texturePrefix": "RCLModule_minefield_ordnance_carrier",
+      "meshQuality": {
+        "role": "field_engineering_crane",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1876,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5386,
+        "meanAcmrAfter": 0.5386,
+        "objects": [
+          {
+            "objectName": "RCLModule_salvage_hauler_minefield_ordnance_carrier_sponsons_Ba",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1084,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5397,
+            "acmrAfter": 0.5397,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_salvage_hauler_minefield_ordnance_carrier_sponsons_B",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 380,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5421,
+            "acmrAfter": 0.5421,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.638,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_salvage_hauler_minefield_ordnance_carrier_sponsons_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 412,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.534,
+            "acmrAfter": 0.534,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.456,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1596,15 +3940,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 962,
+          "blenderFaces": 1876,
           "unityTriangles": 1876
         },
         "LOD1": {
-          "blenderFaces": 435,
+          "blenderFaces": 938,
           "unityTriangles": 938
         },
         "LOD2": {
-          "blenderFaces": 218,
+          "blenderFaces": 466,
           "unityTriangles": 466
         }
       }
@@ -1630,6 +3974,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_salvage_hauler_minefield_ordnance_carrier_fueldrums.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_salvage_hauler_minefield_ordnance_carrier_fueldrums.prefab",
       "texturePrefix": "RCLModule_minefield_ordnance_carrier",
+      "meshQuality": {
+        "role": "ordnance_carrier",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 4724,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5518,
+        "meanAcmrAfter": 0.5518,
+        "objects": [
+          {
+            "objectName": "RCLModule_salvage_hauler_minefield_ordnance_carrier_fueldrums_B",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 3400,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5629,
+            "acmrAfter": 0.5629,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.231,
+              "rMax": 0.991,
+              "gMax": 1.0,
+              "bMax": 0.287,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_salvage_hauler_minefield_ordnance_carrier_fueldrums_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 176,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.376,
+              "rMax": 0.965,
+              "gMax": 0.753,
+              "bMax": 0.266,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_salvage_hauler_minefield_ordnance_carrier_fueldrums",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1148,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.547,
+            "acmrAfter": 0.547,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.371,
+              "rMax": 0.982,
+              "gMax": 0.753,
+              "bMax": 0.05,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1638,15 +4047,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 2258,
+          "blenderFaces": 4724,
           "unityTriangles": 4724
         },
         "LOD1": {
-          "blenderFaces": 1136,
+          "blenderFaces": 2362,
           "unityTriangles": 2362
         },
         "LOD2": {
-          "blenderFaces": 597,
+          "blenderFaces": 1180,
           "unityTriangles": 1180
         }
       }
@@ -1672,6 +4081,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skyguard_sam_solar_flare_radiation_shield_aps.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_solar_flare_radiation_shield_aps.prefab",
       "texturePrefix": "RCLModule_solar_flare_radiation_shield",
+      "meshQuality": {
+        "role": "aps_phase_shield",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1668,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5575,
+        "meanAcmrAfter": 0.5575,
+        "objects": [
+          {
+            "objectName": "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Batch_R",
+            "formClass": "primary_cast",
+            "triangleCount": 344,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5901,
+            "acmrAfter": 0.5901,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.597,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Batch_",
+            "formClass": "primary_cast",
+            "triangleCount": 820,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5427,
+            "acmrAfter": 0.5427,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.235,
+              "rMax": 0.617,
+              "gMax": 0.839,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skyguard_sam_solar_flare_radiation_shield_aps_Batch",
+            "formClass": "primary_cast",
+            "triangleCount": 504,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5397,
+            "acmrAfter": 0.5397,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.27,
+              "rMax": 0.61,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1680,15 +4154,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 858,
+          "blenderFaces": 1668,
           "unityTriangles": 1668
         },
         "LOD1": {
-          "blenderFaces": 468,
+          "blenderFaces": 834,
           "unityTriangles": 834
         },
         "LOD2": {
-          "blenderFaces": 275,
+          "blenderFaces": 416,
           "unityTriangles": 416
         }
       }
@@ -1714,6 +4188,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skyguard_sam_solar_flare_radiation_shield_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_solar_flare_radiation_shield_sponsons.prefab",
       "texturePrefix": "RCLModule_solar_flare_radiation_shield",
+      "meshQuality": {
+        "role": "heavy_flak_battery",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2456,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5473,
+        "meanAcmrAfter": 0.5473,
+        "objects": [
+          {
+            "objectName": "RCLModule_skyguard_sam_solar_flare_radiation_shield_sponsons_Ba",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 224,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5446,
+            "acmrAfter": 0.5446,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.451,
+              "gMax": 0.753,
+              "bMax": 0.617,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skyguard_sam_solar_flare_radiation_shield_sponsons_B",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 936,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5417,
+            "acmrAfter": 0.5417,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.701,
+              "gMax": 0.753,
+              "bMax": 0.565,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skyguard_sam_solar_flare_radiation_shield_sponsons_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1296,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5556,
+            "acmrAfter": 0.5556,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 1.0,
+              "gMax": 0.753,
+              "bMax": 0.376,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1722,15 +4261,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1252,
+          "blenderFaces": 2456,
           "unityTriangles": 2456
         },
         "LOD1": {
-          "blenderFaces": 640,
+          "blenderFaces": 1228,
           "unityTriangles": 1228
         },
         "LOD2": {
-          "blenderFaces": 322,
+          "blenderFaces": 614,
           "unityTriangles": 614
         }
       }
@@ -1756,6 +4295,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skyguard_sam_longshot_sniper_camo_aps.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_longshot_sniper_camo_aps.prefab",
       "texturePrefix": "RCLModule_longshot_sniper_camo",
+      "meshQuality": {
+        "role": "aps_sensor_suite",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3112,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5462,
+        "meanAcmrAfter": 0.5462,
+        "objects": [
+          {
+            "objectName": "RCLModule_skyguard_sam_longshot_sniper_camo_aps_Batch_RCLModule",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 2800,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5564,
+            "acmrAfter": 0.5564,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.202,
+              "rMax": 0.665,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skyguard_sam_longshot_sniper_camo_aps_Batch_RCLModul",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 136,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5368,
+            "acmrAfter": 0.5368,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.27,
+              "rMax": 0.604,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skyguard_sam_longshot_sniper_camo_aps_Batch_RCLModu",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 176,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.371,
+              "rMax": 0.591,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1764,15 +4368,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1476,
+          "blenderFaces": 3112,
           "unityTriangles": 3112
         },
         "LOD1": {
-          "blenderFaces": 717,
+          "blenderFaces": 1556,
           "unityTriangles": 1556
         },
         "LOD2": {
-          "blenderFaces": 401,
+          "blenderFaces": 778,
           "unityTriangles": 778
         }
       }
@@ -1798,6 +4402,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_skyguard_sam_longshot_sniper_camo_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_skyguard_sam_longshot_sniper_camo_sponsons.prefab",
       "texturePrefix": "RCLModule_longshot_sniper_camo",
+      "meshQuality": {
+        "role": "heavy_flak_battery",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2580,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5585,
+        "meanAcmrAfter": 0.5585,
+        "objects": [
+          {
+            "objectName": "RCLModule_skyguard_sam_longshot_sniper_camo_sponsons_Batch_RCLM",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1944,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5391,
+            "acmrAfter": 0.5391,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.991,
+              "gMax": 0.753,
+              "bMax": 0.578,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skyguard_sam_longshot_sniper_camo_sponsons_Batch_RCL",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 256,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5469,
+            "acmrAfter": 0.5469,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.597,
+              "gMax": 0.753,
+              "bMax": 0.44,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_skyguard_sam_longshot_sniper_camo_sponsons_Batch_RC",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 380,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5895,
+            "acmrAfter": 0.5895,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.25,
+              "gMax": 0.753,
+              "bMax": 0.27,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1806,15 +4475,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1334,
+          "blenderFaces": 2580,
           "unityTriangles": 2580
         },
         "LOD1": {
-          "blenderFaces": 643,
+          "blenderFaces": 1290,
           "unityTriangles": 1290
         },
         "LOD2": {
-          "blenderFaces": 337,
+          "blenderFaces": 644,
           "unityTriangles": 644
         }
       }
@@ -1840,6 +4509,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_bulwark_siege_tank_battleship_tungsten.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bulwark_siege_tank_battleship_tungsten.prefab",
       "texturePrefix": "RCLModule_battleship_tungsten",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 5960,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5313,
+        "meanAcmrAfter": 0.5313,
+        "objects": [
+          {
+            "objectName": "RCLModule_bulwark_siege_tank_battleship_tungsten_Batch_RCLModul",
+            "formClass": "primary_faceted",
+            "triangleCount": 5000,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5418,
+            "acmrAfter": 0.5418,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.376,
+              "rMax": 0.973,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bulwark_siege_tank_battleship_tungsten_Batch_RCLModu",
+            "formClass": "primary_faceted",
+            "triangleCount": 960,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5208,
+            "acmrAfter": 0.5208,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.319,
+              "rMax": 0.956,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1848,16 +4564,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 3230,
+          "blenderFaces": 5960,
           "unityTriangles": 5960
         },
         "LOD1": {
-          "blenderFaces": 1500,
-          "unityTriangles": 2960
+          "blenderFaces": 2980,
+          "unityTriangles": 2980
         },
         "LOD2": {
-          "blenderFaces": 654,
-          "unityTriangles": 1450
+          "blenderFaces": 1490,
+          "unityTriangles": 1490
         }
       }
     },
@@ -1882,6 +4598,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_bulwark_siege_tank_minefield_ordnance_carrier.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_bulwark_siege_tank_minefield_ordnance_carrier.prefab",
       "texturePrefix": "RCLModule_minefield_ordnance_carrier",
+      "meshQuality": {
+        "role": "ordnance_carrier",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 6304,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5524,
+        "meanAcmrAfter": 0.5524,
+        "objects": [
+          {
+            "objectName": "RCLModule_bulwark_siege_tank_minefield_ordnance_carrier_Batch_R",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 4648,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5643,
+            "acmrAfter": 0.5643,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.231,
+              "rMax": 0.991,
+              "gMax": 1.0,
+              "bMax": 0.279,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bulwark_siege_tank_minefield_ordnance_carrier_Batch_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 264,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.254,
+              "rMax": 0.965,
+              "gMax": 0.753,
+              "bMax": 0.246,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_bulwark_siege_tank_minefield_ordnance_carrier_Batch",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1392,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5474,
+            "acmrAfter": 0.5474,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.356,
+              "rMax": 0.982,
+              "gMax": 0.753,
+              "bMax": 0.144,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1890,15 +4671,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 3102,
+          "blenderFaces": 6304,
           "unityTriangles": 6304
         },
         "LOD1": {
-          "blenderFaces": 1475,
+          "blenderFaces": 3152,
           "unityTriangles": 3152
         },
         "LOD2": {
-          "blenderFaces": 748,
+          "blenderFaces": 1576,
           "unityTriangles": 1576
         }
       }
@@ -1924,6 +4705,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_arc_lance_walker_plasma_arc_containment.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_arc_lance_walker_plasma_arc_containment.prefab",
       "texturePrefix": "RCLModule_plasma_arc_containment",
+      "meshQuality": {
+        "role": "plasma_containment",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3020,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5496,
+        "meanAcmrAfter": 0.5496,
+        "objects": [
+          {
+            "objectName": "RCLModule_arc_lance_walker_plasma_arc_containment_Batch_RCLModu",
+            "formClass": "primary_faceted",
+            "triangleCount": 328,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.564,
+            "acmrAfter": 0.564,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.761,
+              "bMax": 0.016,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arc_lance_walker_plasma_arc_containment_Batch_RCLMod",
+            "formClass": "primary_faceted",
+            "triangleCount": 2068,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.543,
+            "acmrAfter": 0.543,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 1.0,
+              "gMax": 0.839,
+              "bMax": 0.089,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_arc_lance_walker_plasma_arc_containment_Batch_RCLMo",
+            "formClass": "primary_faceted",
+            "triangleCount": 624,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5417,
+            "acmrAfter": 0.5417,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.371,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.067,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1932,15 +4778,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1592,
+          "blenderFaces": 3020,
           "unityTriangles": 3020
         },
         "LOD1": {
-          "blenderFaces": 714,
+          "blenderFaces": 1510,
           "unityTriangles": 1510
         },
         "LOD2": {
-          "blenderFaces": 425,
+          "blenderFaces": 754,
           "unityTriangles": 754
         }
       }
@@ -1966,6 +4812,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_field_medic_rover_nanite_repair_chitin.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_field_medic_rover_nanite_repair_chitin.prefab",
       "texturePrefix": "RCLModule_nanite_repair_chitin",
+      "meshQuality": {
+        "role": "repair_dispenser",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1296,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5471,
+        "meanAcmrAfter": 0.5471,
+        "objects": [
+          {
+            "objectName": "RCLModule_field_medic_rover_nanite_repair_chitin_Batch_RCLModul",
+            "formClass": "primary_cast",
+            "triangleCount": 132,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_field_medic_rover_nanite_repair_chitin_Batch_RCLModu",
+            "formClass": "primary_cast",
+            "triangleCount": 784,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.551,
+            "acmrAfter": 0.551,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 1.0,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_field_medic_rover_nanite_repair_chitin_Batch_RCLMod",
+            "formClass": "primary_cast",
+            "triangleCount": 380,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5447,
+            "acmrAfter": 0.5447,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.352,
+              "rMax": 1.0,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -1974,15 +4885,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 624,
+          "blenderFaces": 1296,
           "unityTriangles": 1296
         },
         "LOD1": {
-          "blenderFaces": 313,
+          "blenderFaces": 648,
           "unityTriangles": 648
         },
         "LOD2": {
-          "blenderFaces": 153,
+          "blenderFaces": 322,
           "unityTriangles": 322
         }
       }
@@ -2008,6 +4919,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_sentinel_relay_stealth_void_composite.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_sentinel_relay_stealth_void_composite.prefab",
       "texturePrefix": "RCLModule_stealth_void_composite",
+      "meshQuality": {
+        "role": "aps_countermeasure_suite",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1960,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.549,
+        "meanAcmrAfter": 0.549,
+        "objects": [
+          {
+            "objectName": "RCLModule_sentinel_relay_stealth_void_composite_Batch_RCLModule",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 176,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.468,
+              "gMax": 0.753,
+              "bMax": 0.212,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_sentinel_relay_stealth_void_composite_Batch_RCLModul",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1060,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5462,
+            "acmrAfter": 0.5462,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.319,
+              "rMax": 0.973,
+              "gMax": 0.791,
+              "bMax": 0.235,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_sentinel_relay_stealth_void_composite_Batch_RCLModu",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 724,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5552,
+            "acmrAfter": 0.5552,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.352,
+              "rMax": 1.0,
+              "gMax": 0.753,
+              "bMax": 0.262,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2016,15 +4992,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 992,
+          "blenderFaces": 1960,
           "unityTriangles": 1960
         },
         "LOD1": {
-          "blenderFaces": 486,
+          "blenderFaces": 980,
           "unityTriangles": 980
         },
         "LOD2": {
-          "blenderFaces": 234,
+          "blenderFaces": 488,
           "unityTriangles": 488
         }
       }
@@ -2050,6 +5026,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_sentinel_relay_beryllium_mirror_hull_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_sentinel_relay_beryllium_mirror_hull_era.prefab",
       "texturePrefix": "RCLModule_beryllium_mirror_hull",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 2384,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5307,
+        "meanAcmrAfter": 0.5307,
+        "objects": [
+          {
+            "objectName": "RCLModule_sentinel_relay_beryllium_mirror_hull_era_Batch_RCLMod",
+            "formClass": "primary_faceted",
+            "triangleCount": 2000,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5405,
+            "acmrAfter": 0.5405,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.361,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_sentinel_relay_beryllium_mirror_hull_era_Batch_RCLMo",
+            "formClass": "primary_faceted",
+            "triangleCount": 384,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5208,
+            "acmrAfter": 0.5208,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.347,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2058,16 +5081,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1292,
+          "blenderFaces": 2384,
           "unityTriangles": 2384
         },
         "LOD1": {
-          "blenderFaces": 604,
-          "unityTriangles": 1184
+          "blenderFaces": 1192,
+          "unityTriangles": 1192
         },
         "LOD2": {
-          "blenderFaces": 261,
-          "unityTriangles": 580
+          "blenderFaces": 596,
+          "unityTriangles": 596
         }
       }
     },
@@ -2092,6 +5115,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_sentinel_relay_beryllium_mirror_hull_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_sentinel_relay_beryllium_mirror_hull_sponsons.prefab",
       "texturePrefix": "RCLModule_beryllium_mirror_hull",
+      "meshQuality": {
+        "role": "utility_sponson",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 17452,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5291,
+        "meanAcmrAfter": 0.5291,
+        "objects": [
+          {
+            "objectName": "RCLModule_sentinel_relay_beryllium_mirror_hull_sponsons_Batch_R",
+            "formClass": "primary_faceted",
+            "triangleCount": 200,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.525,
+            "acmrAfter": 0.525,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.202,
+              "rMax": 0.468,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_sentinel_relay_beryllium_mirror_hull_sponsons_Batch_",
+            "formClass": "primary_faceted",
+            "triangleCount": 17252,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5332,
+            "acmrAfter": 0.5332,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.474,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2100,16 +5170,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 9696,
+          "blenderFaces": 17452,
           "unityTriangles": 17452
         },
         "LOD1": {
-          "blenderFaces": 4702,
+          "blenderFaces": 8726,
           "unityTriangles": 8726
         },
         "LOD2": {
-          "blenderFaces": 1976,
-          "unityTriangles": 4360
+          "blenderFaces": 4362,
+          "unityTriangles": 4362
         }
       }
     },
@@ -2134,6 +5204,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_gravitas_breaker_quantum_hyperdrive_alloy_sponsons.prefab",
       "texturePrefix": "RCLModule_quantum_hyperdrive_alloy",
+      "meshQuality": {
+        "role": "power_containment",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3072,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5634,
+        "meanAcmrAfter": 0.5634,
+        "objects": [
+          {
+            "objectName": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_sponsons_Ba",
+            "formClass": "primary_faceted",
+            "triangleCount": 276,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.6014,
+            "acmrAfter": 0.6014,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.61,
+              "gMax": 0.753,
+              "bMax": 0.004,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_sponsons_B",
+            "formClass": "primary_faceted",
+            "triangleCount": 2064,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5533,
+            "acmrAfter": 0.5533,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.202,
+              "rMax": 0.753,
+              "gMax": 1.0,
+              "bMax": 0.127,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_sponsons_",
+            "formClass": "primary_faceted",
+            "triangleCount": 732,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5355,
+            "acmrAfter": 0.5355,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.753,
+              "gMax": 0.839,
+              "bMax": 0.058,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2142,15 +5277,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1488,
+          "blenderFaces": 3072,
           "unityTriangles": 3072
         },
         "LOD1": {
-          "blenderFaces": 874,
+          "blenderFaces": 1536,
           "unityTriangles": 1536
         },
         "LOD2": {
-          "blenderFaces": 553,
+          "blenderFaces": 766,
           "unityTriangles": 766
         }
       }
@@ -2176,6 +5311,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_fueldrums.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_gravitas_breaker_quantum_hyperdrive_alloy_fueldrums.prefab",
       "texturePrefix": "RCLModule_quantum_hyperdrive_alloy",
+      "meshQuality": {
+        "role": "ordnance_carrier",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 3120,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5378,
+        "meanAcmrAfter": 0.5378,
+        "objects": [
+          {
+            "objectName": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_fueldrums_B",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 464,
+            "degenerateTriangles": 12,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5366,
+            "acmrAfter": 0.5366,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.202,
+              "rMax": 0.468,
+              "gMax": 0.753,
+              "bMax": 0.356,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_fueldrums_",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1416,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5438,
+            "acmrAfter": 0.5438,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.27,
+              "rMax": 0.552,
+              "gMax": 0.753,
+              "bMax": 0.309,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_gravitas_breaker_quantum_hyperdrive_alloy_fueldrums",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1240,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5331,
+            "acmrAfter": 0.5331,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.292,
+              "rMax": 0.552,
+              "gMax": 0.839,
+              "bMax": 0.238,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2184,15 +5384,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1572,
+          "blenderFaces": 3120,
           "unityTriangles": 3120
         },
         "LOD1": {
-          "blenderFaces": 890,
+          "blenderFaces": 1560,
           "unityTriangles": 1560
         },
         "LOD2": {
-          "blenderFaces": 493,
+          "blenderFaces": 780,
           "unityTriangles": 780
         }
       }
@@ -2218,6 +5418,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_gravitas_breaker_cryogenic_fuel_shroud.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_gravitas_breaker_cryogenic_fuel_shroud.prefab",
       "texturePrefix": "RCLModule_cryogenic_fuel_shroud",
+      "meshQuality": {
+        "role": "fuel_drum_pair",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 2288,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5722,
+        "meanAcmrAfter": 0.5722,
+        "objects": [
+          {
+            "objectName": "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_Batch_RCLModul",
+            "formClass": "primary_cast",
+            "triangleCount": 980,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.6112,
+            "acmrAfter": 0.6112,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.429,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_Batch_RCLModu",
+            "formClass": "primary_cast",
+            "triangleCount": 700,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5429,
+            "acmrAfter": 0.5429,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.44,
+              "gMax": 0.799,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_gravitas_breaker_cryogenic_fuel_shroud_Batch_RCLMod",
+            "formClass": "primary_cast",
+            "triangleCount": 608,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5625,
+            "acmrAfter": 0.5625,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.434,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2226,15 +5491,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1196,
+          "blenderFaces": 2288,
           "unityTriangles": 2288
         },
         "LOD1": {
-          "blenderFaces": 670,
+          "blenderFaces": 1144,
           "unityTriangles": 1144
         },
         "LOD2": {
-          "blenderFaces": 412,
+          "blenderFaces": 570,
           "unityTriangles": 570
         }
       }
@@ -2260,6 +5525,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_command_relay_beryllium_mirror_hull_era.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_beryllium_mirror_hull_era.prefab",
       "texturePrefix": "RCLModule_beryllium_mirror_hull",
+      "meshQuality": {
+        "role": "armor_cassette",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 3576,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5323,
+        "meanAcmrAfter": 0.5323,
+        "objects": [
+          {
+            "objectName": "RCLModule_command_relay_beryllium_mirror_hull_era_Batch_RCLModu",
+            "formClass": "primary_faceted",
+            "triangleCount": 3000,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5437,
+            "acmrAfter": 0.5437,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.361,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_command_relay_beryllium_mirror_hull_era_Batch_RCLMod",
+            "formClass": "primary_faceted",
+            "triangleCount": 576,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5208,
+            "acmrAfter": 0.5208,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.223,
+              "rMax": 0.347,
+              "gMax": 1.0,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2268,16 +5580,16 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 1938,
+          "blenderFaces": 3576,
           "unityTriangles": 3576
         },
         "LOD1": {
-          "blenderFaces": 908,
-          "unityTriangles": 1776
+          "blenderFaces": 1788,
+          "unityTriangles": 1788
         },
         "LOD2": {
-          "blenderFaces": 394,
-          "unityTriangles": 870
+          "blenderFaces": 894,
+          "unityTriangles": 894
         }
       }
     },
@@ -2302,6 +5614,53 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_command_relay_beryllium_mirror_hull_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_beryllium_mirror_hull_sponsons.prefab",
       "texturePrefix": "RCLModule_beryllium_mirror_hull",
+      "meshQuality": {
+        "role": "power_containment",
+        "taubinFairingObjects": [],
+        "objectCount": 2,
+        "totalTriangles": 6524,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5378,
+        "meanAcmrAfter": 0.5378,
+        "objects": [
+          {
+            "objectName": "RCLModule_command_relay_beryllium_mirror_hull_sponsons_Batch_RC",
+            "formClass": "primary_faceted",
+            "triangleCount": 104,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5385,
+            "acmrAfter": 0.5385,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.202,
+              "rMax": 0.468,
+              "gMax": 1.0,
+              "bMax": 0.076,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_command_relay_beryllium_mirror_hull_sponsons_Batch_R",
+            "formClass": "primary_faceted",
+            "triangleCount": 6420,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5372,
+            "acmrAfter": 0.5372,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.445,
+              "gMax": 0.753,
+              "bMax": 0.12,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2310,15 +5669,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 3586,
+          "blenderFaces": 6524,
           "unityTriangles": 6524
         },
         "LOD1": {
-          "blenderFaces": 1588,
+          "blenderFaces": 3262,
           "unityTriangles": 3262
         },
         "LOD2": {
-          "blenderFaces": 822,
+          "blenderFaces": 1630,
           "unityTriangles": 1630
         }
       }
@@ -2344,6 +5703,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_command_relay_cyber_nanoweave_aps.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_cyber_nanoweave_aps.prefab",
       "texturePrefix": "RCLModule_cyber_nanoweave",
+      "meshQuality": {
+        "role": "aps_sensor_suite",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1064,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5524,
+        "meanAcmrAfter": 0.5524,
+        "objects": [
+          {
+            "objectName": "RCLModule_command_relay_cyber_nanoweave_aps_Batch_RCLModuleMate",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 212,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5943,
+            "acmrAfter": 0.5943,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.768,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_command_relay_cyber_nanoweave_aps_Batch_RCLModuleMat",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 552,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5362,
+            "acmrAfter": 0.5362,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.296,
+              "rMax": 0.973,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_command_relay_cyber_nanoweave_aps_Batch_RCLModuleMa",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 300,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5267,
+            "acmrAfter": 0.5267,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.376,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.0,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2352,15 +5776,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 576,
+          "blenderFaces": 1064,
           "unityTriangles": 1064
         },
         "LOD1": {
-          "blenderFaces": 264,
+          "blenderFaces": 532,
           "unityTriangles": 532
         },
         "LOD2": {
-          "blenderFaces": 135,
+          "blenderFaces": 264,
           "unityTriangles": 264
         }
       }
@@ -2386,6 +5810,71 @@
       "prefabAssetPath": "Assets/RogueCommandExpansionSample/VisualModules/Prefabs/RCLModule_command_relay_cyber_nanoweave_sponsons.prefab",
       "assetName": "assets/roguecommandexpansionsample/visualmodules/prefabs/rclmodule_command_relay_cyber_nanoweave_sponsons.prefab",
       "texturePrefix": "RCLModule_cyber_nanoweave",
+      "meshQuality": {
+        "role": "thermal_radiator",
+        "taubinFairingObjects": [],
+        "objectCount": 3,
+        "totalTriangles": 1852,
+        "maxNonManifoldEdges": 0,
+        "meanAcmrBefore": 0.5434,
+        "meanAcmrAfter": 0.5434,
+        "objects": [
+          {
+            "objectName": "RCLModule_command_relay_cyber_nanoweave_sponsons_Batch_RCLModul",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 600,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.54,
+            "acmrAfter": 0.54,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.982,
+              "gMax": 0.991,
+              "bMax": 0.08,
+              "aMin": 1.0,
+              "aMax": 1.0
+            }
+          },
+          {
+            "objectName": "RCLModule_command_relay_cyber_nanoweave_sponsons_Batch_RCLModu",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 1164,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5447,
+            "acmrAfter": 0.5447,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.25,
+              "rMax": 0.973,
+              "gMax": 0.753,
+              "bMax": 0.114,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          },
+          {
+            "objectName": "RCLModule_command_relay_cyber_nanoweave_sponsons_Batch_RCLMod",
+            "formClass": "secondary_mechanism",
+            "triangleCount": 88,
+            "degenerateTriangles": 0,
+            "nonManifoldEdges": 0,
+            "acmrBefore": 0.5455,
+            "acmrAfter": 0.5455,
+            "hasUvMap": true,
+            "vertexWearRgba": {
+              "rMin": 0.342,
+              "rMax": 0.956,
+              "gMax": 0.753,
+              "bMax": 0.093,
+              "aMin": 0.0,
+              "aMax": 0.0
+            }
+          }
+        ]
+      },
       "lodScreenHeights": [
         0.6,
         0.3,
@@ -2394,15 +5883,15 @@
       "geometryBudgetStatus": "UNCALIBRATED_USER_AUTHORIZED",
       "geometryStats": {
         "LOD0": {
-          "blenderFaces": 944,
+          "blenderFaces": 1852,
           "unityTriangles": 1852
         },
         "LOD1": {
-          "blenderFaces": 438,
+          "blenderFaces": 926,
           "unityTriangles": 926
         },
         "LOD2": {
-          "blenderFaces": 241,
+          "blenderFaces": 462,
           "unityTriangles": 462
         }
       }

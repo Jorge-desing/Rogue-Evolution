@@ -95,8 +95,13 @@ foreach ($module in $moduleManifest.modules) {
     }
 }
 
+$detailNormalPath = Join-Path $projectPath "Assets/RogueCommandExpansionSample/Textures/Detail/RCL_SteelMicroDetail_Normal.png"
 Write-Host "Generating the 28 canonical four-map PBR sets with Material Maker 1.7."
-& $textureScript -SizePower 11
+if (Test-Path -LiteralPath $detailNormalPath -PathType Leaf) {
+    & $textureScript -SizePower 11 -DetailNormalPath $detailNormalPath -DetailNormalStrength 0.25
+} else {
+    & $textureScript -SizePower 11
+}
 $textureDirectory = Join-Path $projectPath "Assets/RogueCommandExpansionSample/VisualModules/Textures"
 $presets = @($moduleManifest.modules | ForEach-Object { [string]$_.preset } | Sort-Object -Unique)
 if ($presets.Count -le 0) {

@@ -31,6 +31,7 @@ def run_preset_build(generator_args: Sequence[str], refine: Callable) -> None:
 
     def build_and_export_with_refinement(builder, *args, **kwargs):
         refine(builder)
+        apply_level1_functional_engineering_pass(builder, optimize_vertex_cache=False)
         return original(builder, *args, **kwargs)
 
     builder_type.build_and_export = build_and_export_with_refinement
