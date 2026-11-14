@@ -13,6 +13,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         FlankingManeuver = 15,
         CombatTargeting = 20,
         BaseAndHarvesterDefense = 30,
+        SupportLogistics = 35,
         TacticalSkill = 40,
         SurvivalKite = 50
     }

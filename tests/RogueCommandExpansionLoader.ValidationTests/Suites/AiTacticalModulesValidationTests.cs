@@ -4268,6 +4268,7 @@ internal static partial class ValidationTestRunner
                 IsUnit = true,
                 IsCombatUnit = false,
                 IsEngineer = true,
+                HealAmount1 = 12f,
                 CanMoveAndMovementIsEnabled = true,
                 aiBaseIndex = 0,
                 CurrentHealth = 100f,
@@ -4288,6 +4289,8 @@ internal static partial class ValidationTestRunner
                 CanMoveAndMovementIsEnabled = true,
                 aiBaseIndex = 0,
                 CurrentHealth = 35f,
+                CurrentArmor = 2f,
+                MaxArmor = 20f,
                 MaxHealth = 100f,
                 MoveSpeed = 6f,
                 Role = UnitRole.Harvester,
@@ -4344,6 +4347,12 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("SquadOperationsDirectorAiModule did not dispatch support engineer to damaged harvester.");
             }
+
+            aiEngineer.Position = damagedHarvester.Position;
+            UnityEngine.Time.time += 2f;
+            composite.Tick();
+            if (damagedHarvester.CurrentHealth != 47f || damagedHarvester.CurrentArmor != 8f)
+                throw new InvalidOperationException("A support engineer in range must heal and repair the assigned ally.");
 
             RogueCommandExpansionLoader.Runtime.Ai.AiArchitectureCensus census =
                 RogueCommandExpansionLoader.Runtime.Ai.RuntimeAiArchitectureCensus.Current();

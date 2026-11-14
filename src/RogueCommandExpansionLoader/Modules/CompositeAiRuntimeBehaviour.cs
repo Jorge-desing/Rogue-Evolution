@@ -437,6 +437,31 @@ namespace RogueCommandExpansionLoader.Modules
                         null,
                         EntityCommand.Role.ThisCommandWantsPathToBeCleared);
                 }
+                else if (proposal.Category == AiIntentCategory.SupportLogistics)
+                {
+                    if (!_battlefieldCollector.TryResolveAiEntity(proposal.TargetEntityId, out EntityController patient) ||
+                        patient == null || patient == unit || patient.IsDestroyed || patient.DestroyHasBeenStarted ||
+                        !patient.IsControlledByAi || unit.IsEnemy(patient))
+                    {
+                        return false;
+                    }
+
+                    bool heal = unit.HealAmount1 > 0f && !patient.canNotBeHealed && patient.DeltaHealth > 0.01f;
+                    bool repair = (unit.IsEngineer || unit.HasRole(UnitRole.Engineer)) && patient.DeltaArmor > 0.01f;
+                    if (!heal && !repair)
+                    {
+                        return false;
+                    }
+
+                    if (WithinHorizontalRange(unit.Position, patient.Position, 16f))
+                    {
+                        if (heal) patient.Heal(unit.HealAmount1, unit);
+                        if (repair) patient.RepairArmor(6f, unit, false);
+                        return true;
+                    }
+
+                    command = EntityCommand.Move(patient.Position);
+                }
                 else if (proposal.Category == AiIntentCategory.TacticalSkill)
                 {
                     SkillInfo skillInfo = unit.SkillInfo;

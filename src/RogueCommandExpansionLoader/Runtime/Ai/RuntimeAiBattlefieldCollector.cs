@@ -423,7 +423,10 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 statusEffectFlags: statusFlags,
                 affixFlags: affixFlags,
                 activeSkillRequiresEngagement: string.Equals(activationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase),
-                activeSkillRequiresNearbyHostile: skillRequiresNearbyHostile);
+                activeSkillRequiresNearbyHostile: skillRequiresNearbyHostile,
+                armorDeficit: entity.DeltaArmor, healthHealingBlocked: entity.canNotBeHealed,
+                canHealAllies: entity.HealAmount1 > 0f,
+                canRepairAllies: entity.IsEngineer || entity.HasRole(UnitRole.Engineer));
         }
 
         internal static bool TryReadQueuedCommands(EntityController entity, out bool hasCommands)

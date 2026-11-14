@@ -172,7 +172,7 @@ namespace RogueCommandExpansionLoader.Modules
                         for (int a = 0; a < aiUnits.Count; a++)
                         {
                             AiUnitSnapshot ally = aiUnits[a];
-                            if (ally.UniqueEntityId == unit.UniqueEntityId || ally.HealthRatio >= 0.90f)
+                            if (ally.UniqueEntityId == unit.UniqueEntityId)
                             {
                                 continue;
                             }
@@ -193,15 +193,14 @@ namespace RogueCommandExpansionLoader.Modules
 
                         if (hasPatient)
                         {
-                            // Route via SurvivalKite category or BaseAndHarvesterDefense move so CompositeAiRuntimeBehaviour dispatches Move
                             proposals.Add(new AiIntentProposal(
                                 moduleId: ModuleId,
                                 commandTag: _commandTag + ".support",
                                 unitId: unit.UniqueEntityId,
-                                targetEntityId: -1,
+                                targetEntityId: bestPatient.UniqueEntityId,
                                 destX: bestPatient.PosX,
                                 destZ: bestPatient.PosZ,
-                                category: AiIntentCategory.SurvivalKite,
+                                category: AiIntentCategory.SupportLogistics,
                                 utilityScore: bestSupportScore,
                                 lockoutDurationSeconds: 1.0f,
                                 requiresEmptyQueue: false));

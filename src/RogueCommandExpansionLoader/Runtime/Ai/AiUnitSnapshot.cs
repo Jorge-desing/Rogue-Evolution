@@ -63,6 +63,10 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public bool IsHarvester { get; }
         public bool IsBuilding { get; }
         public bool IsSupportUnit { get; }
+        public float ArmorDeficit { get; }
+        public bool HealthHealingBlocked { get; }
+        public bool CanHealAllies { get; }
+        public bool CanRepairAllies { get; }
         public bool HasQueuedCommands { get; }
         public string CurrentCommandTag { get; }
         public int CurrentTargetId { get; }
@@ -104,7 +108,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             int statusEffectFlags = 0,
             int affixFlags = 0,
             bool activeSkillRequiresEngagement = false,
-            bool activeSkillRequiresNearbyHostile = false)
+            bool activeSkillRequiresNearbyHostile = false, float armorDeficit = 0f,
+            bool healthHealingBlocked = false, bool canHealAllies = false, bool canRepairAllies = false)
         {
             UniqueEntityId = uniqueEntityId;
             EntityId = entityId ?? string.Empty;
@@ -126,6 +131,10 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             IsHarvester = isHarvester;
             IsBuilding = isBuilding;
             IsSupportUnit = isSupportUnit;
+            ArmorDeficit = armorDeficit;
+            HealthHealingBlocked = healthHealingBlocked;
+            CanHealAllies = canHealAllies;
+            CanRepairAllies = canRepairAllies;
             HasQueuedCommands = hasQueuedCommands;
             CurrentCommandTag = currentCommandTag ?? string.Empty;
             CurrentTargetId = currentTargetId;

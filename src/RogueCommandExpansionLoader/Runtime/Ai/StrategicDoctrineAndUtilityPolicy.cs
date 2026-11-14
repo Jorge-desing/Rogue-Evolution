@@ -323,7 +323,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 return 0f;
             }
 
-            if (damagedAlly.HealthRatio >= 0.90f)
+            if (!(supportUnit.CanHealAllies && !damagedAlly.HealthHealingBlocked && damagedAlly.HealthRatio < 0.90f) &&
+                !(supportUnit.CanRepairAllies && damagedAlly.ArmorDeficit > 0.01f))
             {
                 return 0f;
             }
