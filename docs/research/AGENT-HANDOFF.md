@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — restore visual detail queries for mod instances
+
+- Fixed standalone surface/material/quality censuses: mod ownership now comes from the product EntityId namespace, independently of the numeric UniqueEntityId used as the instance key. Registered mod units again receive material binding and bounded mesh-color detail queries. Multiple instances of one product retain distinct numeric keys.
+- This resolves all four previously recorded visual census failures. Release/harness builds: zero warnings/errors. Focused RuntimeAndDiagnostics: 228/228. Full C# harness: 588 passed, zero failed, one skipped (Windows file-symlink privilege unavailable), log `artifacts/general-capability-audit/visual-identity-full-tests.log`.
+- Full Python acceptance (`python -m tools.run_python_tests --output artifacts/general-capability-audit/visual-identity-python-tests.json`): mode all, 768 tests run, successful true, all four unit/Blender groups successful, 36.50 seconds. Preserve the C# symlink skip boundary. These are local checks, not Steam appearance/runtime acceptance.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/visual-identity-deployment/manifest.json`.
+
 ## General capability audit — authored muzzle feedback integration
 
 - RuntimeVisualDirector now binds the primary muzzle's authored `FirePoint_0` ParticleSystem, falling back to a unique descendant emitter. Weapon feedback preserves an already playing native emitter and does not spawn the procedural muzzle burst alongside it. Unbound authored emitters retain the mesh/procedural fallback. Pool reuse stops and clears the bound muzzle emitter.

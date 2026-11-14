@@ -108,7 +108,7 @@ namespace RogueCommandExpansionLoader.Runtime
             Dictionary<Material, RuntimeVisualCensusSupport.MaterialBindingSnapshot> materialCache)
         {
             string key = RuntimeVisualCensusSupport.ResolveEntityKey(unit);
-            bool isLoaderOwned = RuntimeVisualCensusSupport.IsLoaderOwned(key);
+            bool isLoaderOwned = RuntimeVisualCensusSupport.IsLoaderOwned(unit);
 
             GameObject go = null;
             try { go = unit.gameObject; } catch { go = null; }

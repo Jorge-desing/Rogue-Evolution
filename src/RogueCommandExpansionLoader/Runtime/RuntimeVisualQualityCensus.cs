@@ -176,7 +176,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private static VisualQualityRow CollectRow(EntityController unit)
         {
             string key = RuntimeVisualCensusSupport.ResolveEntityKey(unit);
-            bool isLoaderOwned = RuntimeVisualCensusSupport.IsLoaderOwned(key);
+            bool isLoaderOwned = RuntimeVisualCensusSupport.IsLoaderOwned(unit);
             var issues = new List<string>();
             int rendererCount = 0;
             int visibleRendererCount = 0;

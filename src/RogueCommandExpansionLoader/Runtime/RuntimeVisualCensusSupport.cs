@@ -107,9 +107,15 @@ namespace RogueCommandExpansionLoader.Runtime
             try { return unit.name ?? string.Empty; } catch { return string.Empty; }
         }
 
-        internal static bool IsLoaderOwned(string entityKey)
+        internal static bool IsLoaderOwned(EntityController unit)
         {
-            return !string.IsNullOrEmpty(entityKey) && entityKey.IndexOf(':') >= 0;
+            if (unit == null) return false;
+            try
+            {
+                string productId = unit.EntityId;
+                return !string.IsNullOrEmpty(productId) && productId.IndexOf(':') >= 0;
+            }
+            catch { return false; }
         }
 
         internal static VisualHierarchySnapshot CaptureHierarchy(GameObject root)

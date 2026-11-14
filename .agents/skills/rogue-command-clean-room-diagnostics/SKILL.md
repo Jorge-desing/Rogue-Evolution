@@ -18,6 +18,8 @@ Use this skill to inspect in-game state, read telemetry censuses, dispatch gamep
 
 ## 1. Clean-Room Invariants & C# Zero-Allocation Guidelines
 
+Standalone visual censuses identify each live instance by its numeric UniqueEntityId, but determine mod ownership from its product EntityId namespace. Never infer ownership from the instance key: doing so skips PBR/material and vertex-color inspection for every registered mod instance. Preserve separate instances even when they share a product ID.
+
 1. **Independent Authoring**: Never copy proprietary structures or external mod code. Use FNV-1a hashing and calibrated data.
 2. **Zero External JSON Libraries in Runtime**: Do NOT use `Newtonsoft.Json` or `System.Text.Json` in the plugin runtime (`src/RogueCommandExpansionLoader/`). Use the manual string-escaped writer in `AgentDiagnosticsFormatter.cs`.
 3. **Decoupled Primitive DTOs**: DTOs and command results must contain only primitive CLR types (`string`, `int`, `long`, `float`, `double`, `bool`, `IReadOnlyList<T>`). Never expose `UnityEngine.Color`, `Vector3`, `GameObject`, or `Component`.

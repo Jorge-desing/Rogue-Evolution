@@ -5707,7 +5707,7 @@ internal static partial class ValidationTestRunner
             }
 
             VisualSurfaceRow row = census.Rows[0];
-            if (row.EntityKeyId != "unit:visual-surface" || row.RendererCount != 1 ||
+            if (row.EntityKeyId != "861" || row.RendererCount != 1 ||
                 row.MaterialCount != 1 || row.VertexCount != 4 || !row.HasVertexColors ||
                 row.ShaderNames.Count != 1 || row.ShaderNames[0] != "RogueCommand/VehiclePBR_VertexWear")
             {
@@ -6040,7 +6040,7 @@ internal static partial class ValidationTestRunner
             {
                 var unit = new EntityController
                 {
-                    entityId = "sample-native:shared-material-" + i,
+                    entityId = "sample-native:shared-material",
                     UniqueEntityId = 9100 + i,
                     IsControlledByPlayer = true,
                     IsUnit = true,
@@ -6055,7 +6055,9 @@ internal static partial class ValidationTestRunner
 
             VisualMaterialCensus census = RuntimeVisualMaterialCensus.Current(2);
             if (census.Rows.Count != 2 || sharedMaterial.HasPropertyCallCount != 4 ||
-                sharedMaterial.GetTextureCallCount != 1)
+                sharedMaterial.GetTextureCallCount != 1 ||
+                !census.Rows.Any(row => row.EntityKeyId == "9100") ||
+                !census.Rows.Any(row => row.EntityKeyId == "9101"))
             {
                 throw new InvalidOperationException("Standalone material census must inspect each shared material binding once per sweep.");
             }

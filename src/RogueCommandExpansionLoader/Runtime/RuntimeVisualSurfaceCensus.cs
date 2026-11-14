@@ -159,7 +159,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private static VisualSurfaceRow CollectRow(EntityController unit)
         {
             string key = RuntimeVisualCensusSupport.ResolveEntityKey(unit);
-            bool loaderOwned = RuntimeVisualCensusSupport.IsLoaderOwned(key);
+            bool loaderOwned = RuntimeVisualCensusSupport.IsLoaderOwned(unit);
 
             GameObject go = null;
             try { go = unit.gameObject; } catch { go = null; }
