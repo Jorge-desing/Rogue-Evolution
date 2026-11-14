@@ -112,7 +112,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private static readonly Dictionary<int, int> _entityCombatXp =
             new Dictionary<int, int>();
 
-        private static readonly ConditionalWeakTable<object, object> _paidKillRewards =
+        private static readonly ConditionalWeakTable<object, object> _processedKillTargets =
             new ConditionalWeakTable<object, object>();
 
         private static readonly Dictionary<int, float> _nativeAiSkillLogicalLastChecks =
@@ -699,9 +699,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static void ClearProfiles()
         {
-            lock (_paidKillRewards)
+            lock (_processedKillTargets)
             {
-                _paidKillRewards.Clear();
+                _processedKillTargets.Clear();
             }
             lock (_profiles)
             {
@@ -1359,9 +1359,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
         public static void OnBattlefieldRegistryReset()
         {
-            lock (_paidKillRewards)
+            lock (_processedKillTargets)
             {
-                _paidKillRewards.Clear();
+                _processedKillTargets.Clear();
             }
             lock (_entityCombatXp)
             {
@@ -1932,9 +1932,9 @@ namespace RogueCommandExpansionLoader.Runtime
                 int combatExperienceKey = GetCombatExperienceKey(entityObj);
                 if (IsEntityAlive(entityObj))
                 {
-                    lock (_paidKillRewards)
+                    lock (_processedKillTargets)
                     {
-                        _paidKillRewards.Remove(entityObj);
+                        _processedKillTargets.Remove(entityObj);
                     }
                 }
                 RevertBaselineStatusEffects(entityObj, combatExperienceKey);
@@ -1994,15 +1994,15 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        private static bool TryClaimKillRewards(object targetObj)
+        private static bool TryClaimKillEffects(object targetObj)
         {
-            lock (_paidKillRewards)
+            lock (_processedKillTargets)
             {
-                if (_paidKillRewards.TryGetValue(targetObj, out _))
+                if (_processedKillTargets.TryGetValue(targetObj, out _))
                 {
                     return false;
                 }
-                _paidKillRewards.Add(targetObj, new object());
+                _processedKillTargets.Add(targetObj, new object());
                 return true;
             }
         }
@@ -2019,9 +2019,14 @@ namespace RogueCommandExpansionLoader.Runtime
                 EnsureReflection(originatorObj.GetType());
                 float targetHealth = ReadFloatProperty(_currentHealthProperty, targetObj, 1f);
                 bool targetKilled = targetHealth <= 0f || ReadBoolProperty(_destroyStartedProperty, targetObj);
+                bool hostileTarget = IsEnemy(originatorObj, targetObj);
+                if (targetKilled && hostileTarget && !TryClaimKillEffects(targetObj))
+                {
+                    return;
+                }
                 bool payKillRewards = targetKilled &&
                     ReadBoolProperty(_isControlledByPlayerProperty, originatorObj) &&
-                    IsEnemy(originatorObj, targetObj) && TryClaimKillRewards(targetObj);
+                    hostileTarget;
 
                 string originatorId = ReadEntityId(originatorObj);
                 UnitRuntimeMechanicsProfile profile = null;

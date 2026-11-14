@@ -12,7 +12,7 @@ metadata:
 
 # Rogue Command Unit Authoring
 
-Kill currency rewards from the attacker and the victim are each paid once for the first eligible player kill notification in a target lifetime. Later damage notifications share that claim. Living spawn/reuse attachment resets the claim, and profile/registry reset clears it. Claims use weak target references so retired entities can be collected.
+The first hostile lethal notification processes the loader's hit effects once per target lifetime, including experience, life recovery and attacker/victim currency rewards. Later lethal notifications return before those effects. Living spawn/reuse attachment resets the claim, and profile/registry reset clears it. Claims use weak target references so retired entities can be collected.
 
 Field healing and armor repair share a pulse interval of one divided by positive healRate, bounded to 0.25–5 seconds. Zero uses a one-second interval.
 

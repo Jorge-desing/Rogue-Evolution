@@ -2,7 +2,7 @@
 
 ## Combat kill reward ownership
 
-Attacker and victim currency rewards share one claim per target lifetime, preventing repeated damage notifications from paying the kill again. Living spawn/reuse attachment resets the claim and profile/registry resets clear it. The claim uses weak references. The regression exercises both reward sources, repeated notifications and target reuse. Steam payout behavior remains unverified.
+The first hostile lethal notification claims the loader's hit effects for a target lifetime, including currency rewards, experience and life recovery. Later lethal notifications return before those effects. Living spawn/reuse attachment resets the claim and profile/registry resets clear it. The claim uses weak references. The regression exercises both reward sources, experience, life recovery, repeated notifications and target reuse. Steam behavior remains unverified.
 
 ## Clean-Room Runtime Explorer Tools Implemented & Verified (2026-11-14)
 

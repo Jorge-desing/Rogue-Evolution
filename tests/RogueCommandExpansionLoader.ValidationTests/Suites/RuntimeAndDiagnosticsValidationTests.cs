@@ -3482,21 +3482,31 @@ internal static partial class ValidationTestRunner
             {
                 ExperienceReward = new ContentUnitExperienceRewardDefinition { experienceAmount = 7 }
             });
+            profile.Experience = new ContentUnitExperienceDefinition { experiencePerLevel = 10, maxLevel = 3 };
+            profile.VampiricLeech = new ContentUnitVampiricLeechDefinition { siphonRatio = 0.2f, maxSiphonPerHit = 10f };
+            commander.CurrentHealth = 50f;
             RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 50f, commander);
             if (!Bank.Deposits.Any(d => d.Account == "Player" && Math.Abs(d.Amount - 30f) < 0.01f))
             {
                 throw new InvalidOperationException("Expected ExperienceReward on kill to deposit 30 crystals into Player account.");
             }
             int rewardedCount = Bank.Deposits.Count;
+            int earnedXp = RuntimeUnitMechanicsDirector.GetCombatXpForEntity(commander);
+            float healedHealth = commander.CurrentHealth;
+            if (earnedXp != 3 || healedHealth <= 50f)
+                throw new InvalidOperationException("A lethal hit must grant its experience and life recovery.");
             RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 50f, commander);
-            if (Bank.Deposits.Count != rewardedCount)
-                throw new InvalidOperationException("Repeated notifications of the same kill must pay its reward once.");
+            if (Bank.Deposits.Count != rewardedCount ||
+                RuntimeUnitMechanicsDirector.GetCombatXpForEntity(commander) != earnedXp ||
+                commander.CurrentHealth != healedHealth)
+                throw new InvalidOperationException("Repeated kill notifications must preserve the single reward, experience and recovery.");
             enemy.CurrentHealth = 100f;
             enemy.DestroyHasBeenStarted = false;
             RuntimeUnitMechanicsDirector.AttachIfApplicable(enemy);
             enemy.CurrentHealth = 0f;
             RuntimeUnitMechanicsDirector.OnEntityDealtDamage(enemy, 50f, commander);
-            if (Bank.Deposits.Count != rewardedCount + 2)
+            if (Bank.Deposits.Count != rewardedCount + 2 ||
+                RuntimeUnitMechanicsDirector.GetCombatXpForEntity(commander) != earnedXp + 3)
                 throw new InvalidOperationException("A reused target must be able to award a reward for its new life.");
         }
         finally
