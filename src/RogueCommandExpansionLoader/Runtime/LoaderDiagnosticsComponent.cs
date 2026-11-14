@@ -1321,10 +1321,10 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>
         /// Dispatches a movement command to a living unit by entity key ID.
         /// </summary>
-        public string OrderUnitMoveJson(string entityKeyId, float destinationX, float destinationZ)
+        public string OrderUnitMoveJson(string entityKeyId, float destinationX, float destinationZ, bool replaceCurrent = false)
         {
             return AgentDiagnosticsFormatter.SerializeUnitCommandResult(
-                RuntimeGameplayCommandDirector.TryOrderUnitMove(entityKeyId, destinationX, destinationZ));
+                RuntimeGameplayCommandDirector.TryOrderUnitMove(entityKeyId, destinationX, destinationZ, replaceCurrent));
         }
 
         /// <summary>

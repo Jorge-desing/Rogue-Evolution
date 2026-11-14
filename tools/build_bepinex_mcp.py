@@ -906,13 +906,14 @@ TOOL_SPECS = [
     },
     {
         "name": "diagnostics_order_unit_move",
-        "description": "Dispatches an in-game move command to a living unit by entity key ID via LoaderDiagnosticsComponent / RuntimeGameplayCommandDirector.",
+        "description": "Move one live unit.",
         "parameters": {
             "type": "object",
             "properties": {
                 "entityKeyId": {"type": "string", "description": "Entity ID or name of the unit to command."},
                 "destinationX": {"type": "number", "description": "World X coordinate."},
                 "destinationZ": {"type": "number", "description": "World Z coordinate."},
+                "replaceCurrent": {"type": "boolean", "description": "Replace current; retain queue."},
             },
             "required": ["entityKeyId", "destinationX", "destinationZ"],
             "additionalProperties": False,

@@ -1674,7 +1674,10 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             e_key = str(arguments.get("entityKeyId", ""))
             x = float(arguments.get("destinationX", 0.0))
             z = float(arguments.get("destinationZ", 0.0))
-            res = _call_diagnostics_method("OrderUnitMoveJson", [e_key, x, z])
+            args = [e_key, x, z]
+            if arguments.get("replaceCurrent", False):
+                args.append(True)
+            res = _call_diagnostics_method("OrderUnitMoveJson", args)
             return _tool_response(res)
 
         elif name == "diagnostics_order_place_building":

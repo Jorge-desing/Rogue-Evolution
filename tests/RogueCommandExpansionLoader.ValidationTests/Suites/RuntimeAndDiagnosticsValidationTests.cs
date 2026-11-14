@@ -4630,6 +4630,21 @@ internal static partial class ValidationTestRunner
                 throw new InvalidOperationException("Player unit must have received EntityCommand.Move with destination (35, 45).");
             }
 
+            if (playerUnit.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand)
+            {
+                throw new InvalidOperationException("Default movement must preserve the interrupted current order.");
+            }
+            UnitCommandResult replacement = RuntimeGameplayCommandDirector.TryOrderUnitMove(
+                "unit:strike-tank-01", 40f, 50f, replaceCurrent: true);
+            if (!replacement.Success ||
+                playerUnit.LastCommandProcessingType != EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand ||
+                playerUnit.LastExecutedCommand?.command != EntityCommand.Command.Move ||
+                playerUnit.LastExecutedCommand.Value.destination.x != 40f ||
+                playerUnit.LastExecutedCommand.Value.destination.z != 50f)
+            {
+                throw new InvalidOperationException("Replacement movement must cancel the current command and use the new destination.");
+            }
+
             // Test Unit Move on non-existent unit
             UnitCommandResult moveMissing = RuntimeGameplayCommandDirector.TryOrderUnitMove("unit:non-existent", 0f, 0f);
             if (moveMissing.Success)

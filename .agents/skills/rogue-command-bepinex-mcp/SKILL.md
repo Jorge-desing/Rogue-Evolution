@@ -71,6 +71,8 @@ The active-skill order accepts a live entity key for location skills and samples
 
 Self skills use the native untargeted activation path to retain self-activation conditions.
 
+For movement replanning, use the optional replaceCurrent mode described in the automation reference to replace the current native command while preserving pending commands.
+
 1. Read `system_get_game_process_state`. If the game is closed, launch it through Steam only when the user's current request authorizes a live run; never launch the game executable directly. If it is open, ping the bridge and read runtime capabilities before diagnosis.
 2. Read game paths and runtime identity. Before reflection, type inspection, or a Harmony patch, verify the current game version, `Assembly-CSharp.dll` SHA-256 and MVID together, plus Unity backend, BepInEx version, architecture, and supported patch types. Treat the values in `rogue-command-harmony-policy` as a pinned baseline, not as proof that the current installation still matches. If the identity differs, stop using remembered signatures/tokens and re-verify the target assembly before continuing.
 3. Start from read-only census and snapshots. Before mutating a match, identify the exact stage, entity, selector, and expected postcondition. Use stable `UniqueEntityId` / `entityKeyId` for spawned entities when native `EntityId` values can repeat.

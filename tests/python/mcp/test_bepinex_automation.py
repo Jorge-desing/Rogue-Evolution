@@ -220,6 +220,11 @@ class StateWaitTests(unittest.TestCase):
                 mock.call("OrderUnitMoveJson", ["42", 10.0, 20.0]),
                 *[mock.call("GetBattlefieldUnitStateJson", ["42", True, 10.0, 20.0, 1.0])] * 3,
             ])
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true}') as call:
+            result = SERVER.execute_tool("diagnostics_order_unit_move", {
+                "entityKeyId": "42", "destinationX": 30, "destinationZ": 40, "replaceCurrent": True})
+            self.assertFalse(result.get("isError", False))
+            call.assert_called_once_with("OrderUnitMoveJson", ["42", 30.0, 40.0, True])
 
     def test_local_wait_timeout_stops_sequence_before_outer_budget(self):
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{}') as call:

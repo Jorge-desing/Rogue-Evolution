@@ -1806,7 +1806,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        public static UnitCommandResult TryOrderUnitMove(string entityKeyId, float destinationX, float destinationZ)
+        public static UnitCommandResult TryOrderUnitMove(string entityKeyId, float destinationX, float destinationZ, bool replaceCurrent = false)
 
         {
 
@@ -1876,7 +1876,9 @@ namespace RogueCommandExpansionLoader.Runtime
 
 
 
-                unit.ExecuteCommand(moveCmd, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+                unit.ExecuteCommand(moveCmd, replaceCurrent
+                    ? EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand
+                    : EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
 
 
 

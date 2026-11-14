@@ -45,6 +45,8 @@ The census exposes `value` as a number for sliders. Inspect `controlType`, `minV
 
 ## Battlefield orders
 
+Movement orders accept optional `replaceCurrent: true` to revise a unit's current destination using native `ExecuteAndCancelCurrentCommand`. Pending native orders stay in the chain. Omit the option to retain the interrupted current command through the existing prepend behavior. Use replacement when replanning an agent-owned approach, then observe arrival at the new goal.
+
 Native `Self` skills always dispatch through `ActiveSkillWithoutTarget`, including requests containing target arguments. This runs the native self-activation conditions and reports `Self` with the caster's coordinates.
 
 An active-skill order with `targetEntityKeyId` resolves that entity's current position for native `TargetOrigin.ChosenLocation` skills and dispatches `ActiveSkillAtPosition`. The result reports `Position` mode and the chosen coordinates. Entity-targeted skills retain their native target command. The location is sampled at dispatch, so subsequent target motion can move it outside the effect.
