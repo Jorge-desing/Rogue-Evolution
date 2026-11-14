@@ -46,6 +46,18 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Optional Voronoi UV island edge dilation radius in pixels (0 disables).",
     )
+    parser.add_argument(
+        "--detail-normal",
+        type=Path,
+        default=None,
+        help="Optional tileable micro-detail tangent normal PNG composed via RNM.",
+    )
+    parser.add_argument(
+        "--detail-strength",
+        type=float,
+        default=0.35,
+        help="RNM blend strength for --detail-normal (default 0.35).",
+    )
     return parser.parse_args()
 
 
@@ -247,7 +259,12 @@ def _apply_uv_dilation(source_albedo: Path, output_paths: dict[str, Path], dilat
 
 
 def pack_maps(
-    input_dir: Path, output_dir: Path, prefix: str, dilate_px: int = 0
+    input_dir: Path,
+    output_dir: Path,
+    prefix: str,
+    dilate_px: int = 0,
+    detail_normal: Path | None = None,
+    detail_strength: float = 0.35,
 ) -> dict[str, object]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -280,6 +297,15 @@ def pack_maps(
         output_paths["MetallicGloss"],
     )
     normalize_normal(paths["Normal"], output_paths["Normal"])
+    if detail_normal is not None:
+        from tools.functional_engineering_integration import compose_canonical_pbr_detail
+
+        compose_canonical_pbr_detail(
+            output_paths["Normal"],
+            detail_normal,
+            output_paths["Normal"],
+            detail_strength=detail_strength,
+        )
     copy_opaque_rgb(paths["Emission"], output_paths["Emission"])
     _apply_uv_dilation(paths["Albedo"], output_paths, dilate_px)
 
@@ -305,15 +331,36 @@ def pack_maps(
 
 
 def main_for_test(
-    input_dir: Path, output_dir: Path, prefix: str, strict: bool = False, dilate_px: int = 0
+    input_dir: Path,
+    output_dir: Path,
+    prefix: str,
+    strict: bool = False,
+    dilate_px: int = 0,
+    detail_normal: Path | None = None,
+    detail_strength: float = 0.35,
 ) -> int:
-    report = pack_maps(input_dir, output_dir, prefix, dilate_px=dilate_px)
+    report = pack_maps(
+        input_dir,
+        output_dir,
+        prefix,
+        dilate_px=dilate_px,
+        detail_normal=detail_normal,
+        detail_strength=detail_strength,
+    )
     return 2 if strict and report["warnings"] else 0
 
 
 def main() -> int:
     args = parse_args()
-    return main_for_test(args.input_dir, args.output_dir, args.prefix, args.strict, args.dilate_px)
+    return main_for_test(
+        args.input_dir,
+        args.output_dir,
+        args.prefix,
+        args.strict,
+        args.dilate_px,
+        args.detail_normal,
+        args.detail_strength,
+    )
 
 
 if __name__ == "__main__":

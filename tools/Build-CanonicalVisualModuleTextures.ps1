@@ -1,6 +1,9 @@
 param(
     [ValidateSet(9, 10, 11, 12)]
     [int]$SizePower = 11,
+    [int]$DilatePx = 0,
+    [string]$DetailNormalPath = "",
+    [double]$DetailNormalStrength = 0.35,
     [switch]$SkipPromote
 )
 
@@ -38,14 +41,21 @@ for ($index = 0; $index -lt $presets.Count; $index++) {
     $outputDirectory = "$artifactRelative/texture-work/$preset"
     Write-Host "[$($index + 1)/$($presets.Count)] Material Maker 1.7 procedural bake: $preset"
 
-    & $bakeScript `
-        -Workflow procedural `
-        -Preset $preset `
-        -UnitName $unitName `
-        -OutputDirectory $outputDirectory `
-        -SizePower $SizePower `
-        -ForceTemplate `
-        -Strict
+    $bakeArgs = @{
+        Workflow = "procedural"
+        Preset = $preset
+        UnitName = $unitName
+        OutputDirectory = $outputDirectory
+        SizePower = $SizePower
+        ForceTemplate = $true
+        Strict = $true
+        DilatePx = $DilatePx
+        DetailNormalStrength = $DetailNormalStrength
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DetailNormalPath)) {
+        $bakeArgs.DetailNormalPath = $DetailNormalPath
+    }
+    & $bakeScript @bakeArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Material Maker bake failed for preset '$preset' with exit code $LASTEXITCODE."
     }

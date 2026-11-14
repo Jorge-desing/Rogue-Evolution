@@ -893,3 +893,30 @@ def create_canonical_sockets(socket_defs: Mapping[str, Sequence[float]]) -> None
         bpy.context.collection.objects.link(fp)
         fp.parent = bpy.data.objects["Socket_MuzzlePrimary"]
         fp.location = (0.0, 0.0, 0.0)
+
+
+def apply_level1_functional_engineering_pass(
+    builder: Any,
+    *,
+    role: str = "",
+    enable_taubin_fairing: bool = False,
+    optimize_vertex_cache: bool = True,
+) -> dict[str, Any]:
+    """Run Form Hierarchy fairing (cast housings), Forsyth vertex-cache optimization,
+    and topology + Vertex-Wear RGBA audit on a Level 1 primary chassis builder.
+    """
+    tools_dir = str(REPO_ROOT / "tools")
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    import functional_engineering_integration as fei
+
+    objects = [
+        obj for obj in getattr(builder, "objects", [])
+        if obj is not None and getattr(obj, "type", None) == "MESH" and "_COLLIDER" not in obj.name
+    ]
+    return fei.apply_canonical_two_level_mesh_pass_bpy(
+        objects,
+        role=role,
+        enable_taubin_fairing=enable_taubin_fairing,
+        optimize_vertex_cache=optimize_vertex_cache,
+    )

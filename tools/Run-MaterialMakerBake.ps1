@@ -59,6 +59,9 @@ param(
     [string]$UnitName = "TacticalHull",
     [string]$PaintSourceModel = "",
     [string]$BlenderPreviewModel = "",
+    [int]$DilatePx = 0,
+    [string]$DetailNormalPath = "",
+    [double]$DetailNormalStrength = 0.35,
     [switch]$ForceTemplate,
     [switch]$Strict,
     [switch]$VerboseMaterialMaker
@@ -253,7 +256,7 @@ try {
         $mmLog = Join-Path $outDir "material-maker.log"
         $mmErrorLog = Join-Path $outDir "material-maker-error.log"
         try {
-            $materialMakerProcess = Start-Process -FilePath $mmExe -ArgumentList $mmArguments -WorkingDirectory $mmDir -WindowStyle Hidden -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -Wait -PassThru
+            $materialMakerProcess = Start-Process -FilePath $mmExe -ArgumentList $mmArguments -WorkingDirectory $runtimeDir -WindowStyle Hidden -RedirectStandardOutput $mmLog -RedirectStandardError $mmErrorLog -Wait -PassThru
         } finally {
             if ($hadDiagnosticEnvironment) {
                 $env:RCL_MM_DIAG = $previousDiagnosticEnvironment
@@ -272,6 +275,13 @@ try {
     $packArgs = @($packScript, "--input-dir", $rawDir, "--output-dir", $outDir, "--prefix", $templatePrefix)
     if ($Strict.IsPresent) {
         $packArgs += "--strict"
+    }
+    if ($DilatePx -gt 0) {
+        $packArgs += @("--dilate-px", "$DilatePx")
+    }
+    if (-not [string]::IsNullOrWhiteSpace($DetailNormalPath)) {
+        $resolvedDetailNormal = if ([System.IO.Path]::IsPathRooted($DetailNormalPath)) { $DetailNormalPath } else { Join-Path $repoRoot $DetailNormalPath }
+        $packArgs += @("--detail-normal", $resolvedDetailNormal, "--detail-strength", "$DetailNormalStrength")
     }
     & python @packArgs
     $packExitCode = $LASTEXITCODE

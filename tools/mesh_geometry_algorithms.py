@@ -279,16 +279,16 @@ def compute_acmr(faces: np.ndarray, cache_size: int = 32) -> float:
     return float(misses) / float(len(faces))
 
 
-def optimize_vertex_cache_forsyth(
+def compute_forsyth_face_order(
     faces: np.ndarray,
     num_vertices: int,
     cache_size: int = 32,
 ) -> tuple[np.ndarray, float]:
-    """Tom Forsyth (2006) linear-speed LRU post-transform vertex cache optimization."""
+    """Return Forsyth LRU vertex-cache triangle permutation indices and resulting ACMR."""
     tris = np.asarray(faces, dtype=np.int64)
     num_tris = len(tris)
     if num_tris == 0:
-        return tris.copy(), 0.0
+        return np.zeros((0,), dtype=np.int64), 0.0
 
     # Constants from Forsyth's paper
     cache_decay_power = 1.5
@@ -386,8 +386,21 @@ def optimize_vertex_cache_forsyth(
                 best_next = ti
         best_tri = best_next
 
-    reordered = tris[np.array(out_order, dtype=np.int64)]
-    return reordered, compute_acmr(reordered, cache_size=cache_size)
+    order_arr = np.array(out_order, dtype=np.int64)
+    return order_arr, compute_acmr(tris[order_arr], cache_size=cache_size)
+
+
+def optimize_vertex_cache_forsyth(
+    faces: np.ndarray,
+    num_vertices: int,
+    cache_size: int = 32,
+) -> tuple[np.ndarray, float]:
+    """Tom Forsyth (2006) linear-speed LRU post-transform vertex cache optimization."""
+    tris = np.asarray(faces, dtype=np.int64)
+    if len(tris) == 0:
+        return tris.copy(), 0.0
+    order_arr, acmr = compute_forsyth_face_order(tris, num_vertices, cache_size=cache_size)
+    return tris[order_arr], acmr
 
 
 def compute_vertex_wear_rgba(
@@ -545,14 +558,148 @@ def apply_qem_simplify_bpy(
 
 
 def apply_forsyth_cache_optimize_bpy(obj: Any, cache_size: int = 32) -> float:
-    """Reorder a Blender mesh object's triangles via Forsyth LRU vertex-cache optimization."""
-    verts, tris = extract_mesh_arrays_bpy(obj)
-    opt_tris, acmr = optimize_vertex_cache_forsyth(tris, len(verts), cache_size=cache_size)
+    """Reorder a Blender mesh's triangles via Forsyth LRU optimization while preserving
+    UV layers, Color RGBA attributes, material indices, smooth shading, vertex groups,
+    and custom split normals.
+    """
+    import bmesh
+
     mesh = obj.data
+    if len(mesh.polygons) == 0:
+        return 0.0
+
+    # Ensure pure triangle topology while preserving UVs, Color RGBA, materials, and weights
+    if any(len(poly.vertices) != 3 for poly in mesh.polygons):
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bmesh.ops.triangulate(bm, faces=bm.faces[:])
+        bm.to_mesh(mesh)
+        bm.free()
+        mesh.update()
+
+    n_verts = len(mesh.vertices)
+    n_tris = len(mesh.polygons)
+    if n_tris == 0:
+        return 0.0
+
+    verts = np.array([v.co[:] for v in mesh.vertices], dtype=np.float64)
+    tris = np.array([poly.vertices[:] for poly in mesh.polygons], dtype=np.int64)
+    mat_indices = np.array([poly.material_index for poly in mesh.polygons], dtype=np.int32)
+    smooth_flags = np.array([poly.use_smooth for poly in mesh.polygons], dtype=bool)
+
+    # Snapshot UV layers (n_tris, 3, 2)
+    uv_snapshots: list[tuple[str, bool, np.ndarray]] = []
+    for uv_layer in mesh.uv_layers:
+        uv_arr = np.zeros((n_tris, 3, 2), dtype=np.float32)
+        for pi, poly in enumerate(mesh.polygons):
+            for ci, li in enumerate(poly.loop_indices):
+                uv_arr[pi, ci] = uv_layer.data[li].uv[:]
+        uv_snapshots.append((uv_layer.name, uv_layer.active_render, uv_arr))
+
+    # Snapshot Color attributes (CORNER or POINT)
+    color_snapshots: list[tuple[str, str, str, np.ndarray]] = []
+    active_color_name = mesh.color_attributes.active_color.name if mesh.color_attributes.active_color else None
+    for attr in mesh.color_attributes:
+        if attr.domain == "CORNER":
+            c_arr = np.zeros((n_tris, 3, 4), dtype=np.float32)
+            for pi, poly in enumerate(mesh.polygons):
+                for ci, li in enumerate(poly.loop_indices):
+                    c_arr[pi, ci] = attr.data[li].color[:]
+        else:
+            c_arr = np.array([attr.data[vi].color[:] for vi in range(n_verts)], dtype=np.float32)
+        color_snapshots.append((attr.name, attr.data_type, attr.domain, c_arr))
+
+    # Snapshot custom corner normals if present
+    has_custom_normals = bool(getattr(mesh, "has_custom_normals", False))
+    corner_normals = None
+    if has_custom_normals:
+        corner_normals = np.zeros((n_tris, 3, 3), dtype=np.float32)
+        for pi, poly in enumerate(mesh.polygons):
+            for ci, li in enumerate(poly.loop_indices):
+                corner_normals[pi, ci] = mesh.corner_normals[li].vector[:]
+
+    # Snapshot vertex group weights per vertex
+    vgroup_names = [vg.name for vg in obj.vertex_groups]
+    vgroup_weights: list[list[tuple[str, float]]] = [[] for _ in range(n_verts)]
+    if vgroup_names:
+        idx_to_name = {vg.index: vg.name for vg in obj.vertex_groups}
+        for vi, v in enumerate(mesh.vertices):
+            for g in v.groups:
+                if g.group in idx_to_name and g.weight > 0.0:
+                    vgroup_weights[vi].append((idx_to_name[g.group], float(g.weight)))
+
+    saved_materials = list(mesh.materials)
+    order, acmr = compute_forsyth_face_order(tris, n_verts, cache_size=cache_size)
+    opt_tris = tris[order]
+
     mesh.clear_geometry()
     mesh.from_pydata(verts.tolist(), [], opt_tris.tolist())
+    if len(mesh.materials) == 0:
+        for mat in saved_materials:
+            mesh.materials.append(mat)
+
+    for pi, poly in enumerate(mesh.polygons):
+        src_pi = int(order[pi])
+        poly.material_index = int(mat_indices[src_pi])
+        poly.use_smooth = bool(smooth_flags[src_pi])
+
+    for uv_name, is_active_render, uv_arr in uv_snapshots:
+        uv_layer = mesh.uv_layers.new(name=uv_name, do_init=False)
+        uv_layer.active_render = is_active_render
+        opt_uv = uv_arr[order]
+        for pi, poly in enumerate(mesh.polygons):
+            for ci, li in enumerate(poly.loop_indices):
+                uv_layer.data[li].uv = (float(opt_uv[pi, ci, 0]), float(opt_uv[pi, ci, 1]))
+
+    for attr_name, data_type, domain, c_arr in color_snapshots:
+        attr = mesh.color_attributes.new(name=attr_name, type=data_type, domain=domain)
+        if domain == "CORNER":
+            opt_c = c_arr[order]
+            for pi, poly in enumerate(mesh.polygons):
+                for ci, li in enumerate(poly.loop_indices):
+                    attr.data[li].color = tuple(float(x) for x in opt_c[pi, ci])
+        else:
+            for vi in range(n_verts):
+                attr.data[vi].color = tuple(float(x) for x in c_arr[vi])
+        if attr_name == active_color_name:
+            mesh.color_attributes.active_color = attr
+
+    if vgroup_names:
+        for vi, weights in enumerate(vgroup_weights):
+            for vg_name, weight in weights:
+                vg = obj.vertex_groups.get(vg_name)
+                if vg is not None:
+                    vg.add([vi], weight, "REPLACE")
+
+    if corner_normals is not None:
+        opt_n = corner_normals[order].reshape(-1, 3)
+        mesh.normals_split_custom_set([tuple(float(x) for x in n) for n in opt_n])
+
     mesh.update()
     return acmr
+
+
+def audit_blender_object_metrics_bpy(obj: Any, cache_size: int = 32) -> dict[str, Any]:
+    """Inspect a Blender mesh object for topology health, ACMR, UVs, and Vertex-Wear RGBA."""
+    verts, tris = extract_mesh_arrays_bpy(obj)
+    metrics = compute_mesh_quality_metrics(verts, tris, cache_size=cache_size)
+    mesh = obj.data
+    metrics["hasUvMap"] = len(mesh.uv_layers) > 0
+    metrics["colorAttributeCount"] = len(mesh.color_attributes)
+    color_attr = mesh.color_attributes.get("Color")
+    if color_attr is not None and len(color_attr.data) > 0:
+        cols = np.array([d.color[:] for d in color_attr.data], dtype=np.float32)
+        metrics["vertexWearRgba"] = {
+            "rMin": round(float(cols[:, 0].min()), 3),
+            "rMax": round(float(cols[:, 0].max()), 3),
+            "gMax": round(float(cols[:, 1].max()), 3),
+            "bMax": round(float(cols[:, 2].max()), 3),
+            "aMin": round(float(cols[:, 3].min()), 3),
+            "aMax": round(float(cols[:, 3].max()), 3),
+        }
+    else:
+        metrics["vertexWearRgba"] = None
+    return metrics
 
 
 def apply_vertex_wear_rgba_bpy(

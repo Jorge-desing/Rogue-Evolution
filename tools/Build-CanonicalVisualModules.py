@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 import RogueModelKit as rmk  # noqa: E402
+import functional_engineering_integration as fei  # noqa: E402
 import inspect_fbx_geometry as fbx_inspector  # noqa: E402
 from canonical_module_inventory_staging import (  # noqa: E402
     InventoryCapacityGate,
@@ -709,11 +710,14 @@ def prepare_module_export_geometry(
     for obj in created:
         ensure_uv(obj)
         rmk.apply_weighted_normals(obj, weight=60, keep_sharp=True, apply_modifier=True)
+    soot_profile = fei.resolve_functional_soot_profile(entry, created)
     rmk.bake_advanced_vertex_shading(
         created,
         wear_level="field_tested",
-        soot_intensity=0.0,
+        soot_intensity=float(soot_profile["soot_intensity"]),
         team_mask_materials=armor_materials,
+        exhaust_locs=soot_profile["exhaust_locs"],
+        muzzle_loc=soot_profile["muzzle_loc"],
         structural_wear_mask=True,
     )
     combined = rmk.batch_and_join_by_material(
@@ -727,6 +731,12 @@ def prepare_module_export_geometry(
     )
     if not combined:
         raise RuntimeError(f"Material batching produced no meshes for {entry['variantId']}")
+    fei.apply_canonical_two_level_mesh_pass_bpy(
+        combined,
+        role=entry.get("visualEngineeringRole", ""),
+        enable_taubin_fairing=False,
+        optimize_vertex_cache=True,
+    )
     return combined
 
 
@@ -857,12 +867,25 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
         )
         lod_stats = {}
         for lod_name, lod_objects in lod_dict.items():
+            if lod_name != "LOD0":
+                fei.apply_canonical_two_level_mesh_pass_bpy(
+                    lod_objects,
+                    role=entry.get("visualEngineeringRole", ""),
+                    enable_taubin_fairing=False,
+                    optimize_vertex_cache=True,
+                )
             lod_collection = bpy.data.collections.new(entry["moduleName"] + "_" + lod_name)
             module_collection.children.link(lod_collection)
             place_in_collection(lod_objects, lod_collection)
             faces = sum(len(obj.data.polygons) for obj in lod_objects if obj.type == "MESH")
             triangles = rmk.count_mesh_triangles(lod_objects)
             lod_stats[lod_name] = {"blenderFaces": faces, "unityTriangles": triangles}
+        entry["meshQuality"] = fei.apply_canonical_two_level_mesh_pass_bpy(
+            combined,
+            role=entry.get("visualEngineeringRole", ""),
+            enable_taubin_fairing=False,
+            optimize_vertex_cache=False,
+        )
         entry["lodScreenHeights"] = (
             transition_heights if asset_budget is None else
             [row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]]
