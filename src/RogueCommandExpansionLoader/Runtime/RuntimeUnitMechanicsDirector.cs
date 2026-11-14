@@ -3392,6 +3392,8 @@ namespace RogueCommandExpansionLoader.Runtime
             bool replaceExisting = false)
         {
             if (targetObj == null || string.IsNullOrWhiteSpace(statName) || durationSeconds <= 0f ||
+                Single.IsNaN(relativeDelta) || Single.IsInfinity(relativeDelta) ||
+                Single.IsNaN(durationSeconds) || Single.IsInfinity(durationSeconds) ||
                 (!replaceExisting && Math.Abs(relativeDelta) < 0.0001f))
             {
                 return;
@@ -3404,7 +3406,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             string enumName = MapStatNameToChangeableValue(statName, ref relativeDelta);
-            if (enumName == null)
+            if (enumName == null || Single.IsNaN(relativeDelta) || Single.IsInfinity(relativeDelta))
             {
                 return;
             }
@@ -3463,9 +3465,13 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 // Higher AttackSpeed multiplier (e.g. +25% => +0.25) reduces AttackCooldown (-20%)
                 float mult = 1f + relativeDelta;
-                if (mult > 0.1f)
+                if (mult > 0f)
                 {
                     relativeDelta = (1f / mult) - 1f;
+                }
+                else
+                {
+                    return null;
                 }
                 return "AttackCooldown";
             }
@@ -3522,6 +3528,17 @@ namespace RogueCommandExpansionLoader.Runtime
             if (string.Equals(trimmed, "SkillRange", StringComparison.OrdinalIgnoreCase))
             {
                 return "SkillRange";
+            }
+
+            // Accept the actual native attribute names as well as the authoring aliases.
+            // Matching names explicitly excludes numeric strings accepted by Enum.Parse.
+            if (_changeableValueEnumType != null)
+            {
+                foreach (string nativeName in Enum.GetNames(_changeableValueEnumType))
+                {
+                    if (string.Equals(trimmed, nativeName, StringComparison.OrdinalIgnoreCase))
+                        return nativeName;
+                }
             }
 
             return null;

@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — native timed attribute coverage
+
+- Timed stat modifiers now accept actual native ChangeableValue names in addition to authoring aliases. Previously omitted attributes such as MaxMana, SkillManaCost and ProductionDurationOfProduct can now take effect through native timed modifiers.
+- AttackSpeed/FireRate inversion now handles positive multipliers below 0.1 correctly; invalid/non-finite conversion inputs produce no modifier. Numeric strings are excluded from native enum matching. Native source replacement and expiry are preserved.
+- Release/harness builds: zero warnings/errors. RuntimeAndDiagnostics: 221/225; every native enum name and severe fire-rate penalty mapping pass. The same four visual census failures remain; full suite is not green. Pinned version/SHA-256/MVID rechecked. Local evidence only; Steam remains unverified.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/timed-stats-deployment/manifest.json`.
+
 ## General capability audit — shield-priority vampiric recovery
 
 - Shield-priority leech now restores only missing shield and routes the unused per-hit budget to native health healing. It subtracts observed shield restoration capped to the requested amount, preserving fractional deficits without duplicating recovery. The existing siphon ratio and per-hit cap still bound the combined recovery.

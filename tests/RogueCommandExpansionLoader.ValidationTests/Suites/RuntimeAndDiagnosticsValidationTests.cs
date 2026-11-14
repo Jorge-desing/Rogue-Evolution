@@ -3361,6 +3361,28 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("timed stat changes support native attributes and correctly invert severe fire-rate penalties", () =>
+    {
+        var unit = new EntityController();
+        UnityEngine.Time.time = 10f;
+        foreach (var attribute in Enum.GetValues<EntityController.ChangeableValue>())
+        {
+            RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, attribute.ToString(), 0.2f, 3f, "test:native-stat");
+            if (!unit.AppliedSpecificValueChanges.Any(c => c.Value == attribute && Math.Abs(c.Change.ValueToAdd - 0.2f) < 0.001f && c.Change.ValidUntilTimestamp == 13f))
+                throw new InvalidOperationException("Native timed attribute was not applied: " + attribute);
+        }
+        unit.AppliedSpecificValueChanges.Clear();
+        RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "AttackSpeed", -0.95f, 3f, "test:slow-fire");
+        var slow = unit.AppliedSpecificValueChanges.Single();
+        if (slow.Value != EntityController.ChangeableValue.AttackCooldown || Math.Abs(slow.Change.ValueToAdd - 19f) > 0.001f)
+            throw new InvalidOperationException("Five-percent fire rate must produce twenty-times attack cooldown.");
+        int count = unit.AppliedSpecificValueChanges.Count;
+        RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "123", 0.2f, 3f, "test:invalid-stat");
+        RuntimeUnitMechanicsDirector.ApplyTimedStatChange(unit, "AttackSpeed", -1f, 3f, "test:zero-fire");
+        if (unit.AppliedSpecificValueChanges.Count != count)
+            throw new InvalidOperationException("Invalid attribute or undefined zero-rate conversion produced a modifier.");
+        UnityEngine.Time.time = 0f;
+    }),
     ("vampiric siphon splits shield overflow into health within one per-hit budget", () =>
     {
         ExistingControllers.Instance.Reset();
