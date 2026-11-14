@@ -15,7 +15,7 @@ from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 
 UNIT_NAME = "TidebreakerHovercraft"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "tidebreaker-hovercraft.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "tidebreaker-hovercraft-v2.blend"
 RIGGED_BLEND = REPO_ROOT / "content" / "source-art" / "tidebreakerhovercraft-rigged.blend"
 MODEL_DIR = (
     REPO_ROOT

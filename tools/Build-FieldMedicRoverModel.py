@@ -16,7 +16,7 @@ from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 
 UNIT_NAME = "FieldMedicRover"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "fieldmedicrover.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "fieldmedicrover-v2.blend"
 RIGGED_BLEND = REPO_ROOT / "content" / "source-art" / "fieldmedicrover-rigged.blend"
 MODEL_DIR = (
     REPO_ROOT

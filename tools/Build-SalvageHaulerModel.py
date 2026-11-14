@@ -15,7 +15,7 @@ from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 
 UNIT_NAME = "SalvageHauler"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "salvage-hauler.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "salvage-hauler-v2.blend"
 RIGGED_BLEND = REPO_ROOT / "content" / "source-art" / "salvagehauler-rigged.blend"
 MODEL_DIR = (
     REPO_ROOT

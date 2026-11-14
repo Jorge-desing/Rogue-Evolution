@@ -130,6 +130,24 @@ def refine(builder) -> None:
     builder.weapon_audio_loc = builder.weapon_audio_loc or builder.gun_pivot
     simplify_all_terrain_wheels(builder)
     simplify_low_value_bevel_details(builder)
+    import bpy
+    import tactical_operations_v2_recipes as v2_recipes
+    v2_recipes.apply_sentinel_relay_v2()
+    kept_objects = []
+    seen_names = set()
+    for o in builder.objects:
+        try:
+            name = o.name
+        except ReferenceError:
+            continue
+        if name in bpy.data.objects and name not in seen_names:
+            kept_objects.append(bpy.data.objects[name])
+            seen_names.add(name)
+    for o in bpy.data.objects:
+        if o.type == "MESH" and o.name.startswith("SentinelRelay") and o.name not in seen_names:
+            kept_objects.append(o)
+            seen_names.add(o.name)
+    builder.objects = kept_objects
 
 
 def build() -> None:
@@ -147,7 +165,7 @@ def build() -> None:
             "--colliders", "--gameplay-json",
             "--bake-atlas", "--single-material", "--atlas-resolution", "2048",
             "--multiview",
-            "--blend-path", "content/source-art/sentinel-relay.blend",
+            "--blend-path", "content/source-art/sentinel-relay-v2.blend",
             "--fbx-path", "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/SentinelRelay.fbx",
             "--preview-path", "artifacts/previews/SentinelRelay.png",
             "--report-json", "artifacts/previews/SentinelRelay-report.json",

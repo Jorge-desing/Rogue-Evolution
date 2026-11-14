@@ -15,7 +15,7 @@ from CanonicalUnitHardpoints import create_canonical_hardpoint_sockets
 from mathutils import Vector
 
 UNIT_NAME = "SkyguardSAM"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "skyguard-sam.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "skyguard-sam-v2.blend"
 RIGGED_BLEND = REPO_ROOT / "content" / "source-art" / "skyguardsam-rigged.blend"
 MODEL_DIR = (
     REPO_ROOT
