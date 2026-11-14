@@ -261,13 +261,14 @@ def qem_simplify(
 
 def compute_acmr(faces: np.ndarray, cache_size: int = 32) -> float:
     """Compute Average Cache Miss Ratio (misses / triangles) for an LRU vertex cache."""
-    if len(faces) == 0:
+    num_faces = len(faces)
+    if num_faces == 0:
         return 0.0
+    tris_list = faces.tolist() if isinstance(faces, np.ndarray) else list(faces)
     cache: list[int] = []
     misses = 0
-    for f in faces:
-        for vi in f:
-            v = int(vi)
+    for f in tris_list:
+        for v in f:
             if v in cache:
                 cache.remove(v)
                 cache.insert(0, v)
@@ -276,7 +277,7 @@ def compute_acmr(faces: np.ndarray, cache_size: int = 32) -> float:
                 cache.insert(0, v)
                 if len(cache) > cache_size:
                     cache.pop()
-    return float(misses) / float(len(faces))
+    return float(misses) / float(num_faces)
 
 
 def compute_forsyth_face_order(
@@ -295,92 +296,115 @@ def compute_forsyth_face_order(
     last_tri_score = 0.75
     valence_boost_scale = 2.0
     valence_boost_power = 0.5
+    scaler = 1.0 / float(max(1, cache_size - 3))
 
+    tris_list: list[list[int]] = tris.tolist()
     vert_tris: list[list[int]] = [[] for _ in range(num_vertices)]
-    for ti, f in enumerate(tris):
-        for vi in f:
-            vert_tris[int(vi)].append(ti)
+    for ti, f in enumerate(tris_list):
+        v0, v1, v2 = f[0], f[1], f[2]
+        vert_tris[v0].append(ti)
+        vert_tris[v1].append(ti)
+        vert_tris[v2].append(ti)
 
     active_valence = [len(vt) for vt in vert_tris]
     cache_pos = [-1] * num_vertices
     vert_score = [0.0] * num_vertices
 
-    def _calc_vert_score(vi: int) -> float:
-        val = active_valence[vi]
-        if val == 0:
-            return -1.0
-        pos = cache_pos[vi]
-        if pos < 0:
-            score = 0.0
-        elif pos < 3:
-            score = last_tri_score
-        else:
-            scaler = 1.0 / float(max(1, cache_size - 3))
-            score = max(0.0, 1.0 - float(pos - 3) * scaler) ** cache_decay_power
-        valence_boost = valence_boost_scale * (float(val) ** (-valence_boost_power))
-        return score + valence_boost
+    pos_scores = [
+        last_tri_score if pos < 3 else max(0.0, 1.0 - float(pos - 3) * scaler) ** cache_decay_power
+        for pos in range(cache_size)
+    ]
+    pos_scores.append(0.0)  # pos == -1 indexes pos_scores[-1] == 0.0
+
+    max_val = max(active_valence, default=0)
+    val_scores = [-1.0] + [
+        valence_boost_scale * (float(v) ** (-valence_boost_power))
+        for v in range(1, max_val + 1)
+    ]
 
     for vi in range(num_vertices):
-        vert_score[vi] = _calc_vert_score(vi)
+        val = active_valence[vi]
+        vert_score[vi] = -1.0 if val == 0 else val_scores[val]
 
     tri_added = [False] * num_tris
+    tri_stamp = [0] * num_tris
+    stamp = 0
     tri_score = [
-        vert_score[int(f[0])] + vert_score[int(f[1])] + vert_score[int(f[2])]
-        for f in tris
+        vert_score[f[0]] + vert_score[f[1]] + vert_score[f[2]]
+        for f in tris_list
     ]
+    score_heap: list[tuple[float, int]] = [(-s, ti) for ti, s in enumerate(tri_score)]
+    heapq.heapify(score_heap)
 
     cache: list[int] = []
     out_order: list[int] = []
+    affected_tris: list[int] = []
+    heappop = heapq.heappop
+    heappush = heapq.heappush
     best_tri = int(np.argmax(tri_score))
 
     while len(out_order) < num_tris:
         if best_tri < 0 or tri_added[best_tri]:
-            # Scan for highest remaining triangle
-            best_s = -1.0
             best_tri = -1
-            for ti in range(num_tris):
-                if not tri_added[ti] and tri_score[ti] > best_s:
-                    best_s = tri_score[ti]
-                    best_tri = ti
+            while score_heap:
+                neg_s, cand_ti = heappop(score_heap)
+                if not tri_added[cand_ti] and -neg_s == tri_score[cand_ti]:
+                    best_tri = cand_ti
+                    break
             if best_tri < 0:
                 break
 
         tri_added[best_tri] = True
         out_order.append(best_tri)
-        f = tris[best_tri]
+        f = tris_list[best_tri]
 
-        touched_verts: set[int] = set()
-        for vi_raw in f:
-            vi = int(vi_raw)
+        for vi in f:
             active_valence[vi] -= 1
             if vi in cache:
                 cache.remove(vi)
             cache.insert(0, vi)
-            touched_verts.add(vi)
 
-        # Trim cache beyond cache_size + 3 grace window
+        # Trim cache beyond cache_size
+        evicted_verts: list[int] = []
         while len(cache) > cache_size:
             evicted = cache.pop()
             cache_pos[evicted] = -1
-            touched_verts.add(evicted)
+            evicted_verts.append(evicted)
+
+        for vi in evicted_verts:
+            val = active_valence[vi]
+            vert_score[vi] = -1.0 if val == 0 else val_scores[val]
 
         for pos, vi in enumerate(cache):
             cache_pos[vi] = pos
-            touched_verts.add(vi)
+            val = active_valence[vi]
+            vert_score[vi] = -1.0 if val == 0 else val_scores[val] + pos_scores[pos]
 
-        affected_tris: set[int] = set()
-        for vi in touched_verts:
-            vert_score[vi] = _calc_vert_score(vi)
+        stamp += 1
+        affected_tris.clear()
+        for vi in cache:
+            if active_valence[vi] == 0:
+                continue
             for ti in vert_tris[vi]:
-                if not tri_added[ti]:
-                    affected_tris.add(ti)
+                if not tri_added[ti] and tri_stamp[ti] != stamp:
+                    tri_stamp[ti] = stamp
+                    affected_tris.append(ti)
+        for vi in evicted_verts:
+            if active_valence[vi] == 0:
+                continue
+            for ti in vert_tris[vi]:
+                if not tri_added[ti] and tri_stamp[ti] != stamp:
+                    tri_stamp[ti] = stamp
+                    affected_tris.append(ti)
 
         best_next = -1
         best_next_score = -1.0
         for ti in affected_tris:
-            tf = tris[ti]
-            s = vert_score[int(tf[0])] + vert_score[int(tf[1])] + vert_score[int(tf[2])]
-            tri_score[ti] = s
+            tf = tris_list[ti]
+            s = vert_score[tf[0]] + vert_score[tf[1]] + vert_score[tf[2]]
+            if s != tri_score[ti]:
+                tri_score[ti] = s
+                heappush(score_heap, (-s, ti))
             if s > best_next_score:
                 best_next_score = s
                 best_next = ti
@@ -482,7 +506,11 @@ def compute_vertex_wear_rgba(
 
 
 def compute_mesh_quality_metrics(
-    vertices: np.ndarray, faces: np.ndarray, cache_size: int = 32
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    cache_size: int = 32,
+    *,
+    compute_forsyth: bool = True,
 ) -> dict[str, Any]:
     """Compute geometric sanity, manifoldness, and vertex-cache ACMR metrics."""
     verts = np.asarray(vertices, dtype=np.float64)
@@ -490,24 +518,31 @@ def compute_mesh_quality_metrics(
     _, areas = _compute_face_normals_and_areas(verts, tris) if len(tris) else (np.zeros((0, 3)), np.zeros(0))
     degenerate = int(np.sum(areas <= 1e-10))
 
-    edge_counts: dict[tuple[int, int], int] = defaultdict(int)
-    for f in tris:
-        for i in range(3):
-            u, v = int(f[i]), int(f[(i + 1) % 3])
-            key = (u, v) if u < v else (v, u)
-            edge_counts[key] += 1
-    boundary_edges = sum(1 for c in edge_counts.values() if c == 1)
-    non_manifold_edges = sum(1 for c in edge_counts.values() if c > 2)
+    if len(tris) > 0:
+        edges = np.concatenate(
+            [tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]],
+            axis=0,
+        )
+        edges.sort(axis=1)
+        _, counts = np.unique(edges, axis=0, return_counts=True)
+        boundary_edges = int(np.count_nonzero(counts == 1))
+        non_manifold_edges = int(np.count_nonzero(counts > 2))
+    else:
+        boundary_edges = 0
+        non_manifold_edges = 0
 
     acmr_before = compute_acmr(tris, cache_size=cache_size)
-    _, acmr_after = optimize_vertex_cache_forsyth(tris, len(verts), cache_size=cache_size)
+    if compute_forsyth:
+        _, acmr_after = optimize_vertex_cache_forsyth(tris, len(verts), cache_size=cache_size)
+    else:
+        acmr_after = acmr_before
     return {
         "vertexCount": int(len(verts)),
         "triangleCount": int(len(tris)),
         "surfaceArea": float(np.sum(areas)),
         "degenerateTriangles": degenerate,
-        "boundaryEdges": int(boundary_edges),
-        "nonManifoldEdges": int(non_manifold_edges),
+        "boundaryEdges": boundary_edges,
+        "nonManifoldEdges": non_manifold_edges,
         "acmrBefore": round(acmr_before, 4),
         "acmrAfter": round(acmr_after, 4),
     }
@@ -517,8 +552,16 @@ def extract_mesh_arrays_bpy(obj: Any) -> tuple[np.ndarray, np.ndarray]:
     """Extract triangulated (vertices, faces) NumPy arrays from a Blender mesh object."""
     mesh = obj.data
     mesh.calc_loop_triangles()
-    verts = np.array([v.co[:] for v in mesh.vertices], dtype=np.float64)
-    tris = np.array([lt.vertices[:] for lt in mesh.loop_triangles], dtype=np.int64)
+    n_verts = len(mesh.vertices)
+    n_lt = len(mesh.loop_triangles)
+    verts_flat = np.empty(n_verts * 3, dtype=np.float32)
+    mesh.vertices.foreach_get("co", verts_flat)
+    verts = verts_flat.reshape(n_verts, 3).astype(np.float64)
+    if n_lt == 0:
+        return verts, np.zeros((0, 3), dtype=np.int64)
+    lt_flat = np.empty(n_lt * 3, dtype=np.int32)
+    mesh.loop_triangles.foreach_get("vertices", lt_flat)
+    tris = lt_flat.reshape(n_lt, 3).astype(np.int64)
     return verts, tris
 
 
@@ -565,14 +608,15 @@ def apply_forsyth_cache_optimize_bpy(obj: Any, cache_size: int = 32) -> float:
     import bmesh
 
     mesh = obj.data
-    if len(mesh.polygons) == 0:
+    n_polys = len(mesh.polygons)
+    if n_polys == 0:
         return 0.0
     if getattr(mesh, "shape_keys", None) is not None:
         tris = np.array([poly.vertices[:] for poly in mesh.polygons if len(poly.vertices) == 3], dtype=np.int64)
         return compute_acmr(tris, cache_size=cache_size) if len(tris) > 0 else 0.0
 
     # Ensure pure triangle topology while preserving UVs, Color RGBA, materials, and weights
-    if any(len(poly.vertices) != 3 for poly in mesh.polygons):
+    if len(mesh.loops) != n_polys * 3 or any(len(poly.vertices) != 3 for poly in mesh.polygons):
         bm = bmesh.new()
         bm.from_mesh(mesh)
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
@@ -582,49 +626,57 @@ def apply_forsyth_cache_optimize_bpy(obj: Any, cache_size: int = 32) -> float:
 
     n_verts = len(mesh.vertices)
     n_tris = len(mesh.polygons)
+    n_loops = n_tris * 3
     if n_tris == 0:
         return 0.0
 
-    verts = np.array([v.co[:] for v in mesh.vertices], dtype=np.float64)
-    tris = np.array([poly.vertices[:] for poly in mesh.polygons], dtype=np.int64)
-    mat_indices = np.array([poly.material_index for poly in mesh.polygons], dtype=np.int32)
-    smooth_flags = np.array([poly.use_smooth for poly in mesh.polygons], dtype=bool)
+    verts_flat = np.empty(n_verts * 3, dtype=np.float32)
+    mesh.vertices.foreach_get("co", verts_flat)
+    verts = verts_flat.reshape(n_verts, 3)
 
-    # Snapshot UV layers (n_tris, 3, 2)
+    loop_verts = np.empty(n_loops, dtype=np.int32)
+    mesh.loops.foreach_get("vertex_index", loop_verts)
+    tris = loop_verts.reshape(n_tris, 3).astype(np.int64)
+
+    mat_indices = np.empty(n_tris, dtype=np.int32)
+    mesh.polygons.foreach_get("material_index", mat_indices)
+    smooth_flags = np.empty(n_tris, dtype=bool)
+    mesh.polygons.foreach_get("use_smooth", smooth_flags)
+
+    # Snapshot UV layers (n_tris, 3, 2) via fast C array copy
     uv_snapshots: list[tuple[str, bool, np.ndarray]] = []
     for uv_layer in mesh.uv_layers:
-        uv_arr = np.zeros((n_tris, 3, 2), dtype=np.float32)
-        for pi, poly in enumerate(mesh.polygons):
-            for ci, li in enumerate(poly.loop_indices):
-                uv_arr[pi, ci] = uv_layer.data[li].uv[:]
-        uv_snapshots.append((uv_layer.name, uv_layer.active_render, uv_arr))
+        uv_flat = np.empty(n_loops * 2, dtype=np.float32)
+        uv_layer.data.foreach_get("uv", uv_flat)
+        uv_snapshots.append((uv_layer.name, uv_layer.active_render, uv_flat.reshape(n_tris, 3, 2)))
 
     # Snapshot Color attributes (CORNER or POINT)
     color_snapshots: list[tuple[str, str, str, np.ndarray]] = []
     active_color_name = mesh.color_attributes.active_color.name if mesh.color_attributes.active_color else None
     for attr in mesh.color_attributes:
         if attr.domain == "CORNER":
-            c_arr = np.zeros((n_tris, 3, 4), dtype=np.float32)
-            for pi, poly in enumerate(mesh.polygons):
-                for ci, li in enumerate(poly.loop_indices):
-                    c_arr[pi, ci] = attr.data[li].color[:]
+            c_flat = np.empty(n_loops * 4, dtype=np.float32)
+            attr.data.foreach_get("color", c_flat)
+            c_arr = c_flat.reshape(n_tris, 3, 4)
         else:
-            c_arr = np.array([attr.data[vi].color[:] for vi in range(n_verts)], dtype=np.float32)
+            c_flat = np.empty(n_verts * 4, dtype=np.float32)
+            attr.data.foreach_get("color", c_flat)
+            c_arr = c_flat.reshape(n_verts, 4)
         color_snapshots.append((attr.name, attr.data_type, attr.domain, c_arr))
 
     # Snapshot custom corner normals if present
     has_custom_normals = bool(getattr(mesh, "has_custom_normals", False))
     corner_normals = None
     if has_custom_normals:
-        corner_normals = np.zeros((n_tris, 3, 3), dtype=np.float32)
-        for pi, poly in enumerate(mesh.polygons):
-            for ci, li in enumerate(poly.loop_indices):
-                corner_normals[pi, ci] = mesh.corner_normals[li].vector[:]
+        cn_flat = np.empty(n_loops * 3, dtype=np.float32)
+        mesh.corner_normals.foreach_get("vector", cn_flat)
+        corner_normals = cn_flat.reshape(n_tris, 3, 3)
 
     # Snapshot vertex group weights per vertex
     vgroup_names = [vg.name for vg in obj.vertex_groups]
-    vgroup_weights: list[list[tuple[str, float]]] = [[] for _ in range(n_verts)]
+    vgroup_weights: list[list[tuple[str, float]]] = []
     if vgroup_names:
+        vgroup_weights = [[] for _ in range(n_verts)]
         idx_to_name = {vg.index: vg.name for vg in obj.vertex_groups}
         for vi, v in enumerate(mesh.vertices):
             for g in v.groups:
@@ -641,29 +693,20 @@ def apply_forsyth_cache_optimize_bpy(obj: Any, cache_size: int = 32) -> float:
         for mat in saved_materials:
             mesh.materials.append(mat)
 
-    for pi, poly in enumerate(mesh.polygons):
-        src_pi = int(order[pi])
-        poly.material_index = int(mat_indices[src_pi])
-        poly.use_smooth = bool(smooth_flags[src_pi])
+    mesh.polygons.foreach_set("material_index", mat_indices[order])
+    mesh.polygons.foreach_set("use_smooth", smooth_flags[order])
 
     for uv_name, is_active_render, uv_arr in uv_snapshots:
         uv_layer = mesh.uv_layers.new(name=uv_name, do_init=False)
         uv_layer.active_render = is_active_render
-        opt_uv = uv_arr[order]
-        for pi, poly in enumerate(mesh.polygons):
-            for ci, li in enumerate(poly.loop_indices):
-                uv_layer.data[li].uv = (float(opt_uv[pi, ci, 0]), float(opt_uv[pi, ci, 1]))
+        uv_layer.data.foreach_set("uv", np.ascontiguousarray(uv_arr[order]).reshape(-1))
 
     for attr_name, data_type, domain, c_arr in color_snapshots:
         attr = mesh.color_attributes.new(name=attr_name, type=data_type, domain=domain)
         if domain == "CORNER":
-            opt_c = c_arr[order]
-            for pi, poly in enumerate(mesh.polygons):
-                for ci, li in enumerate(poly.loop_indices):
-                    attr.data[li].color = tuple(float(x) for x in opt_c[pi, ci])
+            attr.data.foreach_set("color", np.ascontiguousarray(c_arr[order]).reshape(-1))
         else:
-            for vi in range(n_verts):
-                attr.data[vi].color = tuple(float(x) for x in c_arr[vi])
+            attr.data.foreach_set("color", np.ascontiguousarray(c_arr).reshape(-1))
         if attr_name == active_color_name:
             mesh.color_attributes.active_color = attr
 
@@ -675,23 +718,35 @@ def apply_forsyth_cache_optimize_bpy(obj: Any, cache_size: int = 32) -> float:
                     vg.add([vi], weight, "REPLACE")
 
     if corner_normals is not None:
-        opt_n = corner_normals[order].reshape(-1, 3)
-        mesh.normals_split_custom_set([tuple(float(x) for x in n) for n in opt_n])
+        opt_n = np.ascontiguousarray(corner_normals[order]).reshape(n_loops, 3)
+        mesh.normals_split_custom_set(opt_n)
 
     mesh.update()
     return acmr
 
 
-def audit_blender_object_metrics_bpy(obj: Any, cache_size: int = 32) -> dict[str, Any]:
+def audit_blender_object_metrics_bpy(
+    obj: Any,
+    cache_size: int = 32,
+    *,
+    compute_forsyth: bool = True,
+) -> dict[str, Any]:
     """Inspect a Blender mesh object for topology health, ACMR, UVs, and Vertex-Wear RGBA."""
     verts, tris = extract_mesh_arrays_bpy(obj)
-    metrics = compute_mesh_quality_metrics(verts, tris, cache_size=cache_size)
+    metrics = compute_mesh_quality_metrics(
+        verts,
+        tris,
+        cache_size=cache_size,
+        compute_forsyth=compute_forsyth,
+    )
     mesh = obj.data
     metrics["hasUvMap"] = len(mesh.uv_layers) > 0
     metrics["colorAttributeCount"] = len(mesh.color_attributes)
     color_attr = mesh.color_attributes.get("Color")
     if color_attr is not None and len(color_attr.data) > 0:
-        cols = np.array([d.color[:] for d in color_attr.data], dtype=np.float32)
+        cols_flat = np.empty(len(color_attr.data) * 4, dtype=np.float32)
+        color_attr.data.foreach_get("color", cols_flat)
+        cols = cols_flat.reshape(-1, 4)
         metrics["vertexWearRgba"] = {
             "rMin": round(float(cols[:, 0].min()), 3),
             "rMax": round(float(cols[:, 0].max()), 3),
@@ -722,23 +777,12 @@ def apply_vertex_wear_rgba_bpy(
     if attr is None:
         attr = mesh.color_attributes.new(name=attribute_name, type="BYTE_COLOR", domain="CORNER")
     if attr.domain == "CORNER":
-        for poly in mesh.polygons:
-            for loop_idx in poly.loop_indices:
-                vi = mesh.loops[loop_idx].vertex_index
-                attr.data[loop_idx].color = (
-                    float(rgba[vi, 0]),
-                    float(rgba[vi, 1]),
-                    float(rgba[vi, 2]),
-                    float(rgba[vi, 3]),
-                )
+        n_loops = len(mesh.loops)
+        loop_verts = np.empty(n_loops, dtype=np.int32)
+        mesh.loops.foreach_get("vertex_index", loop_verts)
+        attr.data.foreach_set("color", np.ascontiguousarray(rgba[loop_verts], dtype=np.float32).reshape(-1))
     else:
-        for vi in range(len(verts)):
-            attr.data[vi].color = (
-                float(rgba[vi, 0]),
-                float(rgba[vi, 1]),
-                float(rgba[vi, 2]),
-                float(rgba[vi, 3]),
-            )
+        attr.data.foreach_set("color", np.ascontiguousarray(rgba, dtype=np.float32).reshape(-1))
     mesh.update()
     return rgba
 

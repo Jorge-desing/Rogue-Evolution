@@ -151,6 +151,7 @@ def apply_canonical_two_level_mesh_pass_bpy(
     enable_taubin_fairing: bool = False,
     optimize_vertex_cache: bool = True,
     cache_size: int = 32,
+    assume_cache_optimized: bool = False,
 ) -> dict[str, Any]:
     """Run Form Hierarchy fairing (optional cast shells), Forsyth vertex-cache reordering,
     and topology + Vertex-Wear RGBA auditing across a list of Blender mesh objects.
@@ -170,7 +171,11 @@ def apply_canonical_two_level_mesh_pass_bpy(
             )
             taubin_applied.append(obj.name)
 
-        metrics_before = mga.audit_blender_object_metrics_bpy(obj, cache_size=cache_size)
+        metrics_before = mga.audit_blender_object_metrics_bpy(
+            obj,
+            cache_size=cache_size,
+            compute_forsyth=not optimize_vertex_cache and not assume_cache_optimized,
+        )
         acmr_optimized = metrics_before["acmrBefore"]
         if optimize_vertex_cache:
             acmr_optimized = mga.apply_forsyth_cache_optimize_bpy(obj, cache_size=cache_size)
@@ -212,9 +217,21 @@ def compose_normals_rnm_rgb(
     except ImportError:
         import pbr_texture_algorithms as pbr_algo
 
-    det_arr = np.asarray(detail_rgb, dtype=np.uint8)
-    if det_arr.shape[:2] != base_rgb.shape[:2]:
-        bh, bw = base_rgb.shape[:2]
+    base_arr = np.asarray(base_rgb)
+    det_arr = np.asarray(detail_rgb)
+    if base_arr.dtype != np.uint8 or base_arr.ndim != 3 or base_arr.shape[-1] != 3:
+        raise TypeError(
+            f"base_rgb must be a uint8 HxWx3 image; got dtype={base_arr.dtype}, shape={base_arr.shape}."
+        )
+    if det_arr.dtype != np.uint8 or det_arr.ndim != 3 or det_arr.shape[-1] != 3:
+        raise TypeError(
+            f"detail_rgb must be a uint8 HxWx3 image; got dtype={det_arr.dtype}, shape={det_arr.shape}."
+        )
+    if base_arr.shape[0] == 0 or base_arr.shape[1] == 0 or det_arr.shape[0] == 0 or det_arr.shape[1] == 0:
+        raise ValueError("Base and detail normal images must have non-empty width and height.")
+    strength = pbr_algo.validate_detail_strength(detail_strength)
+    if det_arr.shape[:2] != base_arr.shape[:2]:
+        bh, bw = base_arr.shape[:2]
         dh, dw = det_arr.shape[:2]
         if dh <= bh and dw <= bw and (bh % dh == 0) and (bw % dw == 0):
             det_arr = np.tile(det_arr, (bh // dh, bw // dw, 1))
@@ -224,7 +241,7 @@ def compose_normals_rnm_rgb(
                 dtype=np.uint8,
             )
 
-    return pbr_algo.blend_normals_rnm(base_rgb, det_arr, detail_strength=detail_strength)
+    return pbr_algo.blend_normals_rnm(base_arr, det_arr, detail_strength=strength)
 
 
 def compose_canonical_pbr_detail(

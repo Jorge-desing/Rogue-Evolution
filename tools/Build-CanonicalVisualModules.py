@@ -709,7 +709,6 @@ def prepare_module_export_geometry(
     """Apply the shared in-memory export preparation for production and staging."""
     for obj in created:
         ensure_uv(obj)
-        rmk.apply_weighted_normals(obj, weight=60, keep_sharp=True, apply_modifier=True)
     soot_profile = fei.resolve_functional_soot_profile(entry, created)
     rmk.bake_advanced_vertex_shading(
         created,
@@ -831,106 +830,124 @@ def build_all(entries: list[dict[str, Any]], force: bool) -> None:
             raise FileExistsError("Generated canonical module outputs already exist; rerun with --force: " + ", ".join(existing[:8]))
 
     rmk.clear_scene()
-    root_collection = bpy.context.scene.collection
-    module_rows: list[tuple[dict[str, Any], list[bpy.types.Object], dict[str, list[bpy.types.Object]], dict[str, Any] | None]] = []
-    for index, entry in enumerate(entries):
-        seed = int(hashlib.sha256(entry["variantId"].encode("utf-8")).hexdigest()[:8], 16)
-        module_collection = bpy.data.collections.new(entry["moduleName"])
-        root_collection.children.link(module_collection)
-        created, armor_materials = build_module_geometry(entry, seed)
-        if not created:
-            raise RuntimeError(f"No geometry generated for {entry['variantId']}")
-        asset_budget = None
-        if not uncalibrated_build:
-            # Module demand is charged as its own visible asset demand in the
-            # calibrated scene profile, separate from its owning chassis.
-            asset_budget = rmk.resolve_geometry_budget(entry["moduleName"])
-            rmk.enforce_face_budget_before_export(
-                created,
-                entry["moduleName"],
-                asset_id=entry["moduleName"],
-            )
-        combined = prepare_module_export_geometry(
-            entry, created, armor_materials, allow_uncalibrated_geometry=uncalibrated_build
-        )
-        place_in_collection(combined, module_collection)
-        source_triangles = rmk.count_mesh_triangles(combined)
-        lod_ratios = (
-            [("LOD0", retention_ratios[0]), ("LOD1", retention_ratios[1]), ("LOD2", retention_ratios[2])]
-            if asset_budget is None else rmk.lod_ratios_from_budget(asset_budget, source_triangles)
-        )
-        lod_dict = rmk.generate_lod_chain(
-            combined,
-            prefix=entry["moduleName"],
-            lod_levels=lod_ratios,
-            lod_name_first=True,
-        )
-        lod_stats = {}
-        for lod_name, lod_objects in lod_dict.items():
-            if lod_name != "LOD0":
-                fei.apply_canonical_two_level_mesh_pass_bpy(
-                    lod_objects,
-                    role=entry.get("visualEngineeringRole", ""),
-                    enable_taubin_fairing=False,
-                    optimize_vertex_cache=True,
+    archive_scene = bpy.context.scene
+    archive_collection = archive_scene.collection
+    work_scene = bpy.data.scenes.new("CanonicalModuleWorkScene")
+    work_collection = work_scene.collection
+    window = getattr(bpy.context, "window", None)
+    if window is None:
+        raise RuntimeError("Blender context has no active window for isolated module generation.")
+
+    try:
+        window.scene = work_scene
+        for index, entry in enumerate(entries):
+            seed = int(hashlib.sha256(entry["variantId"].encode("utf-8")).hexdigest()[:8], 16)
+            module_collection = bpy.data.collections.new(entry["moduleName"])
+            work_collection.children.link(module_collection)
+            created, armor_materials = build_module_geometry(entry, seed)
+            if not created:
+                raise RuntimeError(f"No geometry generated for {entry['variantId']}")
+            asset_budget = None
+            if not uncalibrated_build:
+                # Module demand is charged as its own visible asset demand in the
+                # calibrated scene profile, separate from its owning chassis.
+                asset_budget = rmk.resolve_geometry_budget(entry["moduleName"])
+                rmk.enforce_face_budget_before_export(
+                    created,
+                    entry["moduleName"],
+                    asset_id=entry["moduleName"],
                 )
-            lod_collection = bpy.data.collections.new(entry["moduleName"] + "_" + lod_name)
-            module_collection.children.link(lod_collection)
-            place_in_collection(lod_objects, lod_collection)
-            faces = sum(len(obj.data.polygons) for obj in lod_objects if obj.type == "MESH")
-            triangles = rmk.count_mesh_triangles(lod_objects)
-            lod_stats[lod_name] = {"blenderFaces": faces, "unityTriangles": triangles}
-        entry["meshQuality"] = fei.apply_canonical_two_level_mesh_pass_bpy(
-            combined,
-            role=entry.get("visualEngineeringRole", ""),
-            enable_taubin_fairing=False,
-            optimize_vertex_cache=False,
-        )
-        entry["lodScreenHeights"] = (
-            transition_heights if asset_budget is None else
-            [row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]]
-        )
-        entry["geometryBudgetStatus"] = (
-            "UNCALIBRATED_USER_AUTHORIZED" if uncalibrated_build else "CALIBRATED"
-        )
-        entry["geometryStats"] = lod_stats
-        module_rows.append((entry, combined, lod_dict, asset_budget))
-        print(f"[{index + 1:02d}/{len(entries):02d}] {entry['variantId']} -> {entry['slotId']} ({len(combined)} material batch(es))", flush=True)
+            combined = prepare_module_export_geometry(
+                entry, created, armor_materials, allow_uncalibrated_geometry=uncalibrated_build
+            )
+            place_in_collection(combined, module_collection)
+            source_triangles = rmk.count_mesh_triangles(combined)
+            lod_ratios = (
+                [("LOD0", retention_ratios[0]), ("LOD1", retention_ratios[1]), ("LOD2", retention_ratios[2])]
+                if asset_budget is None else rmk.lod_ratios_from_budget(asset_budget, source_triangles)
+            )
+            lod_dict = rmk.generate_lod_chain(
+                combined,
+                prefix=entry["moduleName"],
+                lod_levels=lod_ratios,
+                lod_name_first=True,
+            )
+            lod_stats = {}
+            for lod_name, lod_objects in lod_dict.items():
+                if lod_name != "LOD0":
+                    fei.apply_canonical_two_level_mesh_pass_bpy(
+                        lod_objects,
+                        role=entry.get("visualEngineeringRole", ""),
+                        enable_taubin_fairing=False,
+                        optimize_vertex_cache=True,
+                    )
+                lod_collection = bpy.data.collections.new(entry["moduleName"] + "_" + lod_name)
+                module_collection.children.link(lod_collection)
+                place_in_collection(lod_objects, lod_collection)
+                faces = sum(len(obj.data.polygons) for obj in lod_objects if obj.type == "MESH")
+                triangles = rmk.count_mesh_triangles(lod_objects)
+                lod_stats[lod_name] = {"blenderFaces": faces, "unityTriangles": triangles}
+            entry["meshQuality"] = fei.apply_canonical_two_level_mesh_pass_bpy(
+                combined,
+                role=entry.get("visualEngineeringRole", ""),
+                enable_taubin_fairing=False,
+                optimize_vertex_cache=False,
+                assume_cache_optimized=True,
+            )
+            entry["lodScreenHeights"] = (
+                transition_heights if asset_budget is None else
+                [row["screenRelativeTransitionHeight"] for row in asset_budget["lods"]]
+            )
+            entry["geometryBudgetStatus"] = (
+                "UNCALIBRATED_USER_AUTHORIZED" if uncalibrated_build else "CALIBRATED"
+            )
+            entry["geometryStats"] = lod_stats
+
+            # Export within the isolated 1-module work scene so FBX selection/depsgraph
+            # updates stay O(1) instead of scanning all 57 modules.
+            fbx_path = ROOT / entry["fbxFilePath"]
+            fbx_path.parent.mkdir(parents=True, exist_ok=True)
+            rmk.export_unity_fbx(
+                fbx_path,
+                combined,
+                include_empties=False,
+                include_armature=False,
+                bake_anim=False,
+                asset_id=entry["moduleName"],
+                prevalidated_budget=asset_budget,
+                allow_uncalibrated_export=asset_budget is None,
+                optimize_vertex_cache=False,
+            )
+            if not fbx_path.is_file() or fbx_path.stat().st_size <= 0:
+                raise RuntimeError(f"Blender did not export a non-empty FBX: {fbx_path}")
+            lod_fbx_path = ROOT / entry["lodFbxFilePath"]
+            all_lod_objects = [
+                obj for lod_name in ("LOD1", "LOD2") for obj in lod_dict[lod_name]
+            ]
+            rmk.export_unity_fbx(
+                lod_fbx_path,
+                all_lod_objects,
+                include_empties=False,
+                include_armature=False,
+                bake_anim=False,
+                asset_id=entry["moduleName"],
+                prevalidated_budget=asset_budget,
+                allow_uncalibrated_export=asset_budget is None,
+                optimize_vertex_cache=False,
+            )
+            if not lod_fbx_path.is_file() or lod_fbx_path.stat().st_size <= 0:
+                raise RuntimeError(f"Blender did not export a non-empty LOD FBX: {lod_fbx_path}")
+
+            archive_collection.children.link(module_collection)
+            work_collection.children.unlink(module_collection)
+            print(f"[{index + 1:02d}/{len(entries):02d}] {entry['variantId']} -> {entry['slotId']} ({len(combined)} material batch(es))", flush=True)
+    finally:
+        window.scene = archive_scene
+        if work_scene.name in bpy.data.scenes:
+            bpy.data.scenes.remove(work_scene)
 
     SOURCE_BLEND.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
-
-    for entry, objects, lod_dict, asset_budget in module_rows:
-        fbx_path = ROOT / entry["fbxFilePath"]
-        fbx_path.parent.mkdir(parents=True, exist_ok=True)
-        rmk.export_unity_fbx(
-            fbx_path,
-            objects,
-            include_empties=False,
-            include_armature=False,
-            bake_anim=False,
-            asset_id=entry["moduleName"],
-            prevalidated_budget=asset_budget,
-            allow_uncalibrated_export=asset_budget is None,
-        )
-        if not fbx_path.is_file() or fbx_path.stat().st_size <= 0:
-            raise RuntimeError(f"Blender did not export a non-empty FBX: {fbx_path}")
-        lod_fbx_path = ROOT / entry["lodFbxFilePath"]
-        all_lod_objects = [
-            obj for lod_name in ("LOD1", "LOD2") for obj in lod_dict[lod_name]
-        ]
-        rmk.export_unity_fbx(
-            lod_fbx_path,
-            all_lod_objects,
-            include_empties=False,
-            include_armature=False,
-            bake_anim=False,
-            asset_id=entry["moduleName"],
-            prevalidated_budget=asset_budget,
-            allow_uncalibrated_export=asset_budget is None,
-        )
-        if not lod_fbx_path.is_file() or lod_fbx_path.stat().st_size <= 0:
-            raise RuntimeError(f"Blender did not export a non-empty LOD FBX: {lod_fbx_path}")
 
     role_registry = json.loads(ROLE_REGISTRY_PATH.read_text(encoding="utf-8"))
     manifest = {

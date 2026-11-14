@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Blender 4.5.14 generation speed optimization (2026-11-14)
+
+- Isolated each canonical Level 2 module build/LOD/export inside a per-module `work_scene` in `tools/Build-CanonicalVisualModules.py`, replaced `bpy.ops` primitives/bevels/mode switches with pure-BMesh helpers (`_create_bmesh_object` with explicit `matrix_world`, `_apply_bmesh_angle_bevel`, `temp_override` + active-mesh guards for `shade_smooth_by_angle` and `modifier_apply`) in `tools/RogueModelKit.py` (byte-identical skill copy preserved), added `assume_cache_optimized` to `tools/functional_engineering_integration.py` to skip redundant post-LOD Forsyth solves, and vectorized `tools/mesh_geometry_algorithms.py` (`foreach_get`/`foreach_set`, `np.unique`, lazy `heapq` + LUT `compute_forsyth_face_order`). Timed Blender 4.5.14 57-module build dropped from `662.14s` to `27.19s` (24.3x faster) with `0` diffs across all 57 modules' LOD0/LOD1/LOD2 `blenderFaces`/`unityTriangles`/`maxNonManifoldEdges`/`hasUvMap`/`vertexWearRgba` (`meanAcmrAfter` 0.5443 vs 0.5439), isolated `Build-SampleScoutModel.py` built in `5.21s`, and full `python -m tools.run_python_tests` (`mode=all`) passed `778` (`1` Windows symlink skip, `0` failures) in `18.90s`. Local build/test evidence only; Unity bundle rebuild and in-game rendering were not re-run.
+
 ## Coordinated field support
 
 Squad support scores healable health and repairable armor deficits. Support orders approach their assigned ally and use native Heal or RepairArmor within four world units. Release and 70 tactical checks passed locally. Steam execution remains unverified.

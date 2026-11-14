@@ -384,6 +384,121 @@ def make_material(
     return material
 
 
+def _apply_bmesh_angle_bevel(
+    bm: bmesh.types.BMesh,
+    bevel: float,
+    bevel_segments: int = 1,
+    angle_limit_deg: float = 35.0,
+) -> None:
+    """Apply an angle-limited edge bevel directly on a BMesh without bpy.ops."""
+    if bevel <= 0.0:
+        return
+    bm.normal_update()
+    angle_rad = math.radians(angle_limit_deg)
+    edges = [
+        e for e in bm.edges
+        if e.is_manifold and e.calc_face_angle(0.0) > angle_rad
+    ]
+    if edges:
+        bmesh.ops.bevel(
+            bm,
+            geom=edges,
+            offset=float(bevel),
+            offset_type="OFFSET",
+            segments=max(1, int(bevel_segments)),
+            profile=0.5,
+            affect="EDGES",
+            clamp_overlap=True,
+            loop_slide=True,
+        )
+
+
+def _apply_modifier_fast(obj: bpy.types.Object, modifier_name: str) -> None:
+    """Apply one modifier on `obj` via temp_override without global select_all."""
+    prev_active = bpy.context.view_layer.objects.active
+    bpy.context.view_layer.objects.active = obj
+    try:
+        with bpy.context.temp_override(
+            object=obj,
+            active_object=obj,
+            selected_objects=[obj],
+            selected_editable_objects=[obj],
+        ):
+            bpy.ops.object.modifier_apply(modifier=modifier_name)
+    finally:
+        if prev_active is not None and prev_active.name in bpy.context.view_layer.objects:
+            bpy.context.view_layer.objects.active = prev_active
+
+
+def _shade_smooth_by_angle_fast(obj: bpy.types.Object, angle_rad: float) -> None:
+    """Run Blender's shade_smooth_by_angle via temp_override without global select_all."""
+    if not hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+        return
+    prev_active = bpy.context.view_layer.objects.active
+    bpy.context.view_layer.objects.active = obj
+    try:
+        with bpy.context.temp_override(
+            object=obj,
+            active_object=obj,
+            selected_objects=[obj],
+            selected_editable_objects=[obj],
+        ):
+            bpy.ops.object.shade_smooth_by_angle(angle=angle_rad)
+    finally:
+        if prev_active is not None and prev_active.name in bpy.context.view_layer.objects:
+            bpy.context.view_layer.objects.active = prev_active
+
+
+def _set_poly_smooth(mesh: bpy.types.Mesh, smooth: bool) -> None:
+    """Assign uniform `use_smooth` across all polygons without a Python loop."""
+    n_polys = len(mesh.polygons)
+    if n_polys == 0:
+        return
+    mesh.polygons.foreach_set("use_smooth", [bool(smooth)] * n_polys)
+
+
+def _create_bmesh_object(
+    name: str,
+    bm: bmesh.types.BMesh,
+    location: Tuple[float, float, float] | Vector,
+    material: bpy.types.Material | None,
+    *,
+    bevel: float = 0.0,
+    smooth: bool = False,
+    bevel_segments: int = 1,
+    smooth_axis: Vector | None = None,
+) -> bpy.types.Object:
+    """Finalize a BMesh directly into a linked Blender object without bpy.ops."""
+    try:
+        _apply_bmesh_angle_bevel(bm, bevel, bevel_segments=bevel_segments)
+        mesh = bpy.data.meshes.new(f"{name}_Mesh")
+        bm.to_mesh(mesh)
+    finally:
+        bm.free()
+
+    for uv_layer in mesh.uv_layers:
+        if uv_layer.name == "Float2":
+            uv_layer.name = "UVMap"
+            break
+
+    if material is not None:
+        mesh.materials.append(material)
+
+    if smooth_axis is not None:
+        for polygon in mesh.polygons:
+            polygon.use_smooth = abs(polygon.normal.dot(smooth_axis)) < 0.999
+    else:
+        _set_poly_smooth(mesh, smooth)
+
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    loc_vec = Vector(location)
+    obj.location = loc_vec
+    obj.matrix_world = Matrix.Translation(loc_vec)
+    bpy.context.collection.objects.link(obj)
+    return obj
+
+
 def finish_mesh(
     obj: bpy.types.Object,
     material: bpy.types.Material | None,
@@ -395,20 +510,23 @@ def finish_mesh(
     if material is not None:
         obj.data.materials.append(material)
 
-    for polygon in obj.data.polygons:
-        polygon.use_smooth = smooth
-
     if bevel > 0.0:
-        modifier = obj.modifiers.new("machined chamfers", "BEVEL")
-        modifier.width = bevel
-        modifier.segments = max(1, int(bevel_segments))
-        modifier.limit_method = "ANGLE"
-        modifier.angle_limit = math.radians(35)
-        bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.modifier_apply(modifier=modifier.name)
-        for polygon in obj.data.polygons:
-            polygon.use_smooth = smooth
+        if len(obj.modifiers) == 0:
+            bm = bmesh.new()
+            bm.from_mesh(obj.data)
+            _apply_bmesh_angle_bevel(bm, bevel, bevel_segments=bevel_segments)
+            bm.to_mesh(obj.data)
+            bm.free()
+            obj.data.update()
+        else:
+            modifier = obj.modifiers.new("machined chamfers", "BEVEL")
+            modifier.width = bevel
+            modifier.segments = max(1, int(bevel_segments))
+            modifier.limit_method = "ANGLE"
+            modifier.angle_limit = math.radians(35)
+            _apply_modifier_fast(obj, modifier.name)
 
+    _set_poly_smooth(obj.data, smooth)
     obj.select_set(False)
     return obj
 
@@ -578,7 +696,7 @@ def make_box(
     smooth_faces = resolved_segments > 1 if smooth is None else smooth
     top_scale = _auto_armor_taper(name, size, resolved_bevel)
     if top_scale is not None:
-        obj = _make_tapered_shell(
+        return _make_tapered_shell(
             name,
             size,
             location,
@@ -587,23 +705,24 @@ def make_box(
             bevel=resolved_bevel,
             bevel_segments=resolved_segments,
             smooth=smooth_faces,
+            rotation=rotation,
+            center_origin=True,
         )
-        loc_v = Vector(location)
-        for vertex in obj.data.vertices:
-            vertex.co -= loc_v
-        obj.location = loc_v
-        obj.rotation_euler = rotation
-        bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-        return obj
 
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=location)
-    obj = bpy.context.object
-    obj.name = name
-    obj.dimensions = size
-    obj.rotation_euler = rotation
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-    return finish_mesh(obj, material, resolved_bevel, smooth=smooth_faces, bevel_segments=resolved_segments)
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0, calc_uvs=True)
+    bmesh.ops.scale(bm, vec=size, verts=bm.verts)
+    if any(rotation):
+        bmesh.ops.rotate(bm, verts=bm.verts, matrix=Euler(rotation).to_matrix())
+    return _create_bmesh_object(
+        name,
+        bm,
+        location,
+        material,
+        bevel=resolved_bevel,
+        smooth=smooth_faces,
+        bevel_segments=resolved_segments,
+    )
 
 
 def _make_tapered_shell(
@@ -615,6 +734,8 @@ def _make_tapered_shell(
     bevel: float = 0.025,
     bevel_segments: int = 2,
     smooth: bool = True,
+    rotation: Tuple[float, float, float] = (0.0, 0.0, 0.0),
+    center_origin: bool = False,
 ) -> bpy.types.Object:
     """Creates a tapered armor shell with a narrower roof and softened edge transitions."""
     sx, sy, sz = size
@@ -625,33 +746,38 @@ def _make_tapered_shell(
         raise ValueError("top_scale values must be in the range (0, 1]")
 
     loc = Vector(location)
+    origin = Vector((0.0, 0.0, 0.0)) if center_origin else loc
     hx, hy = sx * 0.5, sy * 0.5
-    z_bottom, z_top = loc.z - sz * 0.5, loc.z + sz * 0.5
-    vertices = [
-        (loc.x - hx, loc.y - hy, z_bottom), (loc.x + hx, loc.y - hy, z_bottom),
-        (loc.x + hx, loc.y + hy, z_bottom), (loc.x - hx, loc.y + hy, z_bottom),
-        (loc.x - hx * scale_x, loc.y - hy * scale_y, z_top),
-        (loc.x + hx * scale_x, loc.y - hy * scale_y, z_top),
-        (loc.x + hx * scale_x, loc.y + hy * scale_y, z_top),
-        (loc.x - hx * scale_x, loc.y + hy * scale_y, z_top),
-    ]
-    faces = [
+    z_bottom, z_top = origin.z - sz * 0.5, origin.z + sz * 0.5
+    coords = (
+        (origin.x - hx, origin.y - hy, z_bottom), (origin.x + hx, origin.y - hy, z_bottom),
+        (origin.x + hx, origin.y + hy, z_bottom), (origin.x - hx, origin.y + hy, z_bottom),
+        (origin.x - hx * scale_x, origin.y - hy * scale_y, z_top),
+        (origin.x + hx * scale_x, origin.y - hy * scale_y, z_top),
+        (origin.x + hx * scale_x, origin.y + hy * scale_y, z_top),
+        (origin.x - hx * scale_x, origin.y + hy * scale_y, z_top),
+    )
+    faces = (
         (3, 2, 1, 0), (4, 5, 6, 7),
         (0, 1, 5, 4), (1, 2, 6, 5),
         (2, 3, 7, 6), (3, 0, 4, 7),
-    ]
-    mesh = bpy.data.meshes.new(f"{name}_Mesh")
-    mesh.from_pydata(vertices, [], faces)
-    mesh.update()
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(obj)
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.mesh.normals_make_consistent(inside=False)
-    bpy.ops.object.mode_set(mode="OBJECT")
-    return finish_mesh(obj, material, bevel, smooth=smooth, bevel_segments=bevel_segments)
+    )
+    bm = bmesh.new()
+    bm_verts = [bm.verts.new(c) for c in coords]
+    for face_idx in faces:
+        bm.faces.new([bm_verts[i] for i in face_idx])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    if rotation and any(rotation):
+        bmesh.ops.rotate(bm, verts=bm.verts, matrix=Euler(rotation).to_matrix())
+    return _create_bmesh_object(
+        name,
+        bm,
+        loc if center_origin else (0.0, 0.0, 0.0),
+        material,
+        bevel=bevel,
+        smooth=smooth,
+        bevel_segments=bevel_segments,
+    )
 
 
 def make_cylinder(
@@ -668,19 +794,32 @@ def make_cylinder(
     """Creates a cylinder with baked scale and proportional chamfers."""
     if rotation is None:
         rotation = (0.0, 0.0, 0.0)
-    bpy.ops.mesh.primitive_cylinder_add(
-        vertices=vertices, radius=radius, depth=depth, location=location, rotation=rotation
+    bm = bmesh.new()
+    bmesh.ops.create_cone(
+        bm,
+        cap_ends=True,
+        cap_tris=False,
+        segments=int(vertices),
+        radius1=float(radius),
+        radius2=float(radius),
+        depth=float(depth),
+        calc_uvs=True,
     )
-    obj = bpy.context.object
-    obj.name = name
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    rot_mat = Euler(rotation).to_matrix()
+    if any(rotation):
+        bmesh.ops.rotate(bm, verts=bm.verts, matrix=rot_mat)
     if bevel is None:
         bevel = min(radius * 0.16, depth * 0.14)
-    obj = finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
-    axis = Euler(rotation).to_matrix() @ Vector((0.0, 0.0, 1.0))
-    for polygon in obj.data.polygons:
-        polygon.use_smooth = abs(polygon.normal.dot(axis)) < 0.999
-    return obj
+    axis = rot_mat @ Vector((0.0, 0.0, 1.0))
+    return _create_bmesh_object(
+        name,
+        bm,
+        location,
+        material,
+        bevel=bevel,
+        bevel_segments=bevel_segments,
+        smooth_axis=axis,
+    )
 
 
 
@@ -705,24 +844,32 @@ def make_tapered_cylinder(
     """
     if rotation is None:
         rotation = (0.0, 0.0, 0.0)
-    bpy.ops.mesh.primitive_cone_add(
-        vertices=vertices,
-        radius1=radius_base,
-        radius2=radius_tip,
-        depth=depth,
-        location=location,
-        rotation=rotation,
+    bm = bmesh.new()
+    bmesh.ops.create_cone(
+        bm,
+        cap_ends=True,
+        cap_tris=False,
+        segments=int(vertices),
+        radius1=float(radius_base),
+        radius2=float(radius_tip),
+        depth=float(depth),
+        calc_uvs=True,
     )
-    obj = bpy.context.object
-    obj.name = name
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    rot_mat = Euler(rotation).to_matrix()
+    if any(rotation):
+        bmesh.ops.rotate(bm, verts=bm.verts, matrix=rot_mat)
     if bevel is None:
         bevel = min(radius_tip * 0.16, depth * 0.14)
-    obj = finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
-    axis = Euler(rotation).to_matrix() @ Vector((0.0, 0.0, 1.0))
-    for polygon in obj.data.polygons:
-        polygon.use_smooth = abs(polygon.normal.dot(axis)) < 0.999
-    return obj
+    axis = rot_mat @ Vector((0.0, 0.0, 1.0))
+    return _create_bmesh_object(
+        name,
+        bm,
+        location,
+        material,
+        bevel=bevel,
+        bevel_segments=bevel_segments,
+        smooth_axis=axis,
+    )
 
 def make_rod(
     name: str,
@@ -742,23 +889,31 @@ def make_rod(
     if length < 1e-6:
         length = 1e-6
 
-    bpy.ops.mesh.primitive_cylinder_add(
-        vertices=vertices,
-        radius=radius,
-        depth=length,
-        location=(start_v + end_v) * 0.5,
+    bm = bmesh.new()
+    bmesh.ops.create_cone(
+        bm,
+        cap_ends=True,
+        cap_tris=False,
+        segments=int(vertices),
+        radius1=float(radius),
+        radius2=float(radius),
+        depth=float(length),
+        calc_uvs=True,
     )
-    obj = bpy.context.object
-    obj.name = name
-    obj.rotation_euler = direction.to_track_quat("Z", "Y").to_euler()
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    rot_mat = direction.to_track_quat("Z", "Y").to_matrix()
+    bmesh.ops.rotate(bm, verts=bm.verts, matrix=rot_mat)
     if bevel is None:
         bevel = min(radius * 0.18, length * 0.03)
-    obj = finish_mesh(obj, material, bevel, bevel_segments=bevel_segments)
     axis = direction.normalized() if direction.length > 1e-6 else Vector((0.0, 0.0, 1.0))
-    for polygon in obj.data.polygons:
-        polygon.use_smooth = abs(polygon.normal.dot(axis)) < 0.999
-    return obj
+    return _create_bmesh_object(
+        name,
+        bm,
+        (start_v + end_v) * 0.5,
+        material,
+        bevel=bevel,
+        bevel_segments=bevel_segments,
+        smooth_axis=axis,
+    )
 
 
 def make_torus(
@@ -7632,10 +7787,6 @@ def apply_weighted_normals(
         return obj
 
     try:
-        bpy.ops.object.select_all(action="DESELECT")
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
-
         mod = obj.modifiers.new(name="RCL_WeightedNormal", type="WEIGHTED_NORMAL")
         mod.mode = mode
         mod.weight = max(1, min(100, int(weight)))
@@ -7643,7 +7794,7 @@ def apply_weighted_normals(
 
         has_armature = any(m.type == "ARMATURE" for m in obj.modifiers)
         if apply_modifier and not has_armature:
-            bpy.ops.object.modifier_apply(modifier=mod.name)
+            _apply_modifier_fast(obj, mod.name)
     except Exception as ex:
         print(f"Warning: Weighted normal pass skipped for {obj.name}: {ex}")
 
@@ -7707,13 +7858,16 @@ def batch_and_join_by_material(
             joined_obj = group[0]
             joined_objects.append(joined_obj)
         else:
-            bpy.ops.object.select_all(action="DESELECT")
-            for obj in group:
-                obj.select_set(True)
-            bpy.context.view_layer.objects.active = group[0]
-
-            bpy.ops.object.join()
-            joined_obj = bpy.context.view_layer.objects.active
+            active_target = group[0]
+            bpy.context.view_layer.objects.active = active_target
+            with bpy.context.temp_override(
+                object=active_target,
+                active_object=active_target,
+                selected_objects=list(group),
+                selected_editable_objects=list(group),
+            ):
+                bpy.ops.object.join()
+            joined_obj = active_target
             mat_name = mat.name.replace(" ", "_") if mat else "Unassigned"
             if unity_batch_names:
                 prefix_marker = f"{prefix}_"
@@ -7723,11 +7877,13 @@ def batch_and_join_by_material(
             else:
                 joined_obj.name = f"{prefix}_{mat_name}"
 
-            # Clean up mesh normals
-            bpy.ops.object.mode_set(mode="EDIT")
-            bpy.ops.mesh.select_all(action="SELECT")
-            bpy.ops.mesh.normals_make_consistent(inside=False)
-            bpy.ops.object.mode_set(mode="OBJECT")
+            # Recalculate consistent outward face normals in memory without mode_set
+            bm_norm = bmesh.new()
+            bm_norm.from_mesh(joined_obj.data)
+            bmesh.ops.recalc_face_normals(bm_norm, faces=bm_norm.faces)
+            bm_norm.to_mesh(joined_obj.data)
+            bm_norm.free()
+            joined_obj.data.update()
             joined_objects.append(joined_obj)
 
         if unity_batch_names and len(group) == 1:
@@ -7738,25 +7894,19 @@ def batch_and_join_by_material(
             joined_obj.name = f"{prefix}_Batch_{mat_name}"
 
         if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
-            bpy.ops.object.select_all(action="DESELECT")
-            joined_obj.select_set(True)
-            bpy.context.view_layer.objects.active = joined_obj
-            bpy.ops.object.shade_smooth_by_angle(angle=math.radians(smooth_angle_deg))
+            _shade_smooth_by_angle_fast(joined_obj, math.radians(smooth_angle_deg))
         else:
-            for poly in joined_obj.data.polygons:
-                poly.use_smooth = False
+            _set_poly_smooth(joined_obj.data, False)
 
         if weighted_normals and smooth_by_angle:
             apply_weighted_normals(joined_obj, weight=normal_weight, keep_sharp=True, apply_modifier=True)
 
     # Also smooth preserved objects if requested
     if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+        angle_rad = math.radians(smooth_angle_deg)
         for p_obj in preserved_objects:
             if p_obj.type == "MESH":
-                bpy.ops.object.select_all(action="DESELECT")
-                p_obj.select_set(True)
-                bpy.context.view_layer.objects.active = p_obj
-                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(smooth_angle_deg))
+                _shade_smooth_by_angle_fast(p_obj, angle_rad)
                 if weighted_normals:
                     apply_weighted_normals(p_obj, weight=normal_weight, keep_sharp=True, apply_modifier=True)
 
@@ -7993,21 +8143,16 @@ def generate_lod_chain(
             bpy.context.collection.objects.link(dup)
 
             if ratio < 0.99:
-                bpy.context.view_layer.objects.active = dup
-                bpy.ops.object.select_all(action="DESELECT")
-                dup.select_set(True)
                 mod = dup.modifiers.new(f"Decimate_{lod_name}", "DECIMATE")
                 mod.ratio = ratio
                 mod.delimit = {"NORMAL", "MATERIAL"}
-                bpy.ops.object.modifier_apply(modifier=mod.name)
+                _apply_modifier_fast(dup, mod.name)
 
             if smooth_by_angle and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
-                bpy.context.view_layer.objects.active = dup
-                bpy.ops.object.select_all(action="DESELECT")
-                dup.select_set(True)
-                bpy.ops.object.shade_smooth_by_angle(angle=math.radians(smooth_angle_deg))
-                if weighted_normals:
-                    apply_weighted_normals(dup, weight=50, keep_sharp=True, apply_modifier=True)
+                if ratio < 0.99 or not getattr(dup.data, "has_custom_normals", False):
+                    _shade_smooth_by_angle_fast(dup, math.radians(smooth_angle_deg))
+                    if weighted_normals:
+                        apply_weighted_normals(dup, weight=50, keep_sharp=True, apply_modifier=True)
 
             lod_objects.append(dup)
         lod_dict[lod_name] = lod_objects
