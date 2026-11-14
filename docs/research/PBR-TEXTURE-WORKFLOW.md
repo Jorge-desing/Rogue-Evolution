@@ -1,5 +1,10 @@
 # Rogue Command PBR Texture Workflow
 
+## Start here for a texture task
+
+Resolve the owning model, material, and Unity prefab from the checkout. Load the [PBR authoring skill](../../.agents/skills/rogue-command-pbr-texture-authoring/SKILL.md) and [PBR validation skill](../../.agents/skills/rogue-command-pbr-texture-validation/SKILL.md). Record which maps were generated and verify the effective Unity importer settings when Unity imports are in scope. Record map validation, importer verification, and runtime observation as separate results.
+
+
 This document defines the project-specific handoff from vehicle texturing to Unity. It supplements [3D Model Authoring](../../.agents/skills/rogue-command-3d-model-authoring/SKILL.md), [PBR Texture Authoring](../../.agents/skills/rogue-command-pbr-texture-authoring/SKILL.md), and [PBR Texture Validation](../../.agents/skills/rogue-command-pbr-texture-validation/SKILL.md). The shader, builder, and pinned Unity project remain the compatibility authority.
 
 ## Supported authoring choices

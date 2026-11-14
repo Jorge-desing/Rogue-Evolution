@@ -1,5 +1,10 @@
 # Agent documentation contract
 
+## Load context at task start
+
+Use the startup routing table in [AGENTS.md](../AGENTS.md) to open the documentation that applies to the current task before making changes. When a new canonical guide introduces a distinct workflow, update the startup route that should surface it. Keep the route short enough to scan every time.
+
+
 Repository documents serve agents implementing, operating, reviewing, or resuming this project. A new agent should be able to find the governing rule, execute the applicable workflow, verify its outcome, and identify the next action using the repository and its evidence.
 
 ## Where information belongs

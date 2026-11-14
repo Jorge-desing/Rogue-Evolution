@@ -1,5 +1,10 @@
 # Herramientas para crear contenido de Rogue Command
 
+## Start here for a content task
+
+Open the [pack contract](../../content/schema/README.md) and the area skill under `../../.agents/skills/` before editing. Resolve the target pack in the current checkout and identify which source or generator owns the output. From the repository root, run `python -m tools.validate_content_pack <pack_dir>` with the actual pack directory, then `python -m tools.audit_content_references --all` for cross-pack references. Record failures before proceeding to packaging. Treat the dated tool search below as historical research and consult the [handoff](AGENT-HANDOFF.md) for newer evidence.
+
+
 **Revisado:** 2026-10-18
 
 **Objetivo:** producir unidades, etapas/mapas y AI originales para el mod Rogue Evolution. El loader se mantiene como infraestructura necesaria.

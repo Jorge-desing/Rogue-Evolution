@@ -1,5 +1,10 @@
 # Rogue Command: control de pruebas en vivo por Steam
 
+## Load before runtime work
+
+Read the [BepInEx MCP skill](../../.agents/skills/rogue-command-bepinex-mcp/SKILL.md) and the relevant sections below before launching or mutating the game. Check current process state, ownership of the active profile, and the expected postcondition. After each mutation verify its effect. For an uncertain result, read current state before another action. Record evidence and restoration status in the [handoff](AGENT-HANDOFF.md).
+
+
 Este runbook es obligatorio antes de interactuar con una partida de Rogue Command. Léelo junto con `AGENTS.md`, `docs/research/AGENT-HANDOFF.md` y la skill `.agents/skills/rogue-command-steam-runtime-validation/SKILL.md`. El handoff enlaza aquí para que futuros agentes encuentren el procedimiento.
 
 ## Ruta de control

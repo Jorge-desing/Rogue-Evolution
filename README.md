@@ -2,7 +2,7 @@
 
 ## Punto de entrada para agentes
 
-La documentación del repositorio está destinada a agentes que implementan, verifican o retoman trabajo. Lee [AGENTS.md](AGENTS.md) para conocer las reglas vigentes y [el handoff](docs/research/AGENT-HANDOFF.md) para localizar evidencia y trabajo pendiente. Antes de actuar, contrasta el handoff con el checkout y abre la skill o el contrato del área correspondiente. Al modificar documentación, aplica [el contrato para agentes](docs/AGENT-DOCUMENTATION.md).
+La documentación del repositorio está destinada a agentes que implementan, verifican o retoman trabajo. Lee [AGENTS.md](AGENTS.md) para cargar la ruta de documentación de la tarea y conocer las reglas vigentes y [el handoff](docs/research/AGENT-HANDOFF.md) para localizar evidencia y trabajo pendiente. Antes de actuar, contrasta el handoff con el checkout y abre la skill o el contrato del área correspondiente. Al modificar documentación, aplica [el contrato para agentes](docs/AGENT-DOCUMENTATION.md).
 
 
 Este repositorio desarrolla un **mod de expansión para añadir unidades, etapas y AI a Rogue Command**. El cargador externo BepInEx 5 con Harmony es la infraestructura que permite registrar y ejecutar ese contenido; no es el objetivo final del mod. Los manifests del repositorio declaran diez unidades y diez edificios de producción, cinco etapas y cinco perfiles AI. El ZIP instalable distribuye nueve unidades en `sample-native-expansion` y la etapa/perfil de `sample-reactive-ai`; `sample-expansion` permanece fuera hasta contar con sus assets completos.

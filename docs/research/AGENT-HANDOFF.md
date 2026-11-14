@@ -3,6 +3,10 @@
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
 
+## Agent documentation startup routing
+
+- Start with the task table in [AGENTS.md](../../AGENTS.md) and open all applicable sources before acting. Authoring, loader, pack schema, Steam runtime, visual, and texture entry points now link the applicable skills and identify checks or evidence. The visual guide now reflects the global diagnostic-only geometry policy. Use the [documentation contract](../AGENT-DOCUMENTATION.md) for subsequent edits.
+
 ## 2026-11-13 Material Maker CLI warning cleanup
 
 - `tools/Setup-TextureAuthoringTools.ps1 -MaterialMaker` now builds an isolated Material Maker 1.7 CLI runtime via `tools/Build-MaterialMakerCli.ps1`. The source patcher pins official Material Maker 1.7 and Godot 4.7 archives by SHA-256, fixes the CLI GPU-resource shutdown order (including joining the render worker), drops the unavailable optional Steam extension from the CLI-only build, and corrects verified upstream packaging issues: three absent demo `.mtl` references, one stale logo UID, and Godot 3 `shader_param/` keys. The official install and Unity/game files remain unchanged.

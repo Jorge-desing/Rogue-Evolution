@@ -5,6 +5,19 @@
 Treat repository documentation as operational context for agents. Write so a new agent can resume the task from the repository and its evidence without access to the previous chat. Follow the [agent documentation contract](docs/AGENT-DOCUMENTATION.md) when creating or updating the README, handoffs, runbooks, specifications, and skills. During each completed pass, update the relevant canonical instructions and record the evidence and next action in the handoff when they affect continuation.
 
 
+### Load task documentation at startup
+
+On the first turn of a task, read the README and handoff and open the applicable documents below before implementation or runtime actions. Load all matching rows for cross-area tasks. When the scope changes, load the newly applicable row before working in that area. Use the files in the current checkout and report a missing prerequisite when it affects the next action.
+
+| Task | Open at startup |
+| --- | --- |
+| Pack, unit, stage, or AI content | [Pack contract](content/schema/README.md), [authoring tool routes](docs/research/CONTENT-AUTHORING-TOOLS.md), and the matching area skill under `.agents/skills/` |
+| Loader, registry, or validation tooling | [Loader tools](docs/research/CONTENT-LOADER-TOOLS.md) and [pack validation skill](.agents/skills/rogue-command-pack-validation/SKILL.md) |
+| Native signatures or Harmony | [Decompilation workflow](docs/research/MANAGED-DLL-DECOMPILATION.md) and [Harmony policy](.agents/skills/rogue-command-harmony-policy/SKILL.md) |
+| Gameplay, intermission, or Steam validation | [Steam runtime runbook](docs/research/STEAM-RUNTIME-CONTROL.md) and [BepInEx MCP skill](.agents/skills/rogue-command-bepinex-mcp/SKILL.md) |
+| Models, rigs, materials, or Unity assets | [Visual authoring](docs/research/UNIT-VISUAL-AUTHORING.md), the matching skill, and [PBR workflow](docs/research/PBR-TEXTURE-WORKFLOW.md) for texture work |
+| Documentation and handoff | [Agent documentation contract](docs/AGENT-DOCUMENTATION.md) and the canonical source or guide for the behavior being documented |
+
 Before changing this repository, read [the agent handoff](docs/research/AGENT-HANDOFF.md), the root [README](README.md), and the content contract in `content/schema/README.md` when the change touches packs.
 
 **Always consult context before acting** (start of every task and conversation): query the mem0 memory store for durable user preferences, facts, and decisions; inspect the current checkout state with `git status`, `git log`, and the current HEAD (never trust remembered state alone); and review the handoff and README. Memory and handoff notes may be stale or contradicted by newer commits — verify against the current tree and recent history before relying on them.

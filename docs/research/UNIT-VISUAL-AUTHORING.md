@@ -4,7 +4,7 @@
 
 **Evidence:** The 2026-11-10 realism pilot was rebuilt and inspected with Blender 4.5.14. Existing Unity manifest/bundle facts below are static historical inspection; no fresh Unity build or Steam match was performed for this visual pass.
 
-**Budget update (2026-11-11):** The fixed face caps described in the historical model notes below have been superseded by the shared scene-calibrated policy in `content/source-art/model-budget-profile.json`. Its local profile is currently uncalibrated, so profile-gated prefab/package builds and new model promotion remain disabled. The Gravitas Hardflow pilot is only a local review candidate under ignored `artifacts/model-budget-hardflow-pilot/`.
+**Current policy:** Load the [3D model authoring skill](../../.agents/skills/rogue-command-3d-model-authoring/SKILL.md) and [repository rules](../../AGENTS.md) before authoring. The global policy makes geometry calibration diagnostic. Build with the required uncalibrated status when applicable, record Blender faces and exported triangles separately, and preserve the source when producing a candidate. Treat fixed caps and prior gating decisions below as historical context.
 
 ## Current models
 

@@ -1,5 +1,10 @@
 # Content Loader Tools — guía de agente
 
+## Start here for a loader task
+
+Locate the changed contract in the [pack schema](../../content/schema/README.md) and identify its DTO, validation, and runtime registration paths before editing. Run the applicable checks from the repository root. See [AGENTS.md](../../AGENTS.md) for acceptance commands, deployment, and evidence requirements. Record the checked commit, gate results, and remaining runtime acceptance in the [handoff](AGENT-HANDOFF.md).
+
+
 **Updated:** 2026-11-10
 **Scope:** herramientas offline que mantienen `content.json` (content loader). No es diagnóstico clean-room ni BepInEx runtime: es validación local y edición de manifiestos.
 

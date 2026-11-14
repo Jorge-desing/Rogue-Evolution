@@ -1,5 +1,10 @@
 # Content Pack v1
 
+## Start here for a pack change
+
+Use this contract with [content.schema.json](content.schema.json) and the [pack validation skill](../../.agents/skills/rogue-command-pack-validation/SKILL.md). From the repository root, run `python -m tools.validate_content_pack <pack_dir>` for the edited pack and `python -m tools.audit_content_references --all` for cross-pack links. Inspect reported schema paths and unresolved IDs before packaging.
+
+
 `content.schema.json` defines the `content.json` file read by the loader. `Newtonsoft.Json` deserializes it into plain C# DTOs. Collections use JSON arrays; `customBalance` is the exception, a named numeric object map. Its DTO stores numbers as `double` to preserve JSON numeric precision until validation; integer-backed native balance values are bounded to `16,777,216` because the game's calculation widens them to `Single`.
 
 ## Shape
