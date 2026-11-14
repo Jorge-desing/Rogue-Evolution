@@ -5,8 +5,7 @@
 .DESCRIPTION
     Installs EdgeFlow, DreamUV, and Ucupaint into Blender 4.5's user scripts/addons directory
     and registers them for hard-surface edge flow, trim-sheet UV mapping, and layered PBR painting.
-    With -IncludeExtended, also installs TexTools-Blender (UV layout, texel density, baking)
-    and Conduit (procedural cable/hose/harness routing).
+    With -IncludeExtended, also installs TexTools-Blender (UV layout, texel density, baking).
 #>
 
 [CmdletBinding()]
@@ -33,8 +32,7 @@ $addons = @(
 )
 if ($IncludeExtended) {
     $addons += @(
-        @{ Name = "TexTools"; Uri = "https://github.com/franMarz/TexTools-Blender.git" },
-        @{ Name = "Conduit"; Uri = "https://github.com/AlbertoCGArt/Conduit.git" }
+        @{ Name = "TexTools"; Uri = "https://github.com/franMarz/TexTools-Blender.git" }
     )
 }
 
@@ -57,13 +55,22 @@ if (Test-Path -LiteralPath $BlenderExecutablePath -PathType Leaf) {
     Write-Host "Verifying addons with Blender at $BlenderExecutablePath..."
     $addonNamesPy = ($addons | ForEach-Object { "'$($_.Name)'" }) -join ", "
     $verifyPy = @"
-import addon_utils
+import addon_utils, sys
+failures = []
 for a in [$addonNamesPy]:
     try:
         addon_utils.enable(a, default_set=True)
-        print(f'[VERIFIED] Enabled {a}')
+        _, is_loaded = addon_utils.check(a)
+        if not is_loaded:
+            failures.append(a)
+            print(f'[ERROR] Addon {a} did not load')
+        else:
+            print(f'[VERIFIED] Enabled {a}')
     except Exception as ex:
+        failures.append(a)
         print(f'[ERROR] Could not enable {a}: {ex}')
+if failures:
+    sys.exit(1)
 "@
     $tempScript = [System.IO.Path]::GetTempFileName() + ".py"
     try {

@@ -498,3 +498,150 @@ def compute_mesh_quality_metrics(
         "acmrBefore": round(acmr_before, 4),
         "acmrAfter": round(acmr_after, 4),
     }
+
+
+def extract_mesh_arrays_bpy(obj: Any) -> tuple[np.ndarray, np.ndarray]:
+    """Extract triangulated (vertices, faces) NumPy arrays from a Blender mesh object."""
+    mesh = obj.data
+    mesh.calc_loop_triangles()
+    verts = np.array([v.co[:] for v in mesh.vertices], dtype=np.float64)
+    tris = np.array([lt.vertices[:] for lt in mesh.loop_triangles], dtype=np.int64)
+    return verts, tris
+
+
+def apply_taubin_smooth_bpy(
+    obj: Any,
+    iterations: int = 6,
+    lam: float = 0.5,
+    mu: float = -0.53,
+    preserve_boundary: bool = True,
+) -> np.ndarray:
+    """Apply volume-preserving Taubin smoothing directly to a Blender mesh object."""
+    verts, tris = extract_mesh_arrays_bpy(obj)
+    smoothed = taubin_smooth(
+        verts, tris, iterations=iterations, lam=lam, mu=mu, preserve_boundary=preserve_boundary
+    )
+    for idx, v in enumerate(obj.data.vertices):
+        v.co = (float(smoothed[idx, 0]), float(smoothed[idx, 1]), float(smoothed[idx, 2]))
+    obj.data.update()
+    return smoothed
+
+
+def apply_qem_simplify_bpy(
+    obj: Any,
+    ratio: float = 0.5,
+    boundary_weight: float = 10.0,
+) -> tuple[int, int]:
+    """Simplify a Blender mesh object in-place using Garland-Heckbert QEM decimation."""
+    verts, tris = extract_mesh_arrays_bpy(obj)
+    orig_count = len(tris)
+    target = max(4, int(round(orig_count * max(0.05, min(1.0, float(ratio))))))
+    new_verts, new_faces = qem_simplify(verts, tris, target_faces=target, boundary_weight=boundary_weight)
+    mesh = obj.data
+    mesh.clear_geometry()
+    mesh.from_pydata(new_verts.tolist(), [], new_faces.tolist())
+    mesh.update()
+    return orig_count, len(new_faces)
+
+
+def apply_forsyth_cache_optimize_bpy(obj: Any, cache_size: int = 32) -> float:
+    """Reorder a Blender mesh object's triangles via Forsyth LRU vertex-cache optimization."""
+    verts, tris = extract_mesh_arrays_bpy(obj)
+    opt_tris, acmr = optimize_vertex_cache_forsyth(tris, len(verts), cache_size=cache_size)
+    mesh = obj.data
+    mesh.clear_geometry()
+    mesh.from_pydata(verts.tolist(), [], opt_tris.tolist())
+    mesh.update()
+    return acmr
+
+
+def apply_vertex_wear_rgba_bpy(
+    obj: Any,
+    soot_anchors: np.ndarray | None = None,
+    soot_radius: float = 0.6,
+    edge_angle_deg: float = 35.0,
+    attribute_name: str = "Color",
+) -> np.ndarray:
+    """Write Rogue Command ``VehiclePBR_VertexWear`` RGBA vertex colors onto a Blender mesh."""
+    verts, tris = extract_mesh_arrays_bpy(obj)
+    rgba = compute_vertex_wear_rgba(
+        verts, tris, soot_anchors=soot_anchors, soot_radius=soot_radius, edge_angle_deg=edge_angle_deg
+    )
+    mesh = obj.data
+    attr = mesh.color_attributes.get(attribute_name)
+    if attr is None:
+        attr = mesh.color_attributes.new(name=attribute_name, type="BYTE_COLOR", domain="CORNER")
+    if attr.domain == "CORNER":
+        for poly in mesh.polygons:
+            for loop_idx in poly.loop_indices:
+                vi = mesh.loops[loop_idx].vertex_index
+                attr.data[loop_idx].color = (
+                    float(rgba[vi, 0]),
+                    float(rgba[vi, 1]),
+                    float(rgba[vi, 2]),
+                    float(rgba[vi, 3]),
+                )
+    else:
+        for vi in range(len(verts)):
+            attr.data[vi].color = (
+                float(rgba[vi, 0]),
+                float(rgba[vi, 1]),
+                float(rgba[vi, 2]),
+                float(rgba[vi, 3]),
+            )
+    mesh.update()
+    return rgba
+
+
+def load_obj_mesh(path: Any) -> tuple[np.ndarray, np.ndarray]:
+    """Minimal Wavefront .obj loader returning triangulated (vertices, faces)."""
+    verts: list[list[float]] = []
+    faces: list[list[int]] = []
+    with open(path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            parts = line.strip().split()
+            if not parts:
+                continue
+            if parts[0] == "v" and len(parts) >= 4:
+                verts.append([float(parts[1]), float(parts[2]), float(parts[3])])
+            elif parts[0] == "f" and len(parts) >= 4:
+                idx = [int(p.split("/")[0]) - 1 for p in parts[1:]]
+                for k in range(1, len(idx) - 1):
+                    faces.append([idx[0], idx[k], idx[k + 1]])
+    return np.array(verts, dtype=np.float64), np.array(faces, dtype=np.int64)
+
+
+def save_obj_mesh(path: Any, vertices: np.ndarray, faces: np.ndarray) -> None:
+    """Minimal Wavefront .obj writer for offline inspection."""
+    with open(path, "w", encoding="utf-8") as fh:
+        for v in vertices:
+            fh.write(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}\n")
+        for f in faces:
+            fh.write(f"f {int(f[0]) + 1} {int(f[1]) + 1} {int(f[2]) + 1}\n")
+
+
+if __name__ == "__main__":
+    import argparse
+    import json
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="command", required=True)
+    insp = sub.add_parser("inspect", help="Compute mesh quality and ACMR metrics for an OBJ.")
+    insp.add_argument("--input", type=Path, required=True)
+    simp = sub.add_parser("simplify", help="QEM simplify an OBJ mesh to a target ratio.")
+    simp.add_argument("--input", type=Path, required=True)
+    simp.add_argument("--output", type=Path, required=True)
+    simp.add_argument("--ratio", type=float, default=0.5)
+
+    args = parser.parse_args()
+    v_in, f_in = load_obj_mesh(args.input)
+    if args.command == "inspect":
+        print(json.dumps(compute_mesh_quality_metrics(v_in, f_in), indent=2))
+    elif args.command == "simplify":
+        target = max(4, int(round(len(f_in) * args.ratio)))
+        v_out, f_out = qem_simplify(v_in, f_in, target_faces=target)
+        f_opt, acmr = optimize_vertex_cache_forsyth(f_out, len(v_out))
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        save_obj_mesh(args.output, v_out, f_opt)
+        print(json.dumps({"inputFaces": len(f_in), "outputFaces": len(f_opt), "acmr": round(acmr, 4)}))

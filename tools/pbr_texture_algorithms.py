@@ -307,6 +307,54 @@ def stochastic_tile_sample(
     return blended[..., 0] if texture.ndim == 2 else blended
 
 
+def normal_to_curvature_cavity(
+    normal_rgb: np.ndarray,
+    tileable: bool = True,
+    gain: float = 2.5,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Derive (edge_wear, cavity_ao) masks in [0, 1] directly from a tangent-space normal map."""
+    n = _decode_normal_rgb(normal_rgb)
+    mode = "wrap" if tileable else "nearest"
+    kx = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]], dtype=np.float32) / 32.0
+    ky = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]], dtype=np.float32) / 32.0
+    dnx_dx = ndimage.convolve(n[..., 0], kx, mode=mode)
+    dny_dy = ndimage.convolve(n[..., 1], ky, mode=mode)
+    # In OpenGL tangent normal maps, +nx tilts right and +ny tilts up; positive divergence = convex ridge
+    div = (dnx_dx - dny_dy) * float(gain)
+    edge_wear = np.clip(div, 0.0, 1.0).astype(np.float32)
+    cavity_ao = np.clip(1.0 + np.minimum(div, 0.0), 0.0, 1.0).astype(np.float32)
+    return edge_wear, cavity_ao
+
+
+def triplanar_project_blend(
+    texture: np.ndarray,
+    positions: np.ndarray,
+    normals: np.ndarray,
+    scale: float = 1.0,
+    sharpness: float = 4.0,
+) -> np.ndarray:
+    """Sample a 2D tileable texture across 3D positions/normals using triplanar blending."""
+    src = np.asarray(texture, dtype=np.float32)
+    if src.ndim == 2:
+        src = src[..., None]
+    sh, sw, _ = src.shape
+    pos = np.asarray(positions, dtype=np.float32) * float(scale)
+    nrm = np.abs(np.asarray(normals, dtype=np.float32))
+    weights = np.power(np.maximum(nrm, 1e-4), float(sharpness))
+    weights /= np.sum(weights, axis=-1, keepdims=True)
+
+    def _sample(uv: np.ndarray) -> np.ndarray:
+        u = np.mod(uv[..., 0] * sw, sw).astype(np.int32) % sw
+        v = np.mod(uv[..., 1] * sh, sh).astype(np.int32) % sh
+        return src[v, u]
+
+    tx = _sample(pos[..., [1, 2]])
+    ty = _sample(pos[..., [0, 2]])
+    tz = _sample(pos[..., [0, 1]])
+    blended = tx * weights[..., 0:1] + ty * weights[..., 1:2] + tz * weights[..., 2:3]
+    return blended[..., 0] if texture.ndim == 2 else blended
+
+
 def pack_metallic_gloss_array(metallic: np.ndarray, roughness: np.ndarray) -> np.ndarray:
     """Pack grayscale metallic & roughness [0..255 or 0..1] into Rogue Command MetallicGloss RGBA."""
     m = np.asarray(metallic, dtype=np.float32)
@@ -347,6 +395,12 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     synth.add_argument("--output-dir", type=Path, required=True)
     synth.add_argument("--prefix", default="ProceduralArmor")
 
+    curv = sub.add_parser("normal-to-curvature", help="Extract edge wear and cavity AO masks from a normal map.")
+    curv.add_argument("--normal", type=Path, required=True)
+    curv.add_argument("--gain", type=float, default=2.5)
+    curv.add_argument("--output-dir", type=Path, required=True)
+    curv.add_argument("--prefix", default="Curvature")
+
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
@@ -386,6 +440,20 @@ def main(argv: Iterable[str] | None = None) -> int:
         _save_png(normal, out_dir / f"{args.prefix}_Normal.png")
         _save_png(emission, out_dir / f"{args.prefix}_Emission.png")
         print(json.dumps({"command": "synthesize-armor", "outputDir": str(out_dir), "prefix": args.prefix, "size": args.size}))
+        return 0
+
+    if args.command == "normal-to-curvature":
+        normal_rgb = _load_rgb(args.normal)
+        wear, cavity = normal_to_curvature_cavity(normal_rgb, tileable=True, gain=args.gain)
+        out_dir = args.output_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(np.clip(np.round(wear * 255.0), 0, 255).astype(np.uint8), "L").save(
+            out_dir / f"{args.prefix}_EdgeWear.png", format="PNG", optimize=True
+        )
+        Image.fromarray(np.clip(np.round(cavity * 255.0), 0, 255).astype(np.uint8), "L").save(
+            out_dir / f"{args.prefix}_CavityAO.png", format="PNG", optimize=True
+        )
+        print(json.dumps({"command": "normal-to-curvature", "outputDir": str(out_dir), "prefix": args.prefix}))
         return 0
 
     return 1

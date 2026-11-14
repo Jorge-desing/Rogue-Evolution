@@ -72,6 +72,22 @@ class PbrTextureAlgorithmsTests(unittest.TestCase):
         self.assertGreaterEqual(float(sampled.min()), 0.0)
         self.assertLessEqual(float(sampled.max()), 1.0)
 
+    def test_normal_to_curvature_and_triplanar_blend(self) -> None:
+        h = pbr_algo.synthesize_periodic_fbm(32, seed=21, octaves=3)
+        nrm = pbr_algo.height_to_normal_scharr(h, strength=2.0, as_uint8=True)
+        wear, cavity = pbr_algo.normal_to_curvature_cavity(nrm, tileable=True, gain=2.5)
+        self.assertEqual(wear.shape, (32, 32))
+        self.assertEqual(cavity.shape, (32, 32))
+        self.assertGreater(float(wear.max()), 0.05)
+        self.assertLess(float(cavity.min()), 0.95)
+
+        pos = np.random.default_rng(1).uniform(-2.0, 2.0, size=(64, 3)).astype(np.float32)
+        norms = np.tile([0.0, 0.0, 1.0], (64, 1)).astype(np.float32)
+        projected = pbr_algo.triplanar_project_blend(h, pos, norms, scale=0.5, sharpness=4.0)
+        self.assertEqual(projected.shape, (64,))
+        self.assertGreaterEqual(float(projected.min()), 0.0)
+        self.assertLessEqual(float(projected.max()), 1.0)
+
     def test_pack_maps_with_optional_uv_dilation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
