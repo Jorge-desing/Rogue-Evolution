@@ -1,5 +1,12 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Material Maker shutdown diagnostics (partial correction)
+
+- `MaterialMakerWaitDevice.gd` now explicitly frees the pinned 1.7 renderer's non-RefCounted shader error handler on CLI exit. The upstream handler extends Object and was never freed. Real strict export removes the retained `shader_error_handler.gd` resource error and reduces the original six leaked ObjectDB instances to three. The remaining renderer ObjectDB warning is unresolved; this is not a warning-free shutdown claim.
+- Verbose diagnosis identifies a retained local RenderingDevice. Rejected experiments freeing it from the main thread produced an owner-thread error; freeing it on its worker still exposed unreleased GPU shader/texture RIDs. Neither experiment is in the final code. Do not suppress stderr or free the device without a verified full resource lifecycle. Verbose mode also reports system Vulkan/Medal layer diagnostics; no system registry, overlay or installed executable was modified.
+- Evidence: `artifacts/mm-warning-fix/before/` contains verbose baseline; `final/` contains the corrected standard strict export. All four 2048px output hashes match the previous bake exactly (`map-comparison.json`). Quality audit and pack checks pass. Full Python report `full.json`: 737 passed, one skip, no failures/errors; concurrent test consolidation changed the inventory. No Unity/game visual claim or production texture change.
+- Material Maker skill updated. Release build passes with zero warnings/errors. With the game closed, backed up and deployed the verified Release with equal source/installed SHA-256 `5592A9CCE6AEAD1712A02F8E3FF8FCCFA9AEBD4DF780CE1442EAF097EFA922A8`; manifest `artifacts/mm-warning-fix/deployment/manifest.json`. Existing memory.csv deletion preserved. Remaining work is upstream renderer resource-lifecycle cleanup, not map generation.
+
 ## 2026-11-13 Unit catalog duplicate scenario
 
 - Consolidated `ExportUnitCatalogTests.test_json_serializable` into `test_counts_units`: both exported the same scaffold. Count, ID and JSON serialization checks remain. Isolated mock mutations to count and an unserializable report value both fail the retained test. Full before/after reports: `artifacts/test-dedup-current/after-stats.json` and `after-catalog.json`.

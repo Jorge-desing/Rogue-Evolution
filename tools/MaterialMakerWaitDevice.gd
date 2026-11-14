@@ -27,3 +27,17 @@ func _ready() -> void:
         OS.delay_msec(5)
 
     print("mm_wait_device: device %s after %d ms" % [str(device), Time.get_ticks_msec() - started_at])
+
+
+func _exit_tree() -> void:
+    # Material Maker 1.7 constructs this non-RefCounted Object but never frees it.
+    # It is no longer needed once the CLI scene exits. Leave the renderer/device
+    # lifecycle to upstream: freeing that device here races its worker and GPU RIDs.
+    var renderer: Node = get_node_or_null("/root/mm_renderer")
+    if renderer == null:
+        return
+    var handler = renderer.get("shader_error_handler")
+    if is_instance_valid(handler):
+        handler.free()
+        renderer.set("shader_error_handler", null)
+        print("mm_wait_device: shader error handler released")
