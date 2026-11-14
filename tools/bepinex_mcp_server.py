@@ -3438,7 +3438,13 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 slot_index = -1 if raw_slot is None else int(raw_slot)
             except (TypeError, ValueError):
                 return _tool_response(json.dumps({"error": "slotIndex must be an integer"}), is_error=True)
-            res = _call_diagnostics_method("OrderChooseIntermissionRewardJson", [reward_id, slot_index])
+            if "instanceId" in arguments:
+                instance_id = arguments["instanceId"]
+                if instance_id == 0:
+                    return _tool_response(json.dumps({"error": "instanceId must be nonzero"}), is_error=True)
+                res = _call_diagnostics_method("OrderChooseIntermissionRewardInstanceJson", [reward_id, slot_index, instance_id])
+            else:
+                res = _call_diagnostics_method("OrderChooseIntermissionRewardJson", [reward_id, slot_index])
             return _tool_response(res)
 
         elif name == "diagnostics_order_skip_intermission_reward":

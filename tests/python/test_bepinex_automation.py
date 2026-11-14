@@ -124,6 +124,15 @@ class StateWaitTests(unittest.TestCase):
             self.assertEqual(mock.call("OrderLeaveIntermissionShopJson", [42]), call.call_args_list[0])
             self.assertEqual(["GetRuntimeControlSurfaceJson"] * len(samples), [entry.args[0] for entry in call.call_args_list[1:]])
 
+    def test_reward_instance_uses_exact_native_order(self):
+        tool = "diagnostics_order_choose_intermission_reward"
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true}') as call:
+            SERVER.execute_tool(tool, {"instanceId": -42, "rewardId": "test:card", "slotIndex": 2})
+            call.assert_called_once_with("OrderChooseIntermissionRewardInstanceJson", ["test:card", 2, -42])
+            call.reset_mock()
+            self.assertTrue(SERVER.execute_tool(tool, {"instanceId": 0})["isError"])
+            call.assert_not_called()
+
     def test_missing_and_type_mismatch_timeout(self):
         for row in ({}, {"ready": 1}, {"ready": "true"}):
             with self.subTest(row=row), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(row)):

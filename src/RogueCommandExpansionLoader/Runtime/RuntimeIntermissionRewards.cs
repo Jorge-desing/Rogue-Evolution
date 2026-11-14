@@ -596,7 +596,7 @@ namespace RogueCommandExpansionLoader.Runtime
         /// Selects an offered reward card in <c>ChooseCard</c> by <paramref name="rewardId"/> or <paramref name="slotIndex"/>.
         /// Fails closed when <c>ChooseCard</c> is not active, not yet clickable, or no matching card is offered.
         /// </summary>
-        public static IntermissionActionResult TryChooseReward(string rewardId = "", int slotIndex = -1)
+        public static IntermissionActionResult TryChooseReward(string rewardId = "", int slotIndex = -1, int instanceId = 0)
         {
             string trimmedId = (rewardId ?? string.Empty).Trim();
             try
@@ -633,6 +633,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 for (int i = 0; i < liveCards.Count; i++)
                 {
                     var entry = liveCards[i];
+                    if (instanceId != 0 && entry.Row.InstanceId != instanceId) continue;
+                    if (instanceId != 0 && slotIndex < 0 && string.IsNullOrEmpty(trimmedId))
+                    {
+                        matched = entry;
+                        found = true;
+                        break;
+                    }
                     if (slotIndex >= 0 && entry.Row.SlotIndex == slotIndex)
                     {
                         if (string.IsNullOrEmpty(trimmedId)
@@ -661,7 +668,7 @@ namespace RogueCommandExpansionLoader.Runtime
                     return new IntermissionActionResult(
                         false, "ChooseReward", trimmedId, slotIndex,
                         ReadNavigatorSceneState(), ReadStaticPlayerHasOpenRewards(),
-                        "No offered card matched rewardId='" + trimmedId + "' slotIndex=" + slotIndex + " (stop point: card match).");
+                        "No offered card matched rewardId='" + trimmedId + "' slotIndex=" + slotIndex + " instanceId=" + instanceId + " (stop point: card match).");
                 }
 
                 MethodInfo pressMethod = matched.CardComponent.GetType().GetMethod(

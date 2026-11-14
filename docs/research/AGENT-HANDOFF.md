@@ -1,5 +1,9 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Exact native reward selection
+
+- Intermission reward choice now accepts an offered card component instanceId, matched on the Unity thread before invoking the existing native card handler. Optional slot and reward ID narrow the same match. The legacy bridge entry point still accepts its original arguments. Local Python acceptance is recorded in artifacts/intermission-native-controls/reward-instance-full.json.
+
 ## 2026-11-13 Shop exit with map transition
 
 - The native Shop exit order accepts optional waitSeconds. It executes the native exit once and waits for two consecutive map observations with Shop inactive under the inherited sequence budget. The response preserves the original action result and exposes the wait outcome. Local regression covers transient map observations and timeout without replay.

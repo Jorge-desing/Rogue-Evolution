@@ -876,6 +876,12 @@ namespace RogueCommandExpansionLoader.Runtime
         /// <summary>
         /// Selects an offered reward card in ChooseCard by rewardId or slotIndex.
         /// </summary>
+        public string OrderChooseIntermissionRewardInstanceJson(string rewardId, int slotIndex, int instanceId)
+        {
+            return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
+                RuntimeIntermissionRewards.TryChooseReward(rewardId, slotIndex, instanceId));
+        }
+
         public string OrderChooseIntermissionRewardJson(string rewardId = "", int slotIndex = -1)
         {
             return AgentDiagnosticsFormatter.SerializeIntermissionActionResult(
