@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Stable observations for agent automation
+
+- `automation_wait_for_state` accepts optional `stableSamples` (1–8, default 1). Only consecutive matching reads satisfy the wait; mismatches reset the streak. Existing query errors, timeout and shared sequence budgets still stop execution. Responses expose the required samples and current streak. Sampling does not establish stability between reads.
+- Runtime skill/reference and Antigravity schemas synchronized. Connected MCP `describe_tool` exposes the new parameter. Local regressions cover transient matches, streak reset, timeout and invalid values; no game run was started. Full acceptance report: `artifacts/automation-stability/final.json`.
+
 ## 2026-11-13 Follow-up suite test deduplication audit
 
 - Re-audited the current 106 Python test modules and all 737 discovered cases. The full suite passed: 736 passed, one skipped, zero failures/errors; IDs are unique. Report: `artifacts/test-dedup-current/reaudit-full.json`.

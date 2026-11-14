@@ -45,6 +45,20 @@ class StateWaitTests(unittest.TestCase):
                 self.assertEqual(payload["reason"], "matched")
                 self.assertEqual(payload["lastObservation"], {"ready": True})
 
+    def test_stable_samples_reset_after_transient_match(self):
+        rows = [True, False, True, True]
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=[json.dumps({"ready": value}) for value in rows]):
+            response, payload = self.wait(stableSamples=2, timeoutSeconds=2)
+            self.assertFalse(response.get("isError", False))
+            self.assertEqual(4, payload["attempts"])
+            self.assertEqual(2, payload["consecutiveMatches"])
+        self.clock.now = 0
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"ready":true}'):
+            response, payload = self.wait(stableSamples=3)
+            self.assertTrue(response["isError"])
+            self.assertEqual("timeout", payload["reason"])
+            self.assertEqual(2, payload["consecutiveMatches"])
+
     def test_missing_and_type_mismatch_timeout(self):
         for row in ({}, {"ready": 1}, {"ready": "true"}):
             with self.subTest(row=row), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(row)):
@@ -56,7 +70,7 @@ class StateWaitTests(unittest.TestCase):
                 self.assertEqual(self.clock.now, 0.5)
 
     def test_invalid_target_arguments_and_limits_do_not_call_bridge(self):
-        invalid = [{"tool": "diagnostics_ui_set_value"}, {"arguments": {"typo": 1}},
+        invalid = [{"stableSamples": 0}, {"stableSamples": 9}, {"stableSamples": True}, {"tool": "diagnostics_ui_set_value"}, {"arguments": {"typo": 1}},
                    {"timeoutSeconds": 0}, {"timeoutSeconds": 31}, {"pollIntervalMs": 99},
                    {"pollIntervalMs": 2001}, {"pollIntervalMs": True}, {"expect": []},
                    {"timeoutSeconds": float("nan")}, {"timeoutSeconds": float("inf")},

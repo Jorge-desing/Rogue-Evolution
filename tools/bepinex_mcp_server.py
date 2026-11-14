@@ -932,6 +932,8 @@ def _wait_for_state(arguments):
     outer_deadline = _AUTOMATION_DEADLINE.get()
     deadline = min(own_deadline, outer_deadline) if outer_deadline is not None else own_deadline
     attempts, observation, checks = 0, None, []
+    consecutive_matches = 0
+    required_matches = arguments.get("stableSamples", 1)
     reason, error = "timeout", None
     while time.monotonic() < deadline:
         token = _AUTOMATION_DEADLINE.set(deadline)
@@ -955,14 +957,16 @@ def _wait_for_state(arguments):
             break
         if time.monotonic() >= deadline:
             break
-        if all(check["matched"] for check in checks):
+        consecutive_matches = consecutive_matches + 1 if all(check["matched"] for check in checks) else 0
+        if consecutive_matches >= required_matches:
             reason = "matched"
             break
         time.sleep(min(arguments.get("pollIntervalMs", 250) / 1000, max(0, deadline - time.monotonic())))
     if reason == "timeout" and outer_deadline is not None and outer_deadline <= own_deadline:
         reason = "sequence_budget_exhausted"
     payload = {"success": reason == "matched", "reason": reason, "tool": arguments["tool"],
-               "attempts": attempts, "elapsedSeconds": round(time.monotonic() - started, 3),
+               "attempts": attempts, "stableSamples": required_matches, "consecutiveMatches": consecutive_matches,
+               "elapsedSeconds": round(time.monotonic() - started, 3),
                "checks": checks, "lastObservation": observation}
     if error:
         payload["error"] = error
