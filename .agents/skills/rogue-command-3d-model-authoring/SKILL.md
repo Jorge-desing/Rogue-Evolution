@@ -11,6 +11,8 @@ Authoritative guide for modeling, texturing, rigging, and exporting 3D vehicle a
 
 ## 1. Verified Architecture & Directory Invariants
 
+Runtime masked faction tint now reads the same native Player/Ai/AiBuilding resources as EntityFactory, using the native shader Color property `Color_72ECFA4B`. It applies through per-renderer property blocks at initialization/reuse without changing shared materials. Explicit non-white variant tints take precedence; white/reset restores the faction tint. Neutral or unavailable resources preserve the authored baseline. Confirm appearance in Steam separately.
+
 Pooled visual directors clear health-driven damaged and critical presentation through the normal repair transitions before restoring the primary variant. New-life health is sampled again during the normal visual update.
 
 Author the first visual variant as the spawn and pool-reuse baseline. The runtime visual director now applies it automatically and clears the previous life’s tactical modules, tint and scale on reuse. Confirm the actual result in-game when runtime acceptance is requested.

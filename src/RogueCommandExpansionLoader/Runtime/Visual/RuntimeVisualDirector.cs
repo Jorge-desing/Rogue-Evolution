@@ -75,6 +75,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private string _activeVisualVariantId;
         private string _activePresetName;
         private Color? _activeColorTint;
+        private Color? _factionColorTint;
         private List<Renderer> _cachedRenderers;
         private readonly Dictionary<Renderer, RendererTintBaseline> _rendererTintBaselines =
             new Dictionary<Renderer, RendererTintBaseline>();
@@ -223,6 +224,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         public void Initialize(EntityController entity)
         {
             _entity = entity;
+            RefreshFactionColorTint();
             DiscoverSocketsAndMeshes(transform);
             EnsureCanonicalHardpointGroups();
             CacheAnimatorParameters();
@@ -253,11 +255,13 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             CacheReflectionAccess();
             _audioBindingStartedAt = Time.unscaledTime;
             RestorePrimaryVisualVariant();
+            ApplyColorTintToRenderers(_activeColorTint ?? new Color(1f, 1f, 1f, 1f));
         }
 
         private void ResetForReuse(EntityController entity)
         {
             _entity = entity;
+            RefreshFactionColorTint();
             _turretJammedOverride = null;
             _doorOpenOverride = null;
             _doorOpenProgress = 0f;
@@ -338,6 +342,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _damageHiddenAttachments.Clear();
             _activeTacticalStanceVisual = "Standard";
             RestorePrimaryVisualVariant();
+            ApplyColorTintToRenderers(_activeColorTint ?? new Color(1f, 1f, 1f, 1f));
         }
 
         private void RestorePrimaryVisualVariant()
@@ -1769,16 +1774,15 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
 
                 renderer.SetPropertyBlock(baselineBlock, materialIndex);
-                if (restore) continue;
-
                 Material material = baseline.Materials[materialIndex];
                 if (material == null) continue;
+                bool usesTeamColorMask = material.HasProperty("_TeamColor");
+                if (restore && (!usesTeamColorMask || !_factionColorTint.HasValue)) continue;
                 var workingBlock = new MaterialPropertyBlock();
                 renderer.GetPropertyBlock(workingBlock, materialIndex);
-                bool usesTeamColorMask = material.HasProperty("_TeamColor");
                 if (usesTeamColorMask)
                 {
-                    workingBlock.SetColor("_TeamColor", tintColor);
+                    workingBlock.SetColor("_TeamColor", restore ? _factionColorTint.Value : tintColor);
                 }
                 else if (material.HasProperty("_BaseColor"))
                 {
@@ -1790,6 +1794,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 }
                 renderer.SetPropertyBlock(workingBlock, materialIndex);
             }
+        }
+
+        private void RefreshFactionColorTint()
+        {
+            Color color;
+            _factionColorTint = RuntimeFactionColorResolver.TryResolve(_entity, out color) ? color : (Color?)null;
         }
 
         private RendererTintBaseline GetOrCaptureTintBaseline(Renderer renderer)

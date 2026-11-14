@@ -3361,6 +3361,44 @@ internal static partial class ValidationTestRunner
             UnityEngine.Time.time = 0f;
         }
     }),
+    ("faction tint resolves native player AI and AI-building materials without guessing neutral colors", () =>
+    {
+        var saved = new Dictionary<string, UnityEngine.Object>(Resources.LoadedResourcesForTest);
+        try
+        {
+            var player = new Material();
+            player.SetColor(RuntimeFactionColorResolver.NativeColorProperty, new Color(0.8f, 0.7f, 0.3f, 0f));
+            var ai = new Material();
+            ai.SetColor(RuntimeFactionColorResolver.NativeColorProperty, new Color(0.9f, 0.3f, 0.2f, 0f));
+            var building = new Material();
+            building.SetColor(RuntimeFactionColorResolver.NativeColorProperty, new Color(0.6f, 0.2f, 0.1f, 0f));
+            Resources.LoadedResourcesForTest["Materials/Player"] = player;
+            Resources.LoadedResourcesForTest["Materials/Ai"] = ai;
+            Resources.LoadedResourcesForTest["Materials/DynamicMaterials/AiBuilding"] = building;
+            var entity = new EntityController { IsControlledByPlayer = true };
+            if (!RuntimeFactionColorResolver.TryResolve(entity, out Color color) || color != new Color(0.8f, 0.7f, 0.3f, 1f))
+                throw new InvalidOperationException("Player material tint was not read from the native shader color property.");
+            entity.IsControlledByPlayer = false;
+            entity.IsControlledByAi = true;
+            if (!RuntimeFactionColorResolver.TryResolve(entity, out color) || color.r != 0.9f)
+                throw new InvalidOperationException("AI unit did not resolve its faction material.");
+            entity.IsBuilding = true;
+            if (!RuntimeFactionColorResolver.TryResolve(entity, out color) || color.r != 0.6f)
+                throw new InvalidOperationException("AI building did not use its separate native material.");
+            entity.IsControlledByAi = false;
+            if (RuntimeFactionColorResolver.TryResolve(entity, out _))
+                throw new InvalidOperationException("Neutral entity received a guessed faction tint.");
+            entity.IsControlledByPlayer = true;
+            Resources.LoadedResourcesForTest.Remove("Materials/Player");
+            if (RuntimeFactionColorResolver.TryResolve(entity, out _))
+                throw new InvalidOperationException("Missing native faction material was treated as resolved.");
+        }
+        finally
+        {
+            Resources.LoadedResourcesForTest.Clear();
+            foreach (var entry in saved) Resources.LoadedResourcesForTest.Add(entry.Key, entry.Value);
+        }
+    }),
     ("support auras reach damaged allies after full-health or healing-blocked candidates", () =>
     {
         ExistingControllers.Instance.Reset();

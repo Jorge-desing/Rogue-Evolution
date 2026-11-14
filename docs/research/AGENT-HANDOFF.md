@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — native faction tint for masked visuals
+
+- RuntimeVisualDirector now resolves the native EntityFactory Player/Ai/AiBuilding resource material color into masked `_TeamColor` on initialization/reuse. Uses the shader's actual Color property `Color_72ECFA4B`, not stale `_BaseColor` data. Per-renderer blocks preserve shared materials; explicit non-white variant tints take precedence. White/reset restores faction tint. Neutral/unavailable material resources preserve authored baseline.
+- Read-only asset evidence and pinned version/SHA-256/MVID: `artifacts/general-capability-audit/faction-tint/native-material-evidence.json`. Source: EntityFactory resource paths and native shader Color property. No authored mesh, texture or ownership changes.
+- Release/harness builds: zero warnings/errors. RuntimeAndDiagnostics: 223/227; resolver coverage includes player, AI unit, AI building, neutral and missing resource. The full visual director is not compiled into this stub harness, so renderer integration/appearance and reuse remain build/static evidence pending Steam. The same four visual census failures remain; full suite is not green.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/faction-tint-deployment/manifest.json`.
+
 ## General capability audit — effective support aura recipients
 
 - Heal/Shield aura recipient limits now count actual health, shield or fallback armor recovery. Full-resource, health-blocked and ineffective native calls no longer starve eligible damaged allies that appear later in the registry. Buff/Debuff status limits remain unchanged.

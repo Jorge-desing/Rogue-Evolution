@@ -739,7 +739,9 @@ namespace UnityEngine
     public static class Resources
     {
         public static Object[] FindObjectsOfTypeAll(System.Type type) => System.Array.FindAll(Object.NativeControlTestObjects, item => type.IsInstanceOfType(item));
-        public static Object Load(string path, System.Type type) => null;
+        public static System.Collections.Generic.Dictionary<string, Object> LoadedResourcesForTest { get; } = new();
+        public static Object Load(string path, System.Type type) =>
+            LoadedResourcesForTest.TryGetValue(path, out var resource) && type.IsInstanceOfType(resource) ? resource : null;
     }
 
     internal static class Application
