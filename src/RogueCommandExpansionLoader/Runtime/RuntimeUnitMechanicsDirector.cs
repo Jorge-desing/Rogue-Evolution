@@ -117,6 +117,9 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             if (unit == null || source == null || unit.CommandChainExecutionIsPaused ||
                 source.canNotBeAttacked || (unit.IsControlledByAi && source.canNotBeTargetedByAi)) return false;
+            // An interrupted taunt may be queued behind a newer command. Do not
+            // insert one unless its exact tagged entry can later be removed.
+            if (CommandChain == null || !(CommandChain.GetValue(unit) is LinkedList<EntityCommand>)) return false;
             if (_tag != null)
             {
                 if (_source != source || !unit.CurrentCommandIsTaggedWith(_tag)) return false;

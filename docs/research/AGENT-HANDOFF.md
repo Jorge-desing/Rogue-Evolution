@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Timed taunt queue access (2026-11-14)
+
+Timed taunts now require the native command chain to be accessible before inserting the tagged command, preventing an interrupted taunt from becoming unremovable if that field is unavailable. Static native inspection found reuse clears the command chain and current command; Unity component lifecycle remains unverified. Release built cleanly and RuntimeAndDiagnostics passed 242/242 (`artifacts/general-capability-audit/taunt-queue-access/runtime.log`). Deployed with game closed and hash-verified backup (`artifacts/general-capability-audit/taunt-queue-access-deployment-20261114150400/manifest.json`). Next verify expiry, interruptions and pooling in Steam.
+
+
 ## Timed taunt orders (2026-11-14)
 
 Taunt inserts a tagged native attack before the target's current command. A target-attached timer renews repeated taunts from the same source, ends on expiry or source destruction, resumes the saved chain only while its tag remains current, and removes an expired tagged order from the native queue if another command interrupted it. Paused current commands wait. Release built without warnings; RuntimeAndDiagnostics passed 242/242 (`artifacts/general-capability-audit/timed-taunt/runtime-final.log`). The test exercises expiry, replacement and queued-tag removal, not Unity lifecycle or actual native queue execution. Game-closed deployment backup/hash manifest: `artifacts/general-capability-audit/timed-taunt-final-deployment-20261114150210/manifest.json`. Next verify queue resumption, source death and pooling in an authorized Steam match.
