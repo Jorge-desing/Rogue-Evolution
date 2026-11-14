@@ -110,3 +110,5 @@ The Surge Arc Tank source check retains the suspension envelope assertion; the f
 Ironclad asset tests inspect the current source blend with pinned Blender and current bundle with UnityPy; never depend on ignored reports from a previous session. Structural profile expectations must follow reviewed hardware removals (Arachnid, Sentinel and Command Relay), including exact absence checks. Missing rigged bundle clips require repairing the FBX/avatar and rebuilding, not weakening animation assertions.
 
 General offline reviews must inspect auxiliary validator coverage as well as suite status: healthy default values and swallowed decode exceptions can conceal unsupported serialized fields. Audio/modifier audits now have explicit read-error/non-finite regressions; audit JSON is local evidence only.
+
+Material Maker config validation and the explicit four-map/shader assertions share one test on the same configuration; retain both the validator result and independent literal assertions in that test.

@@ -1,5 +1,9 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## 2026-11-13 Material Maker duplicate config scenario
+
+- Consolidated `MaterialMakerWorkflowConfigTests.test_config_preserves_the_four_map_contract` into `test_config_covers_urp_blender_3d_and_procedural_workflows`: both exercised the same config, and the latter already ran the validator. The exact four-map and shader assertions remain independent of validator constants. Temporary config mutations to a missing map and a wrong shader each fail the retained test. Full before/after reports: `artifacts/test-dedup-current/before.json` and `after.json`.
+
 ## 2026-11-13 Compatible texture recipes
 
 - Updated all four Material Maker/ArmorPaint/PBR authoring/validation skills and their shared playbook. New reference: `.agents/skills/rogue-command-pbr-texture-authoring/references/compatible-texture-recipes.md`. Recipes use existing tactical palette/scale/response controls and microdetail wiring; optional manual masks, markings, emission and padding require a checked local image export. No generators, shaders, production maps, meshes, prefabs or bundles changed. ArmorPaint is not staged here, so its manual path is conditional, not a tested painting integration.
