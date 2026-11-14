@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Taunt uses a tagged native attack inserted before the current command. A timer attached to the affected unit renews the same source's pulse and stops/restarts the chain on expiry or source death only while its tag remains current; a newer order is never overwritten. Paused chains wait for resumption. Steam gameplay remains unverified.
+
 Taunt pulses target only living hostile units whose native attack is enabled; buildings and units unable to attack do not consume the target cap or receive forced attack orders. Steam behavior remains unverified.
 
 Dynamic command auras and friendly tactical pulses also require matching Player/AI factions; neutral units are excluded. Shockwave continues to select native enemies. Runtime acceptance remains pending.

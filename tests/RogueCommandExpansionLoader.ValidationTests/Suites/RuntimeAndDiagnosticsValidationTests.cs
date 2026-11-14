@@ -17,6 +17,30 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("temporary taunt resumes only its own expired order", () =>
+    {
+        float saved = UnityEngine.Time.time;
+        try
+        {
+            var attacker = new EntityController { IsControlledByAi = true, IsUnit = true, CanAttackAndIsAttackEnabled = true };
+            var source = new EntityController { IsControlledByPlayer = true };
+            var timer = attacker.gameObject.AddComponent<RuntimeTauntOrder>();
+            var update = typeof(RuntimeTauntOrder).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            UnityEngine.Time.time = 10f;
+            if (!timer.TryApply(attacker, source, 2f)) throw new Exception("Taunt was not issued.");
+            UnityEngine.Time.time = 12f;
+            update.Invoke(timer, null);
+            if (attacker.ResumedCommandsForTest != 1 || attacker.CurrentAttackTarget != null) throw new Exception("Expired taunt was not stopped and resumed.");
+            if (!timer.TryApply(attacker, source, 2f)) throw new Exception("Second taunt was not issued.");
+            attacker.CommandChainForTest.AddLast(attacker.LastExecutedCommand!.Value);
+            attacker.ExecuteCommand(EntityCommand.Move(new Vector3(1f, 0f, 0f)), EntityController.CommandProcessingType.ExecuteAndCancelCurrentCommand);
+            UnityEngine.Time.time = 15f;
+            update.Invoke(timer, null);
+            if (attacker.ResumedCommandsForTest != 1) throw new Exception("Taunt overrode a newer order.");
+            if (attacker.CommandChainForTest.Count != 0) throw new Exception("Expired queued taunt was not removed.");
+        }
+        finally { UnityEngine.Time.time = saved; }
+    }),
     ("support faction matching excludes neutral entities", () =>
     {
         var method = typeof(RuntimeUnitMechanicsDirector).GetMethod("IsFriendly", BindingFlags.Static | BindingFlags.NonPublic)!;

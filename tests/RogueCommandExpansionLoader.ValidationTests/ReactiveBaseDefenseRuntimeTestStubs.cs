@@ -269,6 +269,10 @@ public sealed class EntityController : MonoBehaviour
     public bool CurrentCommandIsTaggedWith(string tag) =>
         tag != null && string.Equals(CurrentCommandTag, tag, System.StringComparison.Ordinal);
 
+    public int ResumedCommandsForTest { get; private set; }
+    public void ResetCurrentCommand() { CurrentCommandTag = null; CurrentAttackTarget = null; }
+    public void ExecuteNextCommand() { ResumedCommandsForTest++; }
+
     public void ClearPatrolPositions()
     {
         PatrolPositions.Clear();

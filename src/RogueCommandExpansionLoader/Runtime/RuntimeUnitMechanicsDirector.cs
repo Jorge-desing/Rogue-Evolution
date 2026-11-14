@@ -104,6 +104,62 @@ namespace RogueCommandExpansionLoader.Runtime
     /// <c>TakeDamage</c>/<c>Die</c> postfix seams via <c>InvokeTakeDamage</c> and
     /// <c>SetActiveStatusEffect</c>; reflected damage never re-triggers reflect.
     /// </summary>
+    internal sealed class RuntimeTauntOrder : MonoBehaviour
+    {
+        private EntityController _unit;
+        private EntityController _source;
+        private string _tag;
+        private float _expiresAt;
+        private static int _nextTag;
+        private static readonly FieldInfo CommandChain = typeof(EntityController).GetField("_commandChain", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        internal bool TryApply(EntityController unit, EntityController source, float duration)
+        {
+            if (unit == null || source == null || unit.CommandChainExecutionIsPaused ||
+                source.canNotBeAttacked || (unit.IsControlledByAi && source.canNotBeTargetedByAi)) return false;
+            if (_tag != null)
+            {
+                if (_source != source || !unit.CurrentCommandIsTaggedWith(_tag)) return false;
+                _expiresAt = Time.time + duration;
+                return true;
+            }
+            _unit = unit;
+            _source = source;
+            _tag = "rcl-taunt:" + (++_nextTag).ToString();
+            _expiresAt = Time.time + duration;
+            EntityCommand command = EntityCommand.Attack(source);
+            command.tag = _tag;
+            unit.ExecuteCommand(command, EntityController.CommandProcessingType.ExecuteBeforeCurrentCommand);
+            return unit.CurrentCommandIsTaggedWith(_tag);
+        }
+
+        private void Update()
+        {
+            if (_tag == null || _unit == null) return;
+            bool current = _unit.CurrentCommandIsTaggedWith(_tag);
+            if (Time.time < _expiresAt && _source != null && !_source.IsDestroyed && !_source.DestroyHasBeenStarted) return;
+            if (!current)
+            {
+                var chain = CommandChain?.GetValue(_unit) as LinkedList<EntityCommand>;
+                if (chain == null) return;
+                for (var node = chain.First; node != null;)
+                {
+                    var next = node.Next;
+                    if (node.Value.tag == _tag) chain.Remove(node);
+                    node = next;
+                }
+                _tag = null;
+                return;
+            }
+            if (_unit.CommandChainExecutionIsPaused) return;
+            _unit.ResetCurrentCommand();
+            _unit.ExecuteNextCommand();
+            _tag = null;
+        }
+
+        private void OnDisable() { _tag = null; _unit = null; _source = null; }
+    }
+
     public sealed class RuntimeUnitMechanicsDirector : MonoBehaviour
     {
         private static readonly Dictionary<string, UnitRuntimeMechanicsProfile> _profiles =
@@ -3383,16 +3439,10 @@ namespace RogueCommandExpansionLoader.Runtime
                     continue;
                 }
 
-                if (_attackMethod != null)
-                {
-                    try
-                    {
-                        _attackMethod.Invoke(candidate, new object[] { self });
-                    }
-                    catch
-                    {
-                    }
-                }
+                if (!(self is EntityController source) || enemy.gameObject == null) continue;
+                var order = enemy.gameObject.GetComponent<RuntimeTauntOrder>() ??
+                    enemy.gameObject.AddComponent<RuntimeTauntOrder>();
+                if (!order.TryApply(enemy, source, duration)) continue;
 
                 ApplyTimedStatusEffect(candidate, "Taunt", duration);
                 tauntedCount++;

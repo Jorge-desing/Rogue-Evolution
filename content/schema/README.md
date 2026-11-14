@@ -321,7 +321,7 @@ Packs can declare advanced, native-grounded runtime mechanics on units (`units[]
   - `tauntRadius` (number, 1.0–60m): Radius within which enemies are provoked.
   - `duration` (number, 0–30s): Duration of the provoked taunt state.
   - `maxTargets` (integer, 0–32): Maximum enemy combat units forced to retarget per pulse.
-- **Runtime behavior:** Periodically grants `StatusEffect.Defender` to the unit, discovers nearby hostile combat units within `tauntRadius`, forces them to immediately retarget the tank via native `EntityController.Attack(self)`, and applies `StatusEffect.Taunt` (`0x400000`).
+- **Runtime behavior:** Grants `StatusEffect.Defender` to the source and inserts a tagged native attack before each selected hostile unit's current command, preserving its pending chain. A target-attached timer renews the same source's taunt; on expiration or source death it stops that attack and resumes the chain only if the tagged order remains current. A newer order is left alone, and a paused chain waits. Applies `StatusEffect.Taunt` (`0x400000`). Steam acceptance remains pending.
 
 ### 4. Shield Overload Nova (`shieldOverloadNova`)
 - **Schema:**
