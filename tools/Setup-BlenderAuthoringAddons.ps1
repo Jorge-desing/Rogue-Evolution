@@ -5,11 +5,14 @@
 .DESCRIPTION
     Installs EdgeFlow, DreamUV, and Ucupaint into Blender 4.5's user scripts/addons directory
     and registers them for hard-surface edge flow, trim-sheet UV mapping, and layered PBR painting.
+    With -IncludeExtended, also installs TexTools-Blender (UV layout, texel density, baking)
+    and Conduit (procedural cable/hose/harness routing).
 #>
 
 [CmdletBinding()]
 param(
-    [string]$BlenderExecutablePath = "C:\Program Files\Blender Foundation\Blender 4.5\blender.exe"
+    [string]$BlenderExecutablePath = "C:\Program Files\Blender Foundation\Blender 4.5\blender.exe",
+    [switch]$IncludeExtended
 )
 
 Set-StrictMode -Version Latest
@@ -28,6 +31,12 @@ $addons = @(
     @{ Name = "dream_uv"; Uri = "https://github.com/leukbaars/DreamUV.git" },
     @{ Name = "ucupaint"; Uri = "https://github.com/ucupumar/ucupaint.git" }
 )
+if ($IncludeExtended) {
+    $addons += @(
+        @{ Name = "TexTools"; Uri = "https://github.com/franMarz/TexTools-Blender.git" },
+        @{ Name = "Conduit"; Uri = "https://github.com/AlbertoCGArt/Conduit.git" }
+    )
+}
 
 foreach ($addon in $addons) {
     $addonPath = Join-Path $addonsDir $addon.Name
@@ -46,9 +55,10 @@ foreach ($addon in $addons) {
 # Verify and enable in Blender
 if (Test-Path -LiteralPath $BlenderExecutablePath -PathType Leaf) {
     Write-Host "Verifying addons with Blender at $BlenderExecutablePath..."
+    $addonNamesPy = ($addons | ForEach-Object { "'$($_.Name)'" }) -join ", "
     $verifyPy = @"
 import addon_utils
-for a in ['EdgeFlow', 'dream_uv', 'ucupaint']:
+for a in [$addonNamesPy]:
     try:
         addon_utils.enable(a, default_set=True)
         print(f'[VERIFIED] Enabled {a}')

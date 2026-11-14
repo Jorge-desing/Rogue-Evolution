@@ -48,7 +48,7 @@ Use [compatible texture recipes](references/compatible-texture-recipes.md) when 
 - Start with the existing tactical graph's palette, panel scale, metallic/roughness curves and microdetail controls. Keep `tactical-hd-v2` nodes, connections and metadata; the CLI has no new per-technique switches.
 - Use manual surface masks only with a version-checked export path. Keep baseline Material Maker reports separate from later painted images; a baseline audit does not validate a manual edit.
 - Graph acceptance, exported-image checks and Unity visual review are separate results. Do not add fake emission or noise, drop provenance or bypass a failed check to make a finish pass.
-- Curvature/AO-driven wear, baked triplanar projection and cross-tool normal composition are not integrated by these recipes. Availability in an application's manual is insufficient to add them to this workflow.
+- Offline algorithmic utilities in `tools/pbr_texture_algorithms.py` provide Voronoi UV island edge dilation (exposed via optional `--dilate-px <N>` in `tools/pack_material_maker_pbr.py`, default `0` to preserve baseline hashes), Reoriented Normal Mapping (`compose-normal` CLI / `blend_normals_rnm`), Scharr height-to-normal, Laplacian curvature/cavity, FFT-periodic fBm, Worley cellular plates, Gray-Scott reaction-diffusion, and stochastic tile-free sampling (`synthesize-armor` CLI). Keep generated intermediates under `artifacts/` and always validate final outputs against the four-map Unity contract.
 
 ## Preservation Rules
 

@@ -40,6 +40,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Treat quality warnings as errors (exit code 2).",
     )
+    parser.add_argument(
+        "--dilate-px",
+        type=int,
+        default=0,
+        help="Optional Voronoi UV island edge dilation radius in pixels (0 disables).",
+    )
     return parser.parse_args()
 
 
@@ -217,7 +223,32 @@ def build_report(paths: dict[str, Path], dimensions: dict[str, tuple[int, int]])
     }
 
 
-def pack_maps(input_dir: Path, output_dir: Path, prefix: str) -> dict[str, object]:
+def _apply_uv_dilation(source_albedo: Path, output_paths: dict[str, Path], dilate_px: int) -> None:
+    if dilate_px <= 0:
+        return
+    import numpy as np
+    from tools.pbr_texture_algorithms import dilate_uv_islands
+
+    with Image.open(source_albedo) as src:
+        rgba = src.convert("RGBA")
+        alpha = np.asarray(rgba, dtype=np.uint8)[..., 3]
+        if int(alpha.min()) < 255:
+            mask = alpha > 127
+        else:
+            rgb = np.asarray(rgba, dtype=np.uint8)[..., :3]
+            mask = np.any(rgb > 2, axis=-1)
+
+    for key in ("Albedo", "MetallicGloss", "Normal", "Emission"):
+        path = output_paths[key]
+        with Image.open(path) as img:
+            arr = np.asarray(img)
+            dilated = dilate_uv_islands(arr, mask, max_distance=dilate_px)
+            Image.fromarray(dilated, img.mode).save(path, format="PNG", optimize=True)
+
+
+def pack_maps(
+    input_dir: Path, output_dir: Path, prefix: str, dilate_px: int = 0
+) -> dict[str, object]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     paths = {
@@ -250,6 +281,7 @@ def pack_maps(input_dir: Path, output_dir: Path, prefix: str) -> dict[str, objec
     )
     normalize_normal(paths["Normal"], output_paths["Normal"])
     copy_opaque_rgb(paths["Emission"], output_paths["Emission"])
+    _apply_uv_dilation(paths["Albedo"], output_paths, dilate_px)
 
     # Audit the final packed outputs. In particular, checking the raw Material
     # Maker normal before renormalization makes strict mode reject valid maps.
@@ -272,14 +304,16 @@ def pack_maps(input_dir: Path, output_dir: Path, prefix: str) -> dict[str, objec
     return report
 
 
-def main_for_test(input_dir: Path, output_dir: Path, prefix: str, strict: bool = False) -> int:
-    report = pack_maps(input_dir, output_dir, prefix)
+def main_for_test(
+    input_dir: Path, output_dir: Path, prefix: str, strict: bool = False, dilate_px: int = 0
+) -> int:
+    report = pack_maps(input_dir, output_dir, prefix, dilate_px=dilate_px)
     return 2 if strict and report["warnings"] else 0
 
 
 def main() -> int:
     args = parse_args()
-    return main_for_test(args.input_dir, args.output_dir, args.prefix, args.strict)
+    return main_for_test(args.input_dir, args.output_dir, args.prefix, args.strict, args.dilate_px)
 
 
 if __name__ == "__main__":

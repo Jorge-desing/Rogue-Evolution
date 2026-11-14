@@ -174,3 +174,13 @@ Para preparar Material Maker 1.7 con comprobación de hash y extracción segura,
 - [Unity Technologies: Asset Bundle Browser](https://github.com/Unity-Technologies/AssetBundles-Browser)
 - [UABEA: lector/editor de AssetBundles y archivos serializados](https://github.com/nesrak1/UABEA)
 - [Unity 2021.3: API `AssetBundle.LoadAsset`](https://docs.unity3d.com/2021.3/Documentation/ScriptReference/AssetBundle.LoadAsset.html)
+
+## Nuevas herramientas y algoritmos integrados (2026-11-13)
+
+| Herramienta / Módulo | Licencia / Tipo | Integración en el repositorio |
+|---|---|---|
+| [TexTools-Blender](https://github.com/franMarz/TexTools-Blender) | Open-source (GPL/MIT) | Añadido como opción `-IncludeExtended` en `tools/Setup-BlenderAuthoringAddons.ps1` para empaquetado UV, texel density y horneado auxiliar en Blender 4.5. |
+| [Conduit](https://github.com/AlbertoCGArt/Conduit) | Open-source | Añadido como opción `-IncludeExtended` en `tools/Setup-BlenderAuthoringAddons.ps1` para ruteo de cables, mangueras y arneses mecánicos en Blender 4.5. |
+| `tools/pbr_texture_algorithms.py` | Local (NumPy/SciPy/Pillow) | Dilatación Voronoi de islas UV (`dilate_uv_islands`, opcional `--dilate-px` en `tools/pack_material_maker_pbr.py`), composición de normales **RNM** (`blend_normals_rnm`), gradientes Scharr, curvatura/cavidad Laplaciana, fBm periódico FFT, placas Worley/Voronoi, reacción-difusión Gray-Scott y muestreo estocástico sin repetición. |
+| `tools/mesh_geometry_algorithms.py` | Local (NumPy) | Suavizado **Taubin $\lambda|\mu$** sin encogimiento (`taubin_smooth`), simplificación **QEM** de Garland-Heckbert (`qem_simplify`), optimización de caché de vértices **Forsyth** (`optimize_vertex_cache_forsyth` / ACMR) y síntesis geométrica de **Vertex-Wear RGBA** (`compute_vertex_wear_rgba`) alineada con `VehiclePBR_VertexWear`. |
+| [meshoptimizer](https://github.com/zeux/meshoptimizer) & [xatlas](https://github.com/jpcy/xatlas) | MIT (evaluadas) | Referencias C++/Python evaluadas para simplificación LOD y parametrización UV masiva; las rutinas puras en NumPy de `tools/mesh_geometry_algorithms.py` cubren el flujo local sin dependencias binarias externas. |
