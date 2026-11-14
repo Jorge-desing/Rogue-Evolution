@@ -3244,11 +3244,13 @@ namespace RogueCommandExpansionLoader.Runtime
                 return;
             }
 
-            float dt = Mathf.Clamp(now - _lastShieldRegenTime, 0.05f, 1.0f);
+            float lastSampleTime = _lastShieldRegenTime;
             _lastShieldRegenTime = now;
 
             float lastDamageTime = ReadFloatProperty(_timeOfLastDamageProperty, self, -999f);
-            if ((now - lastDamageTime) < regen.rechargeDelay)
+            float rechargeStartsAt = lastDamageTime + regen.rechargeDelay;
+            float dt = Mathf.Clamp(now - Mathf.Max(lastSampleTime, rechargeStartsAt), 0f, 1f);
+            if (dt <= 0f)
             {
                 return;
             }

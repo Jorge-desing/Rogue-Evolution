@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Shield regeneration credits elapsed scaled time after both the previous sample and the damage cooldown deadline, capped at one second per pulse. A pulse crossing the cooldown boundary starts with the eligible fraction of that interval and applies the configured empty-shield burst once recharge begins.
+
 productionQueue.productionPriority orders product attempts in the factory-reinforcement AI module, highest value first. Equal values preserve the original scan order. Priority-only profiles register without a per-unit runtime component. Native production affordability and population/queue limits remain authoritative.
 
 Positive productionQueue.queueSize caps the native queuedCount independently per producing factory, including the in-progress product. The existing IsProductionPossible hook applies it to player and AI production before native payment/enqueue. Completion and cancellation free a slot through the native count. Zero preserves native queue behavior. Queue-only profiles register without attaching a per-unit runtime component.

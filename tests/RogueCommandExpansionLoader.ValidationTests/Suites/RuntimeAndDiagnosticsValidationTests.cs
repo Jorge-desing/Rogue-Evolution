@@ -2885,7 +2885,7 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.RegisterProfile("test:shield-combination", new UnitRuntimeMechanicsProfile
             {
                 EntityId = "test:shield-combination",
-                ShieldRegen = new ContentUnitShieldRegenDefinition { rechargeRate = 10f, rechargeDelay = 0f, burstAmount = 5f },
+                ShieldRegen = new ContentUnitShieldRegenDefinition { rechargeRate = 10f, rechargeDelay = 0.75f, burstAmount = 5f },
                 ShieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { novaRadius = 2f, damage = 10f, cooldown = 5f }
             });
             var self = new EntityController
@@ -2900,10 +2900,11 @@ internal static partial class ValidationTestRunner
             RuntimeUnitMechanicsDirector.AttachIfApplicable(self);
             var director = self.gameObject.GetComponent<RuntimeUnitMechanicsDirector>()!;
             self.CurrentShield = 0f;
+            self.TimeOfLastDamage = 10f;
             UnityEngine.Time.time = 11f;
             director.TickMechanics();
-            if (enemy.CurrentHealth != 90f || self.CurrentShield <= 0f)
-                throw new InvalidOperationException("Shield break must fire its nova even when the same update immediately recharges it.");
+            if (enemy.CurrentHealth != 90f || self.CurrentShield != 7.5f)
+                throw new InvalidOperationException("Shield break must fire its nova and recharge only the eligible quarter-second plus burst.");
             UnityEngine.Time.time = 12f;
             director.TickMechanics();
             if (enemy.CurrentHealth != 90f)
