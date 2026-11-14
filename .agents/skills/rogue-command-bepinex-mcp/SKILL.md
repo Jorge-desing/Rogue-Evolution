@@ -20,7 +20,7 @@ The `bepinex_mcp` namespace is the authoritative current inventory. Before decid
 | Units, commands and construction | Search `entity`, `selection`, `unit`, `production`, `placement`, `building`, `move` and `attack` |
 | AI and director | `diagnostics_get_active_stage_ai_association`; search `ai`, `director`, `doctrine`, `threat` and `wave` |
 | Economy and gameplay | Search `economy`, `resource`, `card`, `upgrade`, `relic`, `hazard` and `veterancy` |
-| Scene, components and reflection | Search `scene`, `gameobject`, `component` and `type`; inspect the exact current selector and overload |
+| Scene, components and reflection | Search `scene`, `gameobject`, `component`, `type`, and `explorer`; use `diagnostics_explorer_query` (`search_objects`, `find_singletons`, `inspect_type`, `find_implementations`, `inspect_patches`) and `diagnostics_explorer_member` (`get`, `set`, `invoke`) for static/singleton/all-scene/Harmony-patch inspection |
 | Harmony and observation | Search `patch`, `inject`, `watch`, `renderer`, `camera`, `visual` and `frame`; follow the Harmony policy before patching |
 | Coordination and sequences | Search `automation`, `wait`, `sequence`, `batch`, `agent` and `lock`; read [Automation](references/automation.md) before sequences, waits or recovery |
 

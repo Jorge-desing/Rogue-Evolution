@@ -2118,6 +2118,75 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("GetVisualQualityCensusJson", [max_units])
             return _tool_response(res)
 
+        elif name == "diagnostics_explorer_query":
+            action = str(arguments.get("action", "")).strip()
+            if action == "search_objects":
+                res = _call_diagnostics_method(
+                    "ExplorerSearchUnityObjectsJson",
+                    [
+                        str(arguments.get("query", "")),
+                        str(arguments.get("typeName", "")),
+                        str(arguments.get("sceneFilter", "any")),
+                        str(arguments.get("childFilter", "any")),
+                        int(arguments.get("limit", 50)),
+                    ],
+                )
+            elif action == "find_singletons":
+                res = _call_diagnostics_method(
+                    "ExplorerFindSingletonsJson",
+                    [str(arguments.get("typeName", "") or arguments.get("query", "")), int(arguments.get("limit", 50))],
+                )
+            elif action == "inspect_type":
+                res = _call_diagnostics_method(
+                    "ExplorerInspectTypeJson",
+                    [
+                        str(arguments.get("typeName", "")),
+                        str(arguments.get("query", "")),
+                        bool(arguments.get("includeNonPublic", True)),
+                        int(arguments.get("limit", 100)),
+                    ],
+                )
+            elif action == "find_implementations":
+                res = _call_diagnostics_method(
+                    "ExplorerFindImplementationsJson",
+                    [str(arguments.get("typeName", "")), int(arguments.get("limit", 64))],
+                )
+            elif action == "inspect_patches":
+                res = _call_diagnostics_method(
+                    "ExplorerInspectMethodPatchesJson",
+                    [str(arguments.get("typeName", "")), str(arguments.get("query", ""))],
+                )
+            else:
+                return _tool_response(json.dumps({"error": f"Unknown explorer query action: {action}"}), is_error=True)
+            return _tool_response(res)
+
+        elif name == "diagnostics_explorer_member":
+            action = str(arguments.get("action", "")).strip()
+            type_name = str(arguments.get("typeName", ""))
+            member_name = str(arguments.get("memberName", ""))
+            use_singleton = bool(arguments.get("useSingleton", False))
+            instance_id = int(arguments.get("instanceId", 0))
+            if action == "get":
+                res = _call_diagnostics_method(
+                    "ExplorerGetTypeOrSingletonMemberJson",
+                    [type_name, member_name, use_singleton, instance_id],
+                )
+            elif action == "set":
+                res = _call_diagnostics_method(
+                    "ExplorerSetTypeOrSingletonMemberJson",
+                    [type_name, member_name, str(arguments.get("valueText", "")), use_singleton, instance_id],
+                )
+            elif action == "invoke":
+                args_list = arguments.get("args", [])
+                args_json = json.dumps(args_list if isinstance(args_list, list) else [])
+                res = _call_diagnostics_method(
+                    "ExplorerInvokeTypeOrSingletonMethodJson",
+                    [type_name, member_name, args_json, use_singleton, instance_id],
+                )
+            else:
+                return _tool_response(json.dumps({"error": f"Unknown explorer member action: {action}"}), is_error=True)
+            return _tool_response(res)
+
         elif name == "diagnostics_get_visual_material_census":
             max_units = int(arguments.get("maxTrackedUnits", 64))
             res = _call_diagnostics_method("GetVisualMaterialCensusJson", [max_units])

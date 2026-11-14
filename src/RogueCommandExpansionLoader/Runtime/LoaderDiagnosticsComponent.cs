@@ -2752,6 +2752,70 @@ namespace RogueCommandExpansionLoader.Runtime
                 RogueCommandExpansionLoader.Runtime.Ai.RuntimeAiArchitectureCensus.Current());
         }
 
+        public string ExplorerSearchUnityObjectsJson(
+            string nameFilter = "",
+            string typeFilter = "",
+            string sceneFilter = "any",
+            string childFilter = "any",
+            int limit = 50)
+        {
+            return RuntimeExplorerDirector.SearchUnityObjectsJson(
+                nameFilter,
+                typeFilter,
+                sceneFilter,
+                childFilter,
+                limit);
+        }
+
+        public string ExplorerFindSingletonsJson(string typeFilter = "", int limit = 50)
+        {
+            return RuntimeExplorerDirector.FindSingletonsJson(typeFilter, limit);
+        }
+
+        public string ExplorerInspectTypeJson(
+            string typeName,
+            string memberFilter = "",
+            bool includeNonPublic = true,
+            int maxMembers = 100)
+        {
+            return RuntimeExplorerDirector.InspectTypeJson(typeName, memberFilter, includeNonPublic, maxMembers);
+        }
+
+        public string ExplorerFindImplementationsJson(string baseTypeName, int limit = 64)
+        {
+            return RuntimeExplorerDirector.FindImplementationsJson(baseTypeName, limit);
+        }
+
+        public string ExplorerGetTypeOrSingletonMemberJson(string typeName, string memberName, bool useSingleton = false, int instanceId = 0)
+        {
+            return RuntimeExplorerDirector.GetTypeOrSingletonMemberJson(typeName, memberName, useSingleton, instanceId);
+        }
+
+        public string ExplorerSetTypeOrSingletonMemberJson(
+            string typeName,
+            string memberName,
+            string valueText,
+            bool useSingleton = false,
+            int instanceId = 0)
+        {
+            return RuntimeExplorerDirector.SetTypeOrSingletonMemberJson(typeName, memberName, valueText, useSingleton, instanceId);
+        }
+
+        public string ExplorerInvokeTypeOrSingletonMethodJson(
+            string typeName,
+            string methodName,
+            string argsJson = "[]",
+            bool useSingleton = false,
+            int instanceId = 0)
+        {
+            return RuntimeExplorerDirector.InvokeTypeOrSingletonMethodJson(typeName, methodName, argsJson, useSingleton, instanceId);
+        }
+
+        public string ExplorerInspectMethodPatchesJson(string typeName = "", string methodName = "")
+        {
+            return RuntimeExplorerDirector.InspectMethodPatchesJson(typeName, methodName);
+        }
+
         private LoaderDiagnosticsSnapshot SafeSnapshot()
         {
             if (_provider == null)

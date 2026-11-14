@@ -825,12 +825,14 @@ namespace UnityEngine.SceneManagement
         public string name { get; set; }
         public bool isLoaded { get; set; }
         public int handle { get; set; }
+        public int buildIndex { get; set; }
 
         public Scene(string name, bool isLoaded, int handle)
         {
             this.name = name;
             this.isLoaded = isLoaded;
             this.handle = handle;
+            this.buildIndex = 0;
         }
 
         public bool IsValid() => !string.IsNullOrEmpty(name);
@@ -840,6 +842,8 @@ namespace UnityEngine.SceneManagement
     {
         public static string ActiveSceneName { get; set; } = "MainDesertScene";
         public static int ActiveSceneHandle { get; set; } = 1;
+        public static int sceneCount => 1;
+        public static Scene GetSceneAt(int index) => GetActiveScene();
         public static Scene GetActiveScene() => new Scene { name = ActiveSceneName, isLoaded = true, handle = ActiveSceneHandle };
         public static void MoveGameObjectToScene(GameObject gameObject, Scene scene) => gameObject.scene = scene;
     }

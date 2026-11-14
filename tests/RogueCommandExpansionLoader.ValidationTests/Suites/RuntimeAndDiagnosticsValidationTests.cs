@@ -17,6 +17,106 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("RuntimeExplorerDirector inspects types, implementations, singletons, members, methods, and Harmony patches", () =>
+    {
+        RuntimeExplorerTestTarget.Instance = new RuntimeExplorerTestTarget();
+        var inspectObj = JsonDocument.Parse(RuntimeExplorerDirector.InspectTypeJson(
+            typeof(RuntimeExplorerTestTarget).FullName,
+            "",
+            includeNonPublic: true,
+            maxMembers: 50)).RootElement;
+        if (!inspectObj.GetProperty("success").GetBoolean())
+            throw new Exception("InspectTypeJson failed");
+        if (!inspectObj.GetProperty("hasSingleton").GetBoolean())
+            throw new Exception("Expected hasSingleton=true");
+
+        var implObj = JsonDocument.Parse(RuntimeExplorerDirector.FindImplementationsJson(
+            typeof(IRuntimeExplorerTestContract).FullName,
+            20)).RootElement;
+        if (!implObj.GetProperty("success").GetBoolean() || implObj.GetProperty("totalMatched").GetInt32() < 1)
+            throw new Exception("FindImplementationsJson did not find RuntimeExplorerTestTarget");
+
+        RuntimeExplorerTestTarget.Instance = new RuntimeExplorerTestTarget();
+        var singletonsObj = JsonDocument.Parse(RuntimeExplorerDirector.FindSingletonsJson(
+            nameof(RuntimeExplorerTestTarget),
+            20)).RootElement;
+        if (!singletonsObj.GetProperty("success").GetBoolean() || singletonsObj.GetProperty("totalMatched").GetInt32() != 1)
+            throw new Exception("FindSingletonsJson did not resolve RuntimeExplorerTestTarget.Instance");
+
+        var setStaticObj = JsonDocument.Parse(RuntimeExplorerDirector.SetTypeOrSingletonMemberJson(
+            typeof(RuntimeExplorerTestTarget).FullName,
+            "StaticCounter",
+            "42",
+            useSingleton: false)).RootElement;
+        if (!setStaticObj.GetProperty("success").GetBoolean() || RuntimeExplorerTestTarget.StaticCounter != 42)
+            throw new Exception("SetTypeOrSingletonMemberJson failed for StaticCounter");
+
+        var setVecObj = JsonDocument.Parse(RuntimeExplorerDirector.SetTypeOrSingletonMemberJson(
+            typeof(RuntimeExplorerTestTarget).FullName,
+            "InstanceOffset",
+            "1.5,2.5,3.5",
+            useSingleton: true)).RootElement;
+        if (!setVecObj.GetProperty("success").GetBoolean() ||
+            Math.Abs(RuntimeExplorerTestTarget.Instance.InstanceOffset.y - 2.5f) > 0.001f)
+            throw new Exception("SetTypeOrSingletonMemberJson failed for Vector3 InstanceOffset");
+
+        var getVecObj = JsonDocument.Parse(RuntimeExplorerDirector.GetTypeOrSingletonMemberJson(
+            typeof(RuntimeExplorerTestTarget).FullName,
+            "InstanceOffset",
+            useSingleton: true)).RootElement;
+        if (!getVecObj.GetProperty("success").GetBoolean() ||
+            Math.Abs(getVecObj.GetProperty("serializedValue").GetProperty("z").GetDouble() - 3.5) > 0.001)
+            throw new Exception("GetTypeOrSingletonMemberJson failed for InstanceOffset");
+
+        var invokeObj = JsonDocument.Parse(RuntimeExplorerDirector.InvokeTypeOrSingletonMethodJson(
+            typeof(RuntimeExplorerTestTarget).FullName,
+            "ComputeSum",
+            "[10, 2.5]",
+            useSingleton: true)).RootElement;
+        if (!invokeObj.GetProperty("success").GetBoolean() ||
+            Math.Abs(invokeObj.GetProperty("returnValue").GetDouble() - 12.5) > 0.001)
+            throw new Exception("InvokeTypeOrSingletonMethodJson failed for ComputeSum");
+
+        try
+        {
+            var patchObj = JsonDocument.Parse(RuntimeExplorerDirector.InspectMethodPatchesJson(
+                typeof(RuntimeExplorerTestTarget).FullName,
+                nameof(RuntimeExplorerTestTarget.PatchedProbe))).RootElement;
+            if (!patchObj.GetProperty("success").GetBoolean() ||
+                patchObj.GetProperty("count").GetInt32() != 1 ||
+                patchObj.GetProperty("methods")[0].GetProperty("hasPatches").GetBoolean())
+                throw new Exception("InspectMethodPatchesJson returned unexpected patch state");
+
+            var scriptableObj = ScriptableObject.CreateInstance(typeof(RuntimeExplorerTestScriptable));
+            scriptableObj.name = "TestExplorerAsset";
+            UnityEngine.Object.NativeControlTestObjects = new UnityEngine.Object[] { scriptableObj };
+            int targetId = scriptableObj.GetInstanceID();
+
+            var setById = JsonDocument.Parse(RuntimeExplorerDirector.SetTypeOrSingletonMemberJson(
+                "",
+                "Label",
+                "UpdatedById",
+                useSingleton: false,
+                instanceId: targetId)).RootElement;
+            if (!setById.GetProperty("success").GetBoolean() ||
+                ((RuntimeExplorerTestScriptable)scriptableObj).Label != "UpdatedById")
+                throw new Exception("SetTypeOrSingletonMemberJson by instanceId failed");
+
+            var getById = JsonDocument.Parse(RuntimeExplorerDirector.GetTypeOrSingletonMemberJson(
+                "",
+                "Label",
+                useSingleton: false,
+                instanceId: targetId)).RootElement;
+            if (!getById.GetProperty("success").GetBoolean() ||
+                getById.GetProperty("serializedValue").GetString() != "UpdatedById")
+                throw new Exception("GetTypeOrSingletonMemberJson by instanceId failed");
+        }
+        finally
+        {
+            UnityEngine.Object.NativeControlTestObjects = Array.Empty<UnityEngine.Object>();
+            RuntimeExplorerTestTarget.Instance = null;
+        }
+    }),
     ("native Shop exit rejects stale and disabled controls and preserves uncertain invocation", () =>
     {
         try
@@ -12539,4 +12639,23 @@ internal static partial class ValidationTestRunner
             Physics.TestHit = default(RaycastHit);
         }
     }
+}
+
+internal interface IRuntimeExplorerTestContract { }
+
+internal sealed class RuntimeExplorerTestScriptable : ScriptableObject
+{
+    public string Label { get; set; } = "Initial";
+}
+
+internal sealed class RuntimeExplorerTestTarget : IRuntimeExplorerTestContract
+{
+    public static RuntimeExplorerTestTarget? Instance { get; set; }
+    public static int StaticCounter = 0;
+    public Vector3 InstanceOffset { get; set; }
+
+    public double ComputeSum(int a, float b) => a + b;
+
+    public static int PatchedProbe(int x) => x + 1;
+    public static bool ProbePrefix() => true;
 }

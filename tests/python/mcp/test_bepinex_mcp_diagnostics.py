@@ -1391,7 +1391,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             "describe_tool",
         ):
             self.assertIn(expected, names)
-        self.assertEqual(252, len(names))
+        self.assertEqual(254, len(names))
 
     def test_initialize_reports_current_bridge_version(self) -> None:
         response = SERVER.handle_request({
@@ -1405,9 +1405,9 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_tools_list_default_is_all_and_paginates(self) -> None:
         full = SERVER.handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}})
         tools = full["result"]["tools"]
-        self.assertEqual(252, len(tools))
+        self.assertEqual(254, len(tools))
         payload = json.dumps(full["result"], separators=(",", ":")).encode("utf-8")
-        self.assertLess(len(payload), 96000, f"tools/list payload too large: {len(payload)} bytes")
+        self.assertLess(len(payload), 98000, f"tools/list payload too large: {len(payload)} bytes")
         page = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 10}})
         self.assertEqual(10, len(page["result"]["tools"]))
         cursor = page["result"]["nextCursor"]
@@ -1420,7 +1420,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         names = [t["name"] for t in resp["result"]["tools"]]
         self.assertTrue(len(names) >= 1)
         resp2 = SERVER.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"includeAliases": False}})
-        self.assertEqual(len(resp2["result"]["tools"]), 232)
+        self.assertEqual(len(resp2["result"]["tools"]), 234)
         self.assertLess(len(json.dumps(resp2["result"], separators=(",", ":")).encode("utf-8")), 91000)
         self.assertNotIn("ping_unity_bridge", [t["name"] for t in resp2["result"]["tools"]])
         self.assertIn("system_ping", [t["name"] for t in resp2["result"]["tools"]])
@@ -1967,13 +1967,13 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
     def test_optimised_schemas_preserve_all_tools_and_reduce_bytes(self) -> None:
         specs = self._load_tool_specs()
         names = [s["name"] for s in specs]
-        self.assertEqual(252, len(names))
+        self.assertEqual(254, len(names))
         self.assertEqual(len(names), len(set(names)))
         aliases = [s for s in specs if str(s.get("description", "")).startswith("Alias for")]
         self.assertEqual(20, len(aliases))
-        self.assertEqual(232, len(specs) - len(aliases))
+        self.assertEqual(234, len(specs) - len(aliases))
         compact = sum(len(json.dumps(s, ensure_ascii=False, separators=(",", ":"))) for s in specs)
-        self.assertLess(compact, 96000, f"optimised schemas too large: {compact} bytes")
+        self.assertLess(compact, 98000, f"optimised schemas too large: {compact} bytes")
         # Strictness and shape preserved for every tool.
         for spec in specs:
             params = spec["parameters"]
@@ -2024,7 +2024,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             self.assertIn("IntermissionNodeRow", props["level"]["description"])
         self.assertIn("IntermissionNodeRow", by_name["diagnostics_get_intermission_census"]["description"])
         total_props = sum(len(s["parameters"].get("properties") or {}) for s in specs)
-        self.assertEqual(430, total_props)
+        self.assertEqual(444, total_props)
 
     def test_empty_schemas_are_compact_but_strict(self) -> None:
         specs = self._load_tool_specs()
@@ -2100,6 +2100,66 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
                 resp = SERVER.execute_tool(alias, dict(args))
                 self.assertFalse(resp["isError"], alias)
                 self.assertEqual(endpoint, fake.call_args[0][0], alias)
+
+    def test_explorer_tools_dispatch_to_loader_diagnostics(self) -> None:
+        cases = [
+            (
+                "diagnostics_explorer_query",
+                {"action": "search_objects", "query": "Hero", "typeName": "GameObject", "sceneFilter": "active", "childFilter": "root", "limit": 25},
+                "ExplorerSearchUnityObjectsJson",
+                ["Hero", "GameObject", "active", "root", 25],
+            ),
+            (
+                "diagnostics_explorer_query",
+                {"action": "find_singletons", "typeName": "Manager", "limit": 10},
+                "ExplorerFindSingletonsJson",
+                ["Manager", 10],
+            ),
+            (
+                "diagnostics_explorer_query",
+                {"action": "inspect_type", "typeName": "GameManager", "query": "State", "includeNonPublic": False, "limit": 20},
+                "ExplorerInspectTypeJson",
+                ["GameManager", "State", False, 20],
+            ),
+            (
+                "diagnostics_explorer_query",
+                {"action": "find_implementations", "typeName": "IRogueCommandAiModule", "limit": 30},
+                "ExplorerFindImplementationsJson",
+                ["IRogueCommandAiModule", 30],
+            ),
+            (
+                "diagnostics_explorer_query",
+                {"action": "inspect_patches", "typeName": "GameManager", "query": "Update"},
+                "ExplorerInspectMethodPatchesJson",
+                ["GameManager", "Update"],
+            ),
+            (
+                "diagnostics_explorer_member",
+                {"action": "get", "typeName": "GameManager", "memberName": "Instance", "useSingleton": True},
+                "ExplorerGetTypeOrSingletonMemberJson",
+                ["GameManager", "Instance", True, 0],
+            ),
+            (
+                "diagnostics_explorer_member",
+                {"action": "set", "typeName": "GameManager", "memberName": "DebugFlag", "valueText": "true", "useSingleton": False, "instanceId": 42},
+                "ExplorerSetTypeOrSingletonMemberJson",
+                ["GameManager", "DebugFlag", "true", False, 42],
+            ),
+            (
+                "diagnostics_explorer_member",
+                {"action": "invoke", "typeName": "GameManager", "memberName": "SetScale", "args": [2, 1.5], "useSingleton": True},
+                "ExplorerInvokeTypeOrSingletonMethodJson",
+                ["GameManager", "SetScale", "[2, 1.5]", True, 0],
+            ),
+        ]
+        for tool_name, arguments, expected_method, expected_args in cases:
+            with self.subTest(tool_name=tool_name, action=arguments["action"]), mock.patch.object(
+                SERVER, "_call_diagnostics_method", return_value='{"success":true}'
+            ) as call:
+                result = SERVER.execute_tool(tool_name, arguments)
+                self.assertFalse(result.get("isError", False), result)
+                self.assertEqual(expected_method, call.call_args.args[0])
+                self.assertEqual(expected_args, call.call_args.args[1])
 
 
 if __name__ == "__main__":
