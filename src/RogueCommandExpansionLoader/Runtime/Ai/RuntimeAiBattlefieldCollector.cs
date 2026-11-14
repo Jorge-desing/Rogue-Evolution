@@ -412,7 +412,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 activeSkillTargetsSelf: skillTargetsSelf,
                 activeSkillRange: skillRange,
                 statusEffectFlags: statusFlags,
-                affixFlags: affixFlags);
+                affixFlags: affixFlags,
+                activeSkillRequiresEngagement: string.Equals(activationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool HasQueuedCommands(EntityController entity)

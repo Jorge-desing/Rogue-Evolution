@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace RogueCommandExpansionLoader.Runtime.Ai
 {
@@ -67,6 +68,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
         public int CurrentTargetId { get; }
         public bool HasReadyActiveSkill { get; }
         public bool ActiveSkillTargetsSelf { get; }
+        public bool ActiveSkillRequiresEngagement { get; }
         public float ActiveSkillRange { get; }
         public int StatusEffectFlags { get; }
         public int AffixFlags { get; }
@@ -99,7 +101,8 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             bool activeSkillTargetsSelf = false,
             float activeSkillRange = 0f,
             int statusEffectFlags = 0,
-            int affixFlags = 0)
+            int affixFlags = 0,
+            bool activeSkillRequiresEngagement = false)
         {
             UniqueEntityId = uniqueEntityId;
             EntityId = entityId ?? string.Empty;
@@ -126,6 +129,7 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
             CurrentTargetId = currentTargetId;
             HasReadyActiveSkill = hasReadyActiveSkill;
             ActiveSkillTargetsSelf = activeSkillTargetsSelf;
+            ActiveSkillRequiresEngagement = activeSkillRequiresEngagement;
             ActiveSkillRange = Math.Max(0f, SanitizeFloat(activeSkillRange, 0f));
             StatusEffectFlags = statusEffectFlags;
             AffixFlags = affixFlags;
@@ -191,6 +195,25 @@ namespace RogueCommandExpansionLoader.Runtime.Ai
                 float effectiveVitality = CurrentHealth + CurrentShield + (MaxHealth * 0.25f);
                 return Math.Max(1f, DpsEstimate * 2.0f + effectiveVitality * 0.15f);
             }
+        }
+
+        public bool TrySelectSkillTarget(IReadOnlyList<AiUnitSnapshot> hostiles, out AiUnitSnapshot target)
+        {
+            target = default;
+            if (hostiles == null) return false;
+            float bestDistance = ActiveSkillRange * ActiveSkillRange;
+            bool found = false;
+            for (int i = 0; i < hostiles.Count; i++)
+            {
+                AiUnitSnapshot candidate = hostiles[i];
+                if (ActiveSkillRequiresEngagement && candidate.UniqueEntityId != CurrentTargetId) continue;
+                float distance = DistanceSquaredTo(candidate);
+                if (distance > bestDistance || (found && distance == bestDistance)) continue;
+                target = candidate;
+                bestDistance = distance;
+                found = true;
+            }
+            return found;
         }
 
         public float DistanceSquaredTo(AiUnitSnapshot other)

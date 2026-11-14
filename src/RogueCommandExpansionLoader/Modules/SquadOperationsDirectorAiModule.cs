@@ -211,24 +211,7 @@ namespace RogueCommandExpansionLoader.Modules
                     // 3. Tactical Skill activation for support & specialist units
                     if (_settings.EnableTacticalSkills && unit.HasReadyActiveSkill)
                     {
-                        bool hasHostileInRange = false;
-                        AiUnitSnapshot nearestHostile = default(AiUnitSnapshot);
-                        float skillRangeSq = unit.ActiveSkillRange * unit.ActiveSkillRange;
-
-                        if (hostiles != null)
-                        {
-                            for (int h = 0; h < hostiles.Count; h++)
-                            {
-                                float dSq = unit.DistanceSquaredTo(hostiles[h]);
-                                if (dSq <= skillRangeSq)
-                                {
-                                    hasHostileInRange = true;
-                                    nearestHostile = hostiles[h];
-                                    break;
-                                }
-                            }
-                        }
-
+                        bool hasHostileInRange = unit.TrySelectSkillTarget(hostiles, out AiUnitSnapshot nearestHostile);
                         float skillScore = TacticalUtilityScorer.ScoreTacticalSkill(unit, hasHostileInRange, doctrineWeights);
                         if (skillScore > 0f)
                         {

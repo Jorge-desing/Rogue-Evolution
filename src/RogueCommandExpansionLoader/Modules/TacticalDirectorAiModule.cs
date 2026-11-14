@@ -201,19 +201,18 @@ namespace RogueCommandExpansionLoader.Modules
                     // 2. Tactical Skill proposal when ready
                     if (unit.HasReadyActiveSkill && emittedForUnit < _settings.MaxProposalsPerUnit)
                     {
-                        float skillRangeSq = unit.ActiveSkillRange * unit.ActiveSkillRange;
-                        bool hostileInSkillRange = hasNearest && nearestDistSq <= skillRangeSq;
+                        bool hostileInSkillRange = unit.TrySelectSkillTarget(hostiles, out AiUnitSnapshot skillTarget);
                         float skillScore = TacticalUtilityScorer.ScoreTacticalSkill(unit, hostileInSkillRange, doctrineWeights);
                         if (skillScore > 0f)
                         {
-                            int skillTargetId = (!unit.ActiveSkillTargetsSelf && hasNearest) ? nearestHostile.UniqueEntityId : -1;
+                            int skillTargetId = (!unit.ActiveSkillTargetsSelf && hostileInSkillRange) ? skillTarget.UniqueEntityId : -1;
                             proposals.Add(new AiIntentProposal(
                                 moduleId: ModuleId,
                                 commandTag: _commandTag + ".skill",
                                 unitId: unit.UniqueEntityId,
                                 targetEntityId: skillTargetId,
-                                destX: hasNearest ? nearestHostile.PosX : unit.PosX,
-                                destZ: hasNearest ? nearestHostile.PosZ : unit.PosZ,
+                                destX: hostileInSkillRange ? skillTarget.PosX : unit.PosX,
+                                destZ: hostileInSkillRange ? skillTarget.PosZ : unit.PosZ,
                                 category: AiIntentCategory.TacticalSkill,
                                 utilityScore: skillScore,
                                 lockoutDurationSeconds: 1.0f,

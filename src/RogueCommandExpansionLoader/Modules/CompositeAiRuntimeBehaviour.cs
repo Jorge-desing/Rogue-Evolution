@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using RogueCommandExpansionLoader.Contracts;
 using RogueCommandExpansionLoader.Runtime.Ai;
+using RogueCommandExpansionLoader.Runtime;
 using UnityEngine;
 
 namespace RogueCommandExpansionLoader.Modules
@@ -442,6 +443,18 @@ namespace RogueCommandExpansionLoader.Modules
                     {
                         return;
                     }
+                    if (RuntimeUnitMechanicsDirector.TryGetProfile(unit.EntityId, out UnitRuntimeMechanicsProfile profile) &&
+                        string.Equals(profile.AiActivationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase))
+                    {
+                        EntityController engaged = unit.CurrentAttackTarget;
+                        if (!unit.IsTargetInRange || engaged == null || engaged.IsDestroyed || engaged.DestroyHasBeenStarted ||
+                            engaged.canNotBeTargetedByAi || !unit.IsEnemy(engaged) ||
+                            (skillInfo.targetOrigin != TargetOrigin.Self && engaged.UniqueEntityId != proposal.TargetEntityId))
+                        {
+                            return;
+                        }
+                    }
+
                     if (skillInfo.targetOrigin == TargetOrigin.Self)
                     {
                         command = EntityCommand.ActiveSkillWithoutTarget();
