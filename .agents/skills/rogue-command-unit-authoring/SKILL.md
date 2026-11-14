@@ -72,6 +72,7 @@ When adding or altering runtime mechanics, update all 4 layers simultaneously: S
 
 - **Tiered Role Scaling:** Scale mechanics by cost tier (T0 $\le 80$, T1 $\le 260$, T2 $> 260$) and role. Melee/support gain sustain; disposable units get zero leech. Cap flat bounty damage (×0.6 for `MassDestruction`).
 - **Director Cleanup Invariant:** When entities are destroyed or recycled, `RuntimeUnitMechanicsDirector` must call `RemoveStatusEffect` for baseline effects and `RemoveCaptain` for command links. Combat XP is cleared only on final destruction.
+- **Command range ownership:** Command pulses skip followers already owned by another captain before counting capacity or applying command buffs. Track linked followers per director; leaving range, losing eligibility, refreshing the profile or clearing runtime state releases only links still owned by that commander. Returning eligible followers can join again. Timed command buffs retain their declared expiry.
 
 ---
 

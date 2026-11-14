@@ -216,6 +216,7 @@ namespace RogueCommandExpansionLoader.Runtime
         private bool _startingAffixesApplied;
         private bool _defaultLoadoutApplied;
         private bool _startingVeterancyApplied;
+        private readonly HashSet<object> _commandFollowers = new HashSet<object>();
 
         public static int RegisteredProfileCount
         {
@@ -1691,6 +1692,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private void ClearRuntimeState()
         {
+            ReleaseCommandFollowers(null);
             if (_entityController != null)
             {
                 try
@@ -2317,6 +2319,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private void InitializeOrRefresh(object entityController, UnitRuntimeMechanicsProfile profile)
         {
+            ReleaseCommandFollowers(null);
             _entityController = entityController;
             _profile = profile;
             _nextHealCheckTime = Time.time + 0.5f;
@@ -2770,7 +2773,7 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
-        private static void ExecuteCommandPulse(object self, ContentUnitCommandDefinition command)
+        private void ExecuteCommandPulse(object self, ContentUnitCommandDefinition command)
         {
             if (command == null || command.commandRange <= 0f)
             {
@@ -2791,6 +2794,7 @@ namespace RogueCommandExpansionLoader.Runtime
             string originatorTag = "command:" + selfId;
 
             int linkedCount = 0;
+            var retainedFollowers = new HashSet<object>();
             foreach (object candidate in entities)
             {
                 if (candidate == null || ReferenceEquals(candidate, self) || !IsEntityAlive(candidate) || IsEnemy(self, candidate))
@@ -2818,13 +2822,20 @@ namespace RogueCommandExpansionLoader.Runtime
                         object currentCaptain = _captainOfThisEntityProperty != null
                             ? _captainOfThisEntityProperty.GetValue(candidate, null)
                             : null;
-                        if (currentCaptain == null || ReferenceEquals(currentCaptain, self))
+                        if (currentCaptain != null && !ReferenceEquals(currentCaptain, self))
+                        {
+                            continue;
+                        }
+                        if (currentCaptain == null)
                         {
                             _setCaptainMethod.Invoke(candidate, new[] { self });
                         }
+                        _commandFollowers.Add(candidate);
+                        retainedFollowers.Add(candidate);
                     }
                     catch
                     {
+                        continue;
                     }
                 }
 
@@ -2853,6 +2864,26 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     break;
                 }
+            }
+            ReleaseCommandFollowers(retainedFollowers);
+        }
+
+        private void ReleaseCommandFollowers(HashSet<object> retained)
+        {
+            foreach (object follower in new List<object>(_commandFollowers))
+            {
+                if (retained != null && retained.Contains(follower)) continue;
+                try
+                {
+                    object captain = _captainOfThisEntityProperty != null
+                        ? _captainOfThisEntityProperty.GetValue(follower, null) : null;
+                    if (ReferenceEquals(captain, _entityController) && _removeCaptainMethod != null)
+                    {
+                        _removeCaptainMethod.Invoke(follower, new[] { _entityController });
+                    }
+                }
+                catch { }
+                _commandFollowers.Remove(follower);
             }
         }
 

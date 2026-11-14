@@ -129,6 +129,8 @@ public sealed class EntityController : MonoBehaviour
     public void Produce(bool instant = false, bool forFree = false, bool noEvent = false)
     {
         ProduceCallCount++;
+        if ((instant || forFree) && InProductionCount > 0)
+            InProductionCount--;
         InProductionCount = (InProductionCount ?? 0) + 1;
     }
     public UnitRole Role { get; set; }

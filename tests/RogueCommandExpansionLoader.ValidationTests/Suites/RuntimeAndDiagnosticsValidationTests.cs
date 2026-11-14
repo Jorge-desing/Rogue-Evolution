@@ -2569,7 +2569,7 @@ internal static partial class ValidationTestRunner
                 {
                     commandType = "Attack",
                     commandRange = 4f,
-                    maxCommandChain = 4
+                    maxCommandChain = 1
                 }
             });
 
@@ -2589,6 +2589,14 @@ internal static partial class ValidationTestRunner
                 IsControlledByPlayer = true,
                 Position = new UnityEngine.Vector3(5f, 0f, 0f)
             };
+            var otherCaptain = new EntityController { IsUnit = true, IsControlledByPlayer = true };
+            var occupied = new EntityController
+            {
+                IsUnit = true, IsControlledByPlayer = true,
+                CaptainOfThisEntity = otherCaptain,
+                Position = new UnityEngine.Vector3(5f, 0f, 0f)
+            };
+            ExistingControllers.Instance.PlayerUnits().Add(occupied);
             ExistingControllers.Instance.PlayerUnits().Add(reused);
             ExistingControllers.Instance.PlayerUnits().Add(follower);
 
@@ -2601,6 +2609,19 @@ internal static partial class ValidationTestRunner
             {
                 throw new InvalidOperationException("The command pulse did not attach its eligible follower.");
             }
+
+            if (!ReferenceEquals(occupied.CaptainOfThisEntity, otherCaptain) || occupied.AppliedSpecificValueChanges.Count != 0)
+                throw new InvalidOperationException("Command pulse affected a follower owned by another captain.");
+            follower.Position = new UnityEngine.Vector3(100f, 0f, 0f);
+            UnityEngine.Time.time += 1.1f;
+            director.TickMechanics();
+            if (follower.CaptainOfThisEntity != null)
+                throw new InvalidOperationException("Command follower remained linked outside command range.");
+            follower.Position = new UnityEngine.Vector3(5f, 0f, 0f);
+            UnityEngine.Time.time += 1.1f;
+            director.TickMechanics();
+            if (!ReferenceEquals(follower.CaptainOfThisEntity, reused))
+                throw new InvalidOperationException("Returning follower could not rejoin the command group.");
 
             reused.entityId = "test:reuse-no-profile";
             RuntimeUnitMechanicsDirector.AttachIfApplicable(reused);

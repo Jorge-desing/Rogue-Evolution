@@ -2,6 +2,13 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — command follower ownership and range
+
+- Command pulses no longer count or buff a follower owned by another captain. Each director tracks its links and releases followers that leave range or become ineligible; returning followers can rejoin. Profile refresh and runtime cleanup release owned links without taking another captain's followers.
+- Regression extends the existing reuse scenario with a one-follower cap, a foreign-owned candidate, departure and re-entry. Release and harness builds: zero warnings/errors. AiTacticalModules: 68/68 passed. RuntimeAndDiagnostics: 217/221; the command regression passes and the four remaining visual census failures match `artifacts/intermission-native-controls/baseline.log`. Full runtime suite is not green.
+- Corrected the production stub to mirror native instant/free replacement of a queued entry; this restores the production-command regression while retaining reinforcement coverage.
+- Local evidence only; Steam behavior remains unverified. Deployment backup/hash manifest: `artifacts/general-capability-audit/command-links-deployment/manifest.json`.
+
 ## General capability audit — retreat recovery lifecycle
 
 - Retreat-and-regroup tracks its dispatched combatants and releases tagged current orders when average group health recovers, eligibility is lost, or the module shuts down. Pending native orders and foreign current orders are preserved.
