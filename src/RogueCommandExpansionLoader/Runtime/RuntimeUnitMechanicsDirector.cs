@@ -2884,6 +2884,12 @@ namespace RogueCommandExpansionLoader.Runtime
             if ((now - lastDamageTime) >= combatGraceSeconds)
             {
                 float duration = Mathf.Clamp(stealth.cloakDuration, 1.5f, 15.0f);
+                // A status effect is only a tag; native target selection consults this
+                // independently timed parameter. Let the game manage its expiration.
+                if (self is EntityController entity)
+                {
+                    entity.ChangeParameter(EntityController.ChangeableParameter.CanNotBeTargetedByAi, Time.time + duration);
+                }
                 ApplyTimedStatusEffect(self, "Stealth", duration);
             }
         }

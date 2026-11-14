@@ -17,6 +17,26 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("stealth pulse applies native AI targeting protection after grace", () =>
+    {
+        var director = typeof(RuntimeUnitMechanicsDirector);
+        director.GetMethod("EnsureReflection", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, new object[] { typeof(EntityController) });
+        var pulse = director.GetMethod("ExecuteStealthPulse", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var entity = new EntityController { TimeOfLastDamage = 9f };
+        var stealth = new ContentUnitStealthDefinition { stealthLevel = 2f, cloakDuration = 4.5f, detectionReduction = 0.4f };
+        float previousTime = UnityEngine.Time.time;
+        try
+        {
+        UnityEngine.Time.time = 10f;
+        pulse.Invoke(null, new object[] { entity, stealth, 10f });
+        if (entity.canNotBeTargetedByAi) throw new Exception("Recent damage must prevent a new cloak pulse.");
+        UnityEngine.Time.time = 13f;
+        pulse.Invoke(null, new object[] { entity, stealth, 13f });
+        if (!entity.canNotBeTargetedByAi || Math.Abs(entity.UntargetableUntilForTest - 17.5f) > 0.001f)
+            throw new Exception("Cloak did not apply the native timed AI-targeting parameter.");
+        }
+        finally { UnityEngine.Time.time = previousTime; }
+    }),
     ("RuntimeExplorerDirector inspects types, implementations, singletons, members, methods, and Harmony patches", () =>
     {
         RuntimeExplorerTestTarget.Instance = new RuntimeExplorerTestTarget();

@@ -57,6 +57,16 @@ public static class SetStatusEffect
 
 public sealed class EntityController : MonoBehaviour
 {
+    public enum ChangeableParameter { CanNotBeTargetedByAi }
+    public float UntargetableUntilForTest { get; private set; }
+    public void ChangeParameter(ChangeableParameter parameter, float endTimestamp)
+    {
+        if (parameter == ChangeableParameter.CanNotBeTargetedByAi)
+        {
+            canNotBeTargetedByAi = true;
+            UntargetableUntilForTest = Math.Max(UntargetableUntilForTest, endTimestamp);
+        }
+    }
     public enum ChangeableValue
     {
         CostOfProduct,

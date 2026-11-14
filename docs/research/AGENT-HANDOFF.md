@@ -1,5 +1,9 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Timed stealth AI target protection (2026-11-14)
+
+The stealth pulse now uses native `ChangeParameter(CanNotBeTargetedByAi, expiry)` in addition to its status tag. Static inspection of the pinned `EntityAttack` shows AI target selection and retention check that flag. Damage blocks renewal during the existing grace interval but does not cancel an existing timer; native expiration handles the parameter. This is not visual invisibility or graded detection: `detectionReduction` currently changes the grace period only. Release built without warnings; C# acceptance passed 602 with one symlink privilege skip (`artifacts/general-capability-audit/stealth/complete.log`). The installed DLL matched SHA-256 `6B22FAF16675B1C821A8DD652AC160AB46071E39EBDA9191AF96306E15BC4788` after backup (`artifacts/general-capability-audit/stealth-deployment-20261114144029/manifest.json`). Next verify targeting and expiration in an authorized Steam run; no live gameplay was observed in this pass.
+
 ## Native damage event routing
 
 Hit mechanics now follow native OnHasDealtDamage with the final post-armor amount. Native invulnerability, ignored damage and shield interception control event emission. OnHasKilledEntity handles kill experience/currency when hit notification is suppressed. The shared lifetime claim prevents duplicate processing. Kill-only events skip hit boosts and life recovery. The regression covers native argument routing and repeated kill-only notifications. Steam behavior remains unverified.

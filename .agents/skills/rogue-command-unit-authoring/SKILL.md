@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Stealth pulses apply the status tag and the native timed `CanNotBeTargetedByAi` parameter after the damage grace period. Native expiry owns the parameter; damage stops renewal but does not cancel an already active timer. This does not establish visual invisibility or gradual detection reduction. Verify in Steam before claiming gameplay acceptance.
+
 Combat hit mechanics consume native OnHasDealtDamage with the post-armor amount. Native invulnerability, ignored damage and shield interception decide whether that event fires. OnHasKilledEntity grants kill experience and currency when the native hit notification was suppressed, with the same lifetime claim preventing duplicate kill effects. Kill-only processing skips combat boosts and life recovery.
 
 The first hostile lethal notification processes the loader's hit effects once per target lifetime, including experience, life recovery and attacker/victim currency rewards. Later lethal notifications return before those effects. Living spawn/reuse attachment resets the claim, and profile/registry reset clears it. Claims use weak target references so retired entities can be collected.
