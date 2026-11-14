@@ -16,9 +16,9 @@ def _write(path: Path, content: str) -> None:
 
 def _replace_once(path: Path, before: str, after: str, label: str) -> bool:
     content = _read(path)
-    if after in content:
-        return False
     count = content.count(before)
+    if count == 0 and after in content:
+        return False
     if count != 1:
         raise ValueError(f"Expected one upstream {label} block in {path}, found {count}.")
     _write(path, content.replace(before, after, 1))
@@ -56,6 +56,46 @@ def _remove_missing_example_material_libraries(source: Path) -> list[str]:
             continue
         _write(obj_path, "".join(line for line in lines if line not in references))
         changed.append(obj_path.relative_to(source).as_posix())
+    return changed
+
+
+def _remove_ignored_hdr_metadata(source: Path) -> list[str]:
+    changed: list[str] = []
+    expected = {
+        b"GAMMA=1": 0,
+        b"PRIMARIES=0 0 0 0 0 0 0 0": 0,
+    }
+    for path in source.rglob("*.hdr"):
+        raw = path.read_bytes()
+        parts = raw.split(b"\n\n", 1)
+        if len(parts) != 2:
+            if b"GAMMA=" in raw[:4096] or b"PRIMARIES=" in raw[:4096]:
+                raise ValueError(f"Cannot safely locate the pixel payload in HDR file {path}.")
+            continue
+        header, payload = parts
+        retained_lines: list[bytes] = []
+        removed = False
+        for line in header.split(b"\n"):
+            field = line.rstrip(b"\r")
+            if field.startswith(b"GAMMA=") or field.startswith(b"PRIMARIES="):
+                if field not in expected:
+                    raise ValueError(f"Unexpected HDR metadata in {path}: {field!r}")
+                expected[field] += 1
+                removed = True
+                continue
+            retained_lines.append(line)
+        if not removed:
+            continue
+        updated = b"\n".join(retained_lines) + b"\n\n" + payload
+        if updated.split(b"\n\n", 1)[1] != payload:
+            raise ValueError(f"HDR pixel payload changed while removing metadata in {path}.")
+        path.write_bytes(updated)
+        changed.append(path.relative_to(source).as_posix())
+    if expected[b"GAMMA=1"] != 3 or expected[b"PRIMARIES=0 0 0 0 0 0 0 0"] != 3:
+        raise ValueError(
+            "Expected exactly three identity GAMMA and three empty PRIMARIES metadata lines; "
+            f"found {expected!r}."
+        )
     return changed
 
 
@@ -207,6 +247,130 @@ def patch_source(source: Path) -> list[str]:
         if _replace_once(ptex_import, before, after, label):
             changed.append(label)
 
+    new_painter = source / "material_maker/windows/new_painter/new_painter.gd"
+    if _replace_once(
+        new_painter,
+        "func _on_ViewportContainer_resized():\n\tviewport.size = viewport_container.size\n",
+        "func _on_ViewportContainer_resized():\n"
+        "\tif not viewport_container.stretch:\n"
+        "\t\tviewport.size = viewport_container.size\n",
+        "avoid redundant stretched new-painter viewport resizing",
+    ):
+        changed.append("avoid redundant stretched new-painter viewport resizing")
+
+    sdf_preview = source / "material_maker/windows/sdf_builder/preview_3d.gd"
+    if _replace_once(
+        sdf_preview,
+        "func _on_Preview3D_resized():\n"
+        "\tif viewport != null:\n"
+        "\t\tviewport.size = size\n"
+        "\t\tupdate_viewport()\n",
+        "func _on_Preview3D_resized():\n"
+        "\tif viewport != null:\n"
+        "\t\tif not stretch:\n"
+        "\t\t\tviewport.size = size\n"
+        "\t\tupdate_viewport()\n",
+        "avoid redundant stretched SDF-preview viewport resizing",
+    ):
+        changed.append("avoid redundant stretched SDF-preview viewport resizing")
+
+    stretched_viewports = (
+        (
+            "material_maker/panels/paint/paint.tscn",
+            '[node name="MainView" type="SubViewport" parent="VSplitContainer/HSplitContainer/Painter/View"]\n'
+            "own_world_3d = true\n"
+            "handle_input_locally = false\n"
+            "size = Vector2i(800, 480)\n"
+            "render_target_update_mode = 4\n",
+            '[node name="MainView" type="SubViewport" parent="VSplitContainer/HSplitContainer/Painter/View"]\n'
+            "own_world_3d = true\n"
+            "handle_input_locally = false\n"
+            "render_target_update_mode = 4\n",
+            "omit fixed size from stretched paint viewport",
+        ),
+        (
+            "material_maker/panels/preview_3d/preview_3d.tscn",
+            '[node name="MaterialPreview" type="SubViewport" parent="." unique_id=1572255243]\n'
+            "handle_input_locally = false\n"
+            "physics_object_picking = true\n"
+            "size = Vector2i(200, 200)\n"
+            "render_target_clear_mode = 1\n"
+            "render_target_update_mode = 4\n",
+            '[node name="MaterialPreview" type="SubViewport" parent="." unique_id=1572255243]\n'
+            "handle_input_locally = false\n"
+            "physics_object_picking = true\n"
+            "render_target_clear_mode = 1\n"
+            "render_target_update_mode = 4\n",
+            "omit fixed size from stretched material-preview viewport",
+        ),
+        (
+            "material_maker/panels/preview_3d/preview_3d_panel.tscn",
+            '[node name="MaterialPreview" parent="." index="1" unique_id=1572255243]\n'
+            'world_3d = SubResource("World3D_3xlky")\n'
+            "size = Vector2i(250, 256)\n",
+            '[node name="MaterialPreview" parent="." index="1" unique_id=1572255243]\n'
+            'world_3d = SubResource("World3D_3xlky")\n',
+            "omit fixed size from stretched material-preview panel instance",
+        ),
+        (
+            "material_maker/windows/new_painter/new_painter.tscn",
+            '[node name="SubViewport" type="SubViewport" parent="VBoxContainer/Main/SubViewportContainer"]\n'
+            "own_world_3d = true\n"
+            'world_3d = SubResource("World3D_pmwks")\n'
+            "handle_input_locally = false\n"
+            "size = Vector2i(2, 2)\n"
+            "render_target_update_mode = 4\n",
+            '[node name="SubViewport" type="SubViewport" parent="VBoxContainer/Main/SubViewportContainer"]\n'
+            "own_world_3d = true\n"
+            'world_3d = SubResource("World3D_pmwks")\n'
+            "handle_input_locally = false\n"
+            "render_target_update_mode = 4\n",
+            "omit fixed size from stretched new-painter viewport",
+        ),
+        (
+            "material_maker/windows/environment_editor/environment_editor.tscn",
+            '[node name="SubViewport" parent="Main/HSplitContainer/SubViewportContainer" instance=ExtResource("1")]\n'
+            "size = Vector2i(2, 2)\n"
+            "render_target_update_mode = 4\n",
+            '[node name="SubViewport" parent="Main/HSplitContainer/SubViewportContainer" instance=ExtResource("1")]\n'
+            "render_target_update_mode = 4\n",
+            "omit fixed size from stretched environment-editor viewport",
+        ),
+        (
+            "material_maker/windows/environment_editor/environment_editor_viewport.tscn",
+            '[node name="SubViewport" type="SubViewport"]\n'
+            'world_3d = SubResource("World3D_1qbrr")\n'
+            "handle_input_locally = false\n"
+            "size = Vector2i(200, 200)\n"
+            "render_target_update_mode = 3\n",
+            '[node name="SubViewport" type="SubViewport"]\n'
+            'world_3d = SubResource("World3D_1qbrr")\n'
+            "handle_input_locally = false\n"
+            "render_target_update_mode = 3\n",
+            "omit fixed size from stretched environment-editor viewport source",
+        ),
+        (
+            "material_maker/windows/sdf_builder/preview_3d.tscn",
+            '[node name="SubViewport" type="SubViewport" parent="."]\n'
+            "own_world_3d = true\n"
+            'world_3d = SubResource("World3D_5ccqg")\n'
+            "handle_input_locally = false\n"
+            "physics_object_picking = true\n"
+            "size = Vector2i(1280, 720)\n"
+            "render_target_update_mode = 4\n",
+            '[node name="SubViewport" type="SubViewport" parent="."]\n'
+            "own_world_3d = true\n"
+            'world_3d = SubResource("World3D_5ccqg")\n'
+            "handle_input_locally = false\n"
+            "physics_object_picking = true\n"
+            "render_target_update_mode = 4\n",
+            "omit fixed size from stretched SDF-preview viewport",
+        ),
+    )
+    for relative_path, before, after, label in stretched_viewports:
+        if _replace_once(source / relative_path, before, after, label):
+            changed.append(label)
+
     ptex_spatial = source / "addons/material_maker/import_plugin/ptex_spatial_material.gd"
     if _replace_once(
         ptex_spatial,
@@ -309,6 +473,8 @@ def patch_source(source: Path) -> list[str]:
     changed.extend(f"Godot 4 shader parameter key: {path}" for path in changed_shader_resources)
     changed_obj_files = _remove_missing_example_material_libraries(source)
     changed.extend(f"remove absent optional example MTL reference: {path}" for path in changed_obj_files)
+    changed_hdr_files = _remove_ignored_hdr_metadata(source)
+    changed.extend(f"remove ignored identity HDR metadata (pixel bytes preserved): {path}" for path in changed_hdr_files)
 
     extension_list = source / ".godot/extension_list.cfg"
     if extension_list.is_file():

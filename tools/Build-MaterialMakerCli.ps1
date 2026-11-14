@@ -128,8 +128,28 @@ try {
     }
 
     New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
-    Copy-Item -LiteralPath $godotConsole -Destination (Join-Path $runtimeRoot 'Godot_v4.7-stable_win64_console.exe') -Force
-    Copy-Item -LiteralPath $godotGui -Destination (Join-Path $runtimeRoot 'Godot_v4.7-stable_win64.exe') -Force
+    foreach ($godotExecutable in @($godotConsole, $godotGui)) {
+        $runtimeExecutable = Join-Path $runtimeRoot (Split-Path -Leaf $godotExecutable)
+        $sourceHash = (Get-FileHash -LiteralPath $godotExecutable -Algorithm SHA256).Hash
+        if (-not (Test-Path -LiteralPath $runtimeExecutable -PathType Leaf)) {
+            Copy-Item -LiteralPath $godotExecutable -Destination $runtimeExecutable
+            continue
+        }
+
+        $runtimeHash = (Get-FileHash -LiteralPath $runtimeExecutable -Algorithm SHA256).Hash
+        if ($runtimeHash -eq $sourceHash) {
+            Write-Host "Keeping identical pinned Godot runtime: $(Split-Path -Leaf $godotExecutable)"
+            continue
+        }
+
+        $candidateExecutable = Join-Path $runtimeRoot ((Split-Path -Leaf $godotExecutable) + '.' + [guid]::NewGuid().ToString('N') + '.new')
+        $backupExecutable = Join-Path $buildLogRoot ((Split-Path -Leaf $godotExecutable) + '.before')
+        Copy-Item -LiteralPath $godotExecutable -Destination $candidateExecutable
+        if ((Get-FileHash -LiteralPath $candidateExecutable -Algorithm SHA256).Hash -ne $sourceHash) {
+            throw "The staged Godot runtime differs from its verified archive: $($godotExecutable)"
+        }
+        [System.IO.File]::Replace($candidateExecutable, $runtimeExecutable, $backupExecutable)
+    }
 
     foreach ($runtimeFolder in @('doc', 'environments', 'examples', 'export', 'library', 'meshes', 'nodes')) {
         $sourceFolder = Join-Path $materialMakerInstall $runtimeFolder
@@ -185,6 +205,10 @@ try {
     $stageFullPath = [System.IO.Path]::GetFullPath($stageRoot)
     $toolsFullPath = [System.IO.Path]::GetFullPath($toolsRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
     if ($stageFullPath.StartsWith($toolsFullPath, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $stageFullPath -PathType Container)) {
-        Remove-Item -LiteralPath $stageFullPath -Recurse -Force
+        try {
+            Remove-Item -LiteralPath $stageFullPath -Recurse -Force -ErrorAction Stop
+        } catch {
+            Write-Warning "Could not remove the isolated Material Maker build stage at ${stageFullPath}: $($_.Exception.Message)"
+        }
     }
 }

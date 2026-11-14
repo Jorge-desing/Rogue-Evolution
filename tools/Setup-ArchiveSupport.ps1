@@ -58,12 +58,18 @@ function Expand-SafeArchive {
 
     $tempExtractRoot = Join-Path $TargetToolsRoot (".stage-" + [System.Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tempExtractRoot -Force | Out-Null
+    $tempExtractRootFullPath = [System.IO.Path]::GetFullPath($tempExtractRoot).TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
     try {
         Expand-Archive -LiteralPath $ArchivePath -DestinationPath $tempExtractRoot -Force
 
         $extractedFiles = Get-ChildItem -LiteralPath $tempExtractRoot -Recurse -Force
         foreach ($file in $extractedFiles) {
-            $targetPath = [System.IO.Path]::GetFullPath((Join-Path $DestinationPath (Resolve-Path -LiteralPath $file.FullName -RelativeBasePath $tempExtractRoot)))
+            $fileFullPath = [System.IO.Path]::GetFullPath($file.FullName)
+            if (-not $fileFullPath.StartsWith($tempExtractRootFullPath, [StringComparison]::OrdinalIgnoreCase)) {
+                throw "The archive extraction produced an entry outside its staging directory: $($file.FullName)"
+            }
+            $relativePath = $fileFullPath.Substring($tempExtractRootFullPath.Length)
+            $targetPath = [System.IO.Path]::GetFullPath((Join-Path $DestinationPath $relativePath))
             if (-not $targetPath.StartsWith($destinationFullPath, [StringComparison]::OrdinalIgnoreCase)) {
                 throw "The archive contains an entry that escapes the destination path: $($file.FullName)"
             }
