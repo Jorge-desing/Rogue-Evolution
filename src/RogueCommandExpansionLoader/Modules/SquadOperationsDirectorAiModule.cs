@@ -219,7 +219,7 @@ namespace RogueCommandExpansionLoader.Modules
                                 moduleId: ModuleId,
                                 commandTag: _commandTag + ".skill",
                                 unitId: unit.UniqueEntityId,
-                                targetEntityId: (!unit.ActiveSkillTargetsSelf && hasHostileInRange) ? nearestHostile.UniqueEntityId : -1,
+                                targetEntityId: ((!unit.ActiveSkillTargetsSelf || unit.ActiveSkillRequiresNearbyHostile) && hasHostileInRange) ? nearestHostile.UniqueEntityId : -1,
                                 destX: hasHostileInRange ? nearestHostile.PosX : unit.PosX,
                                 destZ: hasHostileInRange ? nearestHostile.PosZ : unit.PosZ,
                                 category: AiIntentCategory.TacticalSkill,

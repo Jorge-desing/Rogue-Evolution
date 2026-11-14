@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Coordinated skill dispatch conditions
+
+Dispatch rechecks live health and horizontal range. Self skills triggered by nearby enemies retain the motivating hostile ID for the live sight check. Release builds cleanly and the tactical suite passes 70/70. Steam execution remains unverified.
+
 ## Coordinated self-skill activation
 
 EnemiesInRange self skills require a hostile within native sight. The coordinated tactical suite passes 70/70, including the self-cast scoring gate. Steam execution remains unverified.

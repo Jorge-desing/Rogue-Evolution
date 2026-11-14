@@ -205,7 +205,7 @@ namespace RogueCommandExpansionLoader.Modules
                         float skillScore = TacticalUtilityScorer.ScoreTacticalSkill(unit, hostileInSkillRange, doctrineWeights);
                         if (skillScore > 0f)
                         {
-                            int skillTargetId = (!unit.ActiveSkillTargetsSelf && hostileInSkillRange) ? skillTarget.UniqueEntityId : -1;
+                            int skillTargetId = ((!unit.ActiveSkillTargetsSelf || unit.ActiveSkillRequiresNearbyHostile) && hostileInSkillRange) ? skillTarget.UniqueEntityId : -1;
                             proposals.Add(new AiIntentProposal(
                                 moduleId: ModuleId,
                                 commandTag: _commandTag + ".skill",

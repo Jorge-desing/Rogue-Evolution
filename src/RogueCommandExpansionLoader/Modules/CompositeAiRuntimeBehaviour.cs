@@ -443,8 +443,16 @@ namespace RogueCommandExpansionLoader.Modules
                     {
                         return;
                     }
-                    if (RuntimeUnitMechanicsDirector.TryGetProfile(unit.EntityId, out UnitRuntimeMechanicsProfile profile) &&
-                        string.Equals(profile.AiActivationTrigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase))
+                    RuntimeUnitMechanicsDirector.TryGetProfile(unit.EntityId, out UnitRuntimeMechanicsProfile profile);
+                    string trigger = profile?.AiActivationTrigger;
+                    bool lowHealth = string.Equals(trigger, "LowHealth", StringComparison.OrdinalIgnoreCase);
+                    bool combatEngaged = string.Equals(trigger, "CombatEngaged", StringComparison.OrdinalIgnoreCase);
+                    if (lowHealth && !(unit.MaxHealth > 0f && unit.CurrentHealth <= unit.MaxHealth * 0.5f))
+                    {
+                        return;
+                    }
+
+                    if (combatEngaged)
                     {
                         EntityController engaged = unit.CurrentAttackTarget;
                         if (!unit.IsTargetInRange || engaged == null || engaged.IsDestroyed || engaged.DestroyHasBeenStarted ||
@@ -457,14 +465,21 @@ namespace RogueCommandExpansionLoader.Modules
 
                     if (skillInfo.targetOrigin == TargetOrigin.Self)
                     {
+                        if (!lowHealth && !combatEngaged &&
+                            (!TryResolveSkillHostile(unit, proposal.TargetEntityId, out EntityController nearby) ||
+                             !WithinHorizontalRange(unit.Position, nearby.Position, unit.SqrSightRadius)))
+                        {
+                            return;
+                        }
+
                         command = EntityCommand.ActiveSkillWithoutTarget();
                     }
                     else
                     {
-                        if (proposal.TargetEntityId < 0 ||
-                            !_battlefieldCollector.TryResolveHostileEntity(proposal.TargetEntityId, out EntityController skillTarget) ||
-                            skillTarget == null || skillTarget.IsDestroyed || skillTarget.DestroyHasBeenStarted ||
-                            skillTarget.canNotBeTargetedByAi || !unit.IsEnemy(skillTarget))
+                        if (!TryResolveSkillHostile(unit, proposal.TargetEntityId, out EntityController skillTarget) ||
+                            (!unit.SkillRangeIsUnlimited &&
+                             !(skillInfo.targetOrigin == TargetOrigin.ChosenLocation && unit.activateSkillAtOnceIndependentOfSkillRadius) &&
+                             !WithinHorizontalRange(unit.Position, skillTarget.Position, unit.SqrSkillRange)))
                         {
                             return;
                         }
@@ -567,5 +582,20 @@ namespace RogueCommandExpansionLoader.Modules
                     " for profile '" + _profileId + "'.", exception);
             }
         }
+        private bool TryResolveSkillHostile(EntityController unit, int targetId, out EntityController target)
+        {
+            target = null;
+            return targetId >= 0 && _battlefieldCollector.TryResolveHostileEntity(targetId, out target) &&
+                target != null && !target.IsDestroyed && !target.DestroyHasBeenStarted &&
+                !target.canNotBeTargetedByAi && unit.IsEnemy(target);
+        }
+
+        private static bool WithinHorizontalRange(Vector3 source, Vector3 target, float squaredRange)
+        {
+            float dx = target.x - source.x;
+            float dz = target.z - source.z;
+            return dx * dx + dz * dz <= squaredRange;
+        }
+
     }
 }
