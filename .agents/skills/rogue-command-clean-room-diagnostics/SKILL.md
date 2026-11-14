@@ -161,6 +161,13 @@ Dispatches validated, safe in-game actions for automated testing and agent execu
 - `diagnostics_order_unit_visual_feedback`: Triggers visual feedback (recoil, hit impact, turret jam, bay door, footsteps).
 - `diagnostics_order_unit_attachment`: Toggles visual modular attachments (`Armor`, `Shield`, `Radar`, `APS`).
 
+### Animation, Model Geometry & Texture Audit (LoaderDiagnosticsComponent)
+- `GetGaitQualityCensusJson(maxTrackedUnits)`: Live gait quality census (foot contact count, ground penetration, stride/hip clearance, screen coverage, and pass/issue flags).
+- `GetModelGeometryCensusJson(maxTrackedUnits)`: Audits `MeshFilter` and `SkinnedMeshRenderer` counts, vertex/triangle totals, bone/bindpose counts, missing `sharedMesh`, and collapsed skinned bounds (`COLLAPSED_SKINNED_BOUNDS`, `MISSING_SHARED_MESH`).
+- `GetTextureAuditCensusJson(maxTrackedUnits)`: Audits bound `Texture2D` slots (`_MainTex`, `_BaseMap`, `_MetallicGlossMap`, `_BumpMap`, `_DetailBumpMap`, `_EmissionMap`) for resolution, `TextureFormat`, mipmaps, `anisoLevel`, `mipMapBias`, NPOT detection, and estimated memory KB.
+- `OrderTextureMipBiasJson(entityKeyId, mipBias)`: Applies diagnostic `mipMapBias` (clamped `[-4, 4]`) to unique `Texture2D` assets bound on the target entity's renderers.
+- `OrderUnitAnimationControlJson(entityKeyId, action, speedMultiplier)`: Directly drives `RCL_IsMoving`, `RCL_Fire`, `RCL_Death`, and `RCL_SpeedMultiplier` on the entity's preferred `Animator` (`Walk`/`Drive`/`Move`, `Idle`/`Stop`, `Fire`/`FireRecoil`, `Death`, `SetSpeed`/`Speed`, `Reset`).
+
 ### Multi-Agent Coordination Tools
 - `diagnostics_register_agent_session`: Registers agent session (`agentId`, `agentRole`, `notes`).
 - `diagnostics_ping_agent`: Heartbeat ping updating agent activity timestamp (`agentId`, `message`).

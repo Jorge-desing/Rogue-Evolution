@@ -2161,6 +2161,12 @@ namespace RogueCommandExpansionLoader.Runtime
                 RuntimeVisualQualityCensus.Current(maxTrackedUnits));
         }
 
+        public string GetGaitQualityCensusJson(int maxTrackedUnits = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeGaitQualityCensus(
+                RuntimeGaitQualityCensus.Current(maxTrackedUnits));
+        }
+
         public string GetVisualHealthSummaryJson(int maxTrackedUnits = 64)
         {
             return AgentDiagnosticsFormatter.SerializeVisualHealthSummary(
@@ -2171,6 +2177,30 @@ namespace RogueCommandExpansionLoader.Runtime
         {
             return AgentDiagnosticsFormatter.SerializeVisualMaterialCensus(
                 RuntimeVisualMaterialCensus.Current(maxTrackedUnits));
+        }
+
+        public string GetModelGeometryCensusJson(int maxTrackedUnits = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeModelGeometryCensus(
+                RuntimeModelGeometryCensus.Current(maxTrackedUnits));
+        }
+
+        public string GetTextureAuditCensusJson(int maxTrackedUnits = 64)
+        {
+            return AgentDiagnosticsFormatter.SerializeTextureAuditCensus(
+                RuntimeTextureAuditCensus.Current(maxTrackedUnits));
+        }
+
+        public string OrderTextureMipBiasJson(string entityKeyId, float mipBias)
+        {
+            return AgentDiagnosticsFormatter.SerializeTextureControlResult(
+                RuntimeTextureAuditCensus.ApplyTextureMipBias(entityKeyId, mipBias));
+        }
+
+        public string OrderUnitAnimationControlJson(string entityKeyId, string action, float speedMultiplier = 1.0f)
+        {
+            return AgentDiagnosticsFormatter.SerializeAnimationControlResult(
+                Visual.RuntimeAnimationControlDirector.OrderUnitAnimationControl(entityKeyId, action, speedMultiplier));
         }
 
         public string GetSocketAuditCensusJson(int maxTrackedUnits = 64)

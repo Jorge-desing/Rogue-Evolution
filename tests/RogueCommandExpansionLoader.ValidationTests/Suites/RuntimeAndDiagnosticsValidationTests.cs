@@ -5882,6 +5882,50 @@ internal static partial class ValidationTestRunner
             ExistingControllers.Instance.Reset();
         }
     }),
+    ("runtime gait quality census serializes omittedRowCount, screen coverage, and ground penetration", () =>
+    {
+        var row = new GaitQualityRow(
+            "sample-native:ironclad#1",
+            "sample-native:ironclad",
+            true,
+            true,
+            true,
+            true,
+            2,
+            0.35f,
+            true,
+            1.15f,
+            "Walk",
+            2,
+            0.01f,
+            0.12f,
+            0,
+            true,
+            0.042f,
+            true,
+            Array.Empty<string>());
+        var census = new GaitQualityCensus(new[] { row }, 0, 1, 1, 0, 0);
+        string json = AgentDiagnosticsFormatter.SerializeGaitQualityCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            JsonElement root = doc.RootElement;
+            if (root.GetProperty("kind").GetString() != "gaitQualityCensus" ||
+                root.GetProperty("omittedRowCount").GetInt32() != 0 ||
+                root.GetProperty("gaitQualityPassCount").GetInt32() != 1 ||
+                root.GetProperty("groundPenetrationUnitCount").GetInt32() != 0 ||
+                root.GetProperty("rows").GetArrayLength() != 1)
+            {
+                throw new InvalidOperationException("SerializeGaitQualityCensus JSON root format error.");
+            }
+            JsonElement firstRow = root.GetProperty("rows")[0];
+            if (!firstRow.GetProperty("gaitQualityPass").GetBoolean() ||
+                firstRow.GetProperty("groundPenetrationCount").GetInt32() != 0 ||
+                firstRow.GetProperty("screenCoverageFraction").GetDouble() <= 0.0)
+            {
+                throw new InvalidOperationException("SerializeGaitQualityCensus row format error.");
+            }
+        }
+    }),
     ("runtime visual quality census accepts active URP rigged overlay materials", () =>
     {
         ExistingControllers.Instance.Reset();
@@ -6182,6 +6226,127 @@ internal static partial class ValidationTestRunner
         finally
         {
             ExistingControllers.Instance.Reset();
+        }
+    }),
+    ("model geometry census detects collapsed skinned bounds and serializes", () =>
+    {
+        ModelGeometryRow healthy = RuntimeModelGeometryCensus.EvaluateGeometryRow(
+            "unit-1", "sample:tank", true, 2, 0, 2, 1200, 800, 0, 0, false, 0);
+        if (healthy.Issues.Count != 0 || healthy.VertexCount != 1200 || healthy.TriangleCount != 800)
+        {
+            throw new InvalidOperationException("Healthy geometry row should have zero issues.");
+        }
+
+        ModelGeometryRow broken = RuntimeModelGeometryCensus.EvaluateGeometryRow(
+            "unit-2", "sample:mech", true, 0, 1, 1, 2400, 1600, 12, 12, true, 1);
+        if (!broken.HasCollapsedSkinnedBounds || broken.MissingMeshCount != 1 ||
+            !broken.Issues.Contains("COLLAPSED_SKINNED_BOUNDS") || !broken.Issues.Contains("MISSING_SHARED_MESH"))
+        {
+            throw new InvalidOperationException("Broken geometry row should flag collapsed bounds and missing mesh.");
+        }
+
+        var census = new ModelGeometryCensus(0, 1, 1, 3600, 2400, new[] { healthy, broken });
+        string json = AgentDiagnosticsFormatter.SerializeModelGeometryCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            JsonElement root = doc.RootElement;
+            if (root.GetProperty("omittedRowCount").GetInt32() != 0 ||
+                root.GetProperty("collapsedSkinnedCount").GetInt32() != 1 ||
+                root.GetProperty("missingMeshUnitCount").GetInt32() != 1 ||
+                root.GetProperty("totalVertices").GetInt32() != 3600 ||
+                root.GetProperty("rowCount").GetInt32() != 2)
+            {
+                throw new InvalidOperationException("SerializeModelGeometryCensus JSON mismatch.");
+            }
+        }
+    }),
+    ("texture audit census estimates memory detects npot and serializes control result", () =>
+    {
+        if (!RuntimeTextureAuditCensus.IsPowerOfTwo(1024) || RuntimeTextureAuditCensus.IsPowerOfTwo(1000) || RuntimeTextureAuditCensus.IsPowerOfTwo(0))
+        {
+            throw new InvalidOperationException("IsPowerOfTwo returned unexpected result.");
+        }
+
+        float rgbaKb = RuntimeTextureAuditCensus.EstimateTextureMemoryKb(1024, 1024, "RGBA32", 1);
+        float dxt1Kb = RuntimeTextureAuditCensus.EstimateTextureMemoryKb(1024, 1024, "DXT1", 1);
+        if (Math.Abs(rgbaKb - 4096f) > 1f || Math.Abs(dxt1Kb - 512f) > 1f)
+        {
+            throw new InvalidOperationException($"Unexpected texture memory estimate: RGBA32={rgbaKb}, DXT1={dxt1Kb}");
+        }
+
+        var slot = new TextureSlotAuditInfo("_MainTex", "atlas_albedo", 1024, 1024, "DXT5", 11, 4, -0.5f, 1365.3f);
+        var row = new TextureAuditRow("unit-1", "sample:tank", true, 1, 1365.3f, 1024, 1024, true, 0, new[] { slot });
+        var census = new TextureAuditCensus(0, 1, 1365.3f, 0, new[] { row });
+        string json = AgentDiagnosticsFormatter.SerializeTextureAuditCensus(census);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            JsonElement root = doc.RootElement;
+            if (root.GetProperty("totalUniqueTextures").GetInt32() != 1 ||
+                root.GetProperty("nonPowerOfTwoCount").GetInt32() != 0 ||
+                root.GetProperty("rows")[0].GetProperty("hasDetailBumpMap").GetBoolean() != true ||
+                root.GetProperty("rows")[0].GetProperty("textures")[0].GetProperty("slotName").GetString() != "_MainTex")
+            {
+                throw new InvalidOperationException("SerializeTextureAuditCensus JSON mismatch.");
+            }
+        }
+
+        var control = new TextureControlResult(true, "unit-1", -0.5f, 3, "Applied.");
+        string controlJson = AgentDiagnosticsFormatter.SerializeTextureControlResult(control);
+        using (var doc = JsonDocument.Parse(controlJson))
+        {
+            JsonElement root = doc.RootElement;
+            if (!root.GetProperty("success").GetBoolean() ||
+                root.GetProperty("updatedTextureCount").GetInt32() != 3 ||
+                Math.Abs(root.GetProperty("appliedMipBias").GetDouble() - (-0.5)) > 0.001)
+            {
+                throw new InvalidOperationException("SerializeTextureControlResult JSON mismatch.");
+            }
+        }
+    }),
+    ("animation control director resolves preferred animator applies actions and serializes", () =>
+    {
+        var root = new GameObject { name = "RootUnit" };
+        var rootAnimator = root.AddComponent<Animator>();
+
+        var childVisual = new GameObject { name = "RCL_Visual_Tank" };
+        var childAnimator = childVisual.AddComponent<Animator>();
+        childVisual.transform.parent = root.transform;
+
+        Animator preferred = RogueCommandExpansionLoader.Runtime.Visual.RuntimeAnimationControlDirector.ResolvePreferredAnimator(root);
+        if (!ReferenceEquals(preferred, childAnimator))
+        {
+            throw new InvalidOperationException("ResolvePreferredAnimator should prefer RCL_Visual_* child animator.");
+        }
+
+        var walk = RogueCommandExpansionLoader.Runtime.Visual.RuntimeAnimationControlDirector.ApplyAnimatorAction("unit-1", preferred, "Walk", 1.5f);
+        if (!walk.Success || !walk.HasAnimator || !walk.IsMoving || Math.Abs(walk.SpeedMultiplier - 1.5f) > 0.001f)
+        {
+            throw new InvalidOperationException("ApplyAnimatorAction Walk failed.");
+        }
+
+        var fire = RogueCommandExpansionLoader.Runtime.Visual.RuntimeAnimationControlDirector.ApplyAnimatorAction("unit-1", preferred, "Fire", 1.0f);
+        if (!fire.Success)
+        {
+            throw new InvalidOperationException("ApplyAnimatorAction Fire failed.");
+        }
+
+        var reset = RogueCommandExpansionLoader.Runtime.Visual.RuntimeAnimationControlDirector.ApplyAnimatorAction("unit-1", preferred, "Reset", 1.0f);
+        if (!reset.Success || reset.IsMoving || Math.Abs(reset.SpeedMultiplier - 1.0f) > 0.001f)
+        {
+            throw new InvalidOperationException("ApplyAnimatorAction Reset failed.");
+        }
+
+        string json = AgentDiagnosticsFormatter.SerializeAnimationControlResult(walk);
+        using (var doc = JsonDocument.Parse(json))
+        {
+            JsonElement rootJson = doc.RootElement;
+            if (!rootJson.GetProperty("success").GetBoolean() ||
+                !rootJson.GetProperty("hasAnimator").GetBoolean() ||
+                !rootJson.GetProperty("isMoving").GetBoolean() ||
+                rootJson.GetProperty("action").GetString() != "Walk")
+            {
+                throw new InvalidOperationException("SerializeAnimationControlResult JSON mismatch.");
+            }
         }
     }),
     ("runtime tech catalog census queries registered upgrades research branches and relics", () =>

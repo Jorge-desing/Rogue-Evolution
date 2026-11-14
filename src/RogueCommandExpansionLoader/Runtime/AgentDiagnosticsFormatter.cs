@@ -3038,6 +3038,191 @@ namespace RogueCommandExpansionLoader.Runtime
             return Serialize(view);
         }
 
+        public static string SerializeGaitQualityCensus(GaitQualityCensus census)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (census != null && census.Rows != null)
+            {
+                foreach (GaitQualityRow row in census.Rows)
+                {
+                    if (row == null) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId ?? string.Empty,
+                        ["entityId"] = row.EntityId ?? string.Empty,
+                        ["isLoaderOwned"] = row.IsLoaderOwned,
+                        ["gaitQualityPass"] = row.GaitQualityPass,
+                        ["hasAnimator"] = row.HasAnimator,
+                        ["animatorActive"] = row.AnimatorActive,
+                        ["layerCount"] = row.LayerCount,
+                        ["additiveLayerWeight"] = row.AdditiveLayerWeight,
+                        ["isMoving"] = row.IsMoving,
+                        ["speedMultiplier"] = row.SpeedMultiplier,
+                        ["activeClipName"] = row.ActiveClipName ?? string.Empty,
+                        ["footContactCount"] = row.FootContactCount,
+                        ["footMinDeltaY"] = row.FootMinDeltaY,
+                        ["footMaxDeltaY"] = row.FootMaxDeltaY,
+                        ["groundPenetrationCount"] = row.GroundPenetrationCount,
+                        ["visibleToMainCamera"] = row.VisibleToMainCamera,
+                        ["screenCoverageFraction"] = row.ScreenCoverageFraction,
+                        ["worldBoundsValid"] = row.WorldBoundsValid,
+                        ["issues"] = row.Issues != null ? row.Issues : (object)Array.Empty<string>(),
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["kind"] = "gaitQualityCensus",
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["loaderOwnedUnitCount"] = census != null ? census.LoaderOwnedUnitCount : 0,
+                ["gaitQualityPassCount"] = census != null ? census.GaitQualityPassCount : 0,
+                ["gaitQualityIssueCount"] = census != null ? census.GaitQualityIssueCount : 0,
+                ["groundPenetrationUnitCount"] = census != null ? census.GroundPenetrationUnitCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeModelGeometryCensus(ModelGeometryCensus census)
+        {
+            var rows = new List<object>();
+            if (census != null && census.Rows != null)
+            {
+                for (int i = 0; i < census.Rows.Count; i++)
+                {
+                    ModelGeometryRow row = census.Rows[i];
+                    if (row == null)
+                    {
+                        continue;
+                    }
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId,
+                        ["entityId"] = row.EntityId,
+                        ["isLoaderOwned"] = row.IsLoaderOwned,
+                        ["meshFilterCount"] = row.MeshFilterCount,
+                        ["skinnedMeshRendererCount"] = row.SkinnedMeshRendererCount,
+                        ["visibleRendererCount"] = row.VisibleRendererCount,
+                        ["vertexCount"] = row.VertexCount,
+                        ["triangleCount"] = row.TriangleCount,
+                        ["boneCount"] = row.BoneCount,
+                        ["bindposeCount"] = row.BindposeCount,
+                        ["hasCollapsedSkinnedBounds"] = row.HasCollapsedSkinnedBounds,
+                        ["missingMeshCount"] = row.MissingMeshCount,
+                        ["issues"] = row.Issues,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["collapsedSkinnedCount"] = census != null ? census.CollapsedSkinnedCount : 0,
+                ["missingMeshUnitCount"] = census != null ? census.MissingMeshUnitCount : 0,
+                ["totalVertices"] = census != null ? census.TotalVertices : 0,
+                ["totalTriangles"] = census != null ? census.TotalTriangles : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeTextureAuditCensus(TextureAuditCensus census)
+        {
+            var rows = new List<object>();
+            if (census != null && census.Rows != null)
+            {
+                for (int i = 0; i < census.Rows.Count; i++)
+                {
+                    TextureAuditRow row = census.Rows[i];
+                    if (row == null)
+                    {
+                        continue;
+                    }
+                    var textures = new List<object>();
+                    if (row.Textures != null)
+                    {
+                        for (int j = 0; j < row.Textures.Count; j++)
+                        {
+                            TextureSlotAuditInfo slot = row.Textures[j];
+                            if (slot == null)
+                            {
+                                continue;
+                            }
+                            textures.Add(new Dictionary<string, object>
+                            {
+                                ["slotName"] = slot.SlotName,
+                                ["textureName"] = slot.TextureName,
+                                ["width"] = slot.Width,
+                                ["height"] = slot.Height,
+                                ["format"] = slot.Format,
+                                ["mipmapCount"] = slot.MipmapCount,
+                                ["anisoLevel"] = slot.AnisoLevel,
+                                ["mipMapBias"] = slot.MipMapBias,
+                                ["estimatedMemoryKb"] = slot.EstimatedMemoryKb,
+                            });
+                        }
+                    }
+
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["entityKeyId"] = row.EntityKeyId,
+                        ["entityId"] = row.EntityId,
+                        ["isLoaderOwned"] = row.IsLoaderOwned,
+                        ["uniqueTextureCount"] = row.UniqueTextureCount,
+                        ["estimatedMemoryKb"] = row.EstimatedMemoryKb,
+                        ["maxWidth"] = row.MaxWidth,
+                        ["maxHeight"] = row.MaxHeight,
+                        ["hasDetailBumpMap"] = row.HasDetailBumpMap,
+                        ["nonPowerOfTwoCount"] = row.NonPowerOfTwoCount,
+                        ["textures"] = textures,
+                    });
+                }
+            }
+
+            var view = new Dictionary<string, object>
+            {
+                ["omittedRowCount"] = census != null ? census.OmittedRowCount : 0,
+                ["totalUniqueTextures"] = census != null ? census.TotalUniqueTextures : 0,
+                ["totalEstimatedMemoryKb"] = census != null ? census.TotalEstimatedMemoryKb : 0f,
+                ["nonPowerOfTwoCount"] = census != null ? census.NonPowerOfTwoCount : 0,
+                ["rowCount"] = rows.Count,
+                ["rows"] = rows,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeTextureControlResult(TextureControlResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["success"] = result != null && result.Success,
+                ["entityKeyId"] = result != null ? result.EntityKeyId : string.Empty,
+                ["appliedMipBias"] = result != null ? result.AppliedMipBias : 0f,
+                ["updatedTextureCount"] = result != null ? result.UpdatedTextureCount : 0,
+                ["message"] = result != null ? result.Message : string.Empty,
+            };
+            return Serialize(view);
+        }
+
+        public static string SerializeAnimationControlResult(Visual.AnimationControlResult result)
+        {
+            var view = new Dictionary<string, object>
+            {
+                ["success"] = result != null && result.Success,
+                ["entityKeyId"] = result != null ? result.EntityKeyId : string.Empty,
+                ["action"] = result != null ? result.Action : string.Empty,
+                ["hasAnimator"] = result != null && result.HasAnimator,
+                ["isMoving"] = result != null && result.IsMoving,
+                ["speedMultiplier"] = result != null ? result.SpeedMultiplier : 1f,
+                ["activeClipName"] = result != null ? result.ActiveClipName : string.Empty,
+                ["message"] = result != null ? result.Message : string.Empty,
+            };
+            return Serialize(view);
+        }
+
         public static string SerializeVisualHealthSummary(VisualHealthSummary summary)
         {
             var rows = new List<Dictionary<string, object>>();

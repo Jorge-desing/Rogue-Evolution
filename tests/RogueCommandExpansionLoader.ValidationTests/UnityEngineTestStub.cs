@@ -142,6 +142,7 @@ namespace UnityEngine
         public float fieldOfView { get; set; } = 45f;
         public bool orthographic { get; set; } = false;
         public float orthographicSize { get; set; } = 10f;
+        public bool isActiveAndEnabled { get; set; } = true;
 
         public static Func<Vector3, Vector3> WorldToScreenPointHook;
 
@@ -149,6 +150,11 @@ namespace UnityEngine
         {
             if (WorldToScreenPointHook != null) return WorldToScreenPointHook(position);
             return new Vector3(position.x, position.y, 1f);
+        }
+
+        public Vector3 WorldToViewportPoint(Vector3 position)
+        {
+            return new Vector3(0.5f, 0.5f, 10f);
         }
 
         public Ray ScreenPointToRay(Vector2 position) => new Ray(new Vector3(position.x, position.y, 0f), new Vector3(0f, 0f, 1f));
@@ -227,6 +233,31 @@ namespace UnityEngine
             this.size = size;
             this.extents = size / 2f;
         }
+
+        public void Encapsulate(Bounds bounds)
+        {
+            Vector3 minA = center - extents;
+            Vector3 maxA = center + extents;
+            Vector3 minB = bounds.center - bounds.extents;
+            Vector3 maxB = bounds.center + bounds.extents;
+            Vector3 min = new Vector3(Math.Min(minA.x, minB.x), Math.Min(minA.y, minB.y), Math.Min(minA.z, minB.z));
+            Vector3 max = new Vector3(Math.Max(maxA.x, maxB.x), Math.Max(maxA.y, maxB.y), Math.Max(maxA.z, maxB.z));
+            center = (min + max) / 2f;
+            size = max - min;
+            extents = size / 2f;
+        }
+    }
+
+    public struct Plane
+    {
+        public Vector3 normal { get; set; }
+        public float distance { get; set; }
+    }
+
+    public static class GeometryUtility
+    {
+        public static Plane[] CalculateFrustumPlanes(Camera camera) => new Plane[6];
+        public static bool TestPlanesAABB(Plane[] planes, Bounds bounds) => true;
     }
 
     public class Component : Object
@@ -392,6 +423,7 @@ namespace UnityEngine
         public Mesh sharedMesh { get; set; }
         public Transform rootBone { get; set; }
         public Transform[] bones { get; set; } = System.Array.Empty<Transform>();
+        public Bounds localBounds { get; set; }
     }
 
     public class TrailRenderer : Renderer
@@ -412,11 +444,18 @@ namespace UnityEngine
         public Mesh mesh { get => sharedMesh; set => sharedMesh = value; }
     }
 
+    public struct Matrix4x4
+    {
+        public static Matrix4x4 identity => new Matrix4x4();
+    }
+
     public class Mesh : Object
     {
         public string name { get; set; } = string.Empty;
         public int vertexCount { get; set; }
         public int subMeshCount { get; set; } = 1;
+        public int[] triangles { get; set; } = System.Array.Empty<int>();
+        public Matrix4x4[] bindposes { get; set; } = System.Array.Empty<Matrix4x4>();
         public Color[] colors { get; set; } = System.Array.Empty<Color>();
         public Color[] colors32 { get; set; } = System.Array.Empty<Color>();
     }
@@ -426,11 +465,27 @@ namespace UnityEngine
         public string name { get; set; } = string.Empty;
     }
 
+    public enum TextureFormat
+    {
+        RGBA32 = 4,
+        DXT1 = 10,
+        DXT5 = 12,
+        BC7 = 25,
+    }
+
     public class Texture : Object
     {
         public string name { get; set; } = string.Empty;
         public int width { get; set; }
         public int height { get; set; }
+        public int mipmapCount { get; set; } = 1;
+        public int anisoLevel { get; set; } = 1;
+        public float mipMapBias { get; set; }
+    }
+
+    public class Texture2D : Texture
+    {
+        public TextureFormat format { get; set; } = TextureFormat.RGBA32;
     }
 
     public class Material : Object
@@ -537,6 +592,7 @@ namespace UnityEngine
     {
         public bool isInitialized { get; set; } = true;
         public bool isActiveAndEnabled { get; set; } = true;
+        public int layerCount { get; set; } = 1;
         public RuntimeAnimatorController runtimeAnimatorController { get; set; }
         public Avatar avatar { get; set; }
         public float speed { get; set; } = 1.0f;
@@ -545,9 +601,13 @@ namespace UnityEngine
         public AnimationClip activeClip { get; set; }
         public AnimatorStateInfo activeStateInfo { get; set; } = new AnimatorStateInfo("Base", 0f, 1f);
 
+        private readonly System.Collections.Generic.Dictionary<int, float> _layerWeights = new();
         private readonly System.Collections.Generic.Dictionary<string, bool> _bools = new(System.StringComparer.OrdinalIgnoreCase);
         private readonly System.Collections.Generic.Dictionary<string, float> _floats = new(System.StringComparer.OrdinalIgnoreCase);
         private readonly System.Collections.Generic.Dictionary<string, int> _ints = new(System.StringComparer.OrdinalIgnoreCase);
+
+        public float GetLayerWeight(int layerIndex) => _layerWeights.TryGetValue(layerIndex, out float w) ? w : (layerIndex == 0 ? 1f : 0f);
+        public void SetLayerWeight(int layerIndex, float weight) => _layerWeights[layerIndex] = weight;
 
         public AnimatorClipInfo[] GetCurrentAnimatorClipInfo(int layerIndex)
         {
@@ -568,6 +628,9 @@ namespace UnityEngine
 
         public int GetInteger(string name) => _ints.TryGetValue(name, out int val) ? val : 0;
         public void SetInteger(string name, int value) => _ints[name] = value;
+
+        public void SetTrigger(string name) => _bools[name] = true;
+        public void ResetTrigger(string name) => _bools[name] = false;
     }
 
     public sealed class GameObject : Object
