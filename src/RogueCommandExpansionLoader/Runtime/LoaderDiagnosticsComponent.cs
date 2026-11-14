@@ -1299,6 +1299,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 entityId = unit.EntityId,
                 sceneHandle = scene.handle,
                 isControlledByPlayer = unit.IsControlledByPlayer,
+                currentHealth = unit.CurrentHealth,
+                healthRatio = unit.MaxHealth > 0f ? (float?)(unit.CurrentHealth / unit.MaxHealth) : null,
                 command = unit.CurrentPlayerCommandName.ToString(),
                 attackTargetKeyId = hasTarget ? target.UniqueEntityId.ToString(CultureInfo.InvariantCulture) : null,
                 attackTargetInRange = hasTarget && unit.IsTargetInRange,

@@ -52,12 +52,32 @@ class StateWaitTests(unittest.TestCase):
             self.assertFalse(response.get("isError", False))
             self.assertEqual(4, payload["attempts"])
             self.assertEqual(2, payload["consecutiveMatches"])
+
         self.clock.now = 0
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"ready":true}'):
             response, payload = self.wait(stableSamples=3)
             self.assertTrue(response["isError"])
             self.assertEqual("timeout", payload["reason"])
             self.assertEqual(2, payload["consecutiveMatches"])
+
+    def test_battlefield_health_threshold_waits_then_dispatches_retreat(self):
+        steps = [
+            {"tool": "automation_wait_for_state", "arguments": {
+                "tool": "diagnostics_get_battlefield_unit_state",
+                "arguments": {"entityKeyId": "42"},
+                "expect": [{"path": "/healthRatio", "atMost": 0.35}]}},
+            {"tool": "diagnostics_order_unit_move", "arguments": {
+                "entityKeyId": "42", "destinationX": 10, "destinationZ": 20}},
+        ]
+        samples = [True, "0.1", 0.5, 0.35]
+        replies = [json.dumps({"healthRatio": value}) for value in samples] + ['{"success":true}']
+        with mock.patch.object(SERVER, "_call_diagnostics_method", side_effect=replies) as call:
+            result = SERVER.execute_tool("automation_run_sequence", {"steps": steps})
+            self.assertFalse(result.get("isError", False))
+            self.assertEqual(call.call_args_list, [
+                *[mock.call("GetBattlefieldUnitStateJson", ["42", False, 0.0, 0.0, 1.0])] * 4,
+                mock.call("OrderUnitMoveJson", ["42", 10.0, 20.0]),
+            ])
 
     def test_reward_wait_forwards_bounds_and_requires_stable_queue_state(self):
         rows = [{"queue": {"remaining": 1}}, {"queue": {"remaining": 0}}, {"queue": {"remaining": 0}}]

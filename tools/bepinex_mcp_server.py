@@ -878,6 +878,8 @@ def _validate_state_wait(arguments, partial=False):
     for check in arguments.get("expect", []):
         if not isinstance(check, dict) or not isinstance(check.get("path"), str) or re.search(r"~(?![01])", check["path"]):
             return {"error": "expect paths must use valid JSON Pointer escaping"}
+        if len(check.keys() & {"equals", "atMost", "atLeast"}) != 1:
+            return {"error": "Each wait check requires exactly one of equals, atMost or atLeast"}
     return None
 
 
@@ -916,8 +918,17 @@ def _state_checks(observation, expected):
                 break
         if not missing and _failed_state_subtree(value):
             raise ValueError("queried section failed: " + check["path"])
-        matched = not missing and json.dumps(value, sort_keys=True, allow_nan=False) == json.dumps(check["equals"], sort_keys=True, allow_nan=False)
-        row = {"path": check["path"], "matched": matched, "expected": check["equals"], "missing": missing}
+        operation = next(key for key in ("equals", "atMost", "atLeast") if key in check)
+        threshold = check[operation]
+        matched = False
+        if not missing:
+            if operation == "equals":
+                matched = json.dumps(value, sort_keys=True, allow_nan=False) == json.dumps(threshold, sort_keys=True, allow_nan=False)
+            elif type(value) in (int, float):
+                matched = value <= threshold if operation == "atMost" else value >= threshold
+        row = {"path": check["path"], "matched": matched, "expected": threshold, "missing": missing}
+        if operation != "equals":
+            row["comparison"] = operation
         if not missing:
             row["actual"] = value
         checks.append(row)

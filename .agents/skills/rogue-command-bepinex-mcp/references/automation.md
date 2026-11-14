@@ -17,9 +17,11 @@ Snapshots and waits do not lock state or keep instance IDs current. Native actio
 
 ## State waits
 
-`automation_wait_for_state` accepts `tool`, optional `arguments`, and 1–8 `expect` checks with strict typed equality at JSON Pointers. Allowed tools: `diagnostics_get_runtime_control_surface`, `diagnostics_get_ui_accessibility_census`, `diagnostics_get_intermission_native_panel_state`, `diagnostics_get_intermission_census`, `diagnostics_get_navigator_state`, `diagnostics_get_game_time_scale`, `diagnostics_get_intermission_reward_state`. Discovery still exposes every other tool; this list restricts automatic polling only.
+`automation_wait_for_state` accepts `tool`, optional `arguments`, and 1–8 `expect` checks at JSON Pointers. Allowed tools: `diagnostics_get_runtime_control_surface`, `diagnostics_get_ui_accessibility_census`, `diagnostics_get_intermission_native_panel_state`, `diagnostics_get_intermission_census`, `diagnostics_get_navigator_state`, `diagnostics_get_game_time_scale`, `diagnostics_get_intermission_reward_state`. Discovery still exposes every other tool; this list restricts automatic polling only.
 
 Optional `stableSamples` (1–8, default 1) requires consecutive matching reads; a missing field or mismatch resets the count. Results report `stableSamples` and `consecutiveMatches`. Use 2 or more when a transient UI state must not advance the agent; this observes stability across samples, not between them. The original timeout and sequence budget still apply.
+
+Each wait condition takes one of `equals`, `atMost`, or `atLeast`. Numeric bounds are inclusive and match only JSON numbers. Sequence step expectations continue to use `equals`.
 
 Defaults: 10 seconds and 250 ms between reads. Limits: 0.1–30 seconds, 100–2000 ms. Missing fields or mismatches remain pending. Invalid replies, transport failures and errors in the queried section stop the wait. An error in an unrelated section does not invalidate a healthy field. Results contain `reason`, `attempts`, `elapsedSeconds`, `checks`, and only the `lastObservation`. No mutation is retried.
 
@@ -44,6 +46,8 @@ The census exposes `value` as a number for sliders. Inspect `controlType`, `minV
 ## Battlefield orders
 
 Find living player units with `diagnostics_get_battlefield_census` and use the row's string `runtimeEntityKeyId`. Refresh keys on scene changes. Confirm the match has started and choose a reachable destination before dispatch. The existing Move, Attack, AttackMove, HoldPosition and Stop tools issue native orders. A successful dispatch records the call. Observe the unit to establish its subsequent state.
+
+To withdraw a player unit when its remaining health reaches 35%, wait on the same unit and scene with the condition `{"path":"/healthRatio","atMost":0.35}`, then dispatch a Move to the chosen withdrawal point. The sample includes `currentHealth` in hit points and `healthRatio` as a fraction. A missing or nonnumeric health ratio cannot trigger the order.
 
 `diagnostics_get_battlefield_unit_state` reads one live entity in `Game`. It reports the scene handle, player ownership, native command, current attack target key and range state, and live X/Z position. An optional `goal` object with `x`, `z`, and `tolerance` (default 1 world unit) adds horizontal distance and `withinGoal`. Use this getter in `automation_wait_for_state` for arrival or wait for both `attackTargetKeyId` and `attackTargetInRange` for engagement. Range and target telemetry establish engagement state. Damage requires a separate observation.
 
