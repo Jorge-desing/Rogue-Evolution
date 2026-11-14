@@ -147,7 +147,15 @@ class MechRigValidator:
         audit.has_hierarchical_legs = has_legs_parent
 
         # Determine rig type
-        if audit.has_armature:
+        lower_model = audit.model_name.lower()
+        is_modular_attachment = audit.model_name.startswith("RCLModule_")
+        is_factory_building = lower_model.endswith("factoryvisual") or lower_model.endswith("factory")
+
+        if is_modular_attachment:
+            audit.rig_type = "modular_attachment"
+        elif is_factory_building:
+            audit.rig_type = "factory_building"
+        elif audit.has_armature:
             audit.rig_type = "skeletal_armature"
         elif audit.has_hierarchical_legs:
             audit.rig_type = "hierarchical_transform"
@@ -209,16 +217,21 @@ class MechRigValidator:
             else:
                 audit.flags.append("STATIC_VEHICLE_RIG: Wheeled or tracked vehicle chassis without limb articulation.")
 
-        # Sockets scoring (common to all tactical units)
-        if not any("muzzle" in s for s in audit.found_sockets):
-            audit.score -= 15
-            audit.flags.append("SOCKET_MUZZLE_MISSING: Socket_MuzzlePrimary missing for projectile firing.")
-        if not any("damagesmoke" in s for s in audit.found_sockets):
-            audit.score -= 10
-            audit.flags.append("SOCKET_DAMAGE_SMOKE_MISSING: Socket_DamageSmoke missing for health <= 50% degradation.")
-        if not any("damagefire" in s for s in audit.found_sockets):
-            audit.score -= 10
-            audit.flags.append("SOCKET_DAMAGE_FIRE_MISSING: Socket_DamageFire missing for health <= 25% degradation.")
+        if audit.rig_type in ("modular_attachment", "factory_building"):
+            audit.flags.append(
+                f"NON_COMBAT_ASSET_EXEMPT: {audit.rig_type} is exempt from walker/muzzle combat scoring."
+            )
+        else:
+            # Sockets scoring (common to all tactical units)
+            if not any("muzzle" in s for s in audit.found_sockets):
+                audit.score -= 15
+                audit.flags.append("SOCKET_MUZZLE_MISSING: Socket_MuzzlePrimary missing for projectile firing.")
+            if not any("damagesmoke" in s for s in audit.found_sockets):
+                audit.score -= 10
+                audit.flags.append("SOCKET_DAMAGE_SMOKE_MISSING: Socket_DamageSmoke missing for health <= 50% degradation.")
+            if not any("damagefire" in s for s in audit.found_sockets):
+                audit.score -= 10
+                audit.flags.append("SOCKET_DAMAGE_FIRE_MISSING: Socket_DamageFire missing for health <= 25% degradation.")
 
         audit.score = max(0, audit.score)
         return audit
@@ -306,7 +319,15 @@ class MechRigValidator:
                         if expected not in {parameter.lower() for parameter in audit.animator_parameters}
                     ]
 
-                    if audit.has_armature:
+                    lower_model = name.lower()
+                    is_modular_attachment = name.startswith("RCLModule_")
+                    is_factory_building = lower_model.endswith("factoryvisual") or lower_model.endswith("factory")
+
+                    if is_modular_attachment:
+                        audit.rig_type = "modular_attachment"
+                    elif is_factory_building:
+                        audit.rig_type = "factory_building"
+                    elif audit.has_armature:
                         audit.rig_type = "skeletal_armature"
                     elif audit.has_hierarchical_legs:
                         audit.rig_type = "hierarchical_transform"
@@ -330,7 +351,7 @@ class MechRigValidator:
                                 "ANIMATION_CLIPS_MISSING: Skeletal armature has no clips referenced by its controller."
                             )
 
-                    if audit.rig_type == "static_unrigged" and "walker" in name.lower():
+                    if audit.rig_type == "static_unrigged" and "walker" in lower_model:
                         audit.score -= 40
                         audit.flags.append(
                             "UNRIGGED_WALKER: Walker visual lacks skeletal bones and hierarchical leg pivots."
@@ -348,7 +369,7 @@ class MechRigValidator:
                         else:
                             audit.missing_sockets.append(s)
 
-                    if not any("muzzle" in s for s in audit.found_sockets):
+                    if audit.rig_type not in ("modular_attachment", "factory_building") and not any("muzzle" in s for s in audit.found_sockets):
                         audit.score -= 15
                         audit.flags.append("SOCKET_MUZZLE_MISSING: Muzzle socket missing.")
 
@@ -512,7 +533,8 @@ def main() -> int:
         print_audit_table(all_audits)
 
     has_critical_failure = any(
-        a.score < 40 or any(flag.startswith("UNRIGGED_WALKER:") for flag in a.flags)
+        not a.model_name.startswith("RCLModule_")
+        and (a.score < 40 or any(flag.startswith("UNRIGGED_WALKER:") for flag in a.flags))
         for a in all_audits
     )
     return 2 if has_critical_failure else 0

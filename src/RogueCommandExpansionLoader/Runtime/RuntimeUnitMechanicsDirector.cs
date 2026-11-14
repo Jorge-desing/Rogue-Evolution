@@ -173,7 +173,7 @@ namespace RogueCommandExpansionLoader.Runtime
     public sealed class RuntimeUnitMechanicsDirector : MonoBehaviour
     {
         private static readonly Dictionary<string, UnitRuntimeMechanicsProfile> _profiles =
-            new Dictionary<string, UnitRuntimeMechanicsProfile>(StringComparer.Ordinal);
+            new Dictionary<string, UnitRuntimeMechanicsProfile>(StringComparer.OrdinalIgnoreCase);
 
         private static readonly Dictionary<int, int> _entityCombatXp =
             new Dictionary<int, int>();
@@ -201,7 +201,7 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         private static readonly Dictionary<string, DynamicCommandAuraState> _activeDynamicCommandAuras =
-            new Dictionary<string, DynamicCommandAuraState>(StringComparer.Ordinal);
+            new Dictionary<string, DynamicCommandAuraState>(StringComparer.OrdinalIgnoreCase);
 
         [ThreadStatic] private static int _reflectDepth;
         [ThreadStatic] private static object[] _isEnemyArgs;

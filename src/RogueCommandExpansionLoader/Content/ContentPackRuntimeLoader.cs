@@ -80,7 +80,7 @@ namespace RogueCommandExpansionLoader.Content
         }
 
         private static readonly Dictionary<string, List<ContentOnHitStatusEffectDefinition>> _onHitStatusEffects =
-            new Dictionary<string, List<ContentOnHitStatusEffectDefinition>>(StringComparer.Ordinal);
+            new Dictionary<string, List<ContentOnHitStatusEffectDefinition>>(StringComparer.OrdinalIgnoreCase);
 
         public static bool TryGetOnHitStatusEffects(string entityId, out List<ContentOnHitStatusEffectDefinition> effects)
         {

@@ -167,7 +167,10 @@ namespace RogueCommandExpansionLoader.Runtime
                         sceneHandle = objSceneHandle,
                         isAssetOrHidden,
                         hasParent,
-                        hierarchyPath
+                        hierarchyPath,
+                        activeSelf = go != null && go.activeSelf,
+                        activeInHierarchy = go != null && go.activeInHierarchy,
+                        componentTypes = go != null ? GetAttachedComponentTypeNames(go) : Array.Empty<string>()
                     });
                 }
             }
@@ -576,16 +579,9 @@ namespace RogueCommandExpansionLoader.Runtime
             object target = null;
             if (instanceId != 0)
             {
-                UnityEngine.Object instanceObj = FindUnityObjectByInstanceId(instanceId);
-                if (instanceObj == null)
+                if (!TryResolveInstanceTarget(instanceId, typeName, out type, out target, out string instanceError))
                 {
-                    return JsonConvert.SerializeObject(new { success = false, error = "No UnityEngine.Object found with instanceId " + instanceId + "." });
-                }
-                target = instanceObj;
-                type = string.IsNullOrWhiteSpace(typeName) ? instanceObj.GetType() : ResolveType(typeName.Trim());
-                if (type == null)
-                {
-                    return JsonConvert.SerializeObject(new { success = false, error = "Type '" + typeName + "' not found." });
+                    return JsonConvert.SerializeObject(new { success = false, error = instanceError });
                 }
             }
             else
@@ -1183,6 +1179,98 @@ namespace RogueCommandExpansionLoader.Runtime
             return null;
         }
 
+        private static bool TryResolveInstanceTarget(
+            int instanceId,
+            string typeName,
+            out Type type,
+            out object target,
+            out string error)
+        {
+            type = null;
+            target = null;
+            error = null;
+
+            UnityEngine.Object instanceObj = FindUnityObjectByInstanceId(instanceId);
+            if (instanceObj == null)
+            {
+                error = "No UnityEngine.Object found with instanceId " + instanceId + ".";
+                return false;
+            }
+
+            target = instanceObj;
+            if (string.IsNullOrWhiteSpace(typeName))
+            {
+                type = instanceObj.GetType();
+                return true;
+            }
+
+            type = ResolveType(typeName.Trim());
+            if (type == null)
+            {
+                error = "Type '" + typeName + "' not found.";
+                return false;
+            }
+
+            if (!type.IsInstanceOfType(instanceObj) && typeof(Component).IsAssignableFrom(type))
+            {
+                GameObject go = instanceObj as GameObject ?? (instanceObj as Component)?.gameObject;
+                if (go != null)
+                {
+                    Component resolvedComponent = go.GetComponent(type);
+                    if (resolvedComponent != null)
+                    {
+                        target = resolvedComponent;
+                        return true;
+                    }
+                }
+            }
+
+            if (!type.IsInstanceOfType(target))
+            {
+                error = "UnityEngine.Object instanceId " + instanceId + " ('" + instanceObj.GetType().FullName +
+                        "') is not assignable to '" + type.FullName + "' and has no matching attached Component.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string[] GetAttachedComponentTypeNames(GameObject go)
+        {
+            if (go == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            Component[] components;
+            try
+            {
+                components = go.GetComponents<Component>();
+            }
+            catch
+            {
+                return Array.Empty<string>();
+            }
+
+            if (components == null || components.Length == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            int count = Math.Min(components.Length, 32);
+            var names = new List<string>(count);
+            for (int i = 0; i < count; i++)
+            {
+                Component c = components[i];
+                if (c != null)
+                {
+                    names.Add(c.GetType().FullName ?? c.GetType().Name);
+                }
+            }
+
+            return names.ToArray();
+        }
+
         private static bool TryResolveTargetAndMember(
             string typeName,
             string memberName,
@@ -1206,18 +1294,8 @@ namespace RogueCommandExpansionLoader.Runtime
 
             if (instanceId != 0)
             {
-                UnityEngine.Object instanceObj = FindUnityObjectByInstanceId(instanceId);
-                if (instanceObj == null)
+                if (!TryResolveInstanceTarget(instanceId, typeName, out type, out target, out error))
                 {
-                    error = "No UnityEngine.Object found with instanceId " + instanceId + ".";
-                    return false;
-                }
-
-                target = instanceObj;
-                type = string.IsNullOrWhiteSpace(typeName) ? instanceObj.GetType() : ResolveType(typeName.Trim());
-                if (type == null)
-                {
-                    error = "Type '" + typeName + "' not found.";
                     return false;
                 }
             }

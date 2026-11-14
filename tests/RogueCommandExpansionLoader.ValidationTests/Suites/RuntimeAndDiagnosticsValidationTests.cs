@@ -195,6 +195,52 @@ internal static partial class ValidationTestRunner
             if (!getById.GetProperty("success").GetBoolean() ||
                 getById.GetProperty("serializedValue").GetString() != "UpdatedById")
                 throw new Exception("GetTypeOrSingletonMemberJson by instanceId failed");
+
+            var go = new GameObject("ExplorerComponentHost");
+            go.transform.localPosition = new Vector3(3f, 4f, 5f);
+            UnityEngine.Object.NativeControlTestObjects = new UnityEngine.Object[] { go, go.transform };
+            int goId = go.GetInstanceID();
+
+            var searchGo = JsonDocument.Parse(RuntimeExplorerDirector.SearchUnityObjectsJson(
+                "ExplorerComponentHost",
+                "UnityEngine.GameObject",
+                "any",
+                "any",
+                10)).RootElement;
+            if (!searchGo.GetProperty("success").GetBoolean() ||
+                searchGo.GetProperty("returnedCount").GetInt32() != 1 ||
+                !searchGo.GetProperty("items")[0].GetProperty("activeSelf").GetBoolean() ||
+                !searchGo.GetProperty("items")[0].GetProperty("activeInHierarchy").GetBoolean() ||
+                searchGo.GetProperty("items")[0].GetProperty("componentTypes").GetArrayLength() < 1)
+                throw new Exception("SearchUnityObjectsJson did not emit activeSelf/activeInHierarchy/componentTypes");
+
+            var getAttachedTransformPos = JsonDocument.Parse(RuntimeExplorerDirector.GetTypeOrSingletonMemberJson(
+                typeof(Transform).FullName,
+                "localPosition",
+                useSingleton: false,
+                instanceId: goId)).RootElement;
+            if (!getAttachedTransformPos.GetProperty("success").GetBoolean() ||
+                Math.Abs(getAttachedTransformPos.GetProperty("serializedValue").GetProperty("x").GetSingle() - 3f) > 0.001f)
+                throw new Exception("GetTypeOrSingletonMemberJson failed to resolve attached Component from GameObject instanceId");
+
+            var missingComponentErr = JsonDocument.Parse(RuntimeExplorerDirector.GetTypeOrSingletonMemberJson(
+                typeof(Renderer).FullName,
+                "enabled",
+                useSingleton: false,
+                instanceId: goId)).RootElement;
+            if (missingComponentErr.GetProperty("success").GetBoolean())
+                throw new Exception("Expected explicit error when GameObject instanceId lacks requested Component");
+
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            RuntimeUnitMechanicsDirector.RegisterProfile("sample:CaseMech", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "sample:CaseMech",
+                DefaultLoadout = "Assault"
+            });
+            if (!RuntimeUnitMechanicsDirector.TryGetProfile("SAMPLE:casemech", out var caseProfile) ||
+                caseProfile == null || caseProfile.DefaultLoadout != "Assault")
+                throw new Exception("RuntimeUnitMechanicsDirector.TryGetProfile should be case-insensitive");
+            RuntimeUnitMechanicsDirector.ClearProfiles();
         }
         finally
         {
@@ -6582,6 +6628,213 @@ internal static partial class ValidationTestRunner
             RuntimeHooks.ResetCoreHookTelemetry();
         }
     }),
+    ("native combat and movement transpilers inject expected hooks, fail closed on drift, and report telemetry counters", () =>
+    {
+        RuntimeHooks.ResetCoreHookTelemetry();
+        try
+        {
+            MethodInfo takeDamage = typeof(CombatMovementTranspilerFixtures.EntityController).GetMethod("TakeDamage", BindingFlags.Instance | BindingFlags.Public)!;
+            FieldInfo amountField = typeof(CombatMovementTranspilerFixtures.TakeDamageClosure).GetField("amount", BindingFlags.Instance | BindingFlags.Public)!;
+            var takeDamageStream = new[]
+            {
+                new HarmonyLib.CodeInstruction(OpCodes.Ldarg_1),
+                new HarmonyLib.CodeInstruction(OpCodes.Stfld, amountField),
+                new HarmonyLib.CodeInstruction(OpCodes.Ret)
+            };
+            var patchedTakeDamage = NativeCombatMovementTranspilers.EntityControllerTakeDamageTranspiler(takeDamageStream, takeDamage).ToList();
+            if (patchedTakeDamage.Count != 7 ||
+                patchedTakeDamage[1].opcode != OpCodes.Ldarg_0 ||
+                patchedTakeDamage[2].opcode != OpCodes.Ldarg_2 ||
+                patchedTakeDamage[3].opcode != OpCodes.Ldarg_S ||
+                !Equals(patchedTakeDamage[4].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnEntityTakeDamageTranspilerHook))) ||
+                patchedTakeDamage[5].opcode != OpCodes.Stfld)
+            {
+                throw new InvalidOperationException("EntityControllerTakeDamageTranspiler did not inject expected hook before stfld amount.");
+            }
+
+            MethodInfo landsCrit = typeof(CombatMovementTranspilerFixtures.EntityController).GetMethod("LandsCriticalHit", BindingFlags.Instance | BindingFlags.Public)!;
+            MethodInfo randomValue = typeof(CombatMovementTranspilerFixtures.Random).GetProperty("value", BindingFlags.Static | BindingFlags.Public)!.GetGetMethod()!;
+            var landsCritStream = new[]
+            {
+                new HarmonyLib.CodeInstruction(OpCodes.Call, randomValue),
+                new HarmonyLib.CodeInstruction(OpCodes.Ldloc_0),
+                new HarmonyLib.CodeInstruction(OpCodes.Cgt_Un),
+                new HarmonyLib.CodeInstruction(OpCodes.Ret)
+            };
+            var patchedCrit = NativeCombatMovementTranspilers.EntityControllerLandsCriticalHitTranspiler(landsCritStream, landsCrit).ToList();
+            if (patchedCrit.Count != 7 ||
+                patchedCrit[2].opcode != OpCodes.Ldarg_0 ||
+                patchedCrit[3].opcode != OpCodes.Ldarg_1 ||
+                !Equals(patchedCrit[4].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnEntityLandsCriticalHitTranspilerHook))))
+            {
+                throw new InvalidOperationException("EntityControllerLandsCriticalHitTranspiler did not inject expected hook after ldloc.0.");
+            }
+
+            MethodInfo shootFromFirepoint = typeof(CombatMovementTranspilerFixtures.ShootProjectile).GetMethod("ShootFromFirepoint", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            MethodInfo instantiate = typeof(CombatMovementTranspilerFixtures.Object).GetMethod("Instantiate", BindingFlags.Static | BindingFlags.Public)!;
+            var shootStream = new[]
+            {
+                new HarmonyLib.CodeInstruction(OpCodes.Call, instantiate),
+                new HarmonyLib.CodeInstruction(OpCodes.Pop),
+                new HarmonyLib.CodeInstruction(OpCodes.Ret)
+            };
+            var patchedShoot = NativeCombatMovementTranspilers.ShootProjectileShootFromFirepointTranspiler(shootStream, shootFromFirepoint).ToList();
+            if (patchedShoot.Count != 7 ||
+                patchedShoot[1].opcode != OpCodes.Dup ||
+                patchedShoot[2].opcode != OpCodes.Ldarg_0 ||
+                patchedShoot[3].opcode != OpCodes.Ldarg_1 ||
+                !Equals(patchedShoot[4].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnShootProjectileSpawnedTranspilerHook))))
+            {
+                throw new InvalidOperationException("ShootProjectileShootFromFirepointTranspiler did not inject expected hook after Instantiate.");
+            }
+
+            MethodInfo setStatusEffect = typeof(CombatMovementTranspilerFixtures.EntityController).GetMethod("SetActiveStatusEffect", BindingFlags.Instance | BindingFlags.Public)!;
+            MethodInfo isUnlimited = typeof(CombatMovementTranspilerFixtures.EntityController).GetMethod("IsUnlimited", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var statusStream = new[]
+            {
+                new HarmonyLib.CodeInstruction(OpCodes.Ldarg_0),
+                new HarmonyLib.CodeInstruction(OpCodes.Ldarg_1),
+                new HarmonyLib.CodeInstruction(OpCodes.Call, isUnlimited),
+                new HarmonyLib.CodeInstruction(OpCodes.Pop),
+                new HarmonyLib.CodeInstruction(OpCodes.Ret)
+            };
+            var patchedStatus = NativeCombatMovementTranspilers.EntityControllerSetActiveStatusEffectTranspiler(statusStream, setStatusEffect).ToList();
+            if (patchedStatus.Count != 11 ||
+                patchedStatus[0].opcode != OpCodes.Ldarg_0 ||
+                patchedStatus[1].opcode != OpCodes.Ldarg_1 ||
+                patchedStatus[2].opcode != OpCodes.Ldarg_2 ||
+                patchedStatus[3].opcode != OpCodes.Ldarg_3 ||
+                !Equals(patchedStatus[4].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnEntitySetActiveStatusEffectTranspilerHook))) ||
+                patchedStatus[5].opcode != OpCodes.Starg_S)
+            {
+                throw new InvalidOperationException("EntityControllerSetActiveStatusEffectTranspiler did not inject expected duration hook.");
+            }
+
+            MethodInfo getMovementInfo = typeof(CombatMovementTranspilerFixtures.EntityFlockingMovement).GetMethod("GetMovementInfo", BindingFlags.Instance | BindingFlags.Public)!;
+            MethodInfo getMoveSpeed = typeof(CombatMovementTranspilerFixtures.EntityController).GetProperty("MoveSpeed", BindingFlags.Instance | BindingFlags.Public)!.GetGetMethod()!;
+            var movementStream = new[]
+            {
+                new HarmonyLib.CodeInstruction(OpCodes.Callvirt, getMoveSpeed),
+                new HarmonyLib.CodeInstruction(OpCodes.Pop),
+                new HarmonyLib.CodeInstruction(OpCodes.Ret)
+            };
+            var patchedMovement = NativeCombatMovementTranspilers.EntityFlockingMovementGetMovementInfoTranspiler(movementStream, getMovementInfo).ToList();
+            if (patchedMovement.Count != 5 ||
+                patchedMovement[1].opcode != OpCodes.Ldarg_0 ||
+                !Equals(patchedMovement[2].operand, typeof(RuntimeHarmonyPatches).GetMethod(nameof(RuntimeHarmonyPatches.OnFlockingGetMovementInfoSpeedTranspilerHook))))
+            {
+                throw new InvalidOperationException("EntityFlockingMovementGetMovementInfoTranspiler did not inject expected hook after get_MoveSpeed.");
+            }
+
+            bool emptyRejected = false;
+            try { NativeCombatMovementTranspilers.EntityControllerTakeDamageTranspiler(new[] { new HarmonyLib.CodeInstruction(OpCodes.Ret) }, takeDamage).ToList(); }
+            catch (InvalidOperationException) { emptyRejected = true; }
+            bool signatureRejected = false;
+            try { NativeCombatMovementTranspilers.EntityFlockingMovementGetMovementInfoTranspiler(movementStream, takeDamage).ToList(); }
+            catch (InvalidOperationException) { signatureRejected = true; }
+            if (!emptyRejected || !signatureRejected)
+            {
+                throw new InvalidOperationException("Combat/movement transpilers must fail closed on drifted streams or signatures.");
+            }
+
+            RuntimeHarmonyPatches.OnEntityTakeDamageTranspilerHook(10f, null, null, false);
+            RuntimeHarmonyPatches.OnEntityLandsCriticalHitTranspilerHook(0.1f, null, null);
+            RuntimeHarmonyPatches.OnShootProjectileSpawnedTranspilerHook(null, null, 0);
+            RuntimeHarmonyPatches.OnEntitySetActiveStatusEffectTranspilerHook(null, 0x10, 1, 2f);
+            RuntimeHarmonyPatches.OnFlockingGetMovementInfoSpeedTranspilerHook(5f, null);
+
+            string hooksJson = AgentDiagnosticsFormatter.SerializeRuntimeHooksState(true, 65, "owner", 0);
+            using (var doc = JsonDocument.Parse(hooksJson))
+            {
+                JsonElement root = doc.RootElement;
+                if (root.GetProperty("entityTakeDamageTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("entityLandsCriticalHitTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("shootProjectileSpawnedTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("entitySetStatusEffectTranspilerCount").GetInt32() != 1 ||
+                    root.GetProperty("flockingGetMovementInfoTranspilerCount").GetInt32() != 1)
+                {
+                    throw new InvalidOperationException("SerializeRuntimeHooksState missing new combat/movement transpiler counters.");
+                }
+            }
+        }
+        finally
+        {
+            RuntimeHooks.ResetCoreHookTelemetry();
+        }
+    }),
+    ("native combat and movement transpiler hooks enforce bounded TacticalStance curve while staying neutral on Standard", () =>
+    {
+        RuntimeHooks.ResetCoreHookTelemetry();
+        var stdEntity = new EntityController { UniqueEntityId = 991001 };
+        var aggEntity = new EntityController { UniqueEntityId = 991002 };
+        var defEntity = new EntityController { UniqueEntityId = 991003 };
+        var kiteEntity = new EntityController { UniqueEntityId = 991004 };
+        ExistingControllers.Instance.PlayerUnits().Add(stdEntity);
+        ExistingControllers.Instance.PlayerUnits().Add(aggEntity);
+        ExistingControllers.Instance.PlayerUnits().Add(defEntity);
+        ExistingControllers.Instance.PlayerUnits().Add(kiteEntity);
+        try
+        {
+            RuntimeGameplayCommandDirector.TrySetUnitTacticalStance("991002", "Aggressive");
+            RuntimeGameplayCommandDirector.TrySetUnitTacticalStance("991003", "Defensive");
+            RuntimeGameplayCommandDirector.TrySetUnitTacticalStance("991004", "Kiting");
+
+            // Standard must be 100% neutral
+            if (Math.Abs(RuntimeHarmonyPatches.OnEntityTakeDamageTranspilerHook(100f, stdEntity, stdEntity, false) - 100f) > 0.001f ||
+                Math.Abs(RuntimeHarmonyPatches.OnEntityLandsCriticalHitTranspilerHook(0.15f, stdEntity, aggEntity) - 0.15f) > 0.001f ||
+                Math.Abs(RuntimeHarmonyPatches.OnEntitySetActiveStatusEffectTranspilerHook(stdEntity, 0x20, 1, 4f) - 4f) > 0.001f)
+            {
+                throw new InvalidOperationException("Standard stance must remain 100% neutral across all combat hooks.");
+            }
+
+            // Aggressive attacker (+15% outgoing) -> Defensive target (-20% incoming) => 100 * 1.15 * 0.80 = 92
+            float aggVsDef = RuntimeHarmonyPatches.OnEntityTakeDamageTranspilerHook(100f, defEntity, aggEntity, false);
+            if (Math.Abs(aggVsDef - 92f) > 0.01f)
+            {
+                throw new InvalidOperationException("Expected Aggressive->Defensive damage 92, got " + aggVsDef);
+            }
+
+            // Crit bonuses: Aggressive +0.10, Kiting +0.05
+            float aggCrit = RuntimeHarmonyPatches.OnEntityLandsCriticalHitTranspilerHook(0.20f, aggEntity, stdEntity);
+            float kiteCrit = RuntimeHarmonyPatches.OnEntityLandsCriticalHitTranspilerHook(0.20f, kiteEntity, stdEntity);
+            if (Math.Abs(aggCrit - 0.30f) > 0.001f || Math.Abs(kiteCrit - 0.25f) > 0.001f)
+            {
+                throw new InvalidOperationException("Unexpected crit stance bonus values.");
+            }
+
+            // Defensive debuff duration: 0x20 (Stun, negative) * 0.75 = 3.0s; 0x01 (CombatBoost, positive) stays 4.0s
+            float defStun = RuntimeHarmonyPatches.OnEntitySetActiveStatusEffectTranspilerHook(defEntity, 0x20, 1, 4f);
+            float defBuff = RuntimeHarmonyPatches.OnEntitySetActiveStatusEffectTranspilerHook(defEntity, 0x01, 1, 4f);
+            if (Math.Abs(defStun - 3.0f) > 0.001f || Math.Abs(defBuff - 4.0f) > 0.001f)
+            {
+                throw new InvalidOperationException("Unexpected Defensive status duration scaling.");
+            }
+
+            // Flocking Burst MoveSpeed multipliers
+            var aggMove = new CombatMovementTranspilerFixtures.TestFlockingMovement(aggEntity);
+            var defMove = new CombatMovementTranspilerFixtures.TestFlockingMovement(defEntity);
+            var kiteMove = new CombatMovementTranspilerFixtures.TestFlockingMovement(kiteEntity);
+            var stdMove = new CombatMovementTranspilerFixtures.TestFlockingMovement(stdEntity);
+            if (Math.Abs(RuntimeHarmonyPatches.OnFlockingGetMovementInfoSpeedTranspilerHook(10f, stdMove) - 10f) > 0.001f ||
+                Math.Abs(RuntimeHarmonyPatches.OnFlockingGetMovementInfoSpeedTranspilerHook(10f, aggMove) - 11f) > 0.001f ||
+                Math.Abs(RuntimeHarmonyPatches.OnFlockingGetMovementInfoSpeedTranspilerHook(10f, defMove) - 8.5f) > 0.001f ||
+                Math.Abs(RuntimeHarmonyPatches.OnFlockingGetMovementInfoSpeedTranspilerHook(10f, kiteMove) - 11.5f) > 0.001f)
+            {
+                throw new InvalidOperationException("Unexpected Flocking Burst speed stance multiplier.");
+            }
+        }
+        finally
+        {
+            RuntimeGameplayCommandDirector.ResetUnitTacticalStance("991002");
+            RuntimeGameplayCommandDirector.ResetUnitTacticalStance("991003");
+            RuntimeGameplayCommandDirector.ResetUnitTacticalStance("991004");
+            ExistingControllers.Instance.PlayerUnits().Remove(stdEntity);
+            ExistingControllers.Instance.PlayerUnits().Remove(aggEntity);
+            ExistingControllers.Instance.PlayerUnits().Remove(defEntity);
+            ExistingControllers.Instance.PlayerUnits().Remove(kiteEntity);
+            RuntimeHooks.ResetCoreHookTelemetry();
+        }
+    }),
     ("model geometry census detects collapsed skinned bounds and serializes", () =>
     {
         ModelGeometryRow healthy = RuntimeModelGeometryCensus.EvaluateGeometryRow(
@@ -12929,5 +13182,75 @@ internal static class AiTranspilerFixtures
     {
         public string Team { get; set; } = "AI";
         public bool IsBuilding { get; set; }
+    }
+}
+
+internal static class CombatMovementTranspilerFixtures
+{
+    public enum StatusEffect
+    {
+        None = 0,
+        CombatBoost = 1,
+        Stun = 0x20
+    }
+
+    public enum DurationType
+    {
+        Frames = 0,
+        Seconds = 1,
+        Unlimited = 2
+    }
+
+    public struct EventPayload
+    {
+    }
+
+    public struct MovingEntityInfo
+    {
+        public float MaxSpeed { get; set; }
+    }
+
+    public sealed class TakeDamageClosure
+    {
+        public float amount = 0f;
+    }
+
+    public static class Random
+    {
+        public static float value => 0.5f;
+    }
+
+    public static class Object
+    {
+        public static object Instantiate() => new object();
+    }
+
+    public sealed class EntityController
+    {
+        public float MoveSpeed => 10f;
+        public void TakeDamage(float amount, EntityController? originator = null, bool doNotFireOnHasDealtDamage = false, bool ignoreArmor = false) { }
+        public bool LandsCriticalHit(EntityController target, EventPayload payload) => false;
+        public void SetActiveStatusEffect(StatusEffect statusEffect, DurationType durationType, float duration) { }
+        private bool IsUnlimited(StatusEffect statusEffect) => false;
+    }
+
+    public sealed class ShootProjectile
+    {
+        private void ShootFromFirepoint(int firePointIndex) { }
+    }
+
+    public sealed class EntityFlockingMovement
+    {
+        public MovingEntityInfo GetMovementInfo(int flowFieldIndex) => default;
+    }
+
+    public sealed class TestFlockingMovement
+    {
+        private readonly global::EntityController _entityController;
+
+        public TestFlockingMovement(global::EntityController entityController)
+        {
+            _entityController = entityController;
+        }
     }
 }

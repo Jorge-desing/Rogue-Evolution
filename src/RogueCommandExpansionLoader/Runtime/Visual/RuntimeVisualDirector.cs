@@ -51,6 +51,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         private Quaternion _antennaBaseLocalRot = Quaternion.identity;
         private Quaternion _thrusterVectorBaseLocalRotL = Quaternion.identity;
         private Quaternion _thrusterVectorBaseLocalRotR = Quaternion.identity;
+        private Quaternion _turretPivotBaseLocalRot = Quaternion.identity;
+        private bool _hasTurretPivotBaseLocalRot;
         private Quaternion _turretPitchBaseLocalRot = Quaternion.identity;
         private bool _hasTurretPitchBaseLocalRot;
         private Transform _chassisTiltTarget;
@@ -268,6 +270,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
                 _hasChassisTiltBaseLocalRot = true;
             }
 
+            if (_socketTurretPivot != null)
+            {
+                _turretPivotBaseLocalRot = _socketTurretPivot.localRotation;
+                _hasTurretPivotBaseLocalRot = true;
+            }
+
             if (_socketTurretPitch != null)
             {
                 _turretPitchBaseLocalRot = _socketTurretPitch.localRotation;
@@ -313,6 +321,10 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (_socketRecoilPrimary != null)
             {
                 _socketRecoilPrimary.localPosition = _recoilBaseLocalPos;
+            }
+            if (_socketTurretPivot != null && _hasTurretPivotBaseLocalRot)
+            {
+                _socketTurretPivot.localRotation = _turretPivotBaseLocalRot;
             }
             if (_socketTurretPitch != null && _hasTurretPitchBaseLocalRot)
             {
@@ -396,6 +408,12 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             _isStunnedVisualActive = false;
             bool wasOnFire = _isOnFireVisualActive;
             _isOnFireVisualActive = false;
+            _isBoostedVisualActive = false;
+            if (!_movementAudioBound || !_weaponAudioBound)
+            {
+                _audioBindingStartedAt = Time.unscaledTime;
+                _nextAudioBindingAttemptAt = 0f;
+            }
             UpdateHealthAndDamageTransitions(false, 1f);
             UpdateDamageFire();
             if (wasOnFire) ApplyProceduralScorch(false);

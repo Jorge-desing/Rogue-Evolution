@@ -123,6 +123,20 @@ class MechRiggingBundleTests(unittest.TestCase):
                     )
                     self.assertGreater(dynamic_count, 0, clip.m_Name)
 
+    def test_modular_attachments_and_factory_buildings_are_not_penalized_as_combat_walkers(self) -> None:
+        tactical_audits = {a.model_name: a for a in self._audit(TACTICAL_BUNDLE)}
+        module_audit = tactical_audits["RCLModule_arc_lance_walker_plasma_arc_containment"]
+        self.assertEqual(module_audit.rig_type, "modular_attachment")
+        self.assertEqual(module_audit.score, 100)
+        self.assertFalse(any(f.startswith(("UNRIGGED_WALKER:", "SOCKET_MUZZLE_MISSING:")) for f in module_audit.flags))
+
+        sample_audits = {a.model_name: a for a in self._audit(SAMPLE_NATIVE_BUNDLE)}
+        for factory_name in ("OverlordCommandHQFactoryVisual", "ArachnidHexapodFactoryVisual"):
+            factory_audit = sample_audits[factory_name]
+            self.assertEqual(factory_audit.rig_type, "factory_building")
+            self.assertEqual(factory_audit.score, 100)
+            self.assertFalse(any(f.startswith(("UNRIGGED_WALKER:", "SOCKET_MUZZLE_MISSING:")) for f in factory_audit.flags))
+
 
 if __name__ == "__main__":
     unittest.main()

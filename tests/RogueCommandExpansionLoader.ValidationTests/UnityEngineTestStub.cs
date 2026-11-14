@@ -680,6 +680,19 @@ namespace UnityEngine
             return null;
         }
 
+        public Component GetComponent(System.Type type)
+        {
+            if (type == null) return null;
+            for (int i = 0; i < _components.Count; i++)
+            {
+                if (_components[i] != null && type.IsInstanceOfType(_components[i]))
+                {
+                    return _components[i];
+                }
+            }
+            return null;
+        }
+
         public T GetComponent<T>() where T : Component
         {
             for (int i = 0; i < _components.Count; i++)
