@@ -2,7 +2,7 @@
 
 ## Load context at task start
 
-Codex loads the project hook in `.codex/hooks.json` when the hook is trusted in the client. Its `UserPromptSubmit` handler reads startup excerpts from the current checkout and delivers them as context. It routes by task terms, includes multiple matching areas, and always includes the full routing table. The prompt is processed locally and is not stored by the hook. Keep the guide paths in `.codex/task-context.py` aligned with the table when adding a workflow.
+Codex loads the project hook in `.codex/hooks.json` when the hook is trusted in the client. Its `UserPromptSubmit` handler reads startup excerpts from the current checkout and delivers them as context. It routes by task terms, includes multiple matching areas, and always includes the full routing table. The prompt is processed locally and is not stored by the hook. Explicit repository skill mentions take priority. Output is capped at 6,000 characters and a missing or unreadable guide leaves the other routes available. Keep the guide paths in `.codex/task-context.py` aligned with the table when adding a workflow.
 
 Use the startup routing table in [AGENTS.md](../AGENTS.md) to open the documentation that applies to the current task before making changes. When a new canonical guide introduces a distinct workflow, update the startup route that should surface it. Keep the route short enough to scan every time.
 

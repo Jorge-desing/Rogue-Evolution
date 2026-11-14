@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import sys
+import unicodedata
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,57 +26,85 @@ ROUTES = (
 )
 
 
-def excerpt(relative_path, heading=None):
-    """Read one startup section from its canonical file."""
+MAX_CONTEXT_CHARS = 6000
+STARTUP_HEADING = "### Load task documentation at startup"
+SKILL_MENTION = re.compile(r"\[\$([a-z0-9][a-z0-9-]*)\]", re.IGNORECASE)
+
+
+def excerpt(relative_path):
+    """Read the routing table or one short paragraph from a canonical file."""
     try:
         source = (ROOT / relative_path).read_text(encoding="utf-8-sig")
-    except OSError:
+    except (OSError, UnicodeError):
         return f"{relative_path}: unavailable in this checkout."
-    if heading:
-        _, found, source = source.partition(f"\n{heading}\n")
-        if not found:
-            return f"{relative_path}: startup section missing. Open the file directly."
-    else:
-        source = source.lstrip()
+    lines = source.splitlines()
     if relative_path == "AGENTS.md":
-        # The routing table is followed by project rules at the same heading level.
-        routes = [line for line in source.splitlines() if line.startswith("|")]
-        return f"{relative_path} routing table\n" + "\n".join(routes)
-    section = re.split(r"\n#{1,3} ", source, maxsplit=1)[0].strip()
-    return f"{relative_path}\n{section.split("\n\n", 1)[0][:1000]}"
+        try:
+            first = lines.index(STARTUP_HEADING)
+            table = next(i for i in range(first + 1, len(lines)) if lines[i].startswith("|"))
+        except (ValueError, StopIteration):
+            return "AGENTS.md: open the startup routing section directly."
+        rows = []
+        for line in lines[table:]:
+            if not line.startswith("|"):
+                break
+            rows.append(line)
+        return "AGENTS.md routing table\n" + "\n".join(rows)
+
+    for index, line in enumerate(lines):
+        if line.startswith("**Current policy:**"):
+            return f"{relative_path}\n{line[:600]}"
+        if line.startswith(("## Start here", "## Load before", "## Load context")):
+            source = "\n".join(lines[index + 1:]).strip()
+            break
+    else:
+        source = source.partition("\n")[2].strip()
+    paragraph = re.split(r"\n\s*\n|\n#", source, maxsplit=1)[0]
+    return f"{relative_path}\n{paragraph[:600]}"
 
 
 def main():
-    request = json.load(sys.stdin)
-    if request.get("hook_event_name") != "UserPromptSubmit":
+    try:
+        request = json.load(sys.stdin)
+    except (ValueError, UnicodeError):
         return
-    prompt = request.get("prompt", "")
+    if not isinstance(request, dict) or request.get("hook_event_name") != "UserPromptSubmit":
+        return
+    prompt = request.get("prompt")
+    if not isinstance(prompt, str):
+        prompt = ""
+    terms = unicodedata.normalize("NFC", prompt)
     guides = dict.fromkeys(
         guide
         for pattern, paths in ROUTES
-        if re.search(r"\b(?:" + pattern + r")\b", prompt, re.IGNORECASE)
+        if re.search(r"\b(?:" + pattern + r")\b", terms, re.IGNORECASE)
         for guide in paths
     )
     context = [
         "Rogue Evolution task startup. Read README.md and docs/research/AGENT-HANDOFF.md. "
         "Apply every relevant AGENTS.md route, including explicitly named skills. "
         "These excerpts orient the task. Open the complete applicable guides before acting.",
-        excerpt("AGENTS.md", "### Load task documentation at startup"),
+        excerpt("AGENTS.md"),
     ]
-    for guide in guides:
-        source = (ROOT / guide)
-        heading = next(
-            (line for line in source.read_text(encoding="utf-8-sig").splitlines()
-             if line.startswith(("## Start here", "## Load before", "## Load context", "**Current policy:**"))),
-            None,
-        ) if source.is_file() else None
-        if heading and heading.startswith("**"):
-            context.append(f"{guide}\n{heading}")
-        else:
-            context.append(excerpt(guide, heading))
+    # Resolve only named repository skills. Ignore the link target in the prompt.
+    explicit = dict.fromkeys(
+        match.group(1).lower() for match in SKILL_MENTION.finditer(prompt)
+    )
+    for name in explicit:
+        path = f".agents/skills/{name}/SKILL.md"
+        if (ROOT / path).is_file():
+            guides.setdefault(path, None)
+
+    ordered_guides = sorted(guides, key=lambda path: not path.startswith(".agents/skills/"))
+    for guide in ordered_guides:
+        entry = (f"Explicitly selected skill: {guide}"
+                 if guide.startswith(".agents/skills/") else excerpt(guide))
+        if sum(len(block) + 2 for block in context) + len(entry) + 2 > MAX_CONTEXT_CHARS:
+            break
+        context.append(entry)
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "UserPromptSubmit",
-        "additionalContext": "\n\n".join(context),
+        "additionalContext": "\n\n".join(context)[:MAX_CONTEXT_CHARS],
     }}))
 
 
