@@ -2374,6 +2374,18 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 float now = Time.time;
 
+                // Observe depletion before aura or regeneration can refill this shield.
+                if (_profile.ShieldOverloadNova != null &&
+                    _profile.ShieldOverloadNova.novaRadius > 0f)
+                {
+                    float currentShield = ReadFloatProperty(_currentShieldProperty, _entityController, 0f);
+                    if (_hasInitializedShield && _previousShield > 0.1f && currentShield <= 0.05f && now >= _nextNovaAvailableTime)
+                    {
+                        _nextNovaAvailableTime = now + Mathf.Max(1.0f, _profile.ShieldOverloadNova.cooldown);
+                        ExecuteShieldOverloadNova(_entityController, _profile.ShieldOverloadNova);
+                    }
+                }
+
                 if (!_defaultStanceApplied && !string.IsNullOrWhiteSpace(_profile.DefaultTacticalStance))
                 {
                     int key = GetCombatExperienceKey(_entityController);
@@ -2493,17 +2505,9 @@ namespace RogueCommandExpansionLoader.Runtime
                     ExecuteTauntPulse(_entityController, _profile.Taunt);
                 }
 
-                if (_profile.ShieldOverloadNova != null &&
-                    _profile.ShieldOverloadNova.novaRadius > 0f)
-                {
-                    float currentShield = ReadFloatProperty(_currentShieldProperty, _entityController, 0f);
-                    if (_hasInitializedShield && _previousShield > 0.1f && currentShield <= 0.05f && now >= _nextNovaAvailableTime)
-                    {
-                        _nextNovaAvailableTime = now + Mathf.Max(1.0f, _profile.ShieldOverloadNova.cooldown);
-                        ExecuteShieldOverloadNova(_entityController, _profile.ShieldOverloadNova);
-                    }
-                    _previousShield = currentShield;
-                }
+                // Arm the next break using the shield after all local recharge effects.
+                _previousShield = ReadFloatProperty(_currentShieldProperty, _entityController, 0f);
+
             }
             catch
             {

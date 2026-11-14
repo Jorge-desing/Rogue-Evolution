@@ -2,6 +2,12 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## General capability audit — shield overload and recharge composition
+
+- Shield-overload break detection now runs before local aura, loadout and regeneration effects can refill the shield. The final shield value is recorded after local effects to rearm later breaks. Nova cooldown remains independent.
+- Release/harness builds: zero warnings/errors. RuntimeAndDiagnostics: 218/222; the new combined overload/instant-regeneration scenario passes first break, recharge-only, cooldown suppression and later break. The same four visual census failures remain; full suite is not green. Local evidence only; Steam remains unverified.
+- Deployment backup/hash manifest: `artifacts/general-capability-audit/shield-deployment/manifest.json`.
+
 ## General capability audit — independent health and armor support
 
 - Health-pulse selection skips native `canNotBeHealed` candidates so a blocked low-health ally cannot starve healable allies. Armor selection remains independent. Support-repair AI can dispatch to missing armor on a health-blocked ally and never attempts to heal its health.

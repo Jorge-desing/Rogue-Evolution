@@ -2856,6 +2856,57 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Bundle fallback must stay fail-closed unless a non-empty fallback path is configured for a missing bundle.");
         }
     }),
+    ("shield overload fires before immediate recharge and rearms after cooldown", () =>
+    {
+        ExistingControllers.Instance.Reset();
+        RuntimeUnitMechanicsDirector.ClearProfiles();
+        try
+        {
+            UnityEngine.Time.time = 10f;
+            RuntimeUnitMechanicsDirector.RegisterProfile("test:shield-combination", new UnitRuntimeMechanicsProfile
+            {
+                EntityId = "test:shield-combination",
+                ShieldRegen = new ContentUnitShieldRegenDefinition { rechargeRate = 10f, rechargeDelay = 0f, burstAmount = 5f },
+                ShieldOverloadNova = new ContentUnitShieldOverloadNovaDefinition { novaRadius = 2f, damage = 10f, cooldown = 5f }
+            });
+            var self = new EntityController
+            {
+                entityId = "test:shield-combination", UniqueEntityId = 9801,
+                IsUnit = true, IsControlledByPlayer = true, HasShield = true,
+                CurrentShield = 50f, MaxShield = 100f
+            };
+            var enemy = new EntityController { IsUnit = true, IsControlledByAi = true, CurrentHealth = 100f, MaxHealth = 100f };
+            ExistingControllers.Instance.PlayerUnits().Add(self);
+            ExistingControllers.Instance.AiUnits().Add(enemy);
+            RuntimeUnitMechanicsDirector.AttachIfApplicable(self);
+            var director = self.gameObject.GetComponent<RuntimeUnitMechanicsDirector>()!;
+            self.CurrentShield = 0f;
+            UnityEngine.Time.time = 11f;
+            director.TickMechanics();
+            if (enemy.CurrentHealth != 90f || self.CurrentShield <= 0f)
+                throw new InvalidOperationException("Shield break must fire its nova even when the same update immediately recharges it.");
+            UnityEngine.Time.time = 12f;
+            director.TickMechanics();
+            if (enemy.CurrentHealth != 90f)
+                throw new InvalidOperationException("Recharge without another break repeated the nova.");
+            self.CurrentShield = 0f;
+            UnityEngine.Time.time = 13f;
+            director.TickMechanics();
+            if (enemy.CurrentHealth != 90f)
+                throw new InvalidOperationException("Shield break ignored the nova cooldown.");
+            self.CurrentShield = 0f;
+            UnityEngine.Time.time = 17f;
+            director.TickMechanics();
+            if (enemy.CurrentHealth != 80f)
+                throw new InvalidOperationException("Recharged shield did not rearm the next nova after cooldown.");
+        }
+        finally
+        {
+            RuntimeUnitMechanicsDirector.ClearProfiles();
+            ExistingControllers.Instance.Reset();
+            UnityEngine.Time.time = 0f;
+        }
+    }),
     ("runtime unit mechanics director executes baseline status effects, combat boosts, veterancy rank-ups, healing, and auras", () =>
     {
         ExistingControllers.Instance.Reset();
