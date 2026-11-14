@@ -190,3 +190,5 @@ The Hierarchical Utility-Blackboard Director coordinates macro strategy and micr
 - Runtime command and visual-census selectors use the unique live `EntityController.UniqueEntityId` when supplied as a numeric key. On deployed loader 1.20.10, two same-product Walkers resolved to keys 278/279; a duplicate native `EntityId` order failed closed and a Move by key 278 succeeded. This improves diagnostic attribution only; the run did not exercise a custom AI profile or prove AI execution. Evidence: `artifacts/runtime-smoke/unique-key-retarget-release-20261111T173856Z/unique-key-retarget-summary.json`.
 
 CombatEngaged requires a living, targetable hostile CurrentAttackTarget within native attack range. The standalone skill module casts toward that target. The coordinated collector gates readiness on the same engagement and leaves target selection to the tactical director.
+
+Coordinated tactical skill dispatch reads live SkillInfo and checks mana and queued activation. Self uses the native untargeted command. Entity and location casts require a living, targetable hostile and use its controller or current position, respectively. An invalid target cancels dispatch.

@@ -2,6 +2,10 @@
 
 This handoff is for the next agent. Start with the latest relevant entry, then verify its branch, source paths, artifacts, and runtime prerequisites against the current checkout. Entries below record evidence at the time of each pass. Follow [AGENTS.md](../../AGENTS.md) and the [agent documentation contract](../AGENT-DOCUMENTATION.md) when updating this file.
 
+## Coordinated tactical skill dispatch
+
+- Dispatch uses live SkillInfo to select self, entity, or location commands and rechecks mana, queued activation, and hostile target availability. Release builds cleanly and the tactical AI suite passes 70/70. Steam execution remains unverified.
+
 ## Tactical skills — CombatEngaged
 
 - Standalone tactical casts require a native in-range hostile attack target and use that target. Coordinated skill readiness requires the same engagement. Release builds cleanly and the tactical AI suite passes 70/70. Steam behavior remains unverified.

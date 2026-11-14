@@ -436,15 +436,37 @@ namespace RogueCommandExpansionLoader.Modules
                 }
                 else if (proposal.Category == AiIntentCategory.TacticalSkill)
                 {
-                    if (proposal.TargetEntityId >= 0 &&
-                        _battlefieldCollector.TryResolveHostileEntity(proposal.TargetEntityId, out EntityController skillTarget) &&
-                        skillTarget != null)
+                    SkillInfo skillInfo = unit.SkillInfo;
+                    if (skillInfo == null || unit.HasSkillActivationInCommandChain ||
+                        unit.CurrentMana < skillInfo.manaCost)
                     {
-                        command = EntityCommand.ActiveSkillOnTarget(skillTarget);
+                        return;
+                    }
+                    if (skillInfo.targetOrigin == TargetOrigin.Self)
+                    {
+                        command = EntityCommand.ActiveSkillWithoutTarget();
                     }
                     else
                     {
-                        command = EntityCommand.ActiveSkillWithoutTarget();
+                        if (proposal.TargetEntityId < 0 ||
+                            !_battlefieldCollector.TryResolveHostileEntity(proposal.TargetEntityId, out EntityController skillTarget) ||
+                            skillTarget == null || skillTarget.IsDestroyed || skillTarget.DestroyHasBeenStarted ||
+                            skillTarget.canNotBeTargetedByAi || !unit.IsEnemy(skillTarget))
+                        {
+                            return;
+                        }
+
+                        switch (skillInfo.targetOrigin)
+                        {
+                            case TargetOrigin.ChosenEntity:
+                                command = EntityCommand.ActiveSkillOnTarget(skillTarget);
+                                break;
+                            case TargetOrigin.ChosenLocation:
+                                command = EntityCommand.ActiveSkillAtPosition(skillTarget.Position);
+                                break;
+                            default:
+                                return;
+                        }
                     }
                 }
                 else if (proposal.Category == AiIntentCategory.FlankingManeuver)
