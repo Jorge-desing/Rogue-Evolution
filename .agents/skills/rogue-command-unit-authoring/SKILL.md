@@ -12,6 +12,8 @@ metadata:
 
 # Rogue Command Unit Authoring
 
+Healing, passive auras, synergies and command pulses identify allies by the native Player/AI controller faction; neutral entities do not receive ally effects. Enemy aura selection continues to use native hostility. Steam behavior remains unverified.
+
 Healing and shield/armor support consider every positive deficit, including deficits below 0.1 points; native recovery still clamps the result. Verify in Steam before claiming gameplay acceptance.
 
 Combat aura `buffAmount` uses percentage points: Buff increases Damage and ArmorProtection; Debuff reduces MoveSpeed by up to 100%. Same source unit IDs refresh the same 1.5-second native modifier rather than stacking. Heal/Shield amounts are points per pulse. Status application must succeed for the combat modifier. Verify balance and behavior in Steam.

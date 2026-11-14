@@ -1,5 +1,10 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Support faction selection (2026-11-14)
+
+Healing, passive auras, synergies and command pulses now match Player/AI factions for allies rather than treating all non-enemies as friendly. Static `Tags.AreEnemies` inspection established neutral is neither Player nor AI enemy. Release built without warnings; RuntimeAndDiagnostics passed 241/241 (`artifacts/general-capability-audit/support-factions/runtime.log`). Deployed with the game closed and a hash-verified backup; manifest `artifacts/general-capability-audit/support-factions-deployment-20261114145246/manifest.json`. Verify faction effects during an authorized Steam run.
+
+
 ## Fractional support recovery (2026-11-14)
 
 Healing and Heal/Shield aura pulses now consider health, armor and shield deficits below 0.1 instead of leaving them unrecovered. Release built without warnings; RuntimeAndDiagnostics passed 240/240 (`artifacts/general-capability-audit/fractional-support/runtime.log`). Game was closed for deployment; backup and SHA-256 manifest are `artifacts/general-capability-audit/fractional-support-deployment-20261114145018/manifest.json`. Steam behavior remains unverified; next inspect native recovery and pulse behavior during an authorized match.

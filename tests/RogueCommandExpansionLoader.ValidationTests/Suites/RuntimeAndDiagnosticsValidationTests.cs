@@ -17,6 +17,18 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("support faction matching excludes neutral entities", () =>
+    {
+        var method = typeof(RuntimeUnitMechanicsDirector).GetMethod("IsFriendly", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var player = new EntityController { IsControlledByPlayer = true };
+        var ally = new EntityController { IsControlledByPlayer = true };
+        var neutral = new EntityController();
+        var enemy = new EntityController { IsControlledByAi = true };
+        if (!(bool)method.Invoke(null, new object[] { player, ally })! ||
+            (bool)method.Invoke(null, new object[] { player, neutral })! ||
+            (bool)method.Invoke(null, new object[] { player, enemy })!)
+            throw new Exception("Support faction matching confused allies, neutrals or enemies.");
+    }),
     ("support aura restores fractional missing health and shield", () =>
     {
         ExistingControllers.Instance.Reset();

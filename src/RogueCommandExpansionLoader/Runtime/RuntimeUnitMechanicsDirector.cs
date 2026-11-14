@@ -2638,7 +2638,7 @@ namespace RogueCommandExpansionLoader.Runtime
 
             foreach (object candidate in entities)
             {
-                if (candidate == null || !IsEntityAlive(candidate) || IsEnemy(self, candidate))
+                if (candidate == null || !IsEntityAlive(candidate) || !IsFriendly(self, candidate))
                 {
                     continue;
                 }
@@ -2728,7 +2728,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 {
                     continue;
                 }
-                if (!isEnemy && !aura.affectsAllies)
+                if (!isEnemy && (!aura.affectsAllies || !IsFriendly(self, candidate)))
                 {
                     continue;
                 }
@@ -2840,7 +2840,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 int buffedCount = 0;
                 foreach (object candidate in entities)
                 {
-                    if (candidate == null || ReferenceEquals(candidate, self) || !IsEntityAlive(candidate) || IsEnemy(self, candidate))
+                    if (candidate == null || ReferenceEquals(candidate, self) || !IsEntityAlive(candidate) || !IsFriendly(self, candidate))
                     {
                         continue;
                     }
@@ -2931,7 +2931,7 @@ namespace RogueCommandExpansionLoader.Runtime
             var retainedFollowers = new HashSet<object>();
             foreach (object candidate in entities)
             {
-                if (candidate == null || ReferenceEquals(candidate, self) || !IsEntityAlive(candidate) || IsEnemy(self, candidate))
+                if (candidate == null || ReferenceEquals(candidate, self) || !IsEntityAlive(candidate) || !IsFriendly(self, candidate))
                 {
                     continue;
                 }
@@ -4223,6 +4223,16 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 return false;
             }
+        }
+
+        private static bool IsFriendly(object self, object other)
+        {
+            if (self is EntityController source && other is EntityController target)
+            {
+                return (source.IsControlledByPlayer && target.IsControlledByPlayer) ||
+                    (source.IsControlledByAi && target.IsControlledByAi);
+            }
+            return false;
         }
 
         private static bool IsEnemy(object self, object other)
