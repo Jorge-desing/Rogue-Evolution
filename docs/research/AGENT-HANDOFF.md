@@ -3077,3 +3077,7 @@ The Windows failure-injection test now verifies that a replacement file with ide
 ### Current Release deployment (2026-11-15)
 
 The prior installed artifact predated loader source commit d4173a1. Rebuilt Release with zero warnings/errors; the validation harness passed 601/602 checks with one skip. Complete harness log: `artifacts/validation-tests/session-loader-check.log`. With Rogue Command closed, backed up and deployed the current DLL; installed and artifact SHA-256 are `2A933FD111AB4B339A9D07A970B4C8EDA8E34A177DFAB4A7867952514BA699CE`. Backup, predeployment manifest and verification: `artifacts/deployment-backups/composition-session-20261115T221443Z/`. No live behavior is implied. Stage publication and POSIX rollback remain open.
+
+### Interrupted bundle rollback (2026-11-15)
+
+Windows rollback now also checks files interrupted before flush completed: matching file identity and full expected SHA-256 permit handle-based removal, while partial content is retained. Bundle/composition modules passed 36 tests. A POSIX runtime was not confirmed on this host; POSIX path and rollback behavior remain unverified.

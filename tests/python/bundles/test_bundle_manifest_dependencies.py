@@ -113,7 +113,7 @@ class BundleManifestDependencyTests(unittest.TestCase):
                             os.replace(replacement, target / "bundles/a.bundle")
                         raise OSError("simulated")
                 with patch("tools.pack_bundle_transfer.resolve_bundle_dependencies"), patch("tools.pack_bundle_transfer.os.fsync", side_effect=fail_second):
-                    with self.assertRaisesRegex(RuntimeError, "Reversión incompleta"):
+                    with self.assertRaises(OSError if mutate == "none" else RuntimeError):
                         copy_bundle_transfer(source, target, pack)
                 first = target / "bundles/a.bundle"
                 if mutate == "edit":
@@ -122,9 +122,9 @@ class BundleManifestDependencyTests(unittest.TestCase):
                     self.assertEqual(b"bundle", first.read_bytes())
                 else:
                     self.assertFalse(first.exists())
-                self.assertTrue((target / "bundles/manifest.bundle").exists())
+                self.assertFalse((target / "bundles/manifest.bundle").exists())
 
-    def test_failed_copy_reports_and_preserves_incomplete_file(self):
+    def test_failed_flush_rolls_back_complete_bytes_on_windows(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source, target = root / "source", root / "target"
@@ -137,7 +137,22 @@ class BundleManifestDependencyTests(unittest.TestCase):
             with patch("tools.pack_bundle_transfer.resolve_bundle_dependencies"), patch("tools.pack_bundle_transfer.os.fsync", side_effect=OSError("simulated")):
                 with self.assertRaisesRegex(RuntimeError, "Reversión incompleta"):
                     copy_bundle_transfer(source, target, pack)
-            self.assertEqual(b"bundle", (target / "bundles/a.bundle").read_bytes())
+            if os.name == "nt":
+                self.assertFalse((target / "bundles/a.bundle").exists())
+            else:
+                self.assertEqual(b"bundle", (target / "bundles/a.bundle").read_bytes())
+
+    @unittest.skipUnless(os.name == "nt", "Windows handle-based rollback")
+    def test_rollback_preserves_incomplete_bytes(self):
+        from tools.pack_bundle_transfer import _rollback_verified_windows_file
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = root / "partial"
+            file.write_bytes(b"part")
+            info = file.stat()
+            self.assertFalse(_rollback_verified_windows_file(root, file, (info.st_dev, info.st_ino), hashlib.sha256(b"complete").hexdigest()))
+            self.assertEqual(b"part", file.read_bytes())
 
 
 if __name__ == "__main__":

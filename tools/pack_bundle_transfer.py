@@ -165,14 +165,13 @@ def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
             target /= parts[-1]
             with open_pack_file(source, row["path"]) as input_stream, open_pack_file(destination, row["path"], create=True) as output_stream:
                 info = os.fstat(output_stream.fileno())
-                created_files.append((target, (info.st_dev, info.st_ino), None))
+                created_files.append((target, (info.st_dev, info.st_ino), row["sha256"]))
                 for block in iter(lambda: input_stream.read(1024 * 1024), b""):
                     output_stream.write(block)
                 output_stream.flush()
                 os.fsync(output_stream.fileno())
             if _pack_sha256(destination, row["path"]) != row["sha256"]:
                 raise ValueError(f"El archivo cambió durante la copia: {row['path']}")
-            created_files[-1] = (target, (info.st_dev, info.st_ino), row["sha256"])
         final = plan_bundle_transfer(source, destination, pack)
         if any(not item["alreadyPresent"] or item["sha256"] != original["sha256"]
                for item, original in zip(final, plan)):
