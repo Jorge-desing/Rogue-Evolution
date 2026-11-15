@@ -184,3 +184,5 @@ Windows directory guards require `GENERIC_READ`: a zero-access CreateFile handle
 The composed writer holds its output parent and ancestors through non-reparse directory handles during staging and publication. On Windows GENERIC_READ without delete sharing blocks renaming that parent. POSIX directory handles reject symlinks but publication still uses pathnames, so concurrent ancestor rename protection is not established there.
 
 Composition creates each staging child while holding its parent directory and checks the child through a non-reparse handle before writing. Windows parent renames are blocked while held; POSIX path-based creation and publication still need race-resistant directory-relative operations.
+
+Dependency analysis verifies that unit references resolve to unit definitions and stage AI profile references resolve to profiles; an ID defined only as another kind is reported unresolved. Generic entity references and native unnamespaced IDs still need their own registry-aware checks.

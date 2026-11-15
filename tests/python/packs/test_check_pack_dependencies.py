@@ -61,6 +61,15 @@ class CheckPackDependenciesTests(unittest.TestCase):
         self.assertIn("external:next", refs)
         self.assertIn("external:blocked", refs)
 
+    def test_unit_reference_cannot_resolve_to_a_profile_or_bundle(self) -> None:
+        pack = SCAFFOLD.generate_scaffold("ns:pack", "alpha")
+        pack["stages"][0]["unitIds"] = ["other:thing"]
+        provider = SCAFFOLD.generate_scaffold("other:pack", "beta")
+        provider["aiProfiles"][0]["id"] = "other:thing"
+        report = DEPS.analyze_dependencies({"consumer": pack, "provider": provider})
+        row = next(row for row in report["packs"] if row["name"] == "consumer")
+        self.assertIn("other:thing (unit)", row["unresolvedReferences"])
+
     def test_synergy_profile_dependencies_module_and_ambiguous_providers(self) -> None:
         packs = _packs()
         dependent = SCAFFOLD.generate_scaffold("other:pack", "beta")

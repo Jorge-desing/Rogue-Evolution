@@ -2946,3 +2946,7 @@ Bundle-transfer and staged-writer directory creation now hold the existing paren
 ## 2026-11-15 — Visual test failures rechecked
 
 The previously failing Bulwark host FBX has changed again: current SHA-256 `7FFBC795926C737CDF1DE8C46797532F527947E2B329E75B020BFCF285CD11E3`, versus `5bda18797919dc2155a56f855333c61730d59596b37420fbf258965dd62a3948` observed in the suite and the pinned test value `1e7af7c4ecea592a970b188eb39054eb32b9f369b2b7b75753dd30760ff24ed1`. Both this FBX and the Arachnid rigged source are modified in the worktree. Arachnid test checks zero NLA tracks; `Refresh-UnitProceduralAnimations.py` removes tracks during regeneration. Current authoring artifacts must be stabilized and their host fit / export independently verified before revising test hashes or replacing source. No visual files were changed by this pass. Continue pack composition destination safety and reference coverage in parallel with the visual acceptance work.
+
+## 2026-11-15 — Typed composition dependencies
+
+The dependency analyzer now checks unit references against unit definitions and stage AI references against profile definitions; a matching ID of the wrong kind is reported unresolved, including same-pack mismatches. Twenty-eight targeted tests passed and the four-pack dependency report remains resolved. Generic entity references and native unnamespaced registry checks remain open, as do destination cleanup and visual suite failures.
