@@ -115,16 +115,31 @@ Tras editar la matriz visual o las fuentes de arte, reconstruye la cadena canón
 .\tools\Build-CanonicalVisualModules.ps1
 ```
 
-El comando regenera los FBX de nivel 2 con Blender 4.5.14, hornea los 28 sets PBR con Material Maker 1.7 en modo estricto (`audit_material_maker_output --workflow urp`), ejecuta una sola sesión batchmode de Unity 2021.3.45f2 (`CanonicalVisualModuleBuilder.RefreshAndBuildCanonicalModules`) para refrescar las prefabs de nivel 1 y compilar los módulos/bundles de nivel 2, audita la salida con `tools.audit_unity_build --strict`, prepara el staging, valida manifiestos y referencias, promueve por defecto los bundles validados a `content/packs/*/bundles/` respaldando los anteriores en `<ArtifactRoot>/prior-bundles-backup/` (via `Invoke-CanonicalBundlePromotion`), y ejecuta `tools.run_animation_validation_matrix --strict-loops`. Al finalizar (salvo con `-DryRun`), escribe `<ArtifactRoot>/build-summary.json` con tiempos por fase, hashes, auditorías, promoción y `calibrationStatus: "UNCALIBRATED_USER_AUTHORIZED"`.
+El comando ejecuta un pipeline *fail-closed* de 10 fases en este orden exacto:
+
+1. `level1-models` (con `-RebuildLevelOneModels`): reconstruye los `.blend` v2 de nivel 1 con Blender 4.5.14 (`--factory-startup`) ejecutando `Build-SampleNativeVehiclesV2SourceBlends.py`, `Build-SampleNativeWalkersV2SourceBlends.py` y `tests/python/authoring/test_sample_native_v2_surface_fit.py` cuando `sample-native-expansion` está en `-Packs`, y `Build-TacticalOperationsV2SourceBlends.py` cuando `tactical-operations` está en `-Packs`.
+2. `level1-textures` (con `-RebuildLevelOneTextures`): ejecuta `tools.build_canonical_level1_textures` a `2^TextureSizePower` y audita en lote con `tools.audit_material_maker_output --prefixes ... --workflow urp --output-dir <ArtifactRoot>/logs --output <ArtifactRoot>/logs/mm-audit-level1-batch.json`.
+3. `blender`: genera la geometría y el manifiesto Level 2 con Blender 4.5.14 (`Build-CanonicalVisualModules.py --force`).
+4. `textures`: hornea los 28 sets PBR (`Build-CanonicalVisualModuleTextures.ps1 -SizePower $TextureSizePower -MaxParallelExports $MaxParallelExports -PackWorkers $PackWorkers`) y ejecuta la auditoría PBR en lote (`tools.audit_material_maker_output --prefixes ... --workflow urp --output-dir <ArtifactRoot>/logs --output <ArtifactRoot>/logs/mm-audit-level2-batch.json`, generando además un `mm-audit-<prefix>.json` por prefijo y `materialMakerBatchQualityReport`, devolviendo código `2` si falla).
+5. `unity`: ejecuta una sola sesión batchmode de Unity 2021.3.45f2 (`CanonicalVisualModuleBuilder.RefreshAndBuildCanonicalModules`, o `BuildCanonicalModules` / `RefreshCanonicalLevelOneVisuals` si se omite una mitad) o hidrata bundles y logs desde caché bajo `-Incremental`.
+6. `unity-audit`: audita el log y bundles con `tools.audit_unity_build --strict` en `<ArtifactRoot>/logs/unity-audit.json` (o verifica el informe hidratado cuando `unity` acierta en caché).
+7. `staging-and-pack-validation`: prepara `<ArtifactRoot>/validation-packs/`, ejecuta `validate_content_pack.py` y `validate_content_bundle_references.py`, corre automáticamente `tools/validate_native_visual_roots.py <stagedRoot> --game-root $GameRoot` cuando existe `$GameRoot\version.txt` para packs con `visualRootPath` o `nativeRigRetarget` (salvo `-SkipNativeVisualValidation`), y genera/verifica la proveniencia (`New-CanonicalVisualBuildManifest` y `Assert-CanonicalVisualBuildFreshness`).
+8. `animation-matrix` (se ejecuta **antes** de `bundle-promotion` para bloquear la promoción si falla): ejecuta `tools.run_animation_validation_matrix --strict-loops` (salvo `-SkipAnimationMatrix`).
+9. `bundle-promotion`: promueve los bundles validados a `content/packs/*/bundles/` respaldando los anteriores con SHA-256 en `<ArtifactRoot>/prior-bundles-backup/` vía `Invoke-CanonicalBundlePromotion` (salvo `-NoPromoteBundles` o `-SkipUnityBuild`).
+10. `package-loader` (con `-PackageLoader` y sin `-SkipUnityBuild`): invoca `tools/Package-Loader.ps1 -CanonicalVisualArtifactRoot <ArtifactRoot> -GameRoot $GameRoot`.
+
+Si falla `bundle-promotion` o `package-loader` tras iniciarse la promoción, el bloque `catch` ejecuta un rollback automático vía `Restore-CanonicalBundlePromotion` desde `<ArtifactRoot>/prior-bundles-backup/` y guarda el resultado en `rollback` dentro de `<ArtifactRoot>/build-summary.json` (junto con tiempos por fase, `audits`, `promotion`, `packageLoader`, `overallSuccess` y `calibrationStatus: "UNCALIBRATED_USER_AUTHORIZED"`, salvo con `-DryRun`).
 
 Flags principales de `Build-CanonicalVisualModules.ps1`:
 
-- `-Incremental`: reutiliza salidas en caché (`artifacts/canonical-level2-cache.json` via `CanonicalVisualBuildProvenance.ps1`) para las fases `blender` y `textures` cuando el hash de entradas coincide.
-- `-SkipBlender`, `-SkipTextures`, `-SkipLevelOneRefresh`, `-SkipUnityBuild`, `-SkipAnimationMatrix`: omiten fases concretas (con `-SkipLevelOneRefresh` invoca `BuildCanonicalModules`; con `-SkipUnityBuild` invoca `RefreshCanonicalLevelOneVisuals` si corresponde).
+- `-Incremental`: habilita la caché de proveniencia por hash (`artifacts/canonical-level2-cache.json` vía `CanonicalVisualBuildProvenance.ps1`) en las 5 fases cacheables (`level1-models`, `level1-textures`, `blender`, `textures` y `unity` mediante hidratación verificada por SHA-256 de bundles, `unity-audit.json` y `unity-builder.log`). Si una fase previa se reconstruye, invalida las dependientes posteriores (`blender` → `textures` → `unity`).
+- `-RebuildLevelOneModels`, `-RebuildLevelOneTextures`: habilitan las fases opcionales de reconstrucción de modelos v2 y texturas de nivel 1.
+- `-SkipBlender`, `-SkipTextures`, `-SkipLevelOneRefresh`, `-SkipUnityBuild`, `-SkipNativeVisualValidation`, `-SkipAnimationMatrix`: omiten fases o validaciones concretas.
 - `-NoPromoteBundles`: omite la promoción automática de bundles a `content/packs/*/bundles/`.
-- `-RebuildLevelOneTextures`: regenera y audita las texturas de nivel 1 (`tools.build_canonical_level1_textures` + `audit_material_maker_output --workflow urp`) antes de Unity.
-- `-DryRun`: valida `-Packs`, resuelve rutas y muestra las fases planificadas (`executed`/`cached`/`skipped`) sin modificar archivos ni lanzar herramientas externas.
-- `-Packs <string[]>`, `-TextureSizePower <7..13>` (por defecto `11` = `2048`), `-ArtifactRoot <string>`: seleccionan paquetes, resolución PBR y carpeta de salida.
+- `-PackageLoader`: encadena `tools/Package-Loader.ps1` como fase 10 al finalizar la promoción.
+- `-RestoreBundlesFrom <backupRoot>`: modo independiente que restaura bundles respaldados (o elimina bundles recién añadidos con `existed=false`) con verificación SHA-256 vía `Restore-CanonicalBundlePromotion` y sale con código `0` (admite `-Packs` y `-DryRun`).
+- `-DryRun`: valida `-Packs`, resuelve rutas y muestra el plan de las 10 fases (`executed`/`cached`/`skipped`) o el plan de restauración sin modificar archivos ni lanzar herramientas externas.
+- `-Packs <string[]>`, `-GameRoot <string>`, `-ArtifactRoot <string>`, `-TextureSizePower <9|10|11|12>` (por defecto `11` = `2048`), `-MaxParallelExports <1..8>` (por defecto `4`), `-PackWorkers <1..8>` (por defecto `4`).
 
 Las posiciones de hardpoints salen de `tools/CanonicalUnitHardpoints.py`, compartido por los constructores de fuente y los constructores rigged; la actualización conserva los sockets de los FBX y completa los cuatro hardpoints canónicos si faltan. La compilación de nivel 2 verifica que cada prefab tenga uno de cada tipo antes de enlazar los módulos. `content/source-art/canonical-visual-module-roles.json` declara la función mecánica visible de cada módulo por variante y hardpoint; los presets PBR solo definen superficie. También guarda una huella de las fuentes y hashes de cada bundle para que un cambio posterior en el proyecto Unity, en los manifiestos o en los roles invalide el staging. Para repetir la auditoría de referencias en el staging recién creado:
 
@@ -138,14 +153,16 @@ El chequeo de referencias lee los AssetBundles con UnityPy y no modifica el pack
 
 El validador de rutas nativas requiere Python 3.11 o posterior y las dependencias fijadas en `requirements.txt`. Verifica versión, SHA-256 y MVID del juego, además del hash de `resources.assets`, y comprueba que cada ruta visual nativa sea única y contenga renderers. La selección del recurso y su aspecto dentro de una partida se comprueban por separado.
 
-Para crear un ZIP de instalación sin escribir en la carpeta del juego:
+Para crear un ZIP de instalación sin escribir en la carpeta del juego (en un solo comando con `-PackageLoader` o ejecutando `Package-Loader.ps1` por separado):
 
 ```powershell
+.\tools\Build-CanonicalVisualModules.ps1 -PackageLoader
+# o en dos pasos:
 .\tools\Build-CanonicalVisualModules.ps1
 .\tools\Package-Loader.ps1
 ```
 
-El primer comando reconstruye y valida los módulos visuales canónicos y prepara los packs actuales en un directorio nuevo `artifacts/canonical-level2-<UTC>/validation-packs/`, sin reemplazar ejecuciones previas. El segundo selecciona el build validado más reciente, comprueba la huella de fuentes, los hashes de los bundles y el `content.json` vigente antes de crear el ZIP en `artifacts/packages/`, con el plugin, el esquema, `sample-native-expansion` y `sample-reactive-ai`. `sample-expansion` queda fuera porque todavía necesita sus propios assets completos de balance, etapa, AI y mapa. Se puede fijar una ejecución concreta con `-CanonicalVisualArtifactRoot <directorio>`; la instalación usada para compilar se cambia con `-GameRoot` y la ruta local de BepInEx con `-BepInExCorePath`.
+El primer comando reconstruye y valida los módulos visuales canónicos y prepara los packs actuales en un directorio nuevo `artifacts/canonical-level2-<UTC>/validation-packs/`, sin reemplazar ejecuciones previas (y con `-PackageLoader` ejecuta `Package-Loader.ps1` como fase 10, activando rollback automático de bundles si el empaquetado falla). El segundo selecciona el build validado más reciente, comprueba la huella de fuentes, los hashes de los bundles y el `content.json` vigente antes de crear el ZIP en `artifacts/packages/`, con el plugin, el esquema, `sample-native-expansion` y `sample-reactive-ai`. `sample-expansion` queda fuera porque todavía necesita sus propios assets completos de balance, etapa, AI y mapa. Se puede fijar una ejecución concreta con `-CanonicalVisualArtifactRoot <directorio>`; la instalación usada para compilar se cambia con `-GameRoot` y la ruta local de BepInEx con `-BepInExCorePath`.
 
 ## Instalar
 

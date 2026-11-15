@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 from PIL import Image, ImageStat
@@ -270,27 +270,95 @@ def build_quality_report(
     }
 
 
-def main() -> int:
+def _resolve_prefixes(
+    parser: argparse.ArgumentParser,
+    prefix: str,
+    prefixes: Sequence[str],
+) -> tuple[bool, list[str]]:
+    """Resolve CLI prefix arguments into `(is_batch, ordered_prefixes)`."""
+    single_prefix = prefix.strip()
+    batch_prefixes = [item.strip() for item in prefixes if item.strip()]
+    if not single_prefix and not batch_prefixes:
+        parser.error("Provide --prefix or --prefixes with at least one non-empty prefix.")
+    if not batch_prefixes:
+        return False, [single_prefix]
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+    candidates = ([single_prefix] if single_prefix else []) + batch_prefixes
+    for candidate in candidates:
+        if candidate not in seen:
+            seen.add(candidate)
+            ordered.append(candidate)
+    return True, ordered
+
+
+def _write_json_report(path: Path, payload: dict[str, Any]) -> None:
+    """Write an indented JSON audit report, creating parent directories if needed."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
-    parser.add_argument("--prefix", required=True)
+    parser.add_argument("--prefix", default="")
+    parser.add_argument("--prefixes", nargs="+", default=[])
     parser.add_argument("--template", type=Path, default=None)
     parser.add_argument("--workspace", type=Path, default=None)
     parser.add_argument("--workflow", default="")
     parser.add_argument("--output", type=Path, default=None)
-    args = parser.parse_args()
-    report = build_quality_report(
-        args.directory,
-        args.prefix,
-        template_path=args.template,
-        workspace_path=args.workspace,
-        workflow_name=args.workflow,
-    )
-    output = args.output or args.directory / f"{args.prefix}_quality-report.json"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(json.dumps(report, indent=2))
-    return 0 if report["qualityGate"]["passed"] else 2
+    parser.add_argument("--output-dir", type=Path, default=None)
+    args = parser.parse_args(argv)
+
+    is_batch, resolved_prefixes = _resolve_prefixes(parser, args.prefix, args.prefixes)
+    if not is_batch:
+        single_prefix = resolved_prefixes[0]
+        report = build_quality_report(
+            args.directory,
+            single_prefix,
+            template_path=args.template,
+            workspace_path=args.workspace,
+            workflow_name=args.workflow,
+        )
+        output = args.output if args.output is not None else args.directory / f"{single_prefix}_quality-report.json"
+        _write_json_report(output, report)
+        print(json.dumps(report, indent=2))
+        return 0 if report["qualityGate"]["passed"] else 2
+
+    reports: list[dict[str, Any]] = []
+    for prefix in resolved_prefixes:
+        report = build_quality_report(
+            args.directory,
+            prefix,
+            template_path=args.template,
+            workspace_path=args.workspace,
+            workflow_name=args.workflow,
+        )
+        individual_output = (
+            args.output_dir / f"mm-audit-{prefix}.json"
+            if args.output_dir is not None
+            else args.directory / f"{prefix}_quality-report.json"
+        )
+        _write_json_report(individual_output, report)
+        reports.append(report)
+
+    batch_report: dict[str, Any] = {
+        "kind": "materialMakerBatchQualityReport",
+        "workflow": args.workflow or "unknown",
+        "totalCount": len(reports),
+        "passedCount": sum(1 for r in reports if r["qualityGate"]["passed"]),
+        "failedPrefixes": [r["prefix"] for r in reports if not r["qualityGate"]["passed"]],
+        "qualityGate": {
+            "passed": all(r["qualityGate"]["passed"] for r in reports),
+            "failureCount": sum(r["qualityGate"]["failureCount"] for r in reports),
+        },
+        "reports": reports,
+    }
+    if args.output is not None:
+        _write_json_report(args.output, batch_report)
+    print(json.dumps(batch_report, indent=2))
+    return 0 if batch_report["qualityGate"]["passed"] else 2
 
 
 if __name__ == "__main__":

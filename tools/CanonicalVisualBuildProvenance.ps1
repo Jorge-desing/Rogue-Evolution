@@ -263,7 +263,7 @@ function Get-CanonicalPhaseInputHash {
         [Parameter(Mandatory = $true)]
         [string]$RepositoryRoot,
         [Parameter(Mandatory = $true)]
-        [ValidateSet('blender', 'textures', 'level1-textures', 'unity')]
+        [ValidateSet('blender', 'textures', 'level1-textures', 'level1-models', 'unity')]
         [string]$Phase
     )
 
@@ -272,6 +272,7 @@ function Get-CanonicalPhaseInputHash {
     $requiredInputs = @()
     $optionalInputs = @()
     $includeUnityDirectories = $false
+    $includeLevelOneSourceBlends = $false
 
     switch ($Phase) {
         'blender' {
@@ -321,6 +322,22 @@ function Get-CanonicalPhaseInputHash {
                 'unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Textures/Detail/RCL_SteelMicroDetail_Normal.png'
             )
         }
+        'level1-models' {
+            $requiredInputs = @(
+                'tools/RogueModelKit.py',
+                'tools/CanonicalUnitHardpoints.py',
+                'tools/VisualModelAuthoringSupport.py'
+            )
+            $optionalInputs = @(
+                'tools/sample_native_vehicles_v2_recipes.py',
+                'tools/sample_native_walkers_v2_recipes.py',
+                'tools/tactical_operations_v2_recipes.py',
+                'tools/Build-SampleNativeVehiclesV2SourceBlends.py',
+                'tools/Build-SampleNativeWalkersV2SourceBlends.py',
+                'tools/Build-TacticalOperationsV2SourceBlends.py'
+            )
+            $includeLevelOneSourceBlends = $true
+        }
         'unity' {
             $requiredInputs = @(
                 'content/packs/sample-native-expansion/content.json',
@@ -345,6 +362,34 @@ function Get-CanonicalPhaseInputHash {
         $fullPath = [System.IO.Path]::GetFullPath((Join-Path $root $relativePath))
         if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
             [void]$inputPaths.Add($fullPath)
+        }
+    }
+
+    if ($includeLevelOneSourceBlends) {
+        $sourceArtDir = Join-Path $root 'content/source-art'
+        if (Test-Path -LiteralPath $sourceArtDir -PathType Container) {
+            $sourceArtItem = Get-Item -LiteralPath $sourceArtDir -Force
+            if (($sourceArtItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Phase '$Phase' input directories cannot be reparse points: $sourceArtDir"
+            }
+            foreach ($file in Get-ChildItem -LiteralPath $sourceArtDir -Filter '*.blend' -File -Force) {
+                $name = $file.Name
+                if (-not $name.EndsWith('.blend', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    continue
+                }
+                if ($name.EndsWith('-v2.blend', [System.StringComparison]::OrdinalIgnoreCase) -or
+                    $name.EndsWith('-rigged.blend', [System.StringComparison]::OrdinalIgnoreCase) -or
+                    [string]::Equals($name, 'canonical-visual-modules.blend', [System.StringComparison]::OrdinalIgnoreCase)) {
+                    continue
+                }
+                if (($file.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    continue
+                }
+                $fullPath = [System.IO.Path]::GetFullPath($file.FullName)
+                if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+                    [void]$inputPaths.Add($fullPath)
+                }
+            }
         }
     }
 
@@ -664,6 +709,251 @@ function Invoke-CanonicalBundlePromotion {
                 backedUpCount = $backedUpCount
                 promotedCount = $promotedRecords.Count
                 bundles = @($promotedRecords.ToArray())
+            }
+        }
+    )
+
+    return $summaries
+}
+
+function Restore-CanonicalBundlePromotion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepositoryRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$BackupRoot,
+        [Parameter(Mandatory = $false)]
+        [string[]]$PackNames = @()
+    )
+
+    $root = [System.IO.Path]::GetFullPath($RepositoryRoot).TrimEnd('\')
+    $backupRootFull = [System.IO.Path]::GetFullPath($BackupRoot).TrimEnd('\')
+    if (-not (Test-Path -LiteralPath $backupRootFull -PathType Container)) {
+        throw "Backup root directory does not exist for restore: $backupRootFull"
+    }
+    $backupRootItem = Get-Item -LiteralPath $backupRootFull -Force
+    if (($backupRootItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Backup root directory cannot be a reparse point: $backupRootFull"
+    }
+    $backupRootPrefix = if ($backupRootFull.EndsWith('\')) { $backupRootFull } else { $backupRootFull + '\' }
+
+    $targetPacks = [System.Collections.Generic.List[string]]::new()
+    if ($null -eq $PackNames -or $PackNames.Count -eq 0) {
+        $discovered = [System.Collections.Generic.SortedSet[string]]::new([System.StringComparer]::Ordinal)
+        foreach ($dir in Get-ChildItem -LiteralPath $backupRootFull -Directory -Force) {
+            $candidateManifest = Join-Path $dir.FullName 'backup-manifest.json'
+            if (Test-Path -LiteralPath $candidateManifest -PathType Leaf) {
+                if (($dir.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "Backup pack directory cannot be a reparse point: $($dir.FullName)"
+                }
+                [void]$discovered.Add($dir.Name)
+            }
+        }
+        foreach ($name in $discovered) {
+            [void]$targetPacks.Add($name)
+        }
+        if ($targetPacks.Count -eq 0) {
+            throw "No pack backup manifests (backup-manifest.json) found under backup root: $backupRootFull"
+        }
+    } else {
+        $seenInputPacks = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+        foreach ($rawPack in $PackNames) {
+            $candidateName = if ($null -eq $rawPack) { '' } else { $rawPack.Trim() }
+            if ($seenInputPacks.Add($candidateName)) {
+                [void]$targetPacks.Add($candidateName)
+            }
+        }
+    }
+
+    $summaries = @(
+        foreach ($packName in $targetPacks) {
+            if ([string]::IsNullOrWhiteSpace($packName) -or $packName -notmatch '^[a-z0-9][a-z0-9-]*$') {
+                throw "Invalid canonical visual pack name for restore: $packName"
+            }
+
+            $packBackupDir = [System.IO.Path]::GetFullPath((Join-Path $backupRootFull $packName))
+            if (-not $packBackupDir.StartsWith($backupRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                throw "Backup pack directory escaped backup root for '$packName': $packBackupDir"
+            }
+            if (-not (Test-Path -LiteralPath $packBackupDir -PathType Container)) {
+                throw "Backup pack directory is missing for restore: $packBackupDir"
+            }
+            $packBackupItem = Get-Item -LiteralPath $packBackupDir -Force
+            if (($packBackupItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Backup pack directory cannot be a reparse point: $packBackupDir"
+            }
+            $packBackupPrefix = $packBackupDir.TrimEnd('\') + '\'
+
+            $backupManifestPath = [System.IO.Path]::GetFullPath((Join-Path $packBackupDir 'backup-manifest.json'))
+            if (-not (Test-Path -LiteralPath $backupManifestPath -PathType Leaf)) {
+                throw "Backup manifest is missing for pack '$packName': $backupManifestPath"
+            }
+            $manifestItem = Get-Item -LiteralPath $backupManifestPath -Force
+            if (($manifestItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Backup manifest cannot be a reparse point: $backupManifestPath"
+            }
+
+            $manifest = Get-Content -LiteralPath $backupManifestPath -Raw | ConvertFrom-Json
+            if ($null -eq $manifest -or $manifest.schemaVersion -is [bool] -or $manifest.schemaVersion -ne 1) {
+                throw "Unsupported backup manifest schemaVersion in '$backupManifestPath': $($manifest.schemaVersion)"
+            }
+            if ([string]$manifest.packName -cne $packName) {
+                throw "Backup manifest packName mismatch in '$backupManifestPath': expected '$packName', got '$($manifest.packName)'"
+            }
+            if ($null -eq $manifest.bundles) {
+                throw "Backup manifest is missing bundles array in '$backupManifestPath'"
+            }
+
+            $sourcePackDir = [System.IO.Path]::GetFullPath((Join-Path $root "content\packs\$packName"))
+            $sourcePackPrefix = $sourcePackDir.TrimEnd('\') + '\'
+            foreach ($dirToCheck in @((Join-Path $root 'content'), (Join-Path $root 'content\packs'), $sourcePackDir)) {
+                if (Test-Path -LiteralPath $dirToCheck) {
+                    $dirItem = Get-Item -LiteralPath $dirToCheck -Force
+                    if (($dirItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                        throw "Destination pack directory cannot be a reparse point: $dirToCheck"
+                    }
+                }
+            }
+
+            $seenPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+            $bundleResults = New-Object System.Collections.Generic.List[object]
+            $restoredCount = 0
+            $removedCount = 0
+
+            foreach ($entry in @($manifest.bundles)) {
+                if ($null -eq $entry) {
+                    throw "Backup manifest contains null bundle entry in '$backupManifestPath'"
+                }
+                $relativePath = [string]$entry.path
+                if ([string]::IsNullOrWhiteSpace($relativePath) -or
+                    $relativePath -notmatch '^bundles/[a-z0-9][a-z0-9._-]*\.bundle$' -or
+                    -not $seenPaths.Add($relativePath)) {
+                    throw "Invalid or duplicate bundle path in backup manifest '$packName': $relativePath"
+                }
+                if ($null -eq $entry.existed -or ($entry.existed -isnot [bool])) {
+                    throw "Backup manifest entry for '$packName/$relativePath' has invalid 'existed' flag."
+                }
+
+                $relativeWin = $relativePath.Replace('/', '\')
+                $liveBundlePath = [System.IO.Path]::GetFullPath((Join-Path $sourcePackDir $relativeWin))
+                if (-not $liveBundlePath.StartsWith($sourcePackPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw "Destination bundle path escaped pack boundary during restore for '$packName': $relativePath"
+                }
+
+                $liveParent = Split-Path -Parent $liveBundlePath
+                if (Test-Path -LiteralPath $liveParent) {
+                    $liveParentItem = Get-Item -LiteralPath $liveParent -Force
+                    if (($liveParentItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                        throw "Destination bundle directory cannot be a reparse point: $liveParent"
+                    }
+                }
+                $existingLiveItem = Get-Item -LiteralPath $liveBundlePath -Force -ErrorAction SilentlyContinue
+                if ($null -ne $existingLiveItem) {
+                    if (($existingLiveItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                        throw "Destination bundle path cannot be a reparse point: $liveBundlePath"
+                    }
+                    if ($existingLiveItem.PSIsContainer) {
+                        throw "Destination bundle path cannot be a directory: $liveBundlePath"
+                    }
+                }
+
+                if ($entry.existed -eq $true) {
+                    $expectedSha = [string]$entry.sha256
+                    if ([string]::IsNullOrWhiteSpace($expectedSha) -or $expectedSha -notmatch '^[0-9a-fA-F]{64}$') {
+                        throw "Backup manifest entry for '$packName/$relativePath' is missing a valid SHA-256."
+                    }
+
+                    $resolvedBackupPath = $null
+                    $primaryBackupPath = [System.IO.Path]::GetFullPath((Join-Path $packBackupDir $relativeWin))
+                    if (-not $primaryBackupPath.StartsWith($packBackupPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        throw "Backup bundle path escaped pack backup boundary for '$packName': $relativePath"
+                    }
+                    $primaryExisting = Get-Item -LiteralPath $primaryBackupPath -Force -ErrorAction SilentlyContinue
+                    if ($null -ne $primaryExisting) {
+                        if (($primaryExisting.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                            throw "Backup bundle cannot be a reparse point: $primaryBackupPath"
+                        }
+                        if (-not $primaryExisting.PSIsContainer) {
+                            $resolvedBackupPath = $primaryBackupPath
+                        }
+                    } elseif (-not [string]::IsNullOrWhiteSpace([string]$entry.backupPath)) {
+                        $rawFallback = [string]$entry.backupPath
+                        $fallbackCandidate = if ([System.IO.Path]::IsPathRooted($rawFallback)) {
+                            [System.IO.Path]::GetFullPath($rawFallback)
+                        } else {
+                            [System.IO.Path]::GetFullPath((Join-Path $packBackupDir $rawFallback))
+                        }
+                        if (-not $fallbackCandidate.StartsWith($packBackupPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                            throw "Fallback backupPath escaped pack backup boundary for '$packName/$relativePath': $rawFallback"
+                        }
+                        $fallbackExisting = Get-Item -LiteralPath $fallbackCandidate -Force -ErrorAction SilentlyContinue
+                        if ($null -ne $fallbackExisting) {
+                            if (($fallbackExisting.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                                throw "Backup bundle cannot be a reparse point: $fallbackCandidate"
+                            }
+                            if (-not $fallbackExisting.PSIsContainer) {
+                                $resolvedBackupPath = $fallbackCandidate
+                            }
+                        }
+                    }
+
+                    if ($null -eq $resolvedBackupPath) {
+                        throw "Backup bundle file is missing for '$packName/$relativePath' under '$packBackupDir'."
+                    }
+
+                    $backupHash = (Get-FileHash -LiteralPath $resolvedBackupPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    if (-not [string]::Equals($backupHash, $expectedSha, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        throw "Backup SHA-256 mismatch for '$packName/$relativePath' (expected $expectedSha, got $backupHash)"
+                    }
+
+                    New-Item -ItemType Directory -Path $liveParent -Force | Out-Null
+                    Copy-Item -LiteralPath $resolvedBackupPath -Destination $liveBundlePath -Force
+                    $postCopyHash = (Get-FileHash -LiteralPath $liveBundlePath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    if (-not [string]::Equals($postCopyHash, $expectedSha, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        throw "Post-copy SHA-256 verification failed during restore for '$packName/$relativePath' (expected $expectedSha, got $postCopyHash)"
+                    }
+
+                    $restoredCount++
+                    [void]$bundleResults.Add([pscustomobject]@{
+                        path = $relativePath
+                        action = 'restored'
+                        existed = $true
+                        sha256 = $postCopyHash
+                        backupPath = $resolvedBackupPath
+                        destinationPath = $liveBundlePath
+                    })
+                } else {
+                    if ($null -ne $existingLiveItem) {
+                        Remove-Item -LiteralPath $liveBundlePath -Force
+                        $removedCount++
+                        [void]$bundleResults.Add([pscustomobject]@{
+                            path = $relativePath
+                            action = 'removed'
+                            existed = $false
+                            sha256 = $null
+                            backupPath = $null
+                            destinationPath = $liveBundlePath
+                        })
+                    } else {
+                        [void]$bundleResults.Add([pscustomobject]@{
+                            path = $relativePath
+                            action = 'absent'
+                            existed = $false
+                            sha256 = $null
+                            backupPath = $null
+                            destinationPath = $liveBundlePath
+                        })
+                    }
+                }
+            }
+
+            [pscustomobject]@{
+                packName = $packName
+                backupManifestPath = $backupManifestPath
+                restoredCount = $restoredCount
+                removedCount = $removedCount
+                bundles = @($bundleResults.ToArray())
             }
         }
     )
