@@ -3109,3 +3109,7 @@ Re-extracted `sample-native:scout-tank` with the current Windows guarded writer 
 ### Atomic Windows stage creation (2026-11-15)
 
 The Windows writer now creates the stage exclusively and acquires its non-delete-sharing directory handle atomically using NtCreateFile, while its parent is guarded. A regression confirms immediate rename protection and no reuse of an existing child. UNC destinations fail explicitly. Composition/secure-read passed 38 tests with one skip; full Python `all` passed in 36.02 s. The prior Windows create-to-guard gap is closed; concurrent child-file changes after the final hash check and POSIX safety remain open.
+
+### Two real packs through atomic writer (2026-11-15)
+
+With atomic Windows stage creation, extracted `sample-native:scout-tank` to `artifacts/composition-real-pack-atomic-20261115` and imported `tactical-operations:tidebreaker-skirmisher` into sample-native at `artifacts/composition-two-real-packs-20261115`. Both validated locally. The imported result has 18 units and two declared bundles; both output bundle hashes matched their sources and UnityPy read the combined manifest with exactly both bundle names. Retained staging copies are `artifacts/.rogue-compose-ss35qtz8` and `artifacts/.rogue-compose-rumtwc3a`. Native references and in-game operation remain unverified; post-hash stage mutation and POSIX safety remain open.
