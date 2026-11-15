@@ -148,6 +148,7 @@ def analyze_dependencies(packs: dict) -> dict:
                 native_refs.add((value, kind))
         for unit in _as_list(_as_dict(packs[name]).get("units")):
             if isinstance(unit, dict):
+                add(unit.get("copyUpgradesToEntityId"), "entity")
                 for upgrade in _as_list(unit.get("upgrades")):
                     if isinstance(upgrade, dict): add(upgrade.get("targetUnitId"), "unit")
                 for synergy in _as_list(unit.get("synergies")):
@@ -173,11 +174,13 @@ def analyze_dependencies(packs: dict) -> dict:
                             if isinstance(parameter, dict) and module.get("moduleId") == "sample:scheduled-base-build" and parameter.get("name") == "entityId": add(parameter.get("value"), "factory")
         for relic in _as_list(_as_dict(packs[name]).get("relics")) + _as_list(_as_dict(packs[name]).get("upgrades")):
             if isinstance(relic, dict):
+                for value in _as_list(relic.get("mustNotHaveOneOfTheseEntityIds")): add(value, "entity")
                 for change in _as_list(relic.get("cardChanges")):
                     if isinstance(change, dict):
                         for field in ("onlyForTheseEntityIds", "entityIdsNotAllowed"):
                             for value in _as_list(change.get(field)): add(value, "unit")
-        catalogs = {"unit": unit_providers, "profile": profile_providers, "factory": factory_providers}
+        entity_providers = {key: unit_providers[key] | factory_providers[key] for key in unit_providers}
+        catalogs = {"unit": unit_providers, "profile": profile_providers, "factory": factory_providers, "entity": entity_providers}
         wrong_type = sorted(f"{value} ({kind})" for value, kind in typed_refs
                             if value in providers and not any(value in ids for ids in catalogs[kind].values()))
         unresolved = sorted(set(unresolved) | set(wrong_type))

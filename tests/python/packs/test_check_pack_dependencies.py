@@ -62,6 +62,14 @@ class CheckPackDependenciesTests(unittest.TestCase):
         self.assertIn("external:next", refs)
         self.assertIn("external:blocked", refs)
 
+    def test_native_copy_and_upgrade_exclusions_are_unverified(self) -> None:
+        pack = _packs()["scaffold"]
+        pack["units"][0]["copyUpgradesToEntityId"] = "NativeTarget"
+        pack["upgrades"] = [{"id": "ns:upgrade", "mustNotHaveOneOfTheseEntityIds": ["NativeBlocked"]}]
+        row = DEPS.analyze_dependencies({"pack": pack})["packs"][0]
+        self.assertIn("NativeTarget (entity)", row["unverifiedNativeReferences"])
+        self.assertIn("NativeBlocked (entity)", row["unverifiedNativeReferences"])
+
     def test_unit_reference_cannot_resolve_to_a_profile_or_bundle(self) -> None:
         pack = SCAFFOLD.generate_scaffold("ns:pack", "alpha")
         pack["stages"][0]["unitIds"] = ["other:thing"]
