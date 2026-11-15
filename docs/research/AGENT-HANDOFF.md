@@ -3101,3 +3101,7 @@ The stage directory is now held without delete sharing during population and val
 ### Stage content snapshot check (2026-11-15)
 
 The composed writer records expected SHA-256 values for bundles, merged manifest, content and sidecar, then checks them before publication; a mismatch retains the stage and prevents output. Failure injection and bundle/composition modules passed 40 tests. A Windows probe showed that keeping a child file open while denying writes prevented parent rename even with delete sharing. Mutation after the hash check remains a race; creation-to-guard and POSIX issues also remain open.
+
+### Guarded real-bundle composition (2026-11-15)
+
+Re-extracted `sample-native:scout-tank` with the current Windows guarded writer to `artifacts/composition-real-pack-guarded-20261115`. Publication succeeded, pack validation passed, the transferred `sample-native-expansion.bundle` SHA-256 matched its source, and Unity manifest dependency inspection matched the declared bundle exactly. The retained temporary source copy is `artifacts/.rogue-compose-hhe_i0lv`; preserve pending explicit inspection. Sixteen native templates remain unverified. This is local evidence, not an in-game test; stage content races and POSIX behavior remain open.
