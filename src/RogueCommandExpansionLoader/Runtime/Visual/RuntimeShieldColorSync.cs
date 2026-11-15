@@ -50,12 +50,98 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             return !string.Equals(currentShaderName, targetShaderName, StringComparison.Ordinal);
         }
 
+        public static readonly Color PlayerTeamTint = new Color(0.62f, 0.80f, 1.0f, 1.0f);
+        public static readonly Color AiTeamTint = new Color(1.0f, 0.58f, 0.52f, 1.0f);
+        public const string TeamColorPropertyName = "_TeamColor";
+
+        public static bool TryResolveTeamTint(bool isPlayer, bool isAi, out Color tint)
+        {
+            tint = new Color(1f, 1f, 1f, 1f);
+            if (isPlayer == isAi)
+            {
+                return false;
+            }
+
+            tint = isPlayer ? PlayerTeamTint : AiTeamTint;
+            return true;
+        }
+
+        /// <summary>
+        /// Writes the faction tint into _TeamColor (alpha-masked hull plates of VehiclePBR_VertexWear)
+        /// through a MaterialPropertyBlock so shared materials are never duplicated. Safe after pool reuse
+        /// because it is re-evaluated whenever the entity leaves EntityFactory.PrespawnedEntities.
+        /// </summary>
+        public static int SyncFactionTeamColors(EntityController entity)
+        {
+            if (entity == null || entity.gameObject == null ||
+                !TryResolveTeamTint(entity.IsControlledByPlayer, entity.IsControlledByAi, out Color tint))
+            {
+                return 0;
+            }
+
+            int updated = 0;
+            Renderer[] renderers = entity.gameObject.GetComponentsInChildren<Renderer>(true);
+            if (renderers == null)
+            {
+                return 0;
+            }
+
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null || !IsUnderModVisual(renderer.transform, entity.transform))
+                {
+                    continue;
+                }
+
+                Material[] materials = renderer.sharedMaterials;
+                if (materials == null)
+                {
+                    continue;
+                }
+
+                for (int m = 0; m < materials.Length; m++)
+                {
+                    Material mat = materials[m];
+                    if (mat == null || !mat.HasProperty(TeamColorPropertyName))
+                    {
+                        continue;
+                    }
+
+                    var block = new MaterialPropertyBlock();
+                    renderer.GetPropertyBlock(block, m);
+                    block.SetColor(TeamColorPropertyName, tint);
+                    renderer.SetPropertyBlock(block, m);
+                    updated++;
+                }
+            }
+
+            return updated;
+        }
+
+        private static bool IsUnderModVisual(Transform target, Transform root)
+        {
+            Transform current = target;
+            while (current != null && !ReferenceEquals(current, root))
+            {
+                if (current.name != null && current.name.StartsWith("RCL_Visual_", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                current = current.parent;
+            }
+
+            return false;
+        }
+
         public static void ApplyIfApplicable(object entityObj)
         {
             EntityController entity = ResolveEntityController(entityObj);
             if (entity != null)
             {
                 SyncShieldVisuals(entity);
+                SyncFactionTeamColors(entity);
             }
         }
 

@@ -130,6 +130,14 @@ namespace RogueCommandExpansionLoader.Runtime
         IEnumerable<PrespawnQuota> GetPrespawnQuotas();
     }
 
+    /// <summary>
+    /// Optional bridge invoked from a Prefix on AiBehaviour.Update, before Setup()/BuildStartBases().
+    /// </summary>
+    public interface IAiPreSetupRuntimeProvider
+    {
+        void OnAiBehaviourPreSetup(object gameBehaviour);
+    }
+
     public interface IStageFallbackRuntimeProvider
     {
         object GetFallbackLandscapeSnapshot(object nativeFallbacks);

@@ -805,6 +805,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
     public sealed class RuntimeVisualDirector : Component
     {
         public static void AttachIfApplicable(object entityObj) { }
+        public static void AttachOrRefreshAfterInstantiate(object entityObj) { }
         public static System.Action<object> OnEntityReusedAction;
         public static void OnEntityReused(object entityObj) => OnEntityReusedAction?.Invoke(entityObj);
         public bool IsTurretJammed { get; set; }

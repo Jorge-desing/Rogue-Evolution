@@ -1382,6 +1382,21 @@ namespace RogueCommandExpansionLoader.Runtime
             }
         }
 
+        public static void AiBehaviourUpdatePrefix(object __instance)
+        {
+            IRuntimeContentProvider provider;
+            lock (Gate)
+            {
+                provider = _provider;
+            }
+
+            IAiPreSetupRuntimeProvider preSetup = provider as IAiPreSetupRuntimeProvider;
+            if (preSetup != null && __instance != null)
+            {
+                SafeCall(delegate { preSetup.OnAiBehaviourPreSetup(__instance); });
+            }
+        }
+
         public static void AiBehaviourUpdatePostfix(object __instance)
         {
             IRuntimeContentProvider provider;
@@ -1811,7 +1826,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 SafeCall(delegate
                 {
-                    Visual.RuntimeVisualDirector.AttachIfApplicable(result);
+                    Visual.RuntimeVisualDirector.AttachOrRefreshAfterInstantiate(result);
                     Visual.RuntimeShieldColorSync.ApplyIfApplicable(result);
                     RuntimeUnitMechanicsDirector.AttachIfApplicable(result);
                     RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(result);
@@ -1882,7 +1897,8 @@ namespace RogueCommandExpansionLoader.Runtime
             System.Threading.Interlocked.Increment(ref _entityOnInstantiatedTranspilerCount);
             SafeCall(delegate
             {
-                Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                Visual.RuntimeVisualDirector.AttachOrRefreshAfterInstantiate(entityObj);
+                Visual.RuntimeShieldColorSync.ApplyIfApplicable(entityObj);
                 RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
                 RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
             });
@@ -3228,6 +3244,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void DefaultAiBehaviourInitPostfix(object __instance)
         {
             RuntimeHooks.DefaultAiBehaviourInitPostfix(__instance);
+        }
+
+        public static void AiBehaviourUpdatePrefix(object __instance)
+        {
+            RuntimeHooks.AiBehaviourUpdatePrefix(__instance);
         }
 
         public static void AiBehaviourUpdatePostfix(object __instance)

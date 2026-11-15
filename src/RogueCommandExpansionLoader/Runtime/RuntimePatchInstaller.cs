@@ -99,7 +99,8 @@ namespace RogueCommandExpansionLoader.Runtime
                     RuntimeHooks.Bind(mutator, provider, logger);
                     RuntimeHooks.OnEntityInstantiated = delegate(object entityObj)
                     {
-                        Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
+                        Visual.RuntimeVisualDirector.AttachOrRefreshAfterInstantiate(entityObj);
+                        Visual.RuntimeShieldColorSync.ApplyIfApplicable(entityObj);
                         RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
                         RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
                     };
@@ -380,6 +381,7 @@ namespace RogueCommandExpansionLoader.Runtime
             MethodInfo instantiatePrefix = Hook("InstantiateEntityPrefix");
             MethodInfo instantiatePostfix = Hook("InstantiateEntityPostfix");
             MethodInfo entityMeshPrefix = Hook("CreateEntityMeshPrefix");
+            MethodInfo aiUpdatePrefix = Hook("AiBehaviourUpdatePrefix");
             MethodInfo aiUpdatePostfix = Hook("AiBehaviourUpdatePostfix");
             MethodInfo aiInitPostfix = Hook("DefaultAiBehaviourInitPostfix");
             MethodInfo aiDestroyPostfix = Hook("AiBehaviourDestroyPostfix");
@@ -670,7 +672,7 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(createLevelMap, levelMapPrefix, null, levelMapFinalizer));
             plan.Add(new PatchPlan(instantiateEntity, instantiatePrefix, instantiatePostfix, instantiateTranspiler, null));
             plan.Add(new PatchPlan(createEntityMesh, entityMeshPrefix, null));
-            plan.Add(new PatchPlan(aiUpdate, null, aiUpdatePostfix));
+            plan.Add(new PatchPlan(aiUpdate, aiUpdatePrefix, aiUpdatePostfix));
             plan.Add(new PatchPlan(aiInit, null, aiInitPostfix));
             plan.Add(new PatchPlan(aiDestroy, null, aiDestroyPostfix));
             plan.Add(new PatchPlan(blueprintName, blueprintNamePrefix, null));

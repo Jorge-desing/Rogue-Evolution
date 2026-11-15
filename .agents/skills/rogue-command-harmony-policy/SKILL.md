@@ -1,6 +1,6 @@
 ---
 name: rogue-command-harmony-policy
-description: "BepInEx 5 + Harmony 2 patching policy for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64), including centralized RuntimePatchInstaller (70 hooks, 30 CIL transpilers), compatibility identity gating, and live patch inspection/patching via BepInEx MCP. [Política de BepInEx 5 + Harmony 2 para Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). Uso: plugins Unity, patches Harmony, transpilers CIL, inspección en vivo y verificación de identidad]"
+description: "BepInEx 5 + Harmony 2 patching policy for Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64), including centralized RuntimePatchInstaller (71 hooks, 30 CIL transpilers), compatibility identity gating, and live patch inspection/patching via BepInEx MCP. [Política de BepInEx 5 + Harmony 2 para Rogue Command (v1.0.9 / Unity 2021.3.45f2, Mono x64). Uso: plugins Unity, patches Harmony, transpilers CIL, inspección en vivo y verificación de identidad]"
 version: 1.4.3
 license: MIT
 author: Hermes Agent
@@ -12,7 +12,7 @@ metadata:
 
 # Rogue Command Harmony Policy
 
-**Current capabilities:** Pinned compatibility gate (`1.0.9`, Unity `2021.3.45f2` Mono x64, `Assembly-CSharp.dll` SHA-256 + MVID); centralized `RuntimePatchInstaller` (`RuntimeHooks`, `RuntimeHarmonyPatches`, `RuntimeTranspilerPatches`, `NativeAiDirectorTranspilers`, `NativeCombatMovementTranspilers`, `NativeEconomyFactoryTranspilers` with `netstandard2.1` `TransferLabels` IL manipulation, 70 installed hooks and 30 CIL transpilers); and live runtime Harmony inspection/patching via `bepinex_mcp` (`diagnostics_explorer_query` `inspect_patches`/`inspect_type`/`find_implementations`, `diagnostics_get_runtime_hooks`, `mod_patch_method`, `mod_inject_class`, `mod_list_patches`, `mod_remove_patch`).
+**Current capabilities:** Pinned compatibility gate (`1.0.9`, Unity `2021.3.45f2` Mono x64, `Assembly-CSharp.dll` SHA-256 + MVID); centralized `RuntimePatchInstaller` (`RuntimeHooks`, `RuntimeHarmonyPatches`, `RuntimeTranspilerPatches`, `NativeAiDirectorTranspilers`, `NativeCombatMovementTranspilers`, `NativeEconomyFactoryTranspilers` with `netstandard2.1` `TransferLabels` IL manipulation, 71 installed hooks and 30 CIL transpilers); and live runtime Harmony inspection/patching via `bepinex_mcp` (`diagnostics_explorer_query` `inspect_patches`/`inspect_type`/`find_implementations`, `diagnostics_get_runtime_hooks`, `mod_patch_method`, `mod_inject_class`, `mod_list_patches`, `mod_remove_patch`).
 
 Damage effects hook the exact instance void EntityController.OnHasDealtDamage(EntityController, int, float) signature. The shim maps its target and final amount to the shared combat handler. Kill effects also hook instance void OnHasKilledEntity(EntityController) for native damage paths that suppress hit events. Both paths share lifetime kill ownership. The legacy TakeDamage postfix helper remains callable for compatibility.
 

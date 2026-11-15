@@ -27,8 +27,11 @@ namespace RogueCommandExpansionLoader.Content
         IRelicLocalizationRuntimeProvider, IUpgradeLocalizationRuntimeProvider, IStageLandscapeRuntimeProvider,
         IBlueprintPoolRuntimeProvider, IStageFallbackRuntimeProvider,
         IStageOwnedAiPlacementDistanceRuntimeProvider, IBlueprintRewardFactoryScopeProvider,
-        IPrespawnRuntimeProvider, IGuaranteedModCardRewardProvider, IGlobalBlueprintCandidateProvider
+        IPrespawnRuntimeProvider, IGuaranteedModCardRewardProvider, IGlobalBlueprintCandidateProvider,
+        IAiPreSetupRuntimeProvider
     {
+        private readonly HashSet<object> _preSetupInjectedAiBehaviours =
+            new HashSet<object>(ReferenceComparer.Instance);
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
         private const uint ShareRead = 0x00000001;
@@ -2632,7 +2635,16 @@ namespace RogueCommandExpansionLoader.Content
 
             if (isNativeTemplateFallback)
             {
-                InjectAllowedAiUnitsIntoNativeBases(behaviour, profile);
+                bool alreadyPreInjected;
+                lock (_gate)
+                {
+                    alreadyPreInjected = !_preSetupInjectedAiBehaviours.Add(behaviour);
+                }
+
+                if (!alreadyPreInjected)
+                {
+                    InjectAllowedAiUnitsIntoNativeBases(behaviour, profile);
+                }
             }
 
             var bound = new BoundAiRuntimeBehaviour(null, null, profile.Id);
@@ -2899,6 +2911,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 _boundAiBehaviours.Remove(gameBehaviour);
+                _preSetupInjectedAiBehaviours.Remove(gameBehaviour);
             }
 
             SafeDestroyAiRuntimeBehaviour(bound, "<AI>");
@@ -3051,23 +3064,14 @@ namespace RogueCommandExpansionLoader.Content
                         continue;
                     }
 
-                    object newEntry = Activator.CreateInstance(_aiDeckEntryType);
-                    _aiDeckEntryEntityIdField.SetValue(newEntry, deckEntityId);
-                    if (_aiDeckEntryStartingInAscensionLevelField != null)
+                    // Factories are built by the native AI builder (CountAtStart 0, MaxLiving 2).
+                    AppendNativeAiDeckEntry(primaryDeck, deckEntityId, 0, 2);
+                    if (!String.Equals(deckEntityId, unit.Id, StringComparison.Ordinal) && injectedCount < 2)
                     {
-                        _aiDeckEntryStartingInAscensionLevelField.SetValue(newEntry, 0);
-                    }
-                    if (_aiDeckEntryCountPerStageField != null)
-                    {
-                        object countPerStage = Activator.CreateInstance(_aiDeckEntryCountPerStageField.FieldType);
-                        if (countPerStage is IList counts)
-                        {
-                            counts.Add(new Vector2Int(0, 2));
-                            _aiDeckEntryCountPerStageField.SetValue(newEntry, countPerStage);
-                        }
+                        // The first products also spawn as an initial patrol in BuildStartBases().
+                        AppendNativeAiDeckEntry(primaryDeck, unit.Id, 1, 2);
                     }
 
-                    primaryDeck.Add(newEntry);
                     existingIds.Add(deckEntityId);
                     existingIds.Add(unit.Id);
                     injectedCount++;
@@ -3081,6 +3085,7 @@ namespace RogueCommandExpansionLoader.Content
 
                 if (injectedCount > 0)
                 {
+                    InvalidateAiConstructableCache(behaviour);
                     Log("Enlace híbrido IA (" + (profile != null ? profile.Id : "native") + "): inyectadas " +
                         injectedCount + " unidad(es)/fábrica(s) mod en " + behaviour.gameObject.name + ".");
                 }
@@ -3088,6 +3093,81 @@ namespace RogueCommandExpansionLoader.Content
             catch (Exception ex)
             {
                 Log("No se pudo inyectar unidades mod en DefaultAiBehaviour nativo: " + ex.Message);
+            }
+        }
+
+        private void AppendNativeAiDeckEntry(IList deck, string entityId, int countAtStart, int maxLiving)
+        {
+            object newEntry = Activator.CreateInstance(_aiDeckEntryType);
+            _aiDeckEntryEntityIdField.SetValue(newEntry, entityId);
+            if (_aiDeckEntryStartingInAscensionLevelField != null)
+            {
+                _aiDeckEntryStartingInAscensionLevelField.SetValue(newEntry, 0);
+            }
+            if (_aiDeckEntryCountPerStageField != null)
+            {
+                object countPerStage = Activator.CreateInstance(_aiDeckEntryCountPerStageField.FieldType);
+                if (countPerStage is IList counts)
+                {
+                    counts.Add(new Vector2Int(countAtStart, maxLiving));
+                    _aiDeckEntryCountPerStageField.SetValue(newEntry, countPerStage);
+                }
+            }
+
+            deck.Add(newEntry);
+        }
+
+        /// <summary>
+        /// DefaultAiBehaviour caches its merged deck in the private _constructableEntities list the first
+        /// time ConstructableEntities() runs. Clearing it forces a rebuild that includes injected entries.
+        /// </summary>
+        private void InvalidateAiConstructableCache(DefaultAiBehaviour behaviour)
+        {
+            try
+            {
+                FieldInfo cacheField = _defaultAiBehaviourType.GetField("_constructableEntities",
+                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                IList cache = cacheField == null ? null : cacheField.GetValue(behaviour) as IList;
+                if (cache != null)
+                {
+                    cache.Clear();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("No se pudo invalidar _constructableEntities: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Runs from a Prefix on AiBehaviour.Update, before Setup()/BuildStartBases() and before
+        /// DefaultAiBehaviour.Init() fills the constructable cache. Idempotent per AI instance.
+        /// </summary>
+        public void OnAiBehaviourPreSetup(object gameBehaviour)
+        {
+            DefaultAiBehaviour behaviour = gameBehaviour as DefaultAiBehaviour;
+            LoadedAiProfile profile;
+            bool isNativeTemplateFallback;
+            if (behaviour == null || !_runtimeContentReady ||
+                !TryGetAiProfile(behaviour, out profile, out isNativeTemplateFallback))
+            {
+                return;
+            }
+
+            if (!isNativeTemplateFallback)
+            {
+                return;
+            }
+
+            bool alreadyPreInjected;
+            lock (_gate)
+            {
+                alreadyPreInjected = !_preSetupInjectedAiBehaviours.Add(behaviour);
+            }
+
+            if (!alreadyPreInjected)
+            {
+                InjectAllowedAiUnitsIntoNativeBases(behaviour, profile);
             }
         }
 

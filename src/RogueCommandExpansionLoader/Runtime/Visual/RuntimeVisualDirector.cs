@@ -188,6 +188,28 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             }
         }
 
+        /// <summary>
+        /// Called after EntityFactory.InstantiateEntity has assigned tag/faction. A director pre-attached
+        /// inside EntityFactory.PrespawnedEntities is re-evaluated (ResetForReuse); otherwise it is attached.
+        /// </summary>
+        public static void AttachOrRefreshAfterInstantiate(object entityObj)
+        {
+            EntityController entity = entityObj as EntityController;
+            if (entity == null || entity.gameObject == null)
+            {
+                return;
+            }
+
+            RuntimeVisualDirector existing = entity.gameObject.GetComponent<RuntimeVisualDirector>();
+            if (existing != null)
+            {
+                existing.ResetForReuse(entity);
+                return;
+            }
+
+            AttachIfApplicable(entity);
+        }
+
         public static void OnEntityReused(object entityObj)
         {
             EntityController entity = entityObj as EntityController;

@@ -3845,6 +3845,32 @@ internal static partial class ValidationTestRunner
             RuntimeGameplayCommandDirector.OnReconcileActiveAiBehaviours = previousReconcile;
         }
     }),
+    ("faction team tint resolves distinct player and AI colors and AI pre-setup hook is a safe contract", () =>
+    {
+        if (!RuntimeShieldColorSync.TryResolveTeamTint(true, false, out Color playerTint) ||
+            !RuntimeShieldColorSync.TryResolveTeamTint(false, true, out Color aiTint))
+        {
+            throw new InvalidOperationException("Faction tint was not resolved for unambiguous ownership.");
+        }
+
+        if (playerTint.r == aiTint.r && playerTint.g == aiTint.g && playerTint.b == aiTint.b)
+        {
+            throw new InvalidOperationException("Player and AI team tints must differ.");
+        }
+
+        if (RuntimeShieldColorSync.TryResolveTeamTint(true, true, out _) ||
+            RuntimeShieldColorSync.TryResolveTeamTint(false, false, out _))
+        {
+            throw new InvalidOperationException("Ambiguous or neutral ownership must not receive a team tint.");
+        }
+
+        if (RuntimeShieldColorSync.SyncFactionTeamColors(null) != 0)
+        {
+            throw new InvalidOperationException("SyncFactionTeamColors(null) must be a no-op.");
+        }
+
+        RuntimeHooks.AiBehaviourUpdatePrefix(null);
+    }),
     ("support auras reach damaged allies after full-health or healing-blocked candidates", () =>
     {
         ExistingControllers.Instance.Reset();
