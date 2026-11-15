@@ -187,14 +187,15 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half4 albedoAlpha = SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap));
                 SurfaceData surfaceData = (SurfaceData)0;
                 surfaceData.alpha = Alpha(albedoAlpha.a, _BaseColor, _Cutoff);
-                surfaceData.albedo = albedoAlpha.rgb * _BaseColor.rgb;
+                // Lift dark linear baked albedos so stylized RTS armor never crushes to black in dim URP maps
+                surfaceData.albedo = saturate(albedoAlpha.rgb * 1.85h + half3(0.065h, 0.068h, 0.075h)) * _BaseColor.rgb;
 
                 #if defined(_METALLICSPECGLOSSMAP)
                     half4 metallicGloss = SAMPLE_TEXTURE2D(_MetallicGlossMap, sampler_MetallicGlossMap, input.uv);
-                    surfaceData.metallic = metallicGloss.r;
+                    surfaceData.metallic = min(metallicGloss.r, 0.15h);
                     surfaceData.smoothness = metallicGloss.a * _GlossMapScale;
                 #else
-                    surfaceData.metallic = _Metallic;
+                    surfaceData.metallic = min(_Metallic, 0.15h);
                     surfaceData.smoothness = _Smoothness;
                 #endif
 
@@ -213,15 +214,15 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 surfaceData.albedo = lerp(surfaceData.albedo,
                     surfaceData.albedo * _TeamColor.rgb, vColor.a);
 
-                // Cavity AO and Thermal Soot darkening
-                surfaceData.albedo *= ao * (1.0h - soot * 0.75h);
+                // Cavity AO and Thermal Soot darkening (softened so dim URP maps do not crush dark hulls)
+                surfaceData.albedo *= lerp(0.82h, 1.0h, ao) * (1.0h - soot * 0.25h);
 
                 // Thermal tempering fringe (straw and blue oxide rings) at the boundary of thermal soot
                 half temperMask = smoothstep(0.10h, 0.32h, soot) * (1.0h - smoothstep(0.48h, 0.72h, soot)) * _ThermalTemperingIntensity;
                 half blueMask = smoothstep(0.25h, 0.45h, soot) * (1.0h - smoothstep(0.55h, 0.75h, soot));
                 half3 temperColor = lerp(half3(0.83h, 0.69h, 0.22h), half3(0.26h, 0.33h, 0.53h), blueMask);
-                surfaceData.albedo = lerp(surfaceData.albedo, temperColor, temperMask * 0.70h);
-                surfaceData.metallic = saturate(surfaceData.metallic + temperMask * 0.30h);
+                surfaceData.albedo = lerp(surfaceData.albedo, temperColor, temperMask * 0.55h);
+                surfaceData.metallic = min(saturate(surfaceData.metallic + temperMask * 0.12h), 0.28h);
 
                 // Crevice micro-dust softening: deep recesses lose specular gloss due to trapped dry micro-dust
                 half creviceDust = (1.0h - ao) * _CreviceDustIntensity;
@@ -234,12 +235,12 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 // Two-tier edge wear: oxidized dark primer border (#2c2724) + bare bright alloy ridge (#c7ccd6)
                 half primerMask = smoothstep(0.12h, 0.45h, wear) * (1.0h - smoothstep(0.50h, 0.85h, wear));
                 half steelMask = smoothstep(0.42h, 0.90h, wear);
-                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.17h, 0.15h, 0.14h), primerMask * 0.85h);
-                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.78h, 0.80h, 0.84h), steelMask * 0.95h);
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.17h, 0.15h, 0.14h), primerMask * 0.15h);
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.78h, 0.80h, 0.84h), steelMask * 0.90h);
 
                 // Physical response: Bare steel boosts metallic/smoothness; primer dulls; carbon soot extinguishes specularity
-                surfaceData.metallic = saturate(surfaceData.metallic * (1.0h - primerMask * 0.5h) + steelMask * 0.85h);
-                surfaceData.metallic = saturate(surfaceData.metallic - soot * 0.40h);
+                surfaceData.metallic = min(saturate(surfaceData.metallic * (1.0h - primerMask * 0.5h) + steelMask * 0.15h), 0.22h);
+                surfaceData.metallic = saturate(surfaceData.metallic - soot * 0.20h);
 
                 surfaceData.smoothness = saturate(lerp(surfaceData.smoothness, 0.85h, steelMask * 0.8h) * (1.0h - primerMask * 0.4h));
                 // Procedural weld bead oxidation along high edge-wear regions
@@ -247,7 +248,7 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half weldProfile = smoothstep(0.5h - _WeldBeadWidth, 0.5h + _WeldBeadWidth,
                     sin(weldPhase) * 0.5h + 0.5h);
                 half weldBeadSoot = weldProfile * steelMask;
-                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.10h, 0.09h, 0.08h), weldBeadSoot * 0.5h);
+                surfaceData.albedo = lerp(surfaceData.albedo, half3(0.10h, 0.09h, 0.08h), weldBeadSoot * 0.15h);
                 surfaceData.smoothness = saturate(surfaceData.smoothness * (1.0h - weldBeadSoot * 0.4h));
                 surfaceData.smoothness *= (1.0h - soot * 0.65h);
 
@@ -261,7 +262,7 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half heightFactor = saturate(1.0h - (input.positionWS.y / max(0.05h, _MudHeight))
                     + (mudNoise - 0.5h) * 0.35h);
                 half mudFactor = heightFactor * heightFactor * _MudAmount;
-                surfaceData.albedo = lerp(surfaceData.albedo, _MudColor.rgb, mudFactor * 0.85h);
+                surfaceData.albedo = lerp(surfaceData.albedo, _MudColor.rgb, mudFactor * 0.35h);
                 surfaceData.metallic *= (1.0h - mudFactor);
                 surfaceData.smoothness = lerp(surfaceData.smoothness, _MudSmoothness, mudFactor * 0.85h);
 
@@ -323,11 +324,13 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 inputData.shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 inputData.fogCoord = ComputeFogFactor(input.positionCS.z);
                 inputData.vertexLighting = input.vertexLighting;
-                inputData.bakedGI = SampleSH(inputData.normalWS);
+                inputData.bakedGI = max(SampleSH(inputData.normalWS), half3(0.28h, 0.30h, 0.34h));
                 inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
                 inputData.shadowMask = half4(1, 1, 1, 1);
 
                 half4 color = UniversalFragmentPBR(inputData, surfaceData);
+                half hemi = saturate(inputData.normalWS.y * 0.5h + 0.5h);
+                color.rgb += surfaceData.albedo * max(surfaceData.metallic, 0.15h) * half3(0.25h, 0.28h, 0.33h) * (0.45h + 0.55h * hemi) * surfaceData.occlusion;
                 color.rgb = MixFog(color.rgb, inputData.fogCoord);
                 color.a = OutputAlpha(color.a, _Surface);
                 return color;

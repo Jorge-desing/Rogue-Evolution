@@ -139,7 +139,7 @@ class IroncladWalkerAssetContractTests(unittest.TestCase):
     def test_shader_base_color_multiplies_vertex_color(self) -> None:
         shader = SHADER_PATH.read_text(encoding="utf-8")
         self.assertIn("input.color", shader)
-        self.assertRegex(shader, r"surfaceData\.albedo\s*=\s*albedoAlpha\.rgb\s*\*\s*_BaseColor\.rgb")
+        self.assertRegex(shader, r"surfaceData\.albedo\s*=.*albedoAlpha\.rgb.*_BaseColor\.rgb")
 
 
 if __name__ == "__main__":

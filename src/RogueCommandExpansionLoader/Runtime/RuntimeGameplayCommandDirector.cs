@@ -4064,24 +4064,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 Vector3 position = new Vector3(targetX, 0f, targetZ);
 
-
-
                 try
-
                 {
-
-                    WorldGrid grid = WorldGrid.Instance;
-
-                    if (grid != null)
-
-                    {
-
-                        position = grid.ClampToWorld(position);
-
-                    }
-
+                    GridCellEvaluationResult gridEval = RuntimeGridCensus.EvaluatePosition(position.x, position.z);
+                    position = new Vector3(gridEval.ClampedX, gridEval.SurfaceHeight, gridEval.ClampedZ);
                 }
-
                 catch { }
 
 
@@ -4139,13 +4126,16 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             catch (Exception ex)
-
             {
+                string firstFrame = string.Empty;
+                if (!string.IsNullOrEmpty(ex.StackTrace))
+                {
+                    int nl = ex.StackTrace.IndexOf('\n');
+                    firstFrame = " @ " + (nl >= 0 ? ex.StackTrace.Substring(0, nl).Trim() : ex.StackTrace.Trim());
+                }
 
                 return new EntitySpawnResult(false, string.Empty, entityId, side ?? string.Empty, targetX, 0f, targetZ, 0f,
-
-                    "Error spawning entity: " + ex.Message);
-
+                    "Error spawning entity: " + ex.GetType().Name + ": " + ex.Message + firstFrame);
             }
 
         }

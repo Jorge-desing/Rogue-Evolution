@@ -6315,7 +6315,22 @@ namespace RogueCommandExpansionLoader.Content
             ValidateNativeRigRetargetPaths(nativePrefab, visualTemplate, unit, packageName, ownerLabel);
 
             Material fallbackMaterial = FindNativeVisualMaterial(originalRenderers.ToArray());
-            float nativeHalfExtent = CalculateRendererHalfExtent(originalRenderers.ToArray());
+            var extentCandidates = new List<Renderer>();
+            for (int i = 0; i < originalRenderers.Count; i++)
+            {
+                Renderer r = originalRenderers[i];
+                if (r != null && r.enabled && !IsScaleCalibrationExcludedRenderer(r))
+                {
+                    extentCandidates.Add(r);
+                }
+            }
+
+            if (extentCandidates.Count == 0)
+            {
+                extentCandidates.AddRange(originalRenderers);
+            }
+
+            float nativeHalfExtent = CalculateRendererHalfExtent(extentCandidates.ToArray());
             float targetHalfExtent = VisualOverlayScaleCalibration.CalculateTargetHalfExtent(nativeHalfExtent, isBuilding);
 
             for (int i = 0; i < originalRenderers.Count; i++)
@@ -6420,6 +6435,31 @@ namespace RogueCommandExpansionLoader.Content
                         "' no identifica una única transformación en el prefab visual.");
                 }
             }
+        }
+
+        private static bool IsScaleCalibrationExcludedRenderer(Renderer renderer)
+        {
+            if (renderer == null)
+            {
+                return true;
+            }
+
+            string objName = renderer.gameObject != null ? renderer.gameObject.name : string.Empty;
+            if (!string.IsNullOrEmpty(objName) &&
+                (objName.IndexOf("OverlapBox", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 objName.IndexOf("Indicator", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 objName.IndexOf("RangeCircle", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return true;
+            }
+
+            Material mat = renderer.sharedMaterial;
+            string matName = mat != null ? mat.name : string.Empty;
+            return !string.IsNullOrEmpty(matName) &&
+                (matName.IndexOf("Indicator", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 matName.IndexOf("Glow", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 matName.IndexOf("Shield", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 matName.IndexOf("Range", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private static float CalculateRendererHalfExtent(Renderer[] renderers)

@@ -1687,6 +1687,8 @@ internal static partial class ValidationTestRunner
         }
 
         if (Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(5f, false) - 4f) > 0.001f ||
+            Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(20f, false) - 5.20f) > 0.001f ||
+            Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(20f, true) - 16.0f) > 0.001f ||
             Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(0f, false) - 0.85f) > 0.001f ||
             Math.Abs(VisualOverlayScaleCalibration.CalculateTargetHalfExtent(float.NaN, true) - 1.60f) > 0.001f)
         {

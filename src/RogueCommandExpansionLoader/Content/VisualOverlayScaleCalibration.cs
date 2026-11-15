@@ -30,6 +30,7 @@ namespace RogueCommandExpansionLoader.Content
     {
         private const float MinimumUsableHalfExtent = 0.001f;
         private const float NativeVisualScaleFactor = 0.80f;
+        private const float MaxUnitNativeHalfExtent = 6.5f;
         private const float UnitFallbackHalfExtent = 0.85f;
         private const float BuildingFallbackHalfExtent = 1.60f;
 
@@ -112,9 +113,15 @@ namespace RogueCommandExpansionLoader.Content
 
         public static float CalculateTargetHalfExtent(float nativeHalfExtent, bool isBuilding)
         {
-            return !float.IsNaN(nativeHalfExtent) && !float.IsInfinity(nativeHalfExtent) && nativeHalfExtent > 0.05f
-                ? nativeHalfExtent * NativeVisualScaleFactor
-                : (isBuilding ? BuildingFallbackHalfExtent : UnitFallbackHalfExtent);
+            if (float.IsNaN(nativeHalfExtent) || float.IsInfinity(nativeHalfExtent) || nativeHalfExtent <= 0.05f)
+            {
+                return isBuilding ? BuildingFallbackHalfExtent : UnitFallbackHalfExtent;
+            }
+
+            float clampedExtent = !isBuilding && nativeHalfExtent > MaxUnitNativeHalfExtent
+                ? MaxUnitNativeHalfExtent
+                : nativeHalfExtent;
+            return clampedExtent * NativeVisualScaleFactor;
         }
 
         public static float CalculateUniformScale(float modelHalfExtent, float targetHalfExtent)

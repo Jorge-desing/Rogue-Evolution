@@ -5,7 +5,7 @@ description: "Control Rogue Command at runtime through the project BepInEx MCP b
 
 # Rogue Command BepInEx MCP
 
-**Current capabilities:** Headless runtime control and inspection via `bepinex_mcp` (`discover_tools` / `describe_tool` with `includeAliases=false`): multi-scene/`DontDestroyOnLoad` object search, singletons, CLR reflection, `find_implementations`, Harmony `inspect_patches`, and static/singleton/`instanceId` `get`/`set`/`invoke` (`diagnostics_explorer_query`, `diagnostics_explorer_member`); native UI/intermission control (`diagnostics_get_runtime_control_surface`, `diagnostics_ui_invoke_native_button`, `diagnostics_ui_click_text`, `diagnostics_ui_set_value`); bounded sequences/waits (`automation_run_sequence`, `automation_wait_for_state`); and reversible runtime Harmony/class injection (`mod_patch_method`, `mod_inject_class`, `mod_list_patches`, `mod_remove_patch`, `diagnostics_get_runtime_hooks`).
+**Current capabilities:** Headless runtime control and inspection via `bepinex_mcp` (`discover_tools` / `describe_tool` with `includeAliases=false`): multi-scene/`DontDestroyOnLoad` object search, singletons, CLR reflection, `find_implementations`, Harmony `inspect_patches`, and static/singleton/`instanceId` `get`/`set`/`invoke` (`diagnostics_explorer_query`, `diagnostics_explorer_member`); native UI/intermission control (`diagnostics_get_runtime_control_surface`, `diagnostics_ui_invoke_native_button`, `diagnostics_ui_click_text`, `diagnostics_ui_set_value`); battlefield orders, including a bounded mixed-command plan for an external agent (`diagnostics_order_battlefield_plan`); bounded sequences/waits (`automation_run_sequence`, `automation_wait_for_state`); and reversible runtime Harmony/class injection (`mod_patch_method`, `mod_inject_class`, `mod_list_patches`, `mod_remove_patch`, `diagnostics_get_runtime_hooks`).
 
 Use this skill as the single workflow for controlling or inspecting the live Rogue Command runtime. It uses the project-maintained MCP bridge and Unity telemetry; it does not require images or desktop automation.
 
@@ -63,6 +63,8 @@ Discover → observe → act → wait/verify → decide the next step. **Require
 
 For battlefield orders, use the [battlefield automation workflow](references/automation.md#battlefield-orders) to resolve live unit keys and observe arrival or engagement after dispatch.
 
+For a turn with different commands for multiple units, use `diagnostics_order_battlefield_plan`; it preflights actors and dispatches one bounded mixed plan in a Unity-thread call. The external agent remains responsible for observing the result and deciding the next plan.
+
 Use the same workflow to dispatch conditional orders after an inclusive numeric wait, such as withdrawing a unit at a specified health fraction.
 
 Use runtime keys from the AI roster to select one target among instances that share an entity definition.
@@ -111,3 +113,8 @@ For movement replanning, use the optional replaceCurrent mode described in the a
 Snapshot regression tests verify presence and exact bounded arguments together for visual material and surface censuses; the GameTimeScale presence assertion remains independent.
 
 Reward choice and Shop purchase controls support optional fresh-state `preconditions` and read-only `dryRun`; consult the intermission reference before using them. Dry runs do not establish native action validity.
+
+### Runtime Spawn, Overlay Scale & CardChange Lessons (2026-11-14)
+- **`diagnostics_spawn_entity` (`RuntimeGameplayCommandDirector.TrySpawnEntity`):** Uses `RuntimeGridCensus.EvaluatePosition(x, z)` so `WorldGrid.CellSize` (`10f` on live maps, not hardcoded `2f`) determines `grid.Height(cell)` (`Y = 10` on standard maps instead of underground `Y = 0`).
+- **Scale Calibration (`VisualOverlayScaleCalibration` & `ContentPackRuntimeLoader`):** Excludes helper/indicator renderers (`OverlapBox`, `Indicator`, `RangeCircle`, `Glow`, `Shield`, `Range` materials) from native half-extent calculation and clamps unit `!isBuilding` half-extent at `MaxUnitNativeHalfExtent = 6.5f` so oversized native aura/indicator bounds cannot inflate units (e.g. `SurgeArcTank`).
+- **`RuntimeCardChangeApplier`:** Always initializes `onlyForTheseEntityIds` and `entityIdsNotAllowed` to non-null `List<string>` instances so native `CardChangeScriptableObject.CardFulfillsConditions` never throws a `NullReferenceException` when evaluating spawned units such as `OverlordCommandHQ`.

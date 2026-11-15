@@ -227,14 +227,8 @@ namespace RogueCommandExpansionLoader.Runtime
                         SetField(cardChange, "side", sideValue);
                     }
                 }
-                if (request.OnlyForTheseEntityIds != null && request.OnlyForTheseEntityIds.Length > 0)
-                {
-                    SetField(cardChange, "onlyForTheseEntityIds", new List<string>(request.OnlyForTheseEntityIds));
-                }
-                if (request.EntityIdsNotAllowed != null && request.EntityIdsNotAllowed.Length > 0)
-                {
-                    SetField(cardChange, "entityIdsNotAllowed", new List<string>(request.EntityIdsNotAllowed));
-                }
+                SetField(cardChange, "onlyForTheseEntityIds", new List<string>(request.OnlyForTheseEntityIds ?? new string[0]));
+                SetField(cardChange, "entityIdsNotAllowed", new List<string>(request.EntityIdsNotAllowed ?? new string[0]));
 
                 object source = _cardIdConstructor.Invoke(new object[] { _cardIdBlueprintValue, request.SourceId });
                 _addInGameCardChangeMethod.Invoke(null, new object[] { uniqueEntityId, cardChange, source });
