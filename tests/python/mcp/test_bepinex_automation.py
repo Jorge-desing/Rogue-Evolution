@@ -256,6 +256,26 @@ class StateWaitTests(unittest.TestCase):
                 self.assertTrue(result["isError"])
                 self.assertTrue(payload["postconditionInspectionRequired"])
 
+    def test_active_skill_rejects_ambiguous_or_incomplete_targets_before_dispatch(self):
+        bad = [{"targetX": 1}, {"targetZ": 2},
+               {"targetEntityKeyId": "20", "targetX": 1, "targetZ": 2}]
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as call:
+            for target in bad:
+                result = SERVER.execute_tool("diagnostics_order_active_skill", {"entityKeyId": "11", **target})
+                payload = json.loads(result["content"][0]["text"])
+                self.assertTrue(result["isError"])
+                self.assertEqual("not_started", payload["completionStatus"])
+            call.assert_not_called()
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as call:
+            result = SERVER.execute_tool("automation_run_sequence", {"steps": [
+                {"tool": "diagnostics_order_unit_move", "arguments": {"entityKeyId": "11", "destinationX": 1, "destinationZ": 2}},
+                {"tool": "diagnostics_order_active_skill", "arguments": {"entityKeyId": "12", "targetX": 1}}]})
+            self.assertTrue(result["isError"])
+            call.assert_not_called()
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true}') as call:
+            SERVER.execute_tool("diagnostics_order_active_skill", {"entityKeyId": "11", "targetX": 0, "targetZ": 2})
+            call.assert_called_once_with("OrderUnitActiveSkillJson", ["11", "", 0.0, 2.0, True])
+
     def test_unreadable_single_order_stops_sequence(self):
         args = {"entityKeyId": "11", "destinationX": 1, "destinationZ": 2}
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value="broken reply") as call:

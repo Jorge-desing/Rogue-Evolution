@@ -117,3 +117,5 @@ Agent sessions, heartbeats and resource locks are advisory coordination for coop
 Malformed mixed-plan or group-mutation responses preserve `rawResponse` and are reported as unknown completion; sequences stop and require postcondition inspection even when continuation was requested.
 
 The same unknown-response and postcondition rule applies to individual battlefield moves, attacks, patrols, retreats, active skills, stances, holds and stops. A failed native result is not an instruction to retry.
+
+For individual active skills, pass exactly one of a target entity, a complete X/Z pair, or no target. Incomplete or conflicting targeting stops before dispatch; static sequence preflight catches fixed invalid shapes before earlier steps.

@@ -1145,6 +1145,13 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     invalid = _validate_tool_arguments(step_tool, step.get("arguments", {}), partial=True)
                     if invalid:
                         return _tool_response(json.dumps({**invalid, "step": index}), is_error=True)
+                    if step_tool == "diagnostics_order_active_skill":
+                        skill_args = step.get("arguments", {})
+                        has_x, has_z = "targetX" in skill_args, "targetZ" in skill_args
+                        target = skill_args.get("targetEntityKeyId")
+                        if has_x != has_z or (has_x and isinstance(target, str) and target.strip()):
+                            return _tool_response(json.dumps({"error": "Active skill requires one target entity, paired targetX/targetZ, or no target.",
+                                                              "step": index, "completionStatus": "not_started"}), True)
                     if step_tool == "automation_wait_for_state":
                         invalid = _validate_state_wait(step.get("arguments", {}), partial=True)
                         if invalid:
@@ -1871,7 +1878,12 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             t_key = arguments.get("targetEntityKeyId")
             tx = arguments.get("targetX")
             tz = arguments.get("targetZ")
-            has_pos = tx is not None and tz is not None
+            has_x, has_z = tx is not None, tz is not None
+            has_target = isinstance(t_key, str) and bool(t_key.strip())
+            if has_x != has_z or (has_target and has_x):
+                return _tool_response(json.dumps({"success": False, "completionStatus": "not_started",
+                    "error": "Active skill requires one target entity, paired targetX/targetZ, or no target."}), True)
+            has_pos = has_x and has_z
             args = [e_key, str(t_key) if t_key is not None else "", float(tx or 0.0), float(tz or 0.0), bool(has_pos)]
             res = _call_diagnostics_method("OrderUnitActiveSkillJson", args)
             return _single_battlefield_response(res)

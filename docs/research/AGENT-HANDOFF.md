@@ -3185,3 +3185,7 @@ Full Python `all` passed after the individual-response changes in 46.40 seconds.
 ### Contradictory battlefield outcomes (2026-11-15)
 
 Unknown completion or an explicit inspection requirement now overrides `success=true` for plan, individual and group MCP responses; a plan claiming success while dispatch did not start is unknown. Automation/diagnostics modules passed 102 tests, including contradictory-result cases. No live game orders were issued.
+
+### Individual skill target semantics (2026-11-15)
+
+Individual MCP active-skill orders now reject a lone coordinate or simultaneous entity and position instead of silently discarding a coordinate or choosing a target. Fixed invalid shapes are also rejected during sequence preflight before any earlier mutation. Referenced values are checked after resolution. Automation/diagnostics modules passed 103 tests. No live orders were issued.

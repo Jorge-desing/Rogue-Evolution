@@ -135,3 +135,5 @@ Mixed-plan and group mutations with unreadable or non-object responses return an
 Individual battlefield move, attack, attack-move, patrol, retreat, active-skill, stance, hold and stop calls also return structured unknown completion for unreadable/non-object responses. Failed outcomes require postcondition inspection unless explicitly `not_started`; sequences stop accordingly.
 
 For battlefield mutations, `completionStatus=unknown` or `postconditionInspectionRequired=true` takes precedence over a contradictory native `success=true`; a plan claiming success without dispatch is also treated as unknown. Inspect state before retrying.
+
+Individual active-skill calls accept a target entity, both target coordinates, or neither. Half coordinates and an entity plus coordinates fail before dispatch; static sequence preflight rejects these combinations before any step, while referenced values are checked after resolution.
