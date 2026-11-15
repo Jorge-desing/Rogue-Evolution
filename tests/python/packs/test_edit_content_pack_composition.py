@@ -30,9 +30,10 @@ class CompositionEditTests(unittest.TestCase):
                 write_composed_pack(pack, [], output)
             invalid = dict(pack, schemaVersion=999)
             invalid_output = Path(directory) / "invalid"
-            with self.assertRaises(ValueError):
+            with self.assertRaisesRegex(RuntimeError, "etapa conservada"):
                 write_composed_pack(invalid, [], invalid_output)
             self.assertFalse(invalid_output.exists())
+            self.assertTrue(list(Path(directory).glob(".rogue-compose-*/pack/content.json")))
 
     def test_atomic_publish_never_replaces_concurrent_destination(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

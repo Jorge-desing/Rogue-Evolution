@@ -2906,3 +2906,7 @@ The staged writer copies each source bundle set into an isolated subdirectory, c
 ## 2026-11-15 — Bundle rollback ownership checks (in progress)
 
 Bundle copy rollback records file identity and only removes completed files whose identity and SHA-256 still match; incomplete, changed or inaccessible copies are retained and reported along with the original error. The focused suite passed 25 cases with one symlink-privilege skip. Remaining: the identity/hash check and unlink are not atomic, and the composed writer's TemporaryDirectory cleanup may remove retained staged files; destination handles, cleanup and full reference coverage require further work. Do not treat rollback as race-safe or the user request as complete.
+
+## 2026-11-15 — Preserve composition staging on failure
+
+The composed writer no longer uses automatic recursive temporary-directory cleanup. It preserves staging directories and reports their path on failure, preventing cleanup from silently deleting changed or incomplete files. Successful compositions also retain isolated staging inputs pending an ownership-safe cleanup mechanism. The CLI reports the failure without a traceback. Targeted suite: 25 passed and one symlink privilege skip. Destination handle stability, atomic rollback and remaining reference coverage remain open; the full suite previously had two visual failures.

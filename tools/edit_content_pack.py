@@ -2170,7 +2170,7 @@ def main(argv: list[str] | None = None) -> int:
                                if { _entity_key(bundle) for bundle in _as_list(source.get("assetBundles")) if _entity_key(bundle) } & final_bundles]
         try:
             written = write_composed_pack(updated, composition_sources, args.out_dir) / "content.json"
-        except (OSError, ValueError, KeyError) as exc:
+        except (OSError, ValueError, KeyError, RuntimeError) as exc:
             print(f"No se pudo escribir el pack compuesto: {exc}", file=sys.stderr)
             return 1
     else:

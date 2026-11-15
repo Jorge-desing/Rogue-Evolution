@@ -168,3 +168,5 @@ Composed pack publication now uses an atomic no-replace rename (Windows `os.rena
 The external dependency analyzer also tracks `units[].upgrades[].targetUnitId` and `upgrades[].mustNotHaveOneOfTheseEntityIds` at their actual schema locations.
 
 Bundle-transfer rollback checks the original file identity and expected hash before removing completed copies; incomplete or changed files are retained and reported. This is not yet race-free: the check and unlink remain separate, and temporary-directory cleanup needs separate review.
+
+The composed writer retains staging directories after success or failure instead of recursively deleting potentially changed files. On failure the diagnostic includes the staging path. Cleanup must be explicit after inspecting ownership and contents; atomic destination-path protection remains under review.

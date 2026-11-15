@@ -46,7 +46,10 @@ def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], out
         raise FileExistsError(f"El destino ya existe: {output_path}")
     if not output_path.parent.is_dir():
         raise ValueError("El directorio padre del destino debe existir")
-    with tempfile.TemporaryDirectory(prefix=".rogue-compose-", dir=output_path.parent) as temporary:
+    # Keep failed staging directories for inspection: automatic recursive cleanup
+    # could remove files changed by another process after an error.
+    temporary = tempfile.mkdtemp(prefix=".rogue-compose-", dir=output_path.parent)
+    try:
         stage = Path(temporary) / "pack"
         stage.mkdir()
         manifest_sources: dict[str, Path] = {}
@@ -81,4 +84,8 @@ def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], out
         if output_path.exists() or output_path.is_symlink():
             raise FileExistsError(f"El destino apareció durante la composición: {output_path}")
         _publish_no_replace(stage, output_path)
+    except Exception as exc:
+        raise RuntimeError(f"Composición fallida; etapa conservada en {temporary}: {exc}") from exc
+    # After successful publication only the isolated copies remain. Keep them
+    # as well, rather than recursively deleting content that may have changed.
     return output_path
