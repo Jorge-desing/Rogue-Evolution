@@ -55,7 +55,8 @@ def _make_stage_dir(parent: Path, name: str) -> Path:
         return child
 
 
-def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], output: str | Path) -> Path:
+def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], output: str | Path,
+                        dependency_report: dict | None = None) -> Path:
     """Write a new pack directory; existing destinations are never intentionally replaced.
 
     Each bundle source supplies a complete manifest and declaration set. Sources
@@ -66,10 +67,11 @@ def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], out
     if not output_path.parent.name:
         raise ValueError("El directorio padre no puede ser la raíz del volumen")
     with open_pack_file(output_path.parent.parent, output_path.parent.name, directory=True):
-        return _write_guarded(pack, bundle_sources, output_path)
+        return _write_guarded(pack, bundle_sources, output_path, dependency_report)
 
 
-def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_path: Path) -> Path:
+def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_path: Path,
+                   dependency_report: dict | None = None) -> Path:
     if output_path.exists() or output_path.is_symlink():
         raise FileExistsError(f"El destino ya existe: {output_path}")
     if not output_path.parent.is_dir():
@@ -107,6 +109,9 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
                 output_stream.write(manifest_bytes)
         with open_pack_file(stage, "content.json", create=True) as output_stream:
             output_stream.write((json.dumps(pack, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+        if dependency_report is not None:
+            with open_pack_file(stage, "composition-dependencies.json", create=True) as output_stream:
+                output_stream.write((json.dumps(dependency_report, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
         errors = validate_pack(str(stage))
         if errors:
             raise ValueError("Pack compuesto inválido: " + "; ".join(errors))

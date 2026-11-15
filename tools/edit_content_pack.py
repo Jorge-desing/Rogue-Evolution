@@ -2120,6 +2120,7 @@ def main(argv: list[str] | None = None) -> int:
 
     is_composition = args.operation in ("extract-units", "import-units") or (args.operation == "batch" and any(
         isinstance(row, dict) and row.get("op") in ("extract-units", "import-units") for row in script))
+    composition_report = None
     if is_composition:
         from tools.check_pack_dependencies import analyze_dependencies, defined_ids
         packs = {"composed": updated}
@@ -2166,6 +2167,9 @@ def main(argv: list[str] | None = None) -> int:
         native = composed_row["unverifiedNativeReferences"]
         if native:
             print("Referencias nativas sin verificar: " + ", ".join(native), file=sys.stderr)
+        composition_report = {"schemaVersion": 1, "packId": updated.get("packId"),
+                              "requiredPackIds": sorted(packs[name]["packId"] for name in required),
+                              "unverifiedNativeReferences": native}
 
     if args.validate_after:
         from tools.validate_balance_overrides import validate_balance
@@ -2192,7 +2196,7 @@ def main(argv: list[str] | None = None) -> int:
         composition_sources = [(root, source) for root, source in composition_sources
                                if { _entity_key(bundle) for bundle in _as_list(source.get("assetBundles")) if _entity_key(bundle) } & final_bundles]
         try:
-            written = write_composed_pack(updated, composition_sources, args.out_dir) / "content.json"
+            written = write_composed_pack(updated, composition_sources, args.out_dir, composition_report) / "content.json"
         except (OSError, ValueError, KeyError, RuntimeError) as exc:
             print(f"No se pudo escribir el pack compuesto: {exc}", file=sys.stderr)
             return 1

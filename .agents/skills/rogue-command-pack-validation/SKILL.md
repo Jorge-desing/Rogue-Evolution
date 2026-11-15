@@ -196,3 +196,5 @@ After successful data-only composition the empty staging parent is removed with 
 Composition rejects duplicate `packId` values between the result and `--dependency-pack` inputs, even if their entity IDs differ. Dependency packs remain separate runtime requirements and must be installed alongside the composed result.
 
 The composition CLI prints the transitive `packId` list that must be installed separately and warns about unverified native references in the composed pack. This report does not copy dependency packs.
+
+Composed output includes `composition-dependencies.json` with required external pack IDs and unverified native references. This is an agent-facing report, not a loader-enforced dependency declaration; install the listed packs separately.

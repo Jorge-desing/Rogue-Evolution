@@ -108,6 +108,8 @@ class CompositionEditTests(unittest.TestCase):
                 self.assertEqual(0, EDIT.main(arguments + ["--dependency-pack", str(dependency)]))
             self.assertTrue((output / "content.json").is_file())
             self.assertIn("other:pack", output_text.getvalue())
+            report = json.loads((output / "composition-dependencies.json").read_text(encoding="utf-8"))
+            self.assertEqual(["other:pack"], report["requiredPackIds"])
 
     def test_composition_rejects_duplicate_pack_id_even_without_entity_collisions(self) -> None:
         pack = self._pack()

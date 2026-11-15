@@ -2970,3 +2970,7 @@ Composition now rejects a missing or duplicate `packId` among the resulting pack
 ## 2026-11-15 — Composition dependency disclosure
 
 Composition now prints the transitive external `packId` dependencies required alongside the result and warns about typed native references that remain unverified. Dependency packs are still separate and not copied. Thirty targeted tests passed. Native catalog verification, output path safety/cleanup and full-suite visual failures remain open.
+
+## 2026-11-15 — Persist composition dependency report
+
+Composed output now includes `composition-dependencies.json` with the composed pack ID, transitive required external pack IDs and unverified native references. The file is written in staging before publication and is agent-facing; the loader does not enforce it or install dependency packs. Thirty-five focused tests passed. Native catalog verification, output path safety/cleanup and full-suite visual failures remain open.
