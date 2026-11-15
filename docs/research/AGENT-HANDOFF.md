@@ -3023,3 +3023,7 @@ Entity references also resolve to separately declared `buildings`, not only unit
 ### Standalone building composition (2026-11-15)
 
 Extraction and import now include locally referenced standalone buildings and their bundles; conflicting existing entity/building IDs fail before import. Dependency and composition test modules passed 33 tests. Continue the reference coverage and destination/rollback security audit.
+
+### Composition entity identity (2026-11-15)
+
+Composition rejects collisions between selected units, production factories and standalone buildings, including duplicate factory IDs. The dependency and composition modules passed 34 tests; see the full-suite result separately. Destination security and the remaining reference audit remain open.

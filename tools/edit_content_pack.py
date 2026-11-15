@@ -925,6 +925,14 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
                 if ref in buildings:
                     selected_buildings.add(ref)
         if previous == (len(selected_units), len(selected_stages), len(selected_profiles), len(selected_buildings)):
+            factory_ids = [_entity_key(units[uid].get("productionBuilding")) for uid in selected_units]
+            factory_ids = [fid for fid in factory_ids if fid]
+            if len(factory_ids) != len(set(factory_ids)):
+                raise ValueError("IDs de fábricas repetidos entre unidades seleccionadas")
+            selected_factories = set(factory_ids)
+            overlap = (selected_units & selected_factories) | (selected_units & selected_buildings) | (selected_factories & selected_buildings)
+            if overlap:
+                raise ValueError("IDs de entidades de distinto tipo en conflicto: " + ", ".join(sorted(overlap)))
             return selected_units, selected_stages, selected_profiles, selected_buildings
 
 

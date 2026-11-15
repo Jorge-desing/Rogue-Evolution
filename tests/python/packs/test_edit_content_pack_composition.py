@@ -148,6 +148,13 @@ class CompositionEditTests(unittest.TestCase):
         self.assertTrue(errors)
         self.assertEqual(destination, unchanged)
 
+    def test_extract_rejects_unit_building_id_collision(self) -> None:
+        source = self._pack()
+        source["buildings"] = [{"id": "ns:alpha"}]
+        extracted, errors = EDIT.extract_units_to_pack(source, ["ns:alpha"])
+        self.assertEqual({}, extracted)
+        self.assertTrue(any("conflicto" in error for error in errors))
+
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()
         extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])

@@ -206,3 +206,5 @@ A present `composition-dependencies.json` is checked by `tools.validate_content_
 Dependency analysis also reports native `copyUpgradesToEntityId` and upgrade/relic `mustNotHaveOneOfTheseEntityIds` as unverified entity references; namespaced values require a unit, production factory, or standalone building provider. These reports do not prove native IDs exist.
 
 Composition carries referenced standalone buildings in its local closure, includes their bundle declarations during import and rejects conflicting destination definitions. Other reference families and destination race protection still require review.
+
+Composition rejects overlapping selected unit, factory and standalone-building IDs, as well as factories shared by multiple selected units, before emitting a pack.
