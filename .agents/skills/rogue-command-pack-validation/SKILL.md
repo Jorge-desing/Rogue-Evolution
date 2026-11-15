@@ -209,4 +209,4 @@ Composition carries referenced standalone buildings in its local closure, includ
 
 Composition rejects overlapping selected unit, factory and standalone-building IDs, as well as factories shared by multiple selected units, before emitting a pack.
 
-Composition selects relics and upgrades whose card changes explicitly target selected units or factories, closes over their referenced entities and bundles, and rejects conflicting card definitions. Role-, side-, and other filter-only card effects are not automatically associated with units; review these manually.
+Composition selects relics and upgrades whose card changes explicitly target selected units or factories, closes over their referenced entities and bundles, and rejects conflicting card definitions. Filter-only card effects are included conservatively because native roles and side cannot be ruled out offline. Imported cards may also affect other destination entities; inspect their scope.

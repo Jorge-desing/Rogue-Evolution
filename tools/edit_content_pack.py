@@ -907,10 +907,14 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
     selected_relics, selected_upgrades = set(), set()
     while True:
         previous = (len(selected_units), len(selected_stages), len(selected_profiles), len(selected_buildings), len(selected_relics), len(selected_upgrades))
-        selected_entity_ids = selected_units | {fid for fid, uid in factories.items() if uid in selected_units and fid}
+        selected_entity_ids = selected_units | selected_buildings | {fid for fid, uid in factories.items() if uid in selected_units and fid}
         for catalog, selected in ((relics, selected_relics), (upgrades, selected_upgrades)):
             for card_id, card in catalog.items():
-                if any(set(_as_list(change.get("onlyForTheseEntityIds"))) & selected_entity_ids
+                # A filter-only change may match a selected entity through roles,
+                # side or native defaults. Keep it conservatively; the manifest
+                # has insufficient information to prove it cannot apply.
+                if any(not _as_list(change.get("onlyForTheseEntityIds")) or
+                       bool(set(_as_list(change.get("onlyForTheseEntityIds"))) & selected_entity_ids)
                        for change in _as_list(card.get("cardChanges")) if isinstance(change, dict)):
                     selected.add(card_id)
         for pid, profile in profiles.items():

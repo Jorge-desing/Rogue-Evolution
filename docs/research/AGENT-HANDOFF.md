@@ -3033,3 +3033,7 @@ Full Python acceptance was run with `python -m tools.run_python_tests` in `all` 
 ### Explicit card composition (2026-11-15)
 
 Extraction/import carries relics and upgrades with `cardChanges.onlyForTheseEntityIds` targeting selected units/factories, closes their dependencies and bundles, and rejects conflicting card definitions. The targeted dependency/composition modules passed 35 tests. Filter-only cards are not selected automatically; destination races, rollback and remaining references still need review.
+
+### Filter-only card composition (2026-11-15)
+
+Composition now conservatively retains cards containing a change without explicit entity targets, because role/side/native defaults may make it apply. These cards can affect other destination entities, so inspect the imported card scope. Explicit targets also match selected standalone buildings. The dependency/composition modules passed 36 tests. Destination races, rollback and remaining references still need review. This supersedes the previous filter-only limitation.

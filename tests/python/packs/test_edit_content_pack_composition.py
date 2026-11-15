@@ -174,6 +174,19 @@ class CompositionEditTests(unittest.TestCase):
         self.assertTrue(errors)
         self.assertEqual(destination, unchanged)
 
+    def test_filter_only_cards_are_conservatively_preserved(self) -> None:
+        source = self._pack()
+        source["relics"] = [{"id": "ns:role", "cardChanges": [{"cardMustHaveOneOfTheseRoles": ["Tank"]}]}]
+        source["upgrades"] = [{"id": "ns:side", "cardChanges": [{"side": "True"}]}]
+        extracted, errors = EDIT.extract_units_to_pack(source, ["ns:alpha"])
+        self.assertEqual([], errors)
+        self.assertEqual("ns:role", extracted["relics"][0]["id"])
+        self.assertEqual("ns:side", extracted["upgrades"][0]["id"])
+        destination = SCAFFOLD.generate_scaffold("other:pack", "beta", stage_slug="sb", ai_slug="ab")
+        imported, errors = EDIT.import_units(destination, source, ["ns:alpha"])
+        self.assertEqual([], errors)
+        self.assertEqual("ns:role", imported["relics"][0]["id"])
+
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()
         extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])
