@@ -3163,3 +3163,7 @@ The MCP sequence executor now stops on an incomplete battlefield plan when dispa
 Native group, formation, group stance and coordinated-assault results may report success after affecting only part of the requested units. `automation_run_sequence` now checks their dispatched/affected counts against the requested bounded count, stops and requires inspection on partial or unquantified success, regardless of `stopOnFailure`. Direct calls retain native semantics and require count inspection. Automation module passed 26 tests; no live orders were issued.
 
 Group-action sequence handling also stops when the returned dispatch count is missing or malformed, including error replies, because the extent of any effect cannot be established. The automation module passed 27 tests after this refinement.
+
+### MCP catalog size and full suite (2026-11-15)
+
+Full Python `all` initially failed because the expanded mixed-plan schema pushed the default tools/list result to 98,366 bytes, exceeding the existing 98,000-byte test limit. The schema now points to `automation.md` for complete command fields; the agent skill directs readers there. No tools or diagnostics were disabled. The targeted module passed and full Python `all` then passed in 43.91 s. The HTTP endpoint answered a read-only game-process query with `running=false`. This supersedes the earlier claim that the catalog itself contains the full command guide.
