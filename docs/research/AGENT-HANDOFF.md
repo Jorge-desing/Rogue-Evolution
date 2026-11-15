@@ -3129,3 +3129,7 @@ Composition now reports filter-only relics/upgrades in required external depende
 ### Stage and AI import conflict resolution (2026-11-15)
 
 `import-units --rename-conflicts` and batch `renameConflicts: true` rename conflicting selected source profiles/stages to unused `-import-N` IDs and update source stage-profile bindings. The CLI prints the mapping. Existing destination definitions and the source files remain untouched; external packs are not rewritten. Tests cover source preservation, bindings, batch and CLI. Composition module passed 37 tests after the final change; full Python `all` passed in 36.95 s before the final selection refinement. Stage-content post-hash and POSIX safety remain open.
+
+### Persistent conflict mappings (2026-11-15)
+
+The composition sidecar now records successful rename-enabled imports in `renamedIds`, including source pack ID and AI/stage ID maps for direct and batch operations. Composition module passed 37 tests. External packs are not rewritten, the report is not authenticated, and Windows post-hash/POSIX safety limitations remain.

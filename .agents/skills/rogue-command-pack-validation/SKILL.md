@@ -250,3 +250,5 @@ The random `.rogue-compose-*` staging parent is also created exclusively with it
 The composition CLI also lists filter-only cards in required external packs, including transitive dependencies, under `dependencyBroadFilterCards` keyed by pack ID. This describes possible cross-pack effects; actual matching remains runtime-dependent.
 
 Use `import-units --rename-conflicts` (batch `renameConflicts: true`) to retain selected incoming stage/AI profile definitions with conflicting IDs under deterministic `-import-N` names; source stage bindings follow renamed profiles. Inspect the printed mapping and any external dependencies, which are not rewritten. Other conflict types still fail.
+
+Successful rename-enabled imports persist source pack ID and stage/profile maps in the composition report `renamedIds`, including batch operations. External packs are not rewritten; the sidecar is not an authenticated attestation.

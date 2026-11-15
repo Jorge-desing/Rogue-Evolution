@@ -377,9 +377,11 @@ class CompositionEditTests(unittest.TestCase):
         imported, errors = EDIT.import_units(destination, renamed, ["other:beta"])
         self.assertEqual([], errors)
         self.assertIn(mappings["stages"][old_stage], [row["id"] for row in imported["stages"]])
+        batch_mappings = []
         with contextlib.redirect_stdout(io.StringIO()):
-            batched, errors = EDIT.apply_edits(destination, [{"op": "import-units", "source": source, "unitIds": ["other:beta"], "renameConflicts": True}])
+            batched, errors = EDIT.apply_edits(destination, [{"op": "import-units", "source": source, "unitIds": ["other:beta"], "renameConflicts": True}], composition_mappings=batch_mappings)
         self.assertEqual([], errors)
+        self.assertEqual({"sourcePackId": "other:pack", **mappings}, batch_mappings[0])
         self.assertIn(mappings["aiProfiles"][old_profile], [row["id"] for row in batched["aiProfiles"]])
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -392,6 +394,8 @@ class CompositionEditTests(unittest.TestCase):
             result = json.loads((output / "content.json").read_text(encoding="utf-8"))
             self.assertIn(mappings["stages"][old_stage], [row["id"] for row in result["stages"]])
             self.assertIn(mappings["aiProfiles"][old_profile], text_out.getvalue())
+            report = json.loads((output / "composition-dependencies.json").read_text(encoding="utf-8"))
+            self.assertEqual({"sourcePackId": "other:pack", **mappings}, report["renamedIds"][0])
 
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()

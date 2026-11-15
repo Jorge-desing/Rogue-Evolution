@@ -707,7 +707,7 @@ _PATTERN_AI = ("aiProfiles",)
 
 
 def apply_edits(
-    pack: dict, operations: list[dict]
+    pack: dict, operations: list[dict], *, composition_mappings: list[dict] | None = None
 ) -> tuple[dict, list[str]]:
     """Aplica una lista de operaciones de edición en secuencia.
 
@@ -872,6 +872,8 @@ def apply_edits(
                     source, mappings = rename_import_conflicts(current, source, op.get("unitIds", []))
                     print("IDs de origen renombrados: " + json.dumps(mappings, ensure_ascii=False))
                 current, d = import_units(current, source, op.get("unitIds", []))
+                if not d and op.get("renameConflicts") and composition_mappings is not None:
+                    composition_mappings.append({"sourcePackId": source.get("packId"), **mappings})
             else:
                 d = [f"op desconocida '{name}'"]
         except Exception as exc:  # keep the batch running per-op
@@ -1846,6 +1848,7 @@ def main(argv: list[str] | None = None) -> int:
     updated = None
     script = None
     composition_sources = []
+    composition_mappings = []
     diagnostics: list[str] = []
 
     if args.operation == "extract-units":
@@ -1877,6 +1880,8 @@ def main(argv: list[str] | None = None) -> int:
             for diagnostic in diagnostics:
                 print(f"  ! {diagnostic}", file=sys.stderr)
             return 1
+        if args.rename_conflicts:
+            composition_mappings.append({"sourcePackId": source_pack.get("packId"), **mappings})
         origin = Path(args.source_pack)
         composition_sources.append((origin if origin.is_dir() else origin.parent, source_pack))
     elif args.operation == "add":
@@ -2185,7 +2190,7 @@ def main(argv: list[str] | None = None) -> int:
                 row["source"] = source_pack
                 origin = Path(source_path)
                 composition_sources.append((origin if origin.is_dir() else origin.parent, source_pack))
-        updated, diagnostics = apply_edits(pack, script)
+        updated, diagnostics = apply_edits(pack, script, composition_mappings=composition_mappings)
         if diagnostics and any(isinstance(row, dict) and row.get("op") in ("extract-units", "import-units") for row in script):
             for diagnostic in diagnostics:
                 print(f"  ! {diagnostic}", file=sys.stderr)
@@ -2267,6 +2272,7 @@ def main(argv: list[str] | None = None) -> int:
         if broad_cards:
             print("Cartas con filtros generales que pueden afectar otras entidades: " + ", ".join(broad_cards), file=sys.stderr)
         composition_report = {"schemaVersion": 1, "packId": updated.get("packId"),
+                              "renamedIds": composition_mappings,
                               "broadFilterCards": broad_cards,
                               "dependencyNativeReferences": dependency_native,
                               "dependencyBroadFilterCards": dependency_broad,
