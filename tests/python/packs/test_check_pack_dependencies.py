@@ -47,6 +47,16 @@ class CheckPackDependenciesTests(unittest.TestCase):
         self.assertEqual(0, report["counts"]["packs"])
         self.assertEqual([], report["packs"])
 
+    def test_native_templates_are_reported_without_asserting_they_exist(self) -> None:
+        pack = _packs()["scaffold"]
+        pack["units"][0]["nativeTemplateId"] = "NativeUnit"
+        pack["units"][0]["productionBuilding"]["nativeTemplateId"] = "NativeFactory"
+        pack["stages"][0]["landscape"] = {"nativeTemplateId": "NativeLandscape"}
+        row = DEPS.analyze_dependencies({"pack": pack})["packs"][0]
+        self.assertIn("NativeUnit (unit template)", row["unverifiedNativeReferences"])
+        self.assertIn("NativeFactory (factory template)", row["unverifiedNativeReferences"])
+        self.assertIn("NativeLandscape (landscape template)", row["unverifiedNativeReferences"])
+
     def test_native_ids_not_external(self) -> None:
         packs = _packs()
         packs["scaffold"]["stages"][0]["unitIds"] = ["PCXBaseTank"]

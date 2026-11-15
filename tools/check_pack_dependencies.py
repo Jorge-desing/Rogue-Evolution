@@ -148,16 +148,30 @@ def analyze_dependencies(packs: dict) -> dict:
                 typed_refs.add((value, kind))
             elif isinstance(value, str) and value.strip() and value != "*":
                 native_refs.add((value, kind))
+        def add_template(value, kind):
+            if isinstance(value, str) and value.strip():
+                native_refs.add((value, kind))
         for unit in _as_list(_as_dict(packs[name]).get("units")):
             if isinstance(unit, dict):
+                add_template(unit.get("nativeTemplateId"), "unit template")
+                factory = unit.get("productionBuilding")
+                if isinstance(factory, dict):
+                    add_template(factory.get("nativeTemplateId"), "factory template")
                 add(unit.get("copyUpgradesToEntityId"), "entity")
                 for upgrade in _as_list(unit.get("upgrades")):
                     if isinstance(upgrade, dict): add(upgrade.get("targetUnitId"), "unit")
                 for synergy in _as_list(unit.get("synergies")):
                     if isinstance(synergy, dict):
                         for value in _as_list(synergy.get("targetUnitIds")): add(value, "unit")
+        for building in _as_list(_as_dict(packs[name]).get("buildings")):
+            if isinstance(building, dict):
+                add_template(building.get("nativeTemplateId"), "building template")
         for stage in _as_list(_as_dict(packs[name]).get("stages")):
             if isinstance(stage, dict):
+                add_template(stage.get("nativeTemplateId"), "stage template")
+                landscape = stage.get("landscape")
+                if isinstance(landscape, dict):
+                    add_template(landscape.get("nativeTemplateId"), "landscape template")
                 for value in _as_list(stage.get("unitIds")): add(value, "unit")
                 for pool in _as_list(stage.get("blueprintPoolEntries")):
                     if isinstance(pool, dict):
@@ -165,6 +179,7 @@ def analyze_dependencies(packs: dict) -> dict:
                 for value in _as_list(stage.get("aiProfileIds")): add(value, "profile")
         for profile in _as_list(_as_dict(packs[name]).get("aiProfiles")):
             if isinstance(profile, dict):
+                add_template(profile.get("nativeTemplateId"), "AI template")
                 for value in _as_list(profile.get("unitDependencies")): add(value, "unit")
                 for section in ("unitEntries", "productionBuildingEntries"):
                     for entry in _as_list(profile.get(section)):

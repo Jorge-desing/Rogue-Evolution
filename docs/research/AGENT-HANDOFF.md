@@ -3081,3 +3081,7 @@ The prior installed artifact predated loader source commit d4173a1. Rebuilt Rele
 ### Interrupted bundle rollback (2026-11-15)
 
 Windows rollback now also checks files interrupted before flush completed: matching file identity and full expected SHA-256 permit handle-based removal, while partial content is retained. Bundle/composition modules passed 36 tests. A POSIX runtime was not confirmed on this host; POSIX path and rollback behavior remain unverified.
+
+### Native template coverage and real-pack composition (2026-11-15)
+
+An extraction of `sample-native:scout-tank` to `artifacts/composition-real-pack-20261115` succeeded, validated locally and contained 9 units, 3 stages, 3 profiles, 1 relic and 1 bundle. This exposed missing native-template reporting: the analyzer now reports unit, factory, building, stage, landscape and AI templates as unverified. The previously emitted sidecar predates that fix and must be regenerated for current coverage. Dependency/composition modules passed 42 tests. This is not live gameplay evidence. Stage publication and POSIX safety remain open.

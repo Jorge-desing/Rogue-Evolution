@@ -232,3 +232,5 @@ The Windows rollback regression also covers replacement by a different file with
 On 2026-11-15, the loader was rebuilt after source commit d4173a1; Release build had zero warnings/errors and the validation harness reported 601/602 checks passed with one skip. This is local evidence, not live gameplay acceptance.
 
 Rollback records the planned hash immediately after exclusive file creation. A write/flush failure can therefore remove that file if its identity and actual bytes match the complete expected hash; partial bytes still fail the hash check and remain.
+
+Dependency analysis lists native templates for units, production factories, standalone buildings, stages, landscapes and AI profiles as unverified native references. Template names are not asserted to exist or treated as namespaced pack dependencies.
