@@ -144,7 +144,8 @@ Dispatches validated, safe in-game actions for automated testing and agent execu
 - `diagnostics_order_warm_prespawn_pool`: Warms EntityFactory pool to prevent runtime hitches (`entityId`, `count` 1–50).
 - `diagnostics_order_set_ai_doctrine`: Configures AI doctrine (`"Standard"`, `"Assault"`, `"Siege"`, `"Kiting"`, `"Fortify"`, `aggressionMultiplier` 0.1–5.0).
 - `diagnostics_order_inject_ai_deck_unit`: Dynamically reinforces AI deck with unit quotas (`baseIndex`, `unitId`, `countAtStart`, `maxLiving`).
-- `diagnostics_order_reconcile_loader_state`: Warms unwarmed pools, attaches missing directors, and reapplies profile squad defaults.
+- `diagnostics_order_reconcile_loader_state`: Warms unwarmed pools, reconciles unbound live `DefaultAiBehaviour` instances via `OnReconcileActiveAiBehaviours`, attaches missing directors (`RuntimeVisualDirector`, `RuntimeUnitMechanicsDirector`), synchronizes `RuntimeShieldColorSync`, and reapplies profile squad defaults.
+- **Zero-Hitch Pre-Spawning & Pool Telemetry:** `RuntimeHooks.AfterPrespawnEntity` (postfix on `EntityFactory.PrespawnEntity`) pre-attaches `RuntimeVisualDirector`, `RuntimeUnitMechanicsDirector`, and `RuntimeShieldColorSync` onto inactive pooled instances in `EntityFactory.PrespawnedEntities` (`EntitiesToPrespawn` / `PrespawnedEntities` are the exact `1.0.9` static dictionary names). Player deck warming resolves `EntityBalancingStore.ProductEntityId(card)` alongside factories, and AI init warms both `unitEntries` and `productionBuildingEntries`.
 
 ### Selection, Harvesters, Economy & Environment
 - `diagnostics_select_units` / `diagnostics_deselect_all`: Controls unit selection by CSV key list or clears selection.

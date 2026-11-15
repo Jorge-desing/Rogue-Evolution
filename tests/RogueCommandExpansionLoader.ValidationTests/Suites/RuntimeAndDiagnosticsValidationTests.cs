@@ -3798,6 +3798,53 @@ internal static partial class ValidationTestRunner
             UnityEngine.Object.NativeControlTestObjects = savedObjects.ToArray();
         }
     }),
+    ("record prespawn warmed and loader reconciliation update prespawn quotas and active AI bindings", () =>
+    {
+        Func<int> previousReconcile = RuntimeGameplayCommandDirector.OnReconcileActiveAiBehaviours;
+        try
+        {
+            const string testEntityId = "sample:test-prespawn-unit";
+            RuntimeGameplayCommandDirector.RecordPrespawnWarmed(testEntityId, 12, 8);
+            IReadOnlyList<PrespawnPoolDiagnosticRow> rows = RuntimeGameplayCommandDirector.GetPrespawnPoolRows(128, out _, out _);
+            PrespawnPoolDiagnosticRow? matched = null;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (string.Equals(rows[i].EntityId, testEntityId, StringComparison.OrdinalIgnoreCase))
+                {
+                    matched = rows[i];
+                    break;
+                }
+            }
+
+            if (matched == null || matched.Value.TargetQuota < 12 || matched.Value.PrespawnedCount < 8)
+            {
+                throw new InvalidOperationException("RecordPrespawnWarmed did not persist quota/warmed count into PrespawnPoolDiagnosticRow.");
+            }
+
+            int callbackCalls = 0;
+            RuntimeGameplayCommandDirector.OnReconcileActiveAiBehaviours = () =>
+            {
+                callbackCalls++;
+                return 2;
+            };
+
+            LoaderReconciliationResult recon = RuntimeGameplayCommandDirector.TryReconcileLoaderRuntimeState(null);
+            if (!recon.Success || callbackCalls != 1 || recon.ReconciledAiProfileCount < 2)
+            {
+                throw new InvalidOperationException(
+                    $"TryReconcileLoaderRuntimeState did not invoke OnReconcileActiveAiBehaviours as expected. Success={recon.Success}, Calls={callbackCalls}, AiProfiles={recon.ReconciledAiProfileCount}");
+            }
+
+            // Must be a safe no-op when Assembly-CSharp is absent or spawned is false.
+            RuntimeHooks.AfterPrespawnEntity(testEntityId, false);
+            RuntimeHooks.AfterPrespawnEntity(testEntityId, true);
+            RuntimeHooks.AfterPrespawnEntity(null, true);
+        }
+        finally
+        {
+            RuntimeGameplayCommandDirector.OnReconcileActiveAiBehaviours = previousReconcile;
+        }
+    }),
     ("support auras reach damaged allies after full-health or healing-blocked candidates", () =>
     {
         ExistingControllers.Instance.Reset();

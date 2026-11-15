@@ -3173,7 +3173,7 @@ namespace RogueCommandExpansionLoader.Content
 
                     if (unit != null && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
                     {
-                        int factoryQuota = Math.Min(50, Math.Max(1, entry.count));
+                        int factoryQuota = Math.Min(50, Math.Max(1, entry.maxLiving));
                         RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.ProductionFactoryId, factoryQuota);
                     }
                 }
@@ -3514,6 +3514,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 await LoadPacksInDependencyOrderAsync(candidates);
+                RuntimeGameplayCommandDirector.OnReconcileActiveAiBehaviours = ReconcileActiveAiBehaviours;
 
                 int productionBuildingCount = 0;
                 int productUnitCount;

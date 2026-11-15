@@ -264,8 +264,17 @@ namespace RogueCommandExpansionLoader.Runtime
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0 && method.ReturnType == typeof(void); });
             MethodInfo setupAiPrespawning = RuntimeReflection.FindUniqueMethod(entityFactory, "SetupAiPrespawning",
                 delegate(MethodInfo method) { return method.GetParameters().Length == 0 && method.ReturnType == typeof(void); });
+            MethodInfo prespawnEntity = TryFindUniqueMethod(entityFactory, "PrespawnEntity",
+                delegate(MethodInfo method)
+                {
+                    ParameterInfo[] parameters = method.GetParameters();
+                    return method.IsStatic && method.ReturnType == typeof(bool) && parameters.Length == 2 &&
+                        parameters[0].ParameterType == typeof(string) &&
+                        parameters[1].ParameterType == typeof(int);
+                });
             MethodInfo setupPrespawningPostfix = Hook("EntityFactorySetupPrespawningPostfix");
             MethodInfo setupAiPrespawningPostfix = Hook("EntityFactorySetupAiPrespawningPostfix");
+            MethodInfo prespawnEntityPostfix = prespawnEntity == null ? null : Hook("EntityFactoryPrespawnEntityPostfix");
             MethodInfo aiUpdate = RuntimeReflection.FindUniqueMethod(aiBehaviour, "Update",
                 delegate(MethodInfo method)
                 {
@@ -688,6 +697,10 @@ namespace RogueCommandExpansionLoader.Runtime
             plan.Add(new PatchPlan(resourcesLoadUntyped, untypedLoadPrefix, null));
             plan.Add(new PatchPlan(setupPrespawning, null, setupPrespawningPostfix));
             plan.Add(new PatchPlan(setupAiPrespawning, null, setupAiPrespawningPostfix));
+            if (prespawnEntity != null && prespawnEntityPostfix != null)
+            {
+                plan.Add(new PatchPlan(prespawnEntity, null, prespawnEntityPostfix));
+            }
             plan.Add(new PatchPlan(isTargetInRange, null, isTargetInRangePostfix));
             plan.Add(new PatchPlan(entityDestroy, null, entityDestroyPostfix, entityDestroyTranspiler, null));
             plan.Add(new PatchPlan(entityFixedUpdate, entityFixedUpdatePrefix, entityFixedUpdatePostfix));

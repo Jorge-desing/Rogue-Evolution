@@ -745,6 +745,10 @@ namespace RogueCommandExpansionLoader.Runtime
                     {
                         PropertyInfo cardsInDeckProp = gameType.GetProperty("CardsInDeck",
                             BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        Type balancingStoreType = RuntimeReflection.FindUniqueType(mutator.GameAssembly, "EntityBalancingStore");
+                        MethodInfo productEntityIdMethod = balancingStoreType?.GetMethod("ProductEntityId",
+                            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                            null, new[] { typeof(string) }, null);
                         if (cardsInDeckProp != null)
                         {
                             IEnumerable<string> cards = cardsInDeckProp.GetValue(null) as IEnumerable<string>;
@@ -755,6 +759,18 @@ namespace RogueCommandExpansionLoader.Runtime
                                     if (!string.IsNullOrEmpty(card))
                                     {
                                         activeEntityIds.Add(card);
+                                        if (productEntityIdMethod != null)
+                                        {
+                                            try
+                                            {
+                                                string productId = productEntityIdMethod.Invoke(null, new object[] { card }) as string;
+                                                if (!string.IsNullOrEmpty(productId))
+                                                {
+                                                    activeEntityIds.Add(productId);
+                                                }
+                                            }
+                                            catch { }
+                                        }
                                     }
                                 }
                             }
@@ -822,19 +838,23 @@ namespace RogueCommandExpansionLoader.Runtime
 
                 if (isActive && prespawnEntityMethod != null)
                 {
+                    int warmedCount = 0;
                     try
                     {
-                        int warmCount = Math.Min(2, quota.Quota);
+                        int warmCount = Math.Min(50, quota.Quota);
                         for (int w = 0; w < warmCount; w++)
                         {
                             object result = prespawnEntityMethod.Invoke(null, new object[] { quota.EntityId, warmCount });
                             if (result is bool spawned && !spawned) break;
+                            warmedCount++;
                         }
                     }
                     catch (Exception ex)
                     {
                         Log("Warm pre-spawn omitted for " + quota.EntityId + ": " + ex.GetBaseException().Message);
                     }
+
+                    RuntimeGameplayCommandDirector.RecordPrespawnWarmed(quota.EntityId, quota.Quota, warmedCount);
                 }
             }
         }
@@ -1726,6 +1746,48 @@ namespace RogueCommandExpansionLoader.Runtime
                 // Logging failures are isolated from the game thread.
             }
         }
+        public static void AfterPrespawnEntity(string entityId, bool spawned)
+        {
+            if (!spawned || string.IsNullOrEmpty(entityId))
+            {
+                return;
+            }
+
+            SafeCall(delegate
+            {
+                Type entityFactoryType = Type.GetType("EntityFactory, Assembly-CSharp", false);
+                if (entityFactoryType == null)
+                {
+                    return;
+                }
+
+                FieldInfo prespawnedField = entityFactoryType.GetField("PrespawnedEntities",
+                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+                System.Collections.IDictionary prespawned = prespawnedField?.GetValue(null) as System.Collections.IDictionary;
+                if (prespawned == null || !prespawned.Contains(entityId))
+                {
+                    return;
+                }
+
+                object stack = prespawned[entityId];
+                if (stack == null)
+                {
+                    return;
+                }
+
+                MethodInfo peekMethod = stack.GetType().GetMethod("Peek", BindingFlags.Instance | BindingFlags.Public);
+                object entityController = peekMethod?.Invoke(stack, null);
+                if (entityController == null)
+                {
+                    return;
+                }
+
+                Visual.RuntimeVisualDirector.AttachIfApplicable(entityController);
+                RuntimeUnitMechanicsDirector.AttachIfApplicable(entityController);
+                Visual.RuntimeShieldColorSync.ApplyIfApplicable(entityController);
+            });
+        }
+
         public static void AfterInstantiateEntity(object result)
         {
             if (result == null)
@@ -3130,6 +3192,11 @@ namespace RogueCommandExpansionLoader.Runtime
         public static void InstantiateEntityPostfix(object __result)
         {
             RuntimeHooks.AfterInstantiateEntity(__result);
+        }
+
+        public static void EntityFactoryPrespawnEntityPostfix(string __0, bool __result)
+        {
+            RuntimeHooks.AfterPrespawnEntity(__0, __result);
         }
 
         public static bool EntityControllerIsProductionPossiblePrefix(object __instance, ref bool __result)

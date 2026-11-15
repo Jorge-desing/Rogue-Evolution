@@ -5473,8 +5473,10 @@ namespace RogueCommandExpansionLoader.Runtime
                 Type entityFactory = Type.GetType("EntityFactory, Assembly-CSharp");
                 if (entityFactory != null)
                 {
-                    FieldInfo toPrespawnField = entityFactory.GetField("toPrespawn", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-                    FieldInfo prespawnedField = entityFactory.GetField("prespawned", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    FieldInfo toPrespawnField = entityFactory.GetField("EntitiesToPrespawn", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+                        ?? entityFactory.GetField("toPrespawn", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+                    FieldInfo prespawnedField = entityFactory.GetField("PrespawnedEntities", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+                        ?? entityFactory.GetField("prespawned", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
 
                     System.Collections.IDictionary toPrespawn = toPrespawnField?.GetValue(null) as System.Collections.IDictionary;
                     System.Collections.IDictionary prespawned = prespawnedField?.GetValue(null) as System.Collections.IDictionary;
@@ -6093,6 +6095,30 @@ namespace RogueCommandExpansionLoader.Runtime
         private static string UnitLoadoutOriginator(string entityKeyId, string statName)
         {
             return "rcl:unit-loadout:" + entityKeyId + ":" + statName;
+        }
+
+        public static Func<int> OnReconcileActiveAiBehaviours { get; set; }
+
+        public static void RecordPrespawnWarmed(string entityId, int quota, int warmedCount)
+        {
+            if (string.IsNullOrWhiteSpace(entityId))
+            {
+                return;
+            }
+
+            string sanitizedId = entityId.Trim();
+            int safeQuota = Math.Max(0, quota);
+            int safeWarmed = Math.Max(0, warmedCount);
+            lock (_prespawnPoolQuotas)
+            {
+                int currentQuota = 0;
+                _prespawnPoolQuotas.TryGetValue(sanitizedId, out currentQuota);
+                _prespawnPoolQuotas[sanitizedId] = Math.Max(currentQuota, safeQuota);
+
+                int currentWarmed = 0;
+                _prespawnPoolWarmed.TryGetValue(sanitizedId, out currentWarmed);
+                _prespawnPoolWarmed[sanitizedId] = Math.Max(currentWarmed, safeWarmed);
+            }
         }
 
         public static PrespawnWarmResult TryWarmPrespawnPool(string entityId, int count)
@@ -7705,10 +7731,20 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
 
                 // 2. Reconcile active AI profiles and doctrine
+                Func<int> reconcileAiCallback = OnReconcileActiveAiBehaviours;
+                if (reconcileAiCallback != null)
+                {
+                    try
+                    {
+                        reconciledAiProfiles += reconcileAiCallback();
+                    }
+                    catch { }
+                }
+
                 AiProfileUnitDefaultsRecord activeAiRecord = null;
                 lock (_aiProfileDefaultsGate)
                 {
-                    reconciledAiProfiles = _aiProfileUnitDefaults.Count;
+                    reconciledAiProfiles = Math.Max(reconciledAiProfiles, _aiProfileUnitDefaults.Count);
                     if (!string.IsNullOrEmpty(_activeAiProfileId))
                     {
                         _aiProfileUnitDefaults.TryGetValue(_activeAiProfileId, out activeAiRecord);
@@ -7778,6 +7814,12 @@ namespace RogueCommandExpansionLoader.Runtime
                                     attachedMechanics++;
                                 }
                             }
+                        }
+                        catch { }
+
+                        try
+                        {
+                            Visual.RuntimeShieldColorSync.ApplyIfApplicable(entity);
                         }
                         catch { }
 
