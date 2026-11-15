@@ -214,3 +214,5 @@ Composition selects relics and upgrades whose card changes explicitly target sel
 During composed-pack writing, the staging parent is held through a non-reparse handle until publication; on Windows a concurrent rename of that parent is blocked. The child-stage replacement race and POSIX pathname publication remain unaddressed; retained failed files still require inspection rather than automatic recursive rollback.
 
 New `pack` and `source-N` staging directories are created exclusively; preexisting children cause failure and are preserved. This does not prevent replacement after creation.
+
+Windows handle-based stage rename requires DELETE access. Current guarded directory opens omit FILE_SHARE_DELETE, so a long-lived DELETE-capable stage handle conflicts with subsequent guarded opens (WinError 32). Coordinate sharing on the exact guarded stage without relaxing ancestor protections before implementing handle publication; a standalone rename prototype is not integration evidence.

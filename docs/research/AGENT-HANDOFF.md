@@ -3045,3 +3045,7 @@ The composed writer holds the temporary staging parent through publication. A Wi
 ### Exclusive staging children (2026-11-15)
 
 New pack and source staging children now fail if the name already exists, preserving the existing directory. Composition and secure-read modules passed 30 tests with one skip. This closes preexisting-child reuse only; post-creation replacement and POSIX pathname races remain open.
+
+### Windows handle publication investigation (2026-11-15)
+
+A standalone `SetFileInformationByHandle(FileRenameInfo)` no-replace directory rename succeeded on this host. Holding a DELETE-capable stage handle across the current writer fails when `open_pack_file` reopens that directory without delete sharing (WinError 32). The prototype was removed; existing behavior is restored. Composition and secure-read modules passed 30 tests with one skip after restoration. Next, coordinate share modes for the exact protected stage while retaining ancestor guards, then test replacement and competing-destination races. POSIX and rollback remain open.
