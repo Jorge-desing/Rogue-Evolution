@@ -212,3 +212,5 @@ Composition rejects overlapping selected unit, factory and standalone-building I
 Composition selects relics and upgrades whose card changes explicitly target selected units or factories, closes over their referenced entities and bundles, and rejects conflicting card definitions. Filter-only card effects are included conservatively because native roles and side cannot be ruled out offline. Imported cards may also affect other destination entities; inspect their scope.
 
 During composed-pack writing, the staging parent is held through a non-reparse handle until publication; on Windows a concurrent rename of that parent is blocked. The child-stage replacement race and POSIX pathname publication remain unaddressed; retained failed files still require inspection rather than automatic recursive rollback.
+
+New `pack` and `source-N` staging directories are created exclusively; preexisting children cause failure and are preserved. This does not prevent replacement after creation.

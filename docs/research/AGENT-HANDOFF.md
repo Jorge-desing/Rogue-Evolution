@@ -3041,3 +3041,7 @@ Composition now conservatively retains cards containing a change without explici
 ### Staging parent guard (2026-11-15)
 
 The composed writer holds the temporary staging parent through publication. A Windows test attempts and fails to rename it while publishing. Composition and secure-read modules passed 29 tests with one skip; an initial invocation used a nonexistent test module and was corrected. This does not establish protection against child-stage replacement or POSIX ancestor races; retained files are not automatically rolled back.
+
+### Exclusive staging children (2026-11-15)
+
+New pack and source staging children now fail if the name already exists, preserving the existing directory. Composition and secure-read modules passed 30 tests with one skip. This closes preexisting-child reuse only; post-creation replacement and POSIX pathname races remain open.

@@ -45,11 +45,11 @@ def _guarded_hash(root: Path, relative: str) -> str:
     return digest.hexdigest()
 
 
-def _make_stage_dir(parent: Path, name: str) -> Path:
+def _make_stage_dir(parent: Path, name: str, *, exist_ok: bool = True) -> Path:
     """Create a single child while holding its parent, then reject reparse points."""
     with open_pack_file(parent.parent, parent.name, directory=True):
         child = parent / name
-        child.mkdir(exist_ok=True)
+        child.mkdir(exist_ok=exist_ok)
         with open_pack_file(parent, name, directory=True):
             pass
         return child
@@ -83,10 +83,10 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
         # Hold the staging parent across all writes and publication. On Windows
         # this prevents its rename or replacement while its path is in use.
         with open_pack_file(output_path.parent, Path(temporary).name, directory=True):
-            stage = _make_stage_dir(Path(temporary), "pack")
+            stage = _make_stage_dir(Path(temporary), "pack", exist_ok=False)
             manifest_sources: dict[str, bytes] = {}
             for index, (root, source_pack) in enumerate(bundle_sources):
-                isolated = _make_stage_dir(Path(temporary), f"source-{index}")
+                isolated = _make_stage_dir(Path(temporary), f"source-{index}", exist_ok=False)
                 copy_bundle_transfer(root, isolated, source_pack)
                 with open_pack_file(isolated, source_pack["assetBundleManifestPath"]) as stream:
                     manifest_bytes = stream.read()
