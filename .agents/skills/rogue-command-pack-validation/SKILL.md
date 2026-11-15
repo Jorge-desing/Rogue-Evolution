@@ -192,3 +192,5 @@ Typed dependency resolution treats `sample:scheduled-base-build` `entityId` as a
 After successful data-only composition the empty staging parent is removed with `rmdir`; when source copies remain, the writer reports the retained staging path as a warning. No recursive cleanup occurs.
 
 `check_pack_dependencies` reports unnamespaced references encountered in typed unit/profile/factory fields under `unverifiedNativeReferences`; an empty unresolved list alone does not verify those IDs against the native registry.
+
+Composition rejects duplicate `packId` values between the result and `--dependency-pack` inputs, even if their entity IDs differ. Dependency packs remain separate runtime requirements and must be installed alongside the composed result.

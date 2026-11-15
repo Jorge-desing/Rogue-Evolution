@@ -108,6 +108,20 @@ class CompositionEditTests(unittest.TestCase):
                 self.assertEqual(0, EDIT.main(arguments + ["--dependency-pack", str(dependency)]))
             self.assertTrue((output / "content.json").is_file())
 
+    def test_composition_rejects_duplicate_pack_id_even_without_entity_collisions(self) -> None:
+        pack = self._pack()
+        dependency = SCAFFOLD.generate_scaffold("ns:pack", "beta", stage_slug="sb", ai_slug="ab")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, other, output = root / "source.json", root / "other.json", root / "output"
+            source.write_text(json.dumps(pack), encoding="utf-8")
+            other.write_text(json.dumps(dependency), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = EDIT.main(["--pack", str(source), "--operation", "extract-units", "--unit-ids", "ns:alpha",
+                                  "--dependency-pack", str(other), "--out-dir", str(output)])
+            self.assertEqual(1, code)
+            self.assertFalse(output.exists())
+
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()
         extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])

@@ -2962,3 +2962,7 @@ After successful data-only composition, the empty staging parent is removed with
 ## 2026-11-15 — Native reference visibility
 
 The dependency report now lists unnamespaced typed unit/profile/factory references as `unverifiedNativeReferences`, rather than silently omitting them; these remain unverified against the actual game registry. Twenty-nine targeted tests passed; current four-pack report has no such references in the covered fields. A current identity-bound native catalog and full field coverage remain open, as do composition cleanup and visual suite failures.
+
+## 2026-11-15 — Composition pack identity conflicts
+
+Composition now rejects a missing or duplicate `packId` among the resulting pack and explicit dependency packs, even when entity IDs do not collide. Dependency packs resolve references but remain separate runtime requirements; they are not copied into the output. Thirty targeted tests passed. Native catalog verification, destination concurrency/cleanup and full-suite visual failures remain open.

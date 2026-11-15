@@ -2130,7 +2130,16 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             packs[f"dependency-{index}"] = dependency
         seen = set()
+        pack_ids = set()
         for name, dependency in packs.items():
+            pack_id = dependency.get("packId") if isinstance(dependency, dict) else None
+            if not isinstance(pack_id, str) or not pack_id:
+                print(f"{name}: packId ausente", file=sys.stderr)
+                return 1
+            if pack_id in pack_ids:
+                print(f"packId duplicado entre packs: {pack_id}", file=sys.stderr)
+                return 1
+            pack_ids.add(pack_id)
             ids = defined_ids(dependency)
             overlap = seen & ids
             if overlap:
