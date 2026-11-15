@@ -13520,6 +13520,48 @@ internal static partial class ValidationTestRunner
                 }
             }
         }),
+        ("threat prioritization retarget floor prevents negative-score oscillation", () =>
+        {
+            float pos = ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.ComputeRetargetFloor(100f, 1.25f);
+            float zero = ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.ComputeRetargetFloor(0f, 1.25f);
+            float neg = ThreatPrioritizationAiModule.ThreatPrioritizationRuntimeBehaviour.ComputeRetargetFloor(-100f, 1.25f);
+            if (Math.Abs(pos - 125f) > 0.001f) throw new Exception($"Expected 125 for positive score, got {pos}.");
+            if (Math.Abs(zero - 0f) > 0.001f) throw new Exception($"Expected 0 for zero score, got {zero}.");
+            if (!(neg > -100f && Math.Abs(neg - (-75f)) < 0.001f))
+            {
+                throw new Exception($"Expected -75 (> -100) for negative score hysteresis, got {neg}.");
+            }
+        }),
+        ("unit mechanics heal/repair and tactical pulse guard NaN/Infinity", () =>
+        {
+            var entity = new EntityController { EntityId = "test:nan-guard", UniqueEntityId = 9001 };
+            RuntimeUnitMechanicsDirector.OnEntityHealed(entity, float.NaN);
+            RuntimeUnitMechanicsDirector.OnEntityHealed(entity, float.PositiveInfinity);
+            RuntimeUnitMechanicsDirector.OnEntityRepairedArmor(entity, float.NaN);
+            RuntimeUnitMechanicsDirector.OnEntityRepairedArmor(entity, float.NegativeInfinity);
+
+            RuntimeUnitMechanicsDirector.TryExecuteTacticalPulse(
+                entity,
+                "Shockwave",
+                float.NaN,
+                float.PositiveInfinity,
+                float.NaN,
+                4,
+                out string pulseType,
+                out int affected,
+                out float dmg,
+                out float heal,
+                out int statuses,
+                out string _);
+            if (!string.Equals(pulseType, "Shockwave", StringComparison.Ordinal))
+            {
+                throw new Exception($"Unexpected pulseType '{pulseType}'.");
+            }
+            if (float.IsNaN(dmg) || float.IsNaN(heal) || affected < 0 || statuses < 0)
+            {
+                throw new Exception("Tactical pulse propagated NaN or negative counts.");
+            }
+        }),
     };
 
     private sealed class TestCardChangeTarget

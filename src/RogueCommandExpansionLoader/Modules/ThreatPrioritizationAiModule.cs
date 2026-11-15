@@ -317,7 +317,7 @@ namespace RogueCommandExpansionLoader.Modules
                             {
                                 float currentScore = ComputeThreatScore(currentTarget, curDistSq, _settings.PriorityMode, roleProfile.DistanceWeight);
                                 // Require best candidate to beat current target by retarget threshold
-                                if (bestScore <= currentScore * _settings.RetargetThreshold)
+                                if (bestScore <= ComputeRetargetFloor(currentScore, _settings.RetargetThreshold))
                                 {
                                     continue;
                                 }
@@ -351,6 +351,12 @@ namespace RogueCommandExpansionLoader.Modules
                 {
                     // Guarded: diagnostics and retargeting must never break the tick.
                 }
+            }
+
+            internal static float ComputeRetargetFloor(float currentScore, float retargetThreshold)
+            {
+                float marginScale = Math.Max(0f, retargetThreshold - 1f);
+                return currentScore + Math.Abs(currentScore) * marginScale;
             }
 
             internal static float ComputeThreatScore(

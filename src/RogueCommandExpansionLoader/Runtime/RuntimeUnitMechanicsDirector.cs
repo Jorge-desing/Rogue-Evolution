@@ -1644,13 +1644,14 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public static void OnEntityHealed(object entityObj, float amount)
         {
-            if (entityObj == null || amount <= 0f)
+            if (entityObj == null || float.IsNaN(amount) || float.IsInfinity(amount) || amount <= 0f)
             {
                 return;
             }
 
             try
             {
+                EnsureReflection(entityObj.GetType());
                 string entityId = ReadEntityId(entityObj);
                 if (string.IsNullOrWhiteSpace(entityId))
                 {
@@ -1709,13 +1710,14 @@ namespace RogueCommandExpansionLoader.Runtime
         /// </summary>
         public static void OnEntityRepairedArmor(object entityObj, float amount)
         {
-            if (entityObj == null || amount <= 0f)
+            if (entityObj == null || float.IsNaN(amount) || float.IsInfinity(amount) || amount <= 0f)
             {
                 return;
             }
 
             try
             {
+                EnsureReflection(entityObj.GetType());
                 string entityId = ReadEntityId(entityObj);
                 if (string.IsNullOrWhiteSpace(entityId))
                 {
@@ -1854,6 +1856,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
         private static void RevertBaselineStatusEffects(object entityObj, int key)
         {
+            if (entityObj == null)
+            {
+                return;
+            }
+
             List<string> applied;
             lock (_appliedBaselineEffects)
             {
@@ -1865,6 +1872,14 @@ namespace RogueCommandExpansionLoader.Runtime
             }
 
             EnsureReflection(entityObj.GetType());
+            MethodInfo removeStatusEffect = entityObj.GetType().GetMethod(
+                "RemoveStatusEffect",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (removeStatusEffect == null || _statusEffectEnumType == null)
+            {
+                return;
+            }
+
             for (int i = 0; i < applied.Count; i++)
             {
                 string effectName = applied[i];
@@ -1874,15 +1889,8 @@ namespace RogueCommandExpansionLoader.Runtime
                 }
                 try
                 {
-                    if (_statusEffectEnumType == null)
-                    {
-                        continue;
-                    }
                     object parsedEffect = Enum.Parse(_statusEffectEnumType, effectName, true);
-                    if (entityObj.GetType().GetMethod("RemoveStatusEffect") != null)
-                    {
-                        entityObj.GetType().GetMethod("RemoveStatusEffect").Invoke(entityObj, new[] { parsedEffect });
-                    }
+                    removeStatusEffect.Invoke(entityObj, new[] { parsedEffect });
                 }
                 catch
                 {
@@ -3180,11 +3188,11 @@ namespace RogueCommandExpansionLoader.Runtime
 
             EnsureReflection(sourceObj.GetType());
 
-            float clampedRadius = Mathf.Clamp(radius, 3f, 50f);
+            float clampedRadius = Mathf.Clamp(float.IsNaN(radius) || float.IsInfinity(radius) ? 12f : radius, 3f, 50f);
 
-            float clampedMagnitude = Mathf.Clamp(magnitude, 0f, 1000f);
+            float clampedMagnitude = Mathf.Clamp(float.IsNaN(magnitude) || float.IsInfinity(magnitude) ? 0f : magnitude, 0f, 1000f);
 
-            float clampedDuration = Mathf.Clamp(durationSeconds, 0.5f, 30f);
+            float clampedDuration = Mathf.Clamp(float.IsNaN(durationSeconds) || float.IsInfinity(durationSeconds) ? 4f : durationSeconds, 0.5f, 30f);
 
             int clampedMaxTargets = Mathf.Clamp(maxTargets, 1, 16);
 

@@ -2,8 +2,37 @@
 """Convenient CLI to invoke BepInEx MCP queries against the running Rogue Command process."""
 
 import json
+import math
 import sys
-from bepinex_mcp_server import execute_tool
+
+try:
+    from .bepinex_mcp_server import execute_tool
+except ImportError:
+    from bepinex_mcp_server import execute_tool
+
+
+def _parse_cli_value(value: str):
+    v_strip = value.strip()
+    if (v_strip.startswith("{") and v_strip.endswith("}")) or (v_strip.startswith("[") and v_strip.endswith("]")):
+        try:
+            return json.loads(v_strip)
+        except Exception:
+            return value
+    low = v_strip.lower()
+    if low == "true":
+        return True
+    if low == "false":
+        return False
+    try:
+        if v_strip and (v_strip.isdigit() or (v_strip[0] in "+-" and v_strip[1:].isdigit())):
+            return int(v_strip)
+        parsed_float = float(v_strip)
+        if math.isfinite(parsed_float):
+            return parsed_float
+    except ValueError:
+        pass
+    return value
+
 
 def main():
     if len(sys.argv) < 2:
@@ -15,21 +44,7 @@ def main():
     for item in sys.argv[2:]:
         if "=" in item:
             k, v = item.split("=", 1)
-            # Try parsing json if object, array, number or bool
-            v_strip = v.strip()
-            if (v_strip.startswith("{") and v_strip.endswith("}")) or (v_strip.startswith("[") and v_strip.endswith("]")):
-                try:
-                    args[k] = json.loads(v_strip)
-                except Exception:
-                    args[k] = v
-            elif v.lower() == "true":
-                args[k] = True
-            elif v.lower() == "false":
-                args[k] = False
-            elif v.isdigit():
-                args[k] = int(v)
-            else:
-                args[k] = v
+            args[k] = _parse_cli_value(v)
         else:
             args[item] = True
 
