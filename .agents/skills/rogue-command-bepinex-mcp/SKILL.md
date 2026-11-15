@@ -127,3 +127,5 @@ Reward choice and Shop purchase controls support optional fresh-state `precondit
 On 2026-11-15 the configured local HTTP frontend was absent and was started with the existing hidden pythonw launcher. An authenticated `tools/list` returned 235 canonical tools and the updated mixed-plan argument guide; this did not establish that the active Codex chat refreshed its namespace or that the game was running.
 
 An incomplete mixed battlefield plan with `dispatchStarted=true` always stops an automation sequence, even with `stopOnFailure=false`, and marks postcondition inspection required. Refresh affected units before replanning; already dispatched orders are not rolled back.
+
+Automation sequences inspect native dispatched/affected counts for group commands, formations, group stances and coordinated assaults, stopping on partial or unquantified successful results even when `stopOnFailure=false`. Direct calls can still report success for partial results; inspect their counts.

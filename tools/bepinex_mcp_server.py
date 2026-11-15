@@ -1154,8 +1154,29 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 budget_exceeded = time.monotonic() > deadline
                 if budget_exceeded:
                     step_failed = True
+                group_counts = {
+                    "diagnostics_order_group_command": ("entityKeyIds", "dispatchedCount"),
+                    "diagnostics_order_formation_move": ("entityKeyIds", "dispatchedCount"),
+                    "diagnostics_order_group_tactical_stance": ("entityKeyIds", "affectedUnitCount"),
+                    "diagnostics_order_coordinated_assault": ("attackerEntityKeyIds", "dispatchedAttackerCount"),
+                }
+                partial_group = False
+                if isinstance(parsed_step, dict) and step_tool in group_counts:
+                    keys_field, count_field = group_counts[step_tool]
+                    keys = resolved_arguments.get(keys_field, [])
+                    expected_count = len(keys) if isinstance(keys, list) else 0
+                    if step_tool == "diagnostics_order_coordinated_assault":
+                        expected_count = min(expected_count, max(1, min(16, resolved_arguments.get("maxAttackers", 8))))
+                    actual_count = parsed_step.get(count_field)
+                    partial_group = expected_count > 0 and (
+                        (type(actual_count) is int and actual_count < expected_count
+                         and (actual_count > 0 or parsed_step.get("success") is True))
+                        or (type(actual_count) is int and actual_count > 0 and parsed_step.get("success") is False)
+                        or (parsed_step.get("success") is True and type(actual_count) is not int)
+                    )
                 uncertain = isinstance(parsed_step, dict) and (
-                    parsed_step.get("completionStatus") == "unknown"
+                    partial_group
+                    or parsed_step.get("completionStatus") == "unknown"
                     or (parsed_step.get("nativeCallInvoked") is True and parsed_step.get("effectObserved") is False)
                     or (step_tool == "diagnostics_order_battlefield_plan"
                         and parsed_step.get("dispatchStarted") is True

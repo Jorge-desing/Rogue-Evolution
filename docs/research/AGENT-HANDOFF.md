@@ -3157,3 +3157,7 @@ The configured `127.0.0.1:18764/mcp` frontend was not found listening and no cor
 ### Partial mixed-plan sequence safety (2026-11-15)
 
 The MCP sequence executor now stops on an incomplete battlefield plan when dispatch started, even with `stopOnFailure=false`, and marks postcondition inspection required. Previously it could continue after a partial native mutation. Automation module passed 25 tests, including injected partial dispatch. No live game order was issued.
+
+### Partial group actions in sequences (2026-11-15)
+
+Native group, formation, group stance and coordinated-assault results may report success after affecting only part of the requested units. `automation_run_sequence` now checks their dispatched/affected counts against the requested bounded count, stops and requires inspection on partial or unquantified success, regardless of `stopOnFailure`. Direct calls retain native semantics and require count inspection. Automation module passed 26 tests; no live orders were issued.

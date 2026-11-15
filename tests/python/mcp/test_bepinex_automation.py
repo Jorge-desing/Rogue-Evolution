@@ -226,6 +226,23 @@ class StateWaitTests(unittest.TestCase):
             self.assertFalse(result.get("isError", False))
             call.assert_called_once_with("OrderUnitMoveJson", ["42", 30.0, 40.0, True])
 
+    def test_partial_group_actions_stop_even_when_native_result_says_success(self):
+        cases = [
+            ("diagnostics_order_group_command", {"entityKeyIds": ["11", "12"], "commandType": "Stop"}, {"dispatchedCount": 1}),
+            ("diagnostics_order_formation_move", {"entityKeyIds": ["11", "12"], "formationType": "Line", "targetX": 0, "targetZ": 0}, {"dispatchedCount": 1}),
+            ("diagnostics_order_group_tactical_stance", {"entityKeyIds": ["11", "12"], "stanceName": "Defensive"}, {"affectedUnitCount": 1}),
+            ("diagnostics_order_coordinated_assault", {"attackerEntityKeyIds": ["11", "12"], "targetEntityKeyId": "20", "maxAttackers": 2}, {"dispatchedAttackerCount": 1}),
+        ]
+        for name, args, counts in cases:
+            with self.subTest(name=name), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps({"success": True, **counts})) as call:
+                response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
+                    {"tool": name, "arguments": args}, {"tool": "diagnostics_get_navigator_state"}]})
+                payload = json.loads(response["content"][0]["text"])
+                self.assertTrue(response["isError"])
+                self.assertEqual(1, call.call_count)
+                self.assertEqual("uncertain_effect", payload["stopReason"]["code"])
+                self.assertTrue(payload["results"][0]["postconditionInspectionRequired"])
+
     def test_partial_battlefield_plan_stops_even_when_continuation_requested(self):
         plan = {"kind": "battlefieldOrderPlanResult", "success": False, "dispatchStarted": True,
                 "acceptedOrderCount": 1, "partialOrderCount": 1, "actions": []}
