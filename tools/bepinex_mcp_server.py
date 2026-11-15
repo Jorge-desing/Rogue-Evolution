@@ -1157,6 +1157,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 uncertain = isinstance(parsed_step, dict) and (
                     parsed_step.get("completionStatus") == "unknown"
                     or (parsed_step.get("nativeCallInvoked") is True and parsed_step.get("effectObserved") is False)
+                    or (step_tool == "diagnostics_order_battlefield_plan"
+                        and parsed_step.get("dispatchStarted") is True
+                        and parsed_step.get("success") is False)
                 )
                 if uncertain:
                     step_failed = True

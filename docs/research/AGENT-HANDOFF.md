@@ -3153,3 +3153,7 @@ The MCP schema for `diagnostics_order_battlefield_plan` now describes command-sp
 ### MCP HTTP frontend restored (2026-11-15)
 
 The configured `127.0.0.1:18764/mcp` frontend was not found listening and no corresponding pythonw process was present. Started the existing hidden launcher without starting the game. An authenticated `tools/list` returned 235 canonical tools, including the updated `diagnostics_order_battlefield_plan` argument guidance. The active Codex chat did not expose the BepInEx namespace, so client refresh remains unverified. Do not treat the server response as gameplay evidence.
+
+### Partial mixed-plan sequence safety (2026-11-15)
+
+The MCP sequence executor now stops on an incomplete battlefield plan when dispatch started, even with `stopOnFailure=false`, and marks postcondition inspection required. Previously it could continue after a partial native mutation. Automation module passed 25 tests, including injected partial dispatch. No live game order was issued.

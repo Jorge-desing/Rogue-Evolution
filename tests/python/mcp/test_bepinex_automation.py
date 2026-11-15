@@ -226,6 +226,20 @@ class StateWaitTests(unittest.TestCase):
             self.assertFalse(result.get("isError", False))
             call.assert_called_once_with("OrderUnitMoveJson", ["42", 30.0, 40.0, True])
 
+    def test_partial_battlefield_plan_stops_even_when_continuation_requested(self):
+        plan = {"kind": "battlefieldOrderPlanResult", "success": False, "dispatchStarted": True,
+                "acceptedOrderCount": 1, "partialOrderCount": 1, "actions": []}
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(plan)) as call:
+            response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
+                {"tool": "diagnostics_order_battlefield_plan", "arguments": {"orders": [
+                    {"commandType": "Stop", "entityKeyIds": ["11"]}]}},
+                {"tool": "diagnostics_get_navigator_state"}]})
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(response["isError"])
+        self.assertEqual(1, call.call_count)
+        self.assertEqual({"code": "uncertain_effect", "step": 0}, payload["stopReason"])
+        self.assertTrue(payload["results"][0]["postconditionInspectionRequired"])
+
     def test_mixed_battlefield_plan_is_sent_in_one_bridge_call(self):
         orders = [
             {"commandType": "FormationMove", "entityKeyIds": ["11", "12"],

@@ -102,7 +102,7 @@ Replace the illustrative unit key `42` and coordinates `(10,20)` below with the 
 
 ## Verify and recover
 
-`stopReason` is null for a successful sequence, otherwise `{code, step}` identifies the first failure (or exhausted budget). A failed wait stops subsequent actions even with `stopOnFailure=false`. An uncertain native effect also stops unconditionally. `stopOnFailure=false` never authorizes automatic recovery or replay.
+`stopReason` is null for a successful sequence, otherwise `{code, step}` identifies the first failure (or exhausted budget). A failed wait or an incomplete battlefield plan whose dispatch started stops subsequent actions even with `stopOnFailure=false`; inspect the affected units before replanning. An uncertain native effect also stops unconditionally. `stopOnFailure=false` never authorizes automatic recovery or replay.
 
 Example: after an uncertain native UI call, inspect this read-only result in a new request and decide whether the intended value is already present. Do not replay the stopped sequence.
 

@@ -125,3 +125,5 @@ Reward choice and Shop purchase controls support optional fresh-state `precondit
 `describe_tool` for `diagnostics_order_battlefield_plan` includes a concise command-to-argument guide in the `arguments` schema; the automation reference remains the complete operating guide. Catalog changes are reloadable by the server, but client schema refresh must be verified.
 
 On 2026-11-15 the configured local HTTP frontend was absent and was started with the existing hidden pythonw launcher. An authenticated `tools/list` returned 235 canonical tools and the updated mixed-plan argument guide; this did not establish that the active Codex chat refreshed its namespace or that the game was running.
+
+An incomplete mixed battlefield plan with `dispatchStarted=true` always stops an automation sequence, even with `stopOnFailure=false`, and marks postcondition inspection required. Refresh affected units before replanning; already dispatched orders are not rolled back.
