@@ -2914,3 +2914,7 @@ The composed writer no longer uses automatic recursive temporary-directory clean
 ## 2026-11-15 — Preserve all failed transfer outputs
 
 Bundle-transfer failure handling no longer unlinks created paths after checking them: a concurrent replacement between check and unlink could remove someone else's file. It reports all created files/directories for inspection; successful copies are unchanged. Focused suite passed 25 cases with one Windows symlink-privilege skip. Destination directory/file handles and safe cleanup still require work; retained paths are intentional. Full Python suite's two visual failures remain open.
+
+## 2026-11-15 — Handle-based destination file creation
+
+Bundle transfer now creates each destination file exclusively through the same non-reparse directory handle walk used for reads. Windows holds parent directories without delete sharing and creates the file without sharing; POSIX uses directory-relative `O_NOFOLLOW|O_EXCL`. Focused suite: 26 passed, one symlink privilege skip (27 total), including no-overwrite and blocked directory rename while writing. Directory creation before handle acquisition, staged writer operations and cleanup still need concurrency review; full suite visual failures remain open.

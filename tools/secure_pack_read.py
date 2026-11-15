@@ -8,8 +8,8 @@ import stat
 
 
 @contextmanager
-def open_pack_file(root: str | Path, relative: str):
-    """Open a regular pack-relative file without following links in its path."""
+def open_pack_file(root: str | Path, relative: str, *, create: bool = False):
+    """Open or exclusively create a pack-relative file without following links."""
     path = PureWindowsPath(relative)
     if not relative or path.anchor or ".." in path.parts or ":" in relative or "\x00" in relative:
         raise ValueError(f"Ruta no relativa al pack: {relative!r}")
@@ -20,10 +20,10 @@ def open_pack_file(root: str | Path, relative: str):
         import msvcrt
 
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        create = kernel.CreateFileW
-        create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+        create_file = kernel.CreateFileW
+        create_file.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
                            wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
-        create.restype = wintypes.HANDLE
+        create_file.restype = wintypes.HANDLE
         close = kernel.CloseHandle
         close.argtypes = [wintypes.HANDLE]
         close.restype = wintypes.BOOL
@@ -40,7 +40,7 @@ def open_pack_file(root: str | Path, relative: str):
             for part in [None] + directories:
                 if part is not None:
                     current /= part
-                handle = create(str(current), 0, 3, None, 3, 0x02200000, None)
+                handle = create_file(str(current), 0, 3, None, 3, 0x02200000, None)
                 if handle == ctypes.c_void_p(-1).value:
                     raise ctypes.WinError(ctypes.get_last_error())
                 handles.append(handle)
@@ -50,7 +50,8 @@ def open_pack_file(root: str | Path, relative: str):
                 if not info.attributes & 0x10 or info.attributes & 0x400:
                     raise ValueError(f"Directorio no regular o reparse: {current}")
             file_path = current / path.parts[-1]
-            handle = create(str(file_path), 0x80000000, 1, None, 3, 0x00200000, None)
+            handle = create_file(str(file_path), 0x40000000 if create else 0x80000000,
+                            0 if create else 1, None, 1 if create else 3, 0x00200000, None)
             if handle == ctypes.c_void_p(-1).value:
                 raise ctypes.WinError(ctypes.get_last_error())
             handles.append(handle)
@@ -59,9 +60,9 @@ def open_pack_file(root: str | Path, relative: str):
                 raise ctypes.WinError(ctypes.get_last_error())
             if info.attributes & (0x10 | 0x400):
                 raise ValueError(f"Archivo no regular o reparse: {file_path}")
-            fd = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+            fd = msvcrt.open_osfhandle(handle, (os.O_WRONLY if create else os.O_RDONLY) | os.O_BINARY)
             handles.pop()
-            stream = os.fdopen(fd, "rb")
+            stream = os.fdopen(fd, "wb" if create else "rb")
             yield stream
         finally:
             if stream is not None:
@@ -77,11 +78,12 @@ def open_pack_file(root: str | Path, relative: str):
             for part in list(absolute_root.parts[1:]) + list(path.parts[:-1]):
                 current = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
                 descriptors.append(current)
-            fd = os.open(path.parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=current)
+            flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL) if create else os.O_RDONLY
+            fd = os.open(path.parts[-1], flags | os.O_NOFOLLOW, 0o600, dir_fd=current)
             if not stat.S_ISREG(os.fstat(fd).st_mode):
                 os.close(fd)
                 raise ValueError("El archivo del pack no es regular")
-            stream = os.fdopen(fd, "rb")
+            stream = os.fdopen(fd, "wb" if create else "rb")
             yield stream
         finally:
             if stream is not None:

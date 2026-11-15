@@ -34,6 +34,20 @@ class SecurePackReadTests(unittest.TestCase):
                 with open_pack_file(root, "link/a.bundle"):
                     pass
 
+    def test_exclusive_creation_does_not_replace_existing_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "bundles").mkdir()
+            with open_pack_file(root, "bundles/a.bundle", create=True) as stream:
+                stream.write(b"original")
+                if os.name == "nt":
+                    with self.assertRaises(OSError):
+                        (root / "bundles").rename(root / "moved")
+            with self.assertRaises(OSError):
+                with open_pack_file(root, "bundles/a.bundle", create=True):
+                    pass
+            self.assertEqual(b"original", (root / "bundles/a.bundle").read_bytes())
+
 
 if __name__ == "__main__":
     unittest.main()

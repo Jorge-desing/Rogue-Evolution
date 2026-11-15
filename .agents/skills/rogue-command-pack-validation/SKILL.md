@@ -172,3 +172,5 @@ Bundle-transfer rollback checks the original file identity and expected hash bef
 The composed writer retains staging directories after success or failure instead of recursively deleting potentially changed files. On failure the diagnostic includes the staging path. Cleanup must be explicit after inspecting ownership and contents; atomic destination-path protection remains under review.
 
 On bundle-copy failure, all newly created files and directories are retained and listed; rollback does not unlink by pathname because a concurrent replacement could occur after an identity check. Inspect the retained staging path before manual cleanup.
+
+Bundle transfer creates destination files exclusively through `open_pack_file(..., create=True)`: Windows holds non-reparse parent directories without delete sharing and opens the file without sharing; POSIX uses directory-relative `O_NOFOLLOW|O_EXCL`. Parent directory creation, staging publication and cleanup still require their own concurrency review.

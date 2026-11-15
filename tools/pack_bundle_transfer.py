@@ -99,7 +99,7 @@ def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
                 except FileExistsError:
                     pass
             target /= parts[-1]
-            with open_pack_file(source, row["path"]) as input_stream, target.open("xb") as output_stream:
+            with open_pack_file(source, row["path"]) as input_stream, open_pack_file(destination, row["path"], create=True) as output_stream:
                 info = os.fstat(output_stream.fileno())
                 created_files.append((target, (info.st_dev, info.st_ino), None))
                 for block in iter(lambda: input_stream.read(1024 * 1024), b""):
