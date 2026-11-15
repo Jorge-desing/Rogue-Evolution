@@ -123,3 +123,5 @@ Reward choice and Shop purchase controls support optional fresh-state `precondit
   - Always pass `replaceCurrent: true` in `diagnostics_order_unit_move` (matching 4-arg `OrderUnitMoveJson`) and chain `[diagnostics_order_unit_move, diagnostics_wait_for_renderer_frame_evidence]` inside one `automation_run_sequence` call (`delayAfterMs: 150..200`) so the unit does not finish moving between separate MCP tool turns.
 
 `describe_tool` for `diagnostics_order_battlefield_plan` includes a concise command-to-argument guide in the `arguments` schema; the automation reference remains the complete operating guide. Catalog changes are reloadable by the server, but client schema refresh must be verified.
+
+On 2026-11-15 the configured local HTTP frontend was absent and was started with the existing hidden pythonw launcher. An authenticated `tools/list` returned 235 canonical tools and the updated mixed-plan argument guide; this did not establish that the active Codex chat refreshed its namespace or that the game was running.

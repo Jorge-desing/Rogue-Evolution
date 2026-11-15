@@ -3149,3 +3149,7 @@ The MCP automation reference now includes `diagnostics_get_battlefield_unit_stat
 ### Discoverable mixed-plan arguments (2026-11-15)
 
 The MCP schema for `diagnostics_order_battlefield_plan` now describes command-specific `arguments`, making the existing functionality discoverable without guessing fields. Automation/shared modules passed 27 tests, including the compact catalog size check. Server schema changes are reloadable but current client refresh and live gameplay were not verified. Stage content and POSIX safety limitations remain open.
+
+### MCP HTTP frontend restored (2026-11-15)
+
+The configured `127.0.0.1:18764/mcp` frontend was not found listening and no corresponding pythonw process was present. Started the existing hidden launcher without starting the game. An authenticated `tools/list` returned 235 canonical tools, including the updated `diagnostics_order_battlefield_plan` argument guidance. The active Codex chat did not expose the BepInEx namespace, so client refresh remains unverified. Do not treat the server response as gameplay evidence.
