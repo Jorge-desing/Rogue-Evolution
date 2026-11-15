@@ -80,47 +80,50 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
     # could remove files changed by another process after an error.
     temporary = tempfile.mkdtemp(prefix=".rogue-compose-", dir=output_path.parent)
     try:
-        stage = _make_stage_dir(Path(temporary), "pack")
-        manifest_sources: dict[str, bytes] = {}
-        for index, (root, source_pack) in enumerate(bundle_sources):
-            isolated = _make_stage_dir(Path(temporary), f"source-{index}")
-            copy_bundle_transfer(root, isolated, source_pack)
-            with open_pack_file(isolated, source_pack["assetBundleManifestPath"]) as stream:
-                manifest_bytes = stream.read()
-            manifest_sources.setdefault(hashlib.sha256(manifest_bytes).hexdigest(), manifest_bytes)
-            for bundle in source_pack["assetBundles"]:
-                relative = PureWindowsPath(bundle["path"])
-                target = stage.joinpath(*relative.parts)
-                _make_stage_dir(stage, relative.parts[0])
-                if target.exists():
-                    if _guarded_hash(stage, bundle["path"]) != _guarded_hash(isolated, bundle["path"]):
-                        raise ValueError(f"Archivo de bundle en conflicto: {relative}")
-                else:
-                    with open_pack_file(isolated, bundle["path"]) as input_stream, open_pack_file(stage, bundle["path"], create=True) as output_stream:
-                        shutil.copyfileobj(input_stream, output_stream, 1024 * 1024)
-        if manifest_sources:
-            target_manifest = stage.joinpath(*PureWindowsPath(pack["assetBundleManifestPath"]).parts)
-            _make_stage_dir(stage, PureWindowsPath(pack["assetBundleManifestPath"]).parts[0])
-            if target_manifest.exists():
-                raise ValueError("La ruta del manifest coincide con un bundle")
-            manifests = list(manifest_sources.values())
-            manifest_bytes = manifests[0] if len(manifests) == 1 else merge_bundle_manifests(manifests)
-            with open_pack_file(stage, pack["assetBundleManifestPath"], create=True) as output_stream:
-                output_stream.write(manifest_bytes)
-        content_bytes = (json.dumps(pack, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
-        with open_pack_file(stage, "content.json", create=True) as output_stream:
-            output_stream.write(content_bytes)
-        if dependency_report is not None:
-            dependency_report = dict(dependency_report, contentSha256=hashlib.sha256(content_bytes).hexdigest())
-            with open_pack_file(stage, "composition-dependencies.json", create=True) as output_stream:
-                output_stream.write((json.dumps(dependency_report, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
-        errors = validate_pack(str(stage))
-        if errors:
-            raise ValueError("Pack compuesto inválido: " + "; ".join(errors))
-        plan_bundle_transfer(stage, stage, pack)
-        if output_path.exists() or output_path.is_symlink():
-            raise FileExistsError(f"El destino apareció durante la composición: {output_path}")
-        _publish_no_replace(stage, output_path)
+        # Hold the staging parent across all writes and publication. On Windows
+        # this prevents its rename or replacement while its path is in use.
+        with open_pack_file(output_path.parent, Path(temporary).name, directory=True):
+            stage = _make_stage_dir(Path(temporary), "pack")
+            manifest_sources: dict[str, bytes] = {}
+            for index, (root, source_pack) in enumerate(bundle_sources):
+                isolated = _make_stage_dir(Path(temporary), f"source-{index}")
+                copy_bundle_transfer(root, isolated, source_pack)
+                with open_pack_file(isolated, source_pack["assetBundleManifestPath"]) as stream:
+                    manifest_bytes = stream.read()
+                manifest_sources.setdefault(hashlib.sha256(manifest_bytes).hexdigest(), manifest_bytes)
+                for bundle in source_pack["assetBundles"]:
+                    relative = PureWindowsPath(bundle["path"])
+                    target = stage.joinpath(*relative.parts)
+                    _make_stage_dir(stage, relative.parts[0])
+                    if target.exists():
+                        if _guarded_hash(stage, bundle["path"]) != _guarded_hash(isolated, bundle["path"]):
+                            raise ValueError(f"Archivo de bundle en conflicto: {relative}")
+                    else:
+                        with open_pack_file(isolated, bundle["path"]) as input_stream, open_pack_file(stage, bundle["path"], create=True) as output_stream:
+                            shutil.copyfileobj(input_stream, output_stream, 1024 * 1024)
+            if manifest_sources:
+                target_manifest = stage.joinpath(*PureWindowsPath(pack["assetBundleManifestPath"]).parts)
+                _make_stage_dir(stage, PureWindowsPath(pack["assetBundleManifestPath"]).parts[0])
+                if target_manifest.exists():
+                    raise ValueError("La ruta del manifest coincide con un bundle")
+                manifests = list(manifest_sources.values())
+                manifest_bytes = manifests[0] if len(manifests) == 1 else merge_bundle_manifests(manifests)
+                with open_pack_file(stage, pack["assetBundleManifestPath"], create=True) as output_stream:
+                    output_stream.write(manifest_bytes)
+            content_bytes = (json.dumps(pack, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+            with open_pack_file(stage, "content.json", create=True) as output_stream:
+                output_stream.write(content_bytes)
+            if dependency_report is not None:
+                dependency_report = dict(dependency_report, contentSha256=hashlib.sha256(content_bytes).hexdigest())
+                with open_pack_file(stage, "composition-dependencies.json", create=True) as output_stream:
+                    output_stream.write((json.dumps(dependency_report, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+            errors = validate_pack(str(stage))
+            if errors:
+                raise ValueError("Pack compuesto inválido: " + "; ".join(errors))
+            plan_bundle_transfer(stage, stage, pack)
+            if output_path.exists() or output_path.is_symlink():
+                raise FileExistsError(f"El destino apareció durante la composición: {output_path}")
+            _publish_no_replace(stage, output_path)
     except Exception as exc:
         raise RuntimeError(f"Composición fallida; etapa conservada en {temporary}: {exc}") from exc
     # No source copies exist for a data-only pack, so removing the now-empty

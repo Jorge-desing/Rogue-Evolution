@@ -3037,3 +3037,7 @@ Extraction/import carries relics and upgrades with `cardChanges.onlyForTheseEnti
 ### Filter-only card composition (2026-11-15)
 
 Composition now conservatively retains cards containing a change without explicit entity targets, because role/side/native defaults may make it apply. These cards can affect other destination entities, so inspect the imported card scope. Explicit targets also match selected standalone buildings. The dependency/composition modules passed 36 tests. Destination races, rollback and remaining references still need review. This supersedes the previous filter-only limitation.
+
+### Staging parent guard (2026-11-15)
+
+The composed writer holds the temporary staging parent through publication. A Windows test attempts and fails to rename it while publishing. Composition and secure-read modules passed 29 tests with one skip; an initial invocation used a nonexistent test module and was corrected. This does not establish protection against child-stage replacement or POSIX ancestor races; retained files are not automatically rolled back.

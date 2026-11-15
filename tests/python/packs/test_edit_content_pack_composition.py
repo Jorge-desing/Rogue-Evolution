@@ -6,8 +6,10 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from tests.python.helpers import load_tool_module
@@ -49,6 +51,20 @@ class CompositionEditTests(unittest.TestCase):
                 _publish_no_replace(stage, target)
             self.assertEqual("preserve", (target / "user-data").read_text(encoding="utf-8"))
             self.assertTrue(stage.is_dir())
+
+    @unittest.skipUnless(os.name == "nt", "Windows directory sharing semantics")
+    def test_staging_parent_cannot_be_renamed_during_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            def publish(stage, destination):
+                with self.assertRaises(OSError):
+                    stage.parent.rename(root / "stolen")
+                _publish_no_replace(stage, destination)
+            with patch("tools.write_composed_pack._publish_no_replace", side_effect=publish):
+                write_composed_pack(self._pack(), [], output)
+            self.assertTrue((output / "content.json").is_file())
+            self.assertFalse((root / "stolen").exists())
 
     def test_extract_cli_writes_a_valid_new_pack(self) -> None:
         pack = self._pack()
