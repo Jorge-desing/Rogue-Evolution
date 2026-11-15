@@ -82,14 +82,41 @@ class CompositionEditTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             output = root / "output"
-            def publish(stage, destination):
+            def publish(stage, destination, identity):
                 with self.assertRaises(OSError):
                     stage.parent.rename(root / "stolen")
-                _publish_no_replace(stage, destination)
+                _publish_no_replace(stage, destination, identity)
             with patch("tools.write_composed_pack._publish_no_replace", side_effect=publish):
                 write_composed_pack(self._pack(), [], output)
             self.assertTrue((output / "content.json").is_file())
             self.assertFalse((root / "stolen").exists())
+
+    @unittest.skipUnless(os.name == "nt", "Windows handle-based publication")
+    def test_publication_rejects_replaced_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            def replace_before_publish(stage, destination, identity):
+                stage.rename(stage.parent / "original-stage")
+                stage.mkdir()
+                (stage / "foreign").write_text("preserve", encoding="utf-8")
+                _publish_no_replace(stage, destination, identity)
+            with patch("tools.write_composed_pack._publish_no_replace", side_effect=replace_before_publish):
+                with self.assertRaisesRegex(RuntimeError, "etapa fue reemplazada"):
+                    write_composed_pack(self._pack(), [], output)
+            self.assertFalse(output.exists())
+            self.assertTrue(list(root.glob(".rogue-compose-*/pack/foreign")))
+            self.assertTrue(list(root.glob(".rogue-compose-*/original-stage/content.json")))
+
+    @unittest.skipUnless(os.name == "nt", "Windows handle-based publication")
+    def test_publication_preserves_exact_destination_name_repeatedly(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for index in range(12):
+                output = root / f"output-{index}"
+                write_composed_pack(self._pack(), [], output)
+                self.assertTrue((output / "content.json").is_file())
+            self.assertEqual({f"output-{index}" for index in range(12)}, {p.name for p in root.iterdir()})
 
     def test_extract_cli_writes_a_valid_new_pack(self) -> None:
         pack = self._pack()

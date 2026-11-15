@@ -234,3 +234,5 @@ On 2026-11-15, the loader was rebuilt after source commit d4173a1; Release build
 Rollback records the planned hash immediately after exclusive file creation. A write/flush failure can therefore remove that file if its identity and actual bytes match the complete expected hash; partial bytes still fail the hash check and remain.
 
 Dependency analysis lists native templates for units, production factories, standalone buildings, stages, landscapes and AI profiles as unverified native references. Template names are not asserted to exist or treated as namespaced pack dependencies.
+
+Windows publication now captures the newly created stage identity, opens it with DELETE access and no delete sharing, checks volume/file ID and reparse attributes, and renames that exact handle without replacement. A UTF-16 terminator is required in the rename buffer: without it Windows produced stray suffixes. This supersedes the earlier unintegrated handle prototype. The interval before the initial identity capture, concurrent content changes during staging, and POSIX pathname races are not eliminated.

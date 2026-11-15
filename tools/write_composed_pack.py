@@ -17,11 +17,57 @@ from tools.secure_pack_read import open_pack_file
 from tools.validate_content_pack import validate_pack
 
 
-def _publish_no_replace(source: Path, destination: Path) -> None:
+def _publish_windows_verified(source: Path, destination: Path, identity: tuple[int, int] | None) -> None:
+    """Rename the exclusively guarded stage handle after checking its original identity."""
+    from ctypes import wintypes
+    class FileInfo(ctypes.Structure):
+        _fields_ = [("attributes", wintypes.DWORD), ("creation", wintypes.FILETIME),
+                    ("access", wintypes.FILETIME), ("write", wintypes.FILETIME),
+                    ("volume", wintypes.DWORD), ("size_high", wintypes.DWORD),
+                    ("size_low", wintypes.DWORD), ("links", wintypes.DWORD),
+                    ("index_high", wintypes.DWORD), ("index_low", wintypes.DWORD)]
+    class RenameInfo(ctypes.Structure):
+        _fields_ = [("replace", wintypes.BOOL), ("root", wintypes.HANDLE),
+                    ("length", wintypes.DWORD), ("name", wintypes.WCHAR * 1)]
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                   wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.CreateFileW(str(source), 0x80010000, 3, None, 3, 0x02200000, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        kernel.GetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.POINTER(FileInfo)]
+        info = FileInfo()
+        if not kernel.GetFileInformationByHandle(handle, ctypes.byref(info)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        current = (info.volume, (info.index_high << 32) | info.index_low)
+        if not info.attributes & 0x10 or info.attributes & 0x400:
+            raise ValueError("La etapa no es un directorio regular")
+        if identity is not None and current != (identity[0] & 0xffffffff, identity[1]):
+            raise ValueError("La etapa fue reemplazada durante la composición")
+        encoded = str(destination).encode("utf-16-le")
+        # Reserve a UTF-16 terminator: on Windows a non-terminated buffer can
+        # produce a destination name with stray trailing characters.
+        buffer = ctypes.create_string_buffer(RenameInfo.name.offset + len(encoded) + 2)
+        rename = RenameInfo.from_buffer(buffer)
+        rename.replace = False
+        rename.root = None
+        rename.length = len(encoded)
+        ctypes.memmove(ctypes.addressof(buffer) + RenameInfo.name.offset, encoded, len(encoded))
+        kernel.SetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        kernel.SetFileInformationByHandle.restype = wintypes.BOOL
+        if not kernel.SetFileInformationByHandle(handle, 3, buffer, len(buffer)):
+            raise ctypes.WinError(ctypes.get_last_error())
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def _publish_no_replace(source: Path, destination: Path, identity: tuple[int, int] | None = None) -> None:
     """Atomically publish without replacing a destination created concurrently."""
     if os.name == "nt":
-        # Windows os.rename does not replace an existing destination.
-        os.rename(source, destination)
+        _publish_windows_verified(source, destination, identity)
         return
     if os.name == "posix":
         libc = ctypes.CDLL(None, use_errno=True)
@@ -84,6 +130,8 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
         # this prevents its rename or replacement while its path is in use.
         with open_pack_file(output_path.parent, Path(temporary).name, directory=True):
             stage = _make_stage_dir(Path(temporary), "pack", exist_ok=False)
+            stage_info = stage.stat()
+            stage_identity = (stage_info.st_dev, stage_info.st_ino)
             manifest_sources: dict[str, bytes] = {}
             for index, (root, source_pack) in enumerate(bundle_sources):
                 isolated = _make_stage_dir(Path(temporary), f"source-{index}", exist_ok=False)
@@ -123,7 +171,7 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
             plan_bundle_transfer(stage, stage, pack)
             if output_path.exists() or output_path.is_symlink():
                 raise FileExistsError(f"El destino apareció durante la composición: {output_path}")
-            _publish_no_replace(stage, output_path)
+            _publish_no_replace(stage, output_path, stage_identity)
     except Exception as exc:
         raise RuntimeError(f"Composición fallida; etapa conservada en {temporary}: {exc}") from exc
     # No source copies exist for a data-only pack, so removing the now-empty

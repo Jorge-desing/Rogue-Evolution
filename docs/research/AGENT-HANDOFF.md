@@ -3089,3 +3089,7 @@ An extraction of `sample-native:scout-tank` to `artifacts/composition-real-pack-
 ### Regenerated composition evidence (2026-11-15)
 
 Regenerated `sample-native:scout-tank` extraction into `artifacts/composition-real-pack-native-templates-20261115`; the CLI reported 16 unverified native templates, the sidecar contains all 16 and its content SHA-256 matches. `tools.validate_content_pack` passed; no external pack IDs were required. The earlier output remains preserved and its sidecar predates template reporting. These are local checks, not live game acceptance.
+
+### Windows stage handle publication (2026-11-15)
+
+The writer records stage volume/file identity after creation and publishes through a DELETE-capable non-reparse directory handle after checking that identity. Existing destinations are not replaced. The previous intermittent batch failure was reproduced as garbage suffixes on destination names; a UTF-16 terminator in the rename buffer fixed it. Tests exercise stage substitution and 12 exact destination names. Composition/secure-read passed 35 tests with one skip; full Python `all` passed in 39.89 s. This supersedes the earlier unintegrated prototype. The initial create-to-identity interval, concurrent edits to stage contents and POSIX pathname races remain open.
