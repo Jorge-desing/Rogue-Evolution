@@ -14,6 +14,21 @@ class AdvancedEditTests(unittest.TestCase):
     def _pack(self) -> dict:
         return SCAFFOLD.generate_scaffold("ns:pack", "alpha", stage_slug="sa", ai_slug="aa")
 
+    def test_rename_and_duplicate_reject_generated_factory_collisions(self) -> None:
+        for operation in (EDIT.rename_unit, EDIT.duplicate_unit):
+            for colliding_kind in ("unit", "factory"):
+                with self.subTest(operation=operation.__name__, kind=colliding_kind):
+                    pack = self._pack()
+                    if colliding_kind == "unit":
+                        pack["units"].append({"id": "ns:beta-factory", "productionBuilding": {"id": "ns:other-factory"}})
+                    else:
+                        pack["units"].append({"id": "ns:other", "productionBuilding": {"id": "ns:beta-factory"}})
+                    original = __import__("copy").deepcopy(pack)
+                    result, diagnostics = operation(pack, "ns:alpha", "ns:beta")
+                    self.assertTrue(diagnostics)
+                    self.assertEqual(original, result)
+                    self.assertEqual(original, pack)
+
     def test_set_unit_flag(self) -> None:
         pack = self._pack()
         updated, diagnostics = EDIT.set_unit_flag(

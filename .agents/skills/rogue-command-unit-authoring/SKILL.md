@@ -198,3 +198,7 @@ Native crystal harvesters now map positive `resourceGathering.gatherRate` to row
 
 - Native `EntityController.shieldGameObject` prefabs bake faction-specific shield shaders (`PCXBaseTank` uses `"Shader Graphs/EntityShieldShader"` / `"ShieldFor AI EntityMaterial 1"` for blue Player shields, while `LightningTank` uses `"Shader Graphs/EntityShieldShader2"` / `"ShieldForEntityMaterial"` for red AI shields), and `EntityFactory.ReplaceMaterial` only swaps `materialToReplace` (`EntityZPlayerColor`).
 - `RogueCommandExpansionLoader.Runtime.Visual.RuntimeShieldColorSync` (wired into `RuntimeHooks` instantiation/reuse hooks and `RuntimeVisualDirector.RefreshFactionColorTint`) automatically synchronizes `shieldGameObject` renderer materials to match `IsControlledByPlayer` vs `IsControlledByAi` across first spawn and pool reuse.
+
+## Unit editor identity
+
+`python -m tools.edit_content_pack` checks the generated production-building ID against existing unit and factory IDs before `rename-unit` or `duplicate-unit`; a collision leaves the pack unchanged. Supply a new unit ID that gives both the unit and its derived factory unique IDs.

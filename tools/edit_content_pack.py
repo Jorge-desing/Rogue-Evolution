@@ -454,12 +454,14 @@ def rename_unit(
         return updated, [
             f"new id '{new_id}' ya existe en el pack (unidad o fábrica)"
         ]
-    if _entity_key(updated and None) and new_id == old_id:
-        return updated, [f"new id '{new_id}' es igual al actual"]
-
     old_unit = _unit_index(updated)[old_id]
     factory = old_unit.get("productionBuilding") if isinstance(old_unit, dict) else None
     old_factory = _entity_key(factory) if isinstance(factory, dict) else None
+    suffix = old_factory[len(old_id):] if old_factory and old_factory.startswith(old_id) else "-factory"
+    new_factory = new_id + suffix
+    if old_factory and (new_factory == new_id or
+                        (new_factory != old_factory and (new_factory in _unit_index(updated) or new_factory in _factory_index(updated)))):
+        return updated, [f"factory id '{new_factory}' colisiona con una unidad o fábrica existente"]
 
     def _remap(value):
         if isinstance(value, str) and value == old_id:
@@ -1288,15 +1290,18 @@ def duplicate_unit(
     if new_id in _unit_index(updated) or new_id in _factory_index(updated):
         return updated, [f"new id '{new_id}' ya existe en el pack (unidad o fábrica)"]
 
+    source_factory = source.get("productionBuilding")
+    old_fid = _entity_key(source_factory) if isinstance(source_factory, dict) else None
+    suffix = old_fid[len(unit_id):] if old_fid and old_fid.startswith(unit_id) else "-factory"
+    new_factory = new_id + suffix
+    if old_fid and (new_factory == new_id or new_factory in _unit_index(updated) or new_factory in _factory_index(updated)):
+        return updated, [f"factory id '{new_factory}' colisiona con una unidad o fábrica existente"]
+
     clone = json.loads(json.dumps(source))
     clone["id"] = new_id
     factory = clone.get("productionBuilding") if isinstance(clone, dict) else None
     if isinstance(factory, dict):
-        old_fid = _entity_key(factory)
-        suffix = "-factory"
-        if old_fid and old_fid.startswith(unit_id):
-            suffix = old_fid[len(unit_id):]
-        factory["id"] = new_id + suffix
+        factory["id"] = new_factory
     updated.setdefault("units", []).append(clone)
     return updated, []
 

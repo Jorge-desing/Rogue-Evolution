@@ -2822,3 +2822,11 @@ Local evidence: MCP Python tests: 98 passed; Release loader build: zero warnings
 ## 2026-11-15 — Complete registry required for entity-key resolution
 
 `RuntimeEntityKeyResolver` now rejects a partial census if any live controller registry or candidate instance ID cannot be read. Previously the partial list could make an ambiguous key appear unique and direct an order at the wrong entity. Local Release build passed without warnings; RuntimeAndDiagnostics passed 250/250 including a simulated registry failure. Game was closed; deployed SHA-256 `3F6F0F8205B76441453DBBE7B29AE016FC320384F0571939C20F459EF1568129`, with backup and manifest in `artifacts/entity-resolution-deploy-20261115-091619/`. No in-game test was performed. Continue the general capability audit and the mixed battlefield plan runtime acceptance.
+
+## 2026-11-15 — Unit editor factory identity (in progress)
+
+`rename-unit` and `duplicate-unit` now reject generated factory IDs that collide with another unit or factory, preserving the input pack. The unit authoring skill and loader tools guide record this behavior. Local editor checks: 50 passed. Broader `tests/python/packs` run: 214 passed, five failures in `test_build_canonical_visual_modules_ps`; Windows PowerShell 5.1 cannot auto-discover `Get-FileHash` in the spawned process, while explicitly importing `Microsoft.PowerShell.Utility` exposes it. The canonical visual provenance script has unrelated pending edits; preserve them. Next: resolve the PowerShell module-loading failure without discarding existing work, rerun the affected suite, then commit and push the task-owned changes. No game runtime evidence was collected.
+
+## 2026-11-15 — Pack editor collision and PowerShell host module
+
+The editor rejects `rename-unit` and `duplicate-unit` when the generated factory ID collides with another unit or factory, without changing the pack. `CanonicalVisualBuildProvenance.ps1` imports the Utility module from the current `$PSHOME`, resolving the five Windows PowerShell 5.1 failures caused by inheriting a PowerShell 7 module path. Local checks: `python -m unittest discover -s tests/python/packs -t .` passed 219/219; log `artifacts/pack-editor-suite.log`. No loader source or game runtime was changed. Continue the general capability audit and preserve unrelated visual authoring work.
