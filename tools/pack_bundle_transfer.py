@@ -100,12 +100,18 @@ def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
             parts = PureWindowsPath(row["path"]).parts
             target = destination
             for part in parts[:-1]:
-                target /= part
-                try:
-                    target.mkdir()
-                    created_dirs.append(target)
-                except FileExistsError:
-                    pass
+                # Lock the existing parent while creating the child. A second
+                # guarded open below rejects a child replaced with a link.
+                parent = target
+                with open_pack_file(parent.parent, parent.name, directory=True):
+                    target = parent / part
+                    try:
+                        target.mkdir()
+                        created_dirs.append(target)
+                    except FileExistsError:
+                        pass
+                    with open_pack_file(parent, part, directory=True):
+                        pass
             target /= parts[-1]
             with open_pack_file(source, row["path"]) as input_stream, open_pack_file(destination, row["path"], create=True) as output_stream:
                 info = os.fstat(output_stream.fileno())

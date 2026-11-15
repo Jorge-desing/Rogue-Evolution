@@ -2938,3 +2938,7 @@ A direct Win32 experiment showed directory handles opened with access 0 or FILE_
 ## 2026-11-15 — Output parent directory guard
 
 The composed writer holds the output parent and ancestors through non-reparse directory handles throughout staging and publication. On Windows, GENERIC_READ without delete sharing blocks parent rename; the targeted test now passes. POSIX handles reject links but the final rename remains pathname-based and ancestor rename races are not ruled out. Focused suite: 27 passed and one Windows symlink privilege skip (28 total). Internal staging directory creation and cleanup still need review; full-suite visual failures remain open.
+
+## 2026-11-15 — Guard composition directory creation
+
+Bundle-transfer and staged-writer directory creation now hold the existing parent and open the new child through a non-reparse directory handle before use. Focused suite: 27 passed and one Windows symlink privilege skip (28 total). POSIX path-based creation/publication and Windows child replacement between creation and open still require race analysis; cleanup remains explicit, and full-suite visual failures remain open.

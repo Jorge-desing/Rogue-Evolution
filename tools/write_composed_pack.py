@@ -44,6 +44,16 @@ def _guarded_hash(root: Path, relative: str) -> str:
     return digest.hexdigest()
 
 
+def _make_stage_dir(parent: Path, name: str) -> Path:
+    """Create a single child while holding its parent, then reject reparse points."""
+    with open_pack_file(parent.parent, parent.name, directory=True):
+        child = parent / name
+        child.mkdir(exist_ok=True)
+        with open_pack_file(parent, name, directory=True):
+            pass
+        return child
+
+
 def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], output: str | Path) -> Path:
     """Write a new pack directory; existing destinations are never intentionally replaced.
 
@@ -67,12 +77,10 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
     # could remove files changed by another process after an error.
     temporary = tempfile.mkdtemp(prefix=".rogue-compose-", dir=output_path.parent)
     try:
-        stage = Path(temporary) / "pack"
-        stage.mkdir()
+        stage = _make_stage_dir(Path(temporary), "pack")
         manifest_sources: dict[str, bytes] = {}
         for index, (root, source_pack) in enumerate(bundle_sources):
-            isolated = Path(temporary) / f"source-{index}"
-            isolated.mkdir()
+            isolated = _make_stage_dir(Path(temporary), f"source-{index}")
             copy_bundle_transfer(root, isolated, source_pack)
             with open_pack_file(isolated, source_pack["assetBundleManifestPath"]) as stream:
                 manifest_bytes = stream.read()
@@ -80,7 +88,7 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
             for bundle in source_pack["assetBundles"]:
                 relative = PureWindowsPath(bundle["path"])
                 target = stage.joinpath(*relative.parts)
-                target.parent.mkdir(parents=True, exist_ok=True)
+                _make_stage_dir(stage, relative.parts[0])
                 if target.exists():
                     if _guarded_hash(stage, bundle["path"]) != _guarded_hash(isolated, bundle["path"]):
                         raise ValueError(f"Archivo de bundle en conflicto: {relative}")
@@ -89,7 +97,7 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
                         shutil.copyfileobj(input_stream, output_stream, 1024 * 1024)
         if manifest_sources:
             target_manifest = stage.joinpath(*PureWindowsPath(pack["assetBundleManifestPath"]).parts)
-            target_manifest.parent.mkdir(parents=True, exist_ok=True)
+            _make_stage_dir(stage, PureWindowsPath(pack["assetBundleManifestPath"]).parts[0])
             if target_manifest.exists():
                 raise ValueError("La ruta del manifest coincide con un bundle")
             manifests = list(manifest_sources.values())

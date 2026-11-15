@@ -182,3 +182,5 @@ Staged manifest reads and bundle comparisons use guarded pack-file handles; the 
 Windows directory guards require `GENERIC_READ`: a zero-access CreateFile handle did not prevent directory renames despite excluding delete sharing. The guarded pack reader now uses read access. Output-root publication still needs its own handle-based integration.
 
 The composed writer holds its output parent and ancestors through non-reparse directory handles during staging and publication. On Windows GENERIC_READ without delete sharing blocks renaming that parent. POSIX directory handles reject symlinks but publication still uses pathnames, so concurrent ancestor rename protection is not established there.
+
+Composition creates each staging child while holding its parent directory and checks the child through a non-reparse handle before writing. Windows parent renames are blocked while held; POSIX path-based creation and publication still need race-resistant directory-relative operations.
