@@ -121,6 +121,11 @@ namespace RogueCommandExpansionLoader.Modules
                 _nextAttemptAt = now + _intervalSeconds;
                 _attempts++;
 
+                if (_requestedEntityId == null && !TryResolveBuildOrder())
+                {
+                    return;
+                }
+
                 if (!TryRefreshDeckMaxLiving())
                 {
                     return;
@@ -128,7 +133,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                 int livingFactories;
                 string countDiagnostic;
-                if (!TryCountLivingFactories(out livingFactories, out countDiagnostic))
+                if (!TryCountLivingFactories(_entityId, out livingFactories, out countDiagnostic))
                 {
                     Stop("could not verify the active AI factory count: " + countDiagnostic);
                     return;
@@ -198,34 +203,59 @@ namespace RogueCommandExpansionLoader.Modules
                         return false;
                     }
 
+                    var candidates = new List<ScheduledBaseBuildCandidate>(constructableEntities.Count);
                     for (int i = 0; i < constructableEntities.Count; i++)
                     {
-                        EntityInAiDeck candidate = constructableEntities[i];
-                        string candidateId = candidate.entityId;
-                        if (String.IsNullOrWhiteSpace(candidateId) ||
-                            (_requestedEntityId != null && !String.Equals(candidateId, _requestedEntityId, StringComparison.Ordinal)) ||
-                            !EntityBalancingStore.IsBuilding(candidateId))
+                        EntityInAiDeck deckEntry = constructableEntities[i];
+                        string candidateId = deckEntry.entityId;
+                        bool isBuilding = !String.IsNullOrWhiteSpace(candidateId) &&
+                            EntityBalancingStore.IsBuilding(candidateId);
+
+                        int livingCount = 0;
+                        if (isBuilding && _requestedEntityId == null)
                         {
-                            continue;
+                            string unusedDiagnostic;
+                            if (!TryCountLivingFactories(candidateId, out livingCount, out unusedDiagnostic))
+                            {
+                                livingCount = 0;
+                            }
                         }
 
-                        _entityId = candidateId;
-                        _deckMaxLiving = candidate.MaxLiving;
-                        if (_deckMaxLiving < 1)
+                        candidates.Add(new ScheduledBaseBuildCandidate
                         {
-                            Stop("the requested building '" + _entityId + "' has no living capacity in the active AI deck.");
-                            return false;
-                        }
-
-                        _resolved = true;
-                        Debug.Log("[RogueCommandExpansionLoader] Scheduled base-build AI selected '" + _entityId + "'.");
-                        return true;
+                            EntityId = candidateId,
+                            IsBuilding = isBuilding,
+                            MaxLiving = deckEntry.MaxLiving,
+                            LivingCount = livingCount
+                        });
                     }
 
-                    Stop(_requestedEntityId == null
-                        ? "the active AI deck contains no building that can be placed by the native helper."
-                        : "the requested entity '" + _requestedEntityId + "' is not a building in the active AI deck.");
-                    return false;
+                    int selectedIndex = ScheduledBaseBuildLimitPolicy.SelectNextCandidateIndex(
+                        candidates, _requestedEntityId);
+                    if (selectedIndex < 0)
+                    {
+                        Stop(_requestedEntityId == null
+                            ? "the active AI deck contains no building that can be placed by the native helper."
+                            : "the requested entity '" + _requestedEntityId + "' is not a building in the active AI deck.");
+                        return false;
+                    }
+
+                    ScheduledBaseBuildCandidate selected = candidates[selectedIndex];
+                    if (selected.MaxLiving < 1)
+                    {
+                        Stop("the requested building '" + selected.EntityId + "' has no living capacity in the active AI deck.");
+                        return false;
+                    }
+
+                    bool changedTarget = !String.Equals(_entityId, selected.EntityId, StringComparison.Ordinal);
+                    _entityId = selected.EntityId;
+                    _deckMaxLiving = selected.MaxLiving;
+                    _resolved = true;
+                    if (changedTarget)
+                    {
+                        Debug.Log("[RogueCommandExpansionLoader] Scheduled base-build AI selected '" + _entityId + "'.");
+                    }
+                    return true;
                 }
                 catch (Exception exception)
                 {
@@ -269,7 +299,7 @@ namespace RogueCommandExpansionLoader.Modules
                 }
             }
 
-            private bool TryCountLivingFactories(out int count, out string diagnostic)
+            private bool TryCountLivingFactories(string entityId, out int count, out string diagnostic)
             {
                 count = 0;
                 diagnostic = null;
@@ -292,7 +322,7 @@ namespace RogueCommandExpansionLoader.Modules
                     var counted = new HashSet<EntityController>();
                     foreach (EntityController building in aiBuildings)
                     {
-                        if (IsLivingFactoryForBase(building) && counted.Add(building))
+                        if (IsLivingFactoryForBase(building, entityId) && counted.Add(building))
                         {
                             count++;
                         }
@@ -300,7 +330,7 @@ namespace RogueCommandExpansionLoader.Modules
 
                     foreach (EntityController building in _createdBuildings)
                     {
-                        if (IsLivingFactoryForBase(building) && counted.Add(building))
+                        if (IsLivingFactoryForBase(building, entityId) && counted.Add(building))
                         {
                             count++;
                         }
@@ -315,11 +345,11 @@ namespace RogueCommandExpansionLoader.Modules
                 }
             }
 
-            private bool IsLivingFactoryForBase(EntityController building)
+            private bool IsLivingFactoryForBase(EntityController building, string entityId)
             {
                 return building != null && !building.IsDestroyed && !building.DestroyHasBeenStarted &&
                     building.IsControlledByAi && building.aiBaseIndex == _baseIndex &&
-                    String.Equals(building.EntityId, _entityId, StringComparison.Ordinal);
+                    String.Equals(building.EntityId, entityId, StringComparison.Ordinal);
             }
 
             private void Stop(string reason)

@@ -2790,8 +2790,9 @@ namespace RogueCommandExpansionLoader.Content
                 return false;
             }
 
-            var moduleIds = new List<string>(modules.Length);
-            var behaviours = new List<IRogueCommandAiRuntimeBehaviour>(modules.Length);
+            var moduleIds = new List<string>(modules.Length + 1);
+            var behaviours = new List<IRogueCommandAiRuntimeBehaviour>(modules.Length + 1);
+            bool hasFactoryReinforcementModule = false;
             for (int i = 0; i < modules.Length; i++)
             {
                 ContentAiModuleDefinition module = modules[i];
@@ -2800,6 +2801,11 @@ namespace RogueCommandExpansionLoader.Content
                     diagnostic = "module entry " + i + " is empty.";
                     DestroyCreatedAiModules(profile.Definition.id, moduleIds, behaviours);
                     return false;
+                }
+
+                if (String.Equals(module.moduleId, FactoryReinforcementAiModule.ModuleId, StringComparison.Ordinal))
+                {
+                    hasFactoryReinforcementModule = true;
                 }
 
                 IRogueCommandAiRuntimeBehaviour moduleBehaviour;
@@ -2832,8 +2838,49 @@ namespace RogueCommandExpansionLoader.Content
                 }
             }
 
+            if (!hasFactoryReinforcementModule && ShouldAutoAttachModFactoryReinforcement(profile))
+            {
+                ContentModuleParameter[] defaultReinforcementParameters = new[]
+                {
+                    new ContentModuleParameter { name = "checkIntervalSeconds", value = "22" },
+                    new ContentModuleParameter { name = "minGameTimeSeconds", value = "10" },
+                    new ContentModuleParameter { name = "maxQueuePerFactory", value = "1" },
+                    new ContentModuleParameter { name = "maxStandingArmy", value = "18" },
+                    new ContentModuleParameter { name = "requireEconomy", value = "false" },
+                    new ContentModuleParameter { name = "prioritizeModFactories", value = "true" }
+                };
+                IRogueCommandAiRuntimeBehaviour reinforcementBehaviour;
+                string reinforcementDiagnostic;
+                if (_moduleRegistry.TryCreateBehaviour(FactoryReinforcementAiModule.ModuleId, gameBehaviour,
+                    defaultReinforcementParameters, out reinforcementBehaviour, out reinforcementDiagnostic))
+                {
+                    moduleIds.Add(FactoryReinforcementAiModule.ModuleId);
+                    behaviours.Add(reinforcementBehaviour);
+                }
+            }
+
             runtimeBehaviour = new CompositeAiRuntimeBehaviour(profile.Definition.id, moduleIds, behaviours);
             return true;
+        }
+
+        private bool ShouldAutoAttachModFactoryReinforcement(LoadedAiProfile profile)
+        {
+            if (profile == null || profile.Definition == null)
+            {
+                return false;
+            }
+
+            lock (_gate)
+            {
+                if (_units.Count == 0)
+                {
+                    return false;
+                }
+            }
+
+            return !String.IsNullOrWhiteSpace(profile.Definition.nativeTemplateId) ||
+                (profile.Definition.productionBuildingEntries != null && profile.Definition.productionBuildingEntries.Length > 0) ||
+                (profile.Definition.unitEntries != null && profile.Definition.unitEntries.Length > 0);
         }
 
         private void DestroyCreatedAiModules(
@@ -3018,69 +3065,48 @@ namespace RogueCommandExpansionLoader.Content
                     return;
                 }
 
-                var candidates = new List<LoadedUnit>();
-                lock (_gate)
-                {
-                    foreach (LoadedUnit unit in _units.Values)
-                    {
-                        if (unit == null || unit.IsProductionBuilding || unit.Definition == null)
-                        {
-                            continue;
-                        }
-
-                        bool allowedForAi = unit.Definition.isAllowedForAi;
-                        if (!allowedForAi && _allowedForAiField != null && unit.BalanceRow != null)
-                        {
-                            try
-                            {
-                                object val = _allowedForAiField.GetValue(unit.BalanceRow);
-                                if (val is bool bVal && bVal)
-                                {
-                                    allowedForAi = true;
-                                }
-                            }
-                            catch { }
-                        }
-
-                        if (allowedForAi)
-                        {
-                            candidates.Add(unit);
-                        }
-                    }
-                }
-
-                candidates.Sort((left, right) => StringComparer.Ordinal.Compare(left.Id, right.Id));
+                var prioritizedUnits = BuildPrioritizedAiInjectionCandidates(profile);
                 int injectedCount = 0;
+                int injectedModFactoryCount = 0;
+                int injectedInitialUnitPatrolCount = 0;
                 const int maxAutoInjectedPerNativeBase = 6;
-                for (int i = 0; i < candidates.Count && injectedCount < maxAutoInjectedPerNativeBase; i++)
+                for (int i = 0; i < prioritizedUnits.Count && injectedCount < maxAutoInjectedPerNativeBase; i++)
                 {
-                    LoadedUnit unit = candidates[i];
-                    string deckEntityId = !String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                    LoadedUnit unit = prioritizedUnits[i];
+                    string factoryId = !String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
                         ? unit.ProductionFactoryId.Trim()
-                        : unit.Id;
+                        : (unit.IsProductionBuilding || unit.IsStandaloneBuilding ? unit.Id : null);
 
-                    if (existingIds.Contains(deckEntityId) || existingIds.Contains(unit.Id))
+                    bool injectedAnyForCandidate = false;
+                    if (!String.IsNullOrWhiteSpace(factoryId) && !existingIds.Contains(factoryId))
                     {
-                        continue;
+                        // First mod factory starts active on the field (CountAtStart = 1, MaxLiving = 2)
+                        // so AI production works from tick 0; subsequent factories expand progressively.
+                        int factoryStartCount = injectedModFactoryCount == 0 ? 1 : 0;
+                        AppendNativeAiDeckEntry(primaryDeck, factoryId, factoryStartCount, 2);
+                        existingIds.Add(factoryId);
+                        injectedModFactoryCount++;
+                        injectedAnyForCandidate = true;
+                        RuntimeGameplayCommandDirector.TryWarmPrespawnPool(factoryId, 2);
                     }
 
-                    // Factories are built by the native AI builder (CountAtStart 0, MaxLiving 2).
-                    AppendNativeAiDeckEntry(primaryDeck, deckEntityId, 0, 2);
-                    if (!String.Equals(deckEntityId, unit.Id, StringComparison.Ordinal) && injectedCount < 2)
+                    if (!unit.IsProductionBuilding && !unit.IsStandaloneBuilding && !existingIds.Contains(unit.Id))
                     {
-                        // The first products also spawn as an initial patrol in BuildStartBases().
-                        AppendNativeAiDeckEntry(primaryDeck, unit.Id, 1, 2);
+                        if (injectedInitialUnitPatrolCount < 2)
+                        {
+                            // MaxLiving matches CountAtStart so BuildingSelector never picks mobile units as buildings.
+                            AppendNativeAiDeckEntry(primaryDeck, unit.Id, 1, 1);
+                            injectedInitialUnitPatrolCount++;
+                            injectedAnyForCandidate = true;
+                        }
+                        existingIds.Add(unit.Id);
+                        RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.Id, Math.Max(2, unit.PrespawnCount));
                     }
 
-                    existingIds.Add(deckEntityId);
-                    existingIds.Add(unit.Id);
-                    injectedCount++;
-
-                    if (!String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
+                    if (injectedAnyForCandidate)
                     {
-                        RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.ProductionFactoryId, 2);
+                        injectedCount++;
                     }
-                    RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.Id, Math.Max(2, unit.PrespawnCount));
                 }
 
                 if (injectedCount > 0)
@@ -3094,6 +3120,95 @@ namespace RogueCommandExpansionLoader.Content
             {
                 Log("No se pudo inyectar unidades mod en DefaultAiBehaviour nativo: " + ex.Message);
             }
+        }
+
+        private List<LoadedUnit> BuildPrioritizedAiInjectionCandidates(LoadedAiProfile profile)
+        {
+            var result = new List<LoadedUnit>();
+            var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            lock (_gate)
+            {
+                if (profile != null && profile.Definition != null)
+                {
+                    if (profile.Definition.unitEntries != null)
+                    {
+                        for (int i = 0; i < profile.Definition.unitEntries.Length; i++)
+                        {
+                            var entry = profile.Definition.unitEntries[i];
+                            if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
+                            {
+                                continue;
+                            }
+
+                            LoadedUnit profileUnit;
+                            if (_units.TryGetValue(entry.unitId.Trim(), out profileUnit) &&
+                                profileUnit != null && seenIds.Add(profileUnit.Id))
+                            {
+                                result.Add(profileUnit);
+                            }
+                        }
+                    }
+
+                    if (profile.Definition.productionBuildingEntries != null)
+                    {
+                        for (int i = 0; i < profile.Definition.productionBuildingEntries.Length; i++)
+                        {
+                            var entry = profile.Definition.productionBuildingEntries[i];
+                            if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
+                            {
+                                continue;
+                            }
+
+                            LoadedUnit profileUnit;
+                            if (_units.TryGetValue(entry.unitId.Trim(), out profileUnit) &&
+                                profileUnit != null && seenIds.Add(profileUnit.Id))
+                            {
+                                result.Add(profileUnit);
+                            }
+                        }
+                    }
+                }
+
+                var fallbackCandidates = new List<LoadedUnit>();
+                foreach (LoadedUnit unit in _units.Values)
+                {
+                    if (unit == null || unit.IsProductionBuilding || unit.Definition == null || seenIds.Contains(unit.Id))
+                    {
+                        continue;
+                    }
+
+                    bool allowedForAi = unit.Definition.isAllowedForAi;
+                    if (!allowedForAi && _allowedForAiField != null && unit.BalanceRow != null)
+                    {
+                        try
+                        {
+                            object val = _allowedForAiField.GetValue(unit.BalanceRow);
+                            if (val is bool bVal && bVal)
+                            {
+                                allowedForAi = true;
+                            }
+                        }
+                        catch { }
+                    }
+
+                    if (allowedForAi)
+                    {
+                        fallbackCandidates.Add(unit);
+                    }
+                }
+
+                fallbackCandidates.Sort((left, right) => StringComparer.Ordinal.Compare(left.Id, right.Id));
+                for (int i = 0; i < fallbackCandidates.Count; i++)
+                {
+                    if (seenIds.Add(fallbackCandidates[i].Id))
+                    {
+                        result.Add(fallbackCandidates[i]);
+                    }
+                }
+            }
+
+            return result;
         }
 
         private void AppendNativeAiDeckEntry(IList deck, string entityId, int countAtStart, int maxLiving)

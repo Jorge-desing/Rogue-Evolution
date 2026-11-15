@@ -173,11 +173,108 @@ namespace RogueCommandExpansionLoader.Modules
         }
     }
 
+    internal struct ScheduledBaseBuildCandidate
+    {
+        public string EntityId;
+        public bool IsBuilding;
+        public int MaxLiving;
+        public int LivingCount;
+    }
+
     internal static class ScheduledBaseBuildLimitPolicy
     {
         public static bool HasRemainingCapacity(int livingCount, int maxLiving)
         {
             return livingCount >= 0 && maxLiving > 0 && livingCount < maxLiving;
+        }
+
+        public static bool IsModNamespacedEntity(string entityId)
+        {
+            return !String.IsNullOrWhiteSpace(entityId) && entityId.IndexOf(':') >= 0;
+        }
+
+        /// <summary>
+        /// Selects the next constructable building candidate.
+        /// When requestedEntityId is omitted, prioritizes mod factories (namespaced IDs) that
+        /// currently have remaining living capacity over native buildings such as PCXBaseControl.
+        /// </summary>
+        public static int SelectNextCandidateIndex(
+            IList<ScheduledBaseBuildCandidate> candidates,
+            string requestedEntityId)
+        {
+            if (candidates == null || candidates.Count == 0)
+            {
+                return -1;
+            }
+
+            if (requestedEntityId != null)
+            {
+                for (int i = 0; i < candidates.Count; i++)
+                {
+                    ScheduledBaseBuildCandidate candidate = candidates[i];
+                    if (candidate.IsBuilding &&
+                        String.Equals(candidate.EntityId, requestedEntityId, StringComparison.Ordinal))
+                    {
+                        return i;
+                    }
+                }
+
+                return -1;
+            }
+
+            int firstModWithCapacity = -1;
+            int firstNativeWithCapacity = -1;
+            int firstModValid = -1;
+            int firstNativeValid = -1;
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                ScheduledBaseBuildCandidate candidate = candidates[i];
+                if (!candidate.IsBuilding || String.IsNullOrWhiteSpace(candidate.EntityId) || candidate.MaxLiving < 1)
+                {
+                    continue;
+                }
+
+                bool isMod = IsModNamespacedEntity(candidate.EntityId);
+                bool hasCapacity = HasRemainingCapacity(candidate.LivingCount, candidate.MaxLiving);
+
+                if (isMod)
+                {
+                    if (firstModValid < 0)
+                    {
+                        firstModValid = i;
+                    }
+
+                    if (hasCapacity && firstModWithCapacity < 0)
+                    {
+                        firstModWithCapacity = i;
+                    }
+                }
+                else
+                {
+                    if (firstNativeValid < 0)
+                    {
+                        firstNativeValid = i;
+                    }
+
+                    if (hasCapacity && firstNativeWithCapacity < 0)
+                    {
+                        firstNativeWithCapacity = i;
+                    }
+                }
+            }
+
+            if (firstModWithCapacity >= 0)
+            {
+                return firstModWithCapacity;
+            }
+
+            if (firstNativeWithCapacity >= 0)
+            {
+                return firstNativeWithCapacity;
+            }
+
+            return firstModValid >= 0 ? firstModValid : firstNativeValid;
         }
     }
 }

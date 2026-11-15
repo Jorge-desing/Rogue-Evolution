@@ -120,8 +120,10 @@ namespace RogueCommandExpansionLoader.Modules
                 }
                 if (currentArmy >= _settings.MaxStandingArmy) return;
 
-                foreach (EntityController factory in buildings.OrderByDescending(
-                    factory => RuntimeUnitMechanicsDirector.GetProductionPriority(factory)))
+                foreach (EntityController factory in buildings
+                    .OrderByDescending(factory => _settings.PrioritizeModFactories &&
+                        ScheduledBaseBuildLimitPolicy.IsModNamespacedEntity(factory != null ? factory.EntityId : null) ? 1 : 0)
+                    .ThenByDescending(factory => RuntimeUnitMechanicsDirector.GetProductionPriority(factory)))
                 {
                     if (!IsInScope(factory) || !factory.IsFactory)
                     {

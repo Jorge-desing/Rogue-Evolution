@@ -2386,5 +2386,94 @@ internal static partial class ValidationTestRunner
             AiModuleRegistry.ResetActive();
         }
     }),
+    ("scheduled base build candidate selector skips saturated PCXBaseControl and rotates mod factories", () =>
+    {
+        var candidates = new List<ScheduledBaseBuildCandidate>
+        {
+            new ScheduledBaseBuildCandidate { EntityId = "PCXBaseControl", IsBuilding = true, MaxLiving = 1, LivingCount = 1 },
+            new ScheduledBaseBuildCandidate { EntityId = "PCXBarracks", IsBuilding = true, MaxLiving = 2, LivingCount = 1 },
+            new ScheduledBaseBuildCandidate { EntityId = "sample-native:artillery-factory", IsBuilding = true, MaxLiving = 2, LivingCount = 1 },
+            new ScheduledBaseBuildCandidate { EntityId = "sample-native:mech-bay", IsBuilding = true, MaxLiving = 2, LivingCount = 0 }
+        };
+
+        int firstPick = ScheduledBaseBuildLimitPolicy.SelectNextCandidateIndex(candidates, null);
+        if (firstPick != 2)
+        {
+            throw new InvalidOperationException("Expected first mod factory with capacity (index 2), got " + firstPick);
+        }
+
+        // Saturate first mod factory (2/2) and verify rotation to second mod factory (index 3)
+        var saturatedFirst = candidates[2];
+        saturatedFirst.LivingCount = 2;
+        candidates[2] = saturatedFirst;
+
+        int secondPick = ScheduledBaseBuildLimitPolicy.SelectNextCandidateIndex(candidates, null);
+        if (secondPick != 3)
+        {
+            throw new InvalidOperationException("Expected rotation to second mod factory (index 3), got " + secondPick);
+        }
+
+        // Explicit entityId must still resolve its exact target regardless of mod priority
+        int explicitPick = ScheduledBaseBuildLimitPolicy.SelectNextCandidateIndex(candidates, "PCXBarracks");
+        if (explicitPick != 1)
+        {
+            throw new InvalidOperationException("Expected explicit selection of PCXBarracks (index 1), got " + explicitPick);
+        }
+    }),
+    ("factory reinforcement parser supports prioritizeModFactories default and explicit values", () =>
+    {
+        if (!FactoryReinforcementParameterParser.TryParse(Array.Empty<ContentModuleParameter>(), out FactoryReinforcementSettings defaults, out string? diag))
+        {
+            throw new InvalidOperationException("Expected default FactoryReinforcement settings to parse: " + diag);
+        }
+
+        if (!defaults.PrioritizeModFactories)
+        {
+            throw new InvalidOperationException("Expected PrioritizeModFactories to default to true.");
+        }
+
+        var explicitFalse = new[] { new ContentModuleParameter { name = "prioritizeModFactories", value = "false" } };
+        if (!FactoryReinforcementParameterParser.TryParse(explicitFalse, out FactoryReinforcementSettings disabled, out diag) || disabled.PrioritizeModFactories)
+        {
+            throw new InvalidOperationException("Expected prioritizeModFactories=false to parse cleanly.");
+        }
+
+        var invalid = new[] { new ContentModuleParameter { name = "prioritizeModFactories", value = "maybe" } };
+        if (FactoryReinforcementParameterParser.TryParse(invalid, out _, out _))
+        {
+            throw new InvalidOperationException("Expected invalid boolean for prioritizeModFactories to be rejected.");
+        }
+    }),
+    ("constructable entities filter removes mobile units and preserves buildings", () =>
+    {
+        bool hadBaseControl = EntityBalancingStore.BuildingEntityIds.Contains("PCXBaseControl");
+        bool hadMechBay = EntityBalancingStore.BuildingEntityIds.Contains("sample-native:mech-bay");
+        bool hadArtillery = EntityBalancingStore.BuildingEntityIds.Contains("sample-native:heavy-artillery");
+
+        EntityBalancingStore.BuildingEntityIds.Add("PCXBaseControl");
+        EntityBalancingStore.BuildingEntityIds.Add("sample-native:mech-bay");
+        EntityBalancingStore.BuildingEntityIds.Remove("sample-native:heavy-artillery");
+        try
+        {
+            var deck = new List<EntityInAiDeck>
+            {
+                new EntityInAiDeck { entityId = "PCXBaseControl", MaxLiving = 1 },
+                new EntityInAiDeck { entityId = "sample-native:heavy-artillery", MaxLiving = 2 },
+                new EntityInAiDeck { entityId = "sample-native:mech-bay", MaxLiving = 2 }
+            };
+
+            int removed = RuntimeHooks.FilterNonBuildingConstructableEntries(deck);
+            if (removed != 1 || deck.Count != 2 || deck[0].entityId != "PCXBaseControl" || deck[1].entityId != "sample-native:mech-bay")
+            {
+                throw new InvalidOperationException($"Expected mobile unit removal (removed={removed}, count={deck.Count}).");
+            }
+        }
+        finally
+        {
+            if (!hadBaseControl) EntityBalancingStore.BuildingEntityIds.Remove("PCXBaseControl");
+            if (!hadMechBay) EntityBalancingStore.BuildingEntityIds.Remove("sample-native:mech-bay");
+            if (hadArtillery) EntityBalancingStore.BuildingEntityIds.Add("sample-native:heavy-artillery");
+        }
+    }),
     };
 }

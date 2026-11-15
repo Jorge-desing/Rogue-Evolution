@@ -13,6 +13,7 @@ namespace RogueCommandExpansionLoader.Modules
         public int MaxStandingArmy;
         public bool RequireEconomy;
         public float MinGameTimeSeconds;
+        public bool PrioritizeModFactories;
     }
 
     /// <summary>
@@ -29,6 +30,7 @@ namespace RogueCommandExpansionLoader.Modules
         private const int DefaultMaxStandingArmy = 25;
         private const bool DefaultRequireEconomy = true;
         private const float DefaultMinGameTimeSeconds = 15f;
+        private const bool DefaultPrioritizeModFactories = true;
 
         public static bool TryParse(
             ContentModuleParameter[] parameters,
@@ -50,7 +52,8 @@ namespace RogueCommandExpansionLoader.Modules
 
                 if (parameter.name != "baseIndex" && parameter.name != "checkIntervalSeconds" &&
                     parameter.name != "maxQueuePerFactory" && parameter.name != "maxStandingArmy" &&
-                    parameter.name != "requireEconomy" && parameter.name != "minGameTimeSeconds")
+                    parameter.name != "requireEconomy" && parameter.name != "minGameTimeSeconds" &&
+                    parameter.name != "prioritizeModFactories")
                 {
                     diagnostic = "Unknown parameter '" + parameter.name + "' for module " + ModuleId + ".";
                     return false;
@@ -111,6 +114,14 @@ namespace RogueCommandExpansionLoader.Modules
                 return false;
             }
 
+            bool prioritizeModFactories;
+            if (!TryGetBoolean(values, "prioritizeModFactories", DefaultPrioritizeModFactories,
+                out prioritizeModFactories))
+            {
+                diagnostic = "prioritizeModFactories must be true or false.";
+                return false;
+            }
+
             settings = new FactoryReinforcementSettings
             {
                 BaseIndex = baseIndex,
@@ -118,7 +129,8 @@ namespace RogueCommandExpansionLoader.Modules
                 MaxQueuePerFactory = maxQueuePerFactory,
                 MaxStandingArmy = maxStandingArmy,
                 RequireEconomy = requireEconomy,
-                MinGameTimeSeconds = minGameTimeSeconds
+                MinGameTimeSeconds = minGameTimeSeconds,
+                PrioritizeModFactories = prioritizeModFactories
             };
             diagnostic = null;
             return true;

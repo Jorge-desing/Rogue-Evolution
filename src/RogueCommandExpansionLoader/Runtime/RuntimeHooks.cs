@@ -2144,6 +2144,8 @@ namespace RogueCommandExpansionLoader.Runtime
             });
         }
 
+        private static FieldInfo _cachedDeckEntryEntityIdField;
+
         public static void OnDefaultAiConstructableEntitiesTranspiler(object listObj, object aiBehaviourObj)
         {
             System.Threading.Interlocked.Increment(ref _aiConstructableEntitiesTranspilerCount);
@@ -2154,8 +2156,58 @@ namespace RogueCommandExpansionLoader.Runtime
 
             SafeCall(delegate
             {
+                FilterNonBuildingConstructableEntries(listObj);
                 RuntimeGameplayCommandDirector.ApplyActiveAiUnitDefaultsToAiUnits();
             });
+        }
+
+        internal static int FilterNonBuildingConstructableEntries(object listObj)
+        {
+            System.Collections.IList list = listObj as System.Collections.IList;
+            if (list == null || list.Count == 0)
+            {
+                return 0;
+            }
+
+            int removed = 0;
+            for (int i = list.Count - 1; i >= 0; i--)
+            {
+                object entry = list[i];
+                if (entry == null)
+                {
+                    continue;
+                }
+
+                string entityId = entry is EntityInAiDeck deckEntry
+                    ? deckEntry.entityId
+                    : ReadDeckEntryEntityId(entry);
+                if (string.IsNullOrWhiteSpace(entityId))
+                {
+                    continue;
+                }
+
+                if (!EntityBalancingStore.IsBuilding(entityId))
+                {
+                    list.RemoveAt(i);
+                    removed++;
+                }
+            }
+
+            return removed;
+        }
+
+        private static string ReadDeckEntryEntityId(object entry)
+        {
+            Type entryType = entry.GetType();
+            if (_cachedDeckEntryEntityIdField == null || _cachedDeckEntryEntityIdField.DeclaringType != entryType)
+            {
+                _cachedDeckEntryEntityIdField = entryType.GetField("entityId",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            }
+
+            return _cachedDeckEntryEntityIdField != null
+                ? _cachedDeckEntryEntityIdField.GetValue(entry) as string
+                : null;
         }
 
         private static PropertyInfo _cachedTeamProperty;
