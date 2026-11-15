@@ -3073,3 +3073,7 @@ On failed transfer, Windows removes completed created files only through an excl
 ### Rollback replacement and full suite (2026-11-15)
 
 The Windows failure-injection test now verifies that a replacement file with identical bytes is retained when file identity changes. The bundle module passed 6 tests; full Python `all` returned successful in 36.48 s, started before this test-only update. Windows stage publication and POSIX races/rollback remain open.
+
+### Current Release deployment (2026-11-15)
+
+The prior installed artifact predated loader source commit d4173a1. Rebuilt Release with zero warnings/errors; the validation harness passed 601/602 checks with one skip. Complete harness log: `artifacts/validation-tests/session-loader-check.log`. With Rogue Command closed, backed up and deployed the current DLL; installed and artifact SHA-256 are `2A933FD111AB4B339A9D07A970B4C8EDA8E34A177DFAB4A7867952514BA699CE`. Backup, predeployment manifest and verification: `artifacts/deployment-backups/composition-session-20261115T221443Z/`. No live behavior is implied. Stage publication and POSIX rollback remain open.

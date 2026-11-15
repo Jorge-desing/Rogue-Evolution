@@ -228,3 +228,5 @@ Composition reports `dependencyNativeReferences` by required external pack ID, i
 On Windows, failed bundle transfer attempts to delete complete created files through an exclusively opened DELETE-capable handle only after matching recorded file identity and SHA-256. Changed, incomplete, locked or unverified files and created directories are retained and reported. POSIX retains all created paths; no recursive cleanup occurs.
 
 The Windows rollback regression also covers replacement by a different file with identical bytes: identity mismatch preserves it.
+
+On 2026-11-15, the loader was rebuilt after source commit d4173a1; Release build had zero warnings/errors and the validation harness reported 601/602 checks passed with one skip. This is local evidence, not live gameplay acceptance.
