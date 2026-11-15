@@ -263,6 +263,7 @@ class CompositionEditTests(unittest.TestCase):
         provider["units"][0]["copyUpgradesToEntityId"] = "third:gamma"
         third = SCAFFOLD.generate_scaffold("third:pack", "gamma", stage_slug="sc", ai_slug="ac")
         third["units"][0]["copyUpgradesToEntityId"] = "NativeTarget"
+        third["relics"] = [{"id": "third:global", "cardChanges": [{"side": "True"}]}]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             a, b, c, output = root / "source.json", root / "provider.json", root / "third.json", root / "output"
@@ -274,7 +275,8 @@ class CompositionEditTests(unittest.TestCase):
             self.assertEqual(0, code)
             report = json.loads((output / "composition-dependencies.json").read_text(encoding="utf-8"))
             self.assertIn("NativeTarget (entity)", report["dependencyNativeReferences"]["third:pack"])
-            self.assertIn("third:pack", stderr.getvalue())
+            self.assertEqual(["relics:third:global"], report["dependencyBroadFilterCards"]["third:pack"])
+            self.assertIn("relics:third:global", stderr.getvalue())
 
     def test_composition_rejects_duplicate_pack_id_even_without_entity_collisions(self) -> None:
         pack = self._pack()

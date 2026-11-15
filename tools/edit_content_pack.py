@@ -2213,16 +2213,23 @@ def main(argv: list[str] | None = None) -> int:
                              for row in report["packs"] if row["name"] in required and row["unverifiedNativeReferences"]}
         for dependency_id, references in sorted(dependency_native.items()):
             print(f"Referencias nativas sin verificar en {dependency_id}: " + ", ".join(references), file=sys.stderr)
-        broad_cards = sorted(f"{section}:{_entity_key(card)}"
-                             for section in ("relics", "upgrades")
-                             for card in _as_list(updated.get(section)) if isinstance(card, dict) and _entity_key(card)
-                             if any(not _as_list(change.get("onlyForTheseEntityIds"))
-                                    for change in _as_list(card.get("cardChanges")) if isinstance(change, dict)))
+        def broad_filter_cards(pack_data):
+            return sorted(f"{section}:{_entity_key(card)}"
+                          for section in ("relics", "upgrades")
+                          for card in _as_list(pack_data.get(section)) if isinstance(card, dict) and _entity_key(card)
+                          if any(not _as_list(change.get("onlyForTheseEntityIds"))
+                                 for change in _as_list(card.get("cardChanges")) if isinstance(change, dict)))
+        broad_cards = broad_filter_cards(updated)
+        dependency_broad = {packs[name]["packId"]: cards for name in sorted(required)
+                            if (cards := broad_filter_cards(packs[name]))}
+        for dependency_id, cards in sorted(dependency_broad.items()):
+            print(f"Cartas con filtros generales en {dependency_id}: " + ", ".join(cards), file=sys.stderr)
         if broad_cards:
             print("Cartas con filtros generales que pueden afectar otras entidades: " + ", ".join(broad_cards), file=sys.stderr)
         composition_report = {"schemaVersion": 1, "packId": updated.get("packId"),
                               "broadFilterCards": broad_cards,
                               "dependencyNativeReferences": dependency_native,
+                              "dependencyBroadFilterCards": dependency_broad,
                               "requiredPackIds": sorted(packs[name]["packId"] for name in required),
                               "unverifiedNativeReferences": native}
 

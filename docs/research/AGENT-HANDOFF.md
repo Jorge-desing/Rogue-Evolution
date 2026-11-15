@@ -3121,3 +3121,7 @@ Windows cleanup of a successful composition now removes the original empty stagi
 ### Atomic staging-parent creation (2026-11-15)
 
 The random staging parent now uses the same atomic create-and-guard operation as the child on Windows; collisions preserve the existing directory. POSIX creation uses mode 0700 and still needs race-safe handling. The composition module passed 36 tests after the collision test was added; full Python `all` passed in 37.40 s, started before that test-only addition. Stage-file mutation after the final hash and POSIX publication/rollback remain open.
+
+### External broad-card scope (2026-11-15)
+
+Composition now reports filter-only relics/upgrades in required external dependency packs, including transitively required packs, in `dependencyBroadFilterCards` and stderr. The three-pack test exercises this alongside native-reference reporting; composition/dependency modules passed 49 tests. This is potential scope, not runtime matching evidence. Windows post-hash content races and POSIX publication/rollback remain open.

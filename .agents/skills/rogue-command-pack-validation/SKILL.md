@@ -246,3 +246,5 @@ On Windows the pack stage is now created exclusively and opened without delete s
 After successful publication on Windows, empty staging-parent cleanup opens the directory without delete sharing, checks its volume/file ID and uses handle-based deletion; replaced or nonempty directories remain reported. POSIX now retains even empty staging parents because pathname-only cleanup cannot establish the same guarantee.
 
 The random `.rogue-compose-*` staging parent is also created exclusively with its initial non-delete-sharing handle in one Windows operation. Name collisions fail without reuse. POSIX creates mode 0700 but its creation-to-guard and pathname publication races remain unverified.
+
+The composition CLI also lists filter-only cards in required external packs, including transitive dependencies, under `dependencyBroadFilterCards` keyed by pack ID. This describes possible cross-pack effects; actual matching remains runtime-dependent.
