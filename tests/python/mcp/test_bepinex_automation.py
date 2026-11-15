@@ -243,6 +243,19 @@ class StateWaitTests(unittest.TestCase):
                 self.assertEqual(1, call.call_count)
                 self.assertEqual("uncertain_effect", outcome["stopReason"]["code"])
 
+    def test_unknown_status_overrides_native_success(self):
+        cases = [
+            ("diagnostics_order_unit_move", {"entityKeyId": "11", "destinationX": 1, "destinationZ": 2}, {"success": True, "completionStatus": "unknown"}),
+            ("diagnostics_order_group_command", {"entityKeyIds": ["11"], "commandType": "Stop"}, {"success": True, "dispatchedCount": 1, "completionStatus": "unknown"}),
+            ("diagnostics_order_battlefield_plan", {"orders": [{"commandType": "Stop", "entityKeyIds": ["11"]}]}, {"success": True, "dispatchStarted": False}),
+        ]
+        for tool, args, native in cases:
+            with self.subTest(tool=tool), mock.patch.object(SERVER, "_call_diagnostics_method", return_value=json.dumps(native)):
+                result = SERVER.execute_tool(tool, args)
+                payload = json.loads(result["content"][0]["text"])
+                self.assertTrue(result["isError"])
+                self.assertTrue(payload["postconditionInspectionRequired"])
+
     def test_unreadable_single_order_stops_sequence(self):
         args = {"entityKeyId": "11", "destinationX": 1, "destinationZ": 2}
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value="broken reply") as call:

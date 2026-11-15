@@ -430,13 +430,17 @@ def _battlefield_plan_response(text: str) -> dict[str, Any]:
         return _unreadable_mutation_response(text)
     if not isinstance(payload, dict):
         return _unreadable_mutation_response(text)
-    if type(payload.get("dispatchStarted")) is not bool and payload.get("completionStatus") != "not_started":
+    if payload.get("dispatchStarted") is False and payload.get("success") is True:
+        payload["completionStatus"] = "unknown"
+        payload["postconditionInspectionRequired"] = True
+    elif type(payload.get("dispatchStarted")) is not bool and payload.get("completionStatus") != "not_started":
         payload["completionStatus"] = "unknown"
         payload["postconditionInspectionRequired"] = True
     elif payload.get("dispatchStarted") is True and payload.get("success") is not True:
         payload["postconditionInspectionRequired"] = True
     return _tool_response(json.dumps(payload, ensure_ascii=False),
-                          is_error=payload.get("success") is not True or payload.get("completionStatus") == "unknown")
+                          is_error=payload.get("success") is not True or payload.get("completionStatus") == "unknown"
+                          or payload.get("postconditionInspectionRequired") is True)
 
 
 def _single_battlefield_response(text: str) -> dict[str, Any]:
@@ -449,9 +453,10 @@ def _single_battlefield_response(text: str) -> dict[str, Any]:
         return _unreadable_mutation_response(text)
     if type(payload.get("success")) is not bool and payload.get("completionStatus") != "not_started":
         payload["completionStatus"] = "unknown"
-    if payload.get("success") is not True and payload.get("completionStatus") != "not_started":
+    if (payload.get("success") is not True or payload.get("completionStatus") == "unknown") and payload.get("completionStatus") != "not_started":
         payload["postconditionInspectionRequired"] = True
-    return _tool_response(json.dumps(payload, ensure_ascii=False), is_error=payload.get("success") is not True)
+    return _tool_response(json.dumps(payload, ensure_ascii=False),
+                          is_error=payload.get("success") is not True or payload.get("postconditionInspectionRequired") is True)
 
 
 def _group_action_response(text: str, count_field: str, expected: int) -> dict[str, Any]:
@@ -464,7 +469,9 @@ def _group_action_response(text: str, count_field: str, expected: int) -> dict[s
         return _unreadable_mutation_response(text)
     count = payload.get(count_field)
     known_count = type(count) is int and count >= 0
-    complete = expected > 0 and known_count and count == expected and payload.get("success") is True
+    complete = (expected > 0 and known_count and count == expected and payload.get("success") is True
+                and payload.get("completionStatus") != "unknown"
+                and payload.get("postconditionInspectionRequired") is not True)
     partial = known_count and count > 0 and not complete
     inspect = not complete
     payload["expectedUnitCount"] = expected

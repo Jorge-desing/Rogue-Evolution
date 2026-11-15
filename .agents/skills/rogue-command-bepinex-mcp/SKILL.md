@@ -133,3 +133,5 @@ Automation sequences inspect native dispatched/affected counts for group command
 Mixed-plan and group mutations with unreadable or non-object responses return an MCP error with `completionStatus=unknown`, the original `rawResponse`, and `postconditionInspectionRequired=true`. A plan response missing dispatch state is likewise unknown unless explicitly not started. Inspect current state before retrying.
 
 Individual battlefield move, attack, attack-move, patrol, retreat, active-skill, stance, hold and stop calls also return structured unknown completion for unreadable/non-object responses. Failed outcomes require postcondition inspection unless explicitly `not_started`; sequences stop accordingly.
+
+For battlefield mutations, `completionStatus=unknown` or `postconditionInspectionRequired=true` takes precedence over a contradictory native `success=true`; a plan claiming success without dispatch is also treated as unknown. Inspect state before retrying.

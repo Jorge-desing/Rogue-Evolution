@@ -3181,3 +3181,7 @@ Mixed-plan and group MCP calls now preserve unreadable/non-object raw responses 
 Individual MCP move, attack, attack-move, patrol, retreat, active-skill, stance, hold and stop responses now preserve unreadable responses as unknown completion and flag failed outcomes for postcondition inspection unless explicitly not started. The sequence stops accordingly. Automation/diagnostics modules passed 101 tests. A prior failed-reference test now uses a failed read-only getter because a failed mutation correctly stops immediately. No live orders were issued.
 
 Full Python `all` passed after the individual-response changes in 46.40 seconds.
+
+### Contradictory battlefield outcomes (2026-11-15)
+
+Unknown completion or an explicit inspection requirement now overrides `success=true` for plan, individual and group MCP responses; a plan claiming success while dispatch did not start is unknown. Automation/diagnostics modules passed 102 tests, including contradictory-result cases. No live game orders were issued.
