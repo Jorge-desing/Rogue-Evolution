@@ -75,7 +75,7 @@ def plan_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
 
 
 def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, pack: dict) -> list[dict]:
-    """Copy a checked bundle set without replacing existing files; roll back new files on failure."""
+    """Copy a checked bundle set without replacing existing files; report retained files on failure."""
     source, destination = Path(source_root), Path(destination_root)
     plan = plan_bundle_transfer(source, destination, pack)
     created_files: list[tuple[Path, tuple[int, int], str | None]] = []
@@ -115,25 +115,11 @@ def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
             raise ValueError("El conjunto de bundles cambió durante la transferencia")
         return plan
     except Exception as original:
-        retained = []
-        for path, identity, expected_hash in reversed(created_files):
-            try:
-                info = path.lstat()
-                if (expected_hash is None or (info.st_dev, info.st_ino) != identity or
-                    not stat.S_ISREG(info.st_mode) or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT or
-                    _sha256(path) != expected_hash):
-                    retained.append(str(path))
-                    continue
-                path.unlink()
-            except FileNotFoundError:
-                continue
-            except OSError:
-                retained.append(str(path))
-        for path in reversed(created_dirs):
-            try:
-                path.rmdir()
-            except OSError:
-                pass
+        # Never unlink by pathname after an exception: a different process can
+        # replace it between an identity check and deletion. Retain all created
+        # paths and report them for inspection.
+        retained = [str(path) for path, _, _ in created_files]
+        retained.extend(str(path) for path in created_dirs)
         if retained:
             raise RuntimeError(f"Reversión incompleta; archivos conservados: {', '.join(retained)}; error original: {original}") from original
         raise

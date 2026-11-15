@@ -170,3 +170,5 @@ The external dependency analyzer also tracks `units[].upgrades[].targetUnitId` a
 Bundle-transfer rollback checks the original file identity and expected hash before removing completed copies; incomplete or changed files are retained and reported. This is not yet race-free: the check and unlink remain separate, and temporary-directory cleanup needs separate review.
 
 The composed writer retains staging directories after success or failure instead of recursively deleting potentially changed files. On failure the diagnostic includes the staging path. Cleanup must be explicit after inspecting ownership and contents; atomic destination-path protection remains under review.
+
+On bundle-copy failure, all newly created files and directories are retained and listed; rollback does not unlink by pathname because a concurrent replacement could occur after an identity check. Inspect the retained staging path before manual cleanup.

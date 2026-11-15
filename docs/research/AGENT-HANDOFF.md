@@ -2910,3 +2910,7 @@ Bundle copy rollback records file identity and only removes completed files whos
 ## 2026-11-15 — Preserve composition staging on failure
 
 The composed writer no longer uses automatic recursive temporary-directory cleanup. It preserves staging directories and reports their path on failure, preventing cleanup from silently deleting changed or incomplete files. Successful compositions also retain isolated staging inputs pending an ownership-safe cleanup mechanism. The CLI reports the failure without a traceback. Targeted suite: 25 passed and one symlink privilege skip. Destination handle stability, atomic rollback and remaining reference coverage remain open; the full suite previously had two visual failures.
+
+## 2026-11-15 — Preserve all failed transfer outputs
+
+Bundle-transfer failure handling no longer unlinks created paths after checking them: a concurrent replacement between check and unlink could remove someone else's file. It reports all created files/directories for inspection; successful copies are unchanged. Focused suite passed 25 cases with one Windows symlink-privilege skip. Destination directory/file handles and safe cleanup still require work; retained paths are intentional. Full Python suite's two visual failures remain open.
