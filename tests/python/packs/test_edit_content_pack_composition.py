@@ -91,6 +91,19 @@ class CompositionEditTests(unittest.TestCase):
             self.assertTrue((output / "content.json").is_file())
             self.assertFalse((root / "stolen").exists())
 
+    @unittest.skipUnless(os.name == "nt", "Windows directory sharing semantics")
+    def test_stage_is_locked_during_validation(self) -> None:
+        from tools.write_composed_pack import validate_pack as real_validate
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def validate(stage):
+                with self.assertRaises(OSError):
+                    Path(stage).rename(Path(stage).parent / "stolen")
+                return real_validate(stage)
+            with patch("tools.write_composed_pack.validate_pack", side_effect=validate):
+                write_composed_pack(self._pack(), [], root / "output")
+            self.assertTrue((root / "output/content.json").is_file())
+
     @unittest.skipUnless(os.name == "nt", "Windows handle-based publication")
     def test_publication_rejects_replaced_stage(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
