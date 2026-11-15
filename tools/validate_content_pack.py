@@ -5,12 +5,15 @@ Uso:
     python tools/validate_content_pack.py <pack_dir> [--schema schema.json]
 """
 import argparse
+import hashlib
 import json
 import sys
 import stat
 from pathlib import Path, PureWindowsPath
 
 import jsonschema
+
+from tools.secure_pack_read import open_pack_file
 
 SCHEMA_PATH = Path(__file__).resolve().parents[1] / "content/schema/content.schema.json"
 
@@ -70,6 +73,20 @@ def validate_pack(pack_dir: str, schema_path: str | None = None) -> list[str]:
 
     if not isinstance(data, dict):
         return ["content.json debe ser un objeto"]
+
+    report_path = pack_path / "composition-dependencies.json"
+    if report_path.exists() or report_path.is_symlink():
+        try:
+            with open_pack_file(pack_path, "composition-dependencies.json") as stream:
+                report = json.load(stream)
+            with open_pack_file(pack_path, "content.json") as stream:
+                digest = hashlib.sha256(stream.read()).hexdigest()
+            if not isinstance(report, dict) or report.get("schemaVersion") != 1:
+                errors.append("Informe de composición inválido: versión o formato no admitido")
+            elif report.get("packId") != data.get("packId") or report.get("contentSha256") != digest:
+                errors.append("Informe de composición obsoleto o perteneciente a otro pack")
+        except (ValueError, OSError, UnicodeError) as exc:
+            errors.append(f"Informe de composición ilegible: {exc}")
 
     def check_reference(label, value):
         if value is not None and value != "":

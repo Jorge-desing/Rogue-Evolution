@@ -15,6 +15,7 @@ from tests.python.helpers import load_tool_module
 EDIT = load_tool_module("edit_content_pack")
 SCAFFOLD = load_tool_module("scaffold_pack")
 from tools.write_composed_pack import _publish_no_replace, write_composed_pack
+from tools.validate_content_pack import validate_pack
 
 
 class CompositionEditTests(unittest.TestCase):
@@ -112,6 +113,10 @@ class CompositionEditTests(unittest.TestCase):
             report = json.loads((output / "composition-dependencies.json").read_text(encoding="utf-8"))
             self.assertEqual(["other:pack"], report["requiredPackIds"])
             self.assertEqual(hashlib.sha256((output / "content.json").read_bytes()).hexdigest(), report["contentSha256"])
+            self.assertEqual([], validate_pack(str(output)))
+            with (output / "content.json").open("a", encoding="utf-8") as stream:
+                stream.write(" ")
+            self.assertTrue(any("obsoleto" in error for error in validate_pack(str(output))))
 
     def test_composition_rejects_duplicate_pack_id_even_without_entity_collisions(self) -> None:
         pack = self._pack()

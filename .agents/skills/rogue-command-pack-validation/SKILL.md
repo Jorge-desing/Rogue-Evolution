@@ -200,3 +200,5 @@ The composition CLI prints the transitive `packId` list that must be installed s
 Composed output includes `composition-dependencies.json` with required external pack IDs and unverified native references. This is an agent-facing report, not a loader-enforced dependency declaration; install the listed packs separately.
 
 `composition-dependencies.json` includes `contentSha256`, calculated from the exact written `content.json` bytes. Compare it with the current file before relying on the report; this is provenance, not automatic enforcement or proof that dependency packs are installed.
+
+A present `composition-dependencies.json` is checked by `tools.validate_content_pack` against the exact `content.json` SHA-256 and pack ID; malformed, stale or linked reports fail validation. This detects stale reports but does not verify that external packs are installed or authenticate the report.

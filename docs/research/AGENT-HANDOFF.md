@@ -3007,3 +3007,7 @@ Composed output now includes `composition-dependencies.json` with the composed p
 ## 2026-11-15 — Bind composition report to content bytes
 
 The staged composition dependency report now records SHA-256 of the exact `content.json` bytes it accompanies. Agents must compare the hash before using the report; the loader does not enforce it. Thirty-five targeted tests passed. Dependency availability, native catalog, destination safety/cleanup and full-suite acceptance remain open.
+
+### Composition report binding (2026-11-15)
+
+`tools.validate_content_pack` verifies a present composition dependency report against the content bytes and pack ID, reading both through guarded file handles. The composition tests passed (20 tests). This is freshness checking, not proof that required external packs are installed. Destination races and rollback limitations described in the pack-validation skill remain open; continue reviewing them and the remaining reference coverage.
