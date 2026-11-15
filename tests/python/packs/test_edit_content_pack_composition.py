@@ -16,7 +16,7 @@ from tests.python.helpers import load_tool_module
 
 EDIT = load_tool_module("edit_content_pack")
 SCAFFOLD = load_tool_module("scaffold_pack")
-from tools.write_composed_pack import _created_stage, _make_stage_dir, _publish_no_replace, write_composed_pack
+from tools.write_composed_pack import _created_stage, _make_stage_dir, _publish_no_replace, _remove_empty_staging_parent, write_composed_pack
 from tools.validate_content_pack import validate_pack
 
 
@@ -30,7 +30,10 @@ class CompositionEditTests(unittest.TestCase):
             output = Path(directory) / "output"
             write_composed_pack(pack, [], output)
             self.assertEqual(pack, json.loads((output / "content.json").read_text(encoding="utf-8")))
-            self.assertFalse(list(Path(directory).glob(".rogue-compose-*")))
+            if os.name == "nt":
+                self.assertFalse(list(Path(directory).glob(".rogue-compose-*")))
+            else:
+                self.assertTrue(list(Path(directory).glob(".rogue-compose-*")))
             with self.assertRaises(FileExistsError):
                 write_composed_pack(pack, [], output)
             invalid = dict(pack, schemaVersion=999)
@@ -157,6 +160,21 @@ class CompositionEditTests(unittest.TestCase):
                     write_composed_pack(self._pack(), [], output)
             self.assertFalse(output.exists())
             self.assertTrue(list(root.glob(".rogue-compose-*/pack/content.json")))
+
+    @unittest.skipUnless(os.name == "nt", "Windows handle-based cleanup")
+    def test_cleanup_preserves_replaced_empty_staging_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def replace_before_cleanup(temporary, identity):
+                temporary.rename(root / "original-temp")
+                temporary.mkdir()
+                return _remove_empty_staging_parent(temporary, identity)
+            with patch("tools.write_composed_pack._remove_empty_staging_parent", side_effect=replace_before_cleanup):
+                with self.assertWarnsRegex(RuntimeWarning, "conservadas"):
+                    write_composed_pack(self._pack(), [], root / "output")
+            self.assertTrue((root / "output/content.json").is_file())
+            self.assertTrue((root / "original-temp").is_dir())
+            self.assertTrue(list(root.glob(".rogue-compose-*")))
 
     def test_extract_cli_writes_a_valid_new_pack(self) -> None:
         pack = self._pack()

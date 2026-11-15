@@ -3113,3 +3113,7 @@ The Windows writer now creates the stage exclusively and acquires its non-delete
 ### Two real packs through atomic writer (2026-11-15)
 
 With atomic Windows stage creation, extracted `sample-native:scout-tank` to `artifacts/composition-real-pack-atomic-20261115` and imported `tactical-operations:tidebreaker-skirmisher` into sample-native at `artifacts/composition-two-real-packs-20261115`. Both validated locally. The imported result has 18 units and two declared bundles; both output bundle hashes matched their sources and UnityPy read the combined manifest with exactly both bundle names. Retained staging copies are `artifacts/.rogue-compose-ss35qtz8` and `artifacts/.rogue-compose-rumtwc3a`. Native references and in-game operation remain unverified; post-hash stage mutation and POSIX safety remain open.
+
+### Verified empty staging cleanup (2026-11-15)
+
+Windows cleanup of a successful composition now removes the original empty staging parent only by an identity-checked directory handle; a substituted empty directory is retained and reported. POSIX conservatively retains the parent. Bundle/composition modules passed 42 tests, including replacement injection. Concurrent stage-content mutation after final hash and POSIX path publication remain open.

@@ -102,6 +102,41 @@ def _make_stage_dir(parent: Path, name: str, *, exist_ok: bool = True) -> Path:
         return child
 
 
+def _remove_empty_staging_parent(path: Path, identity: tuple[int, int]) -> bool:
+    """Remove only the original empty Windows directory, through its open handle."""
+    if os.name != "nt":
+        return False
+    from ctypes import wintypes
+    class FileInfo(ctypes.Structure):
+        _fields_ = [("attributes", wintypes.DWORD), ("creation", wintypes.FILETIME),
+                    ("access", wintypes.FILETIME), ("write", wintypes.FILETIME),
+                    ("volume", wintypes.DWORD), ("size_high", wintypes.DWORD),
+                    ("size_low", wintypes.DWORD), ("links", wintypes.DWORD),
+                    ("index_high", wintypes.DWORD), ("index_low", wintypes.DWORD)]
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                  wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    kernel.CreateFileW.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.CreateFileW(str(path), 0x80010000, 3, None, 3, 0x02200000, None)
+    if handle == ctypes.c_void_p(-1).value:
+        return False
+    try:
+        kernel.GetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.POINTER(FileInfo)]
+        info = FileInfo()
+        if not kernel.GetFileInformationByHandle(handle, ctypes.byref(info)):
+            return False
+        current = (info.volume, (info.index_high << 32) | info.index_low)
+        if not info.attributes & 0x10 or info.attributes & 0x400 or current != (identity[0] & 0xffffffff, identity[1]):
+            return False
+        disposition = wintypes.BOOL(True)
+        kernel.SetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        kernel.SetFileInformationByHandle.restype = wintypes.BOOL
+        return bool(kernel.SetFileInformationByHandle(handle, 4, ctypes.byref(disposition), ctypes.sizeof(disposition)))
+    finally:
+        kernel.CloseHandle(handle)
+
+
 @contextmanager
 def _created_stage(parent: Path):
     """Create the Windows stage and acquire its non-delete-sharing handle atomically."""
@@ -182,6 +217,8 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
         # Hold the staging parent across all writes and publication. On Windows
         # this prevents its rename or replacement while its path is in use.
         with open_pack_file(output_path.parent, Path(temporary).name, directory=True):
+            temporary_info = Path(temporary).stat()
+            temporary_identity = (temporary_info.st_dev, temporary_info.st_ino)
             # Creation and the first stage guard are one operation on Windows.
             # Publication compares identity after releasing that guard.
             with _created_stage(Path(temporary)) as stage:
@@ -238,10 +275,8 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
             _publish_no_replace(stage, output_path, stage_identity)
     except Exception as exc:
         raise RuntimeError(f"Composición fallida; etapa conservada en {temporary}: {exc}") from exc
-    # No source copies exist for a data-only pack, so removing the now-empty
-    # staging parent is safe and atomic. Otherwise report the retained copies.
-    try:
-        Path(temporary).rmdir()
-    except OSError:
+    # Delete only the original empty Windows directory by verified handle.
+    # On unsupported systems or any mismatch, preserve it for inspection.
+    if not _remove_empty_staging_parent(Path(temporary), temporary_identity):
         warnings.warn(f"Copias temporales conservadas para inspección: {temporary}", RuntimeWarning)
     return output_path
