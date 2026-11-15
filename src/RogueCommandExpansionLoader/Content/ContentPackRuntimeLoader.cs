@@ -32,6 +32,9 @@ namespace RogueCommandExpansionLoader.Content
     {
         private readonly HashSet<object> _preSetupInjectedAiBehaviours =
             new HashSet<object>(ReferenceComparer.Instance);
+        private readonly Dictionary<object, List<string>> _injectedAiUnitIdsByBehaviour =
+            new Dictionary<object, List<string>>(ReferenceComparer.Instance);
+        private string _playerPoolsWarmedCombatId;
         private const int MaxManifestBytes = 1024 * 1024;
         private const uint GenericRead = 0x80000000;
         private const uint ShareRead = 0x00000001;
@@ -2731,7 +2734,7 @@ namespace RogueCommandExpansionLoader.Content
                     profile.Definition.startingUnitAffixes,
                     profile.Definition.startingUnitVeterancyRank,
                     true,
-                    GetAiProfileTargetUnitIds(profile.Definition));
+                    GetEffectiveAiProfileTargetUnitIds(behaviour, profile.Definition));
                 if (!String.IsNullOrWhiteSpace(profile.Definition.doctrine))
                 {
                     float mult = profile.Definition.aggressionMultiplier ?? 1.0f;
@@ -2739,6 +2742,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
                 RuntimeGameplayCommandDirector.ApplyActiveAiUnitDefaultsToAiUnits();
                 WarmAiProfileUnitAndFactoryPools(behaviour, profile);
+                WarmPlayerDeckUnitAndFactoryPools(behaviour);
                 bool stillRegistered = false;
                 lock (_gate)
                 {
@@ -2790,9 +2794,10 @@ namespace RogueCommandExpansionLoader.Content
                 return false;
             }
 
-            var moduleIds = new List<string>(modules.Length + 1);
-            var behaviours = new List<IRogueCommandAiRuntimeBehaviour>(modules.Length + 1);
+            var moduleIds = new List<string>(modules.Length + 2);
+            var behaviours = new List<IRogueCommandAiRuntimeBehaviour>(modules.Length + 2);
             bool hasFactoryReinforcementModule = false;
+            bool hasSkillActivationOrSquadDirector = false;
             for (int i = 0; i < modules.Length; i++)
             {
                 ContentAiModuleDefinition module = modules[i];
@@ -2806,6 +2811,12 @@ namespace RogueCommandExpansionLoader.Content
                 if (String.Equals(module.moduleId, FactoryReinforcementAiModule.ModuleId, StringComparison.Ordinal))
                 {
                     hasFactoryReinforcementModule = true;
+                }
+
+                if (String.Equals(module.moduleId, TacticalSkillActivationParameterParser.ModuleId, StringComparison.Ordinal) ||
+                    String.Equals(module.moduleId, SquadOperationsDirectorParameterParser.ModuleId, StringComparison.Ordinal))
+                {
+                    hasSkillActivationOrSquadDirector = true;
                 }
 
                 IRogueCommandAiRuntimeBehaviour moduleBehaviour;
@@ -2856,6 +2867,25 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     moduleIds.Add(FactoryReinforcementAiModule.ModuleId);
                     behaviours.Add(reinforcementBehaviour);
+                }
+            }
+
+            if (!hasSkillActivationOrSquadDirector && ShouldAutoAttachModFactoryReinforcement(profile))
+            {
+                ContentModuleParameter[] defaultSkillParameters = new[]
+                {
+                    new ContentModuleParameter { name = "baseIndex", value = "-1" },
+                    new ContentModuleParameter { name = "cooldownSeconds", value = "4.0" },
+                    new ContentModuleParameter { name = "enemyTriggerRadiusCells", value = "10.0" },
+                    new ContentModuleParameter { name = "minManaRatio", value = "0.5" }
+                };
+                IRogueCommandAiRuntimeBehaviour skillBehaviour;
+                string skillDiagnostic;
+                if (_moduleRegistry.TryCreateBehaviour(TacticalSkillActivationParameterParser.ModuleId, gameBehaviour,
+                    defaultSkillParameters, out skillBehaviour, out skillDiagnostic))
+                {
+                    moduleIds.Add(TacticalSkillActivationParameterParser.ModuleId);
+                    behaviours.Add(skillBehaviour);
                 }
             }
 
@@ -2959,6 +2989,11 @@ namespace RogueCommandExpansionLoader.Content
 
                 _boundAiBehaviours.Remove(gameBehaviour);
                 _preSetupInjectedAiBehaviours.Remove(gameBehaviour);
+                _injectedAiUnitIdsByBehaviour.Remove(gameBehaviour);
+                if (_boundAiBehaviours.Count == 0)
+                {
+                    _playerPoolsWarmedCombatId = null;
+                }
             }
 
             SafeDestroyAiRuntimeBehaviour(bound, "<AI>");
@@ -3066,6 +3101,7 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 var prioritizedUnits = BuildPrioritizedAiInjectionCandidates(profile);
+                var injectedUnitIds = new List<string>();
                 int injectedCount = 0;
                 int injectedModFactoryCount = 0;
                 int injectedInitialUnitPatrolCount = 0;
@@ -3103,9 +3139,22 @@ namespace RogueCommandExpansionLoader.Content
                         RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.Id, Math.Max(2, unit.PrespawnCount));
                     }
 
+                    if (!unit.IsProductionBuilding && !unit.IsStandaloneBuilding)
+                    {
+                        injectedUnitIds.Add(unit.Id);
+                    }
+
                     if (injectedAnyForCandidate)
                     {
                         injectedCount++;
+                    }
+                }
+
+                if (injectedUnitIds.Count > 0)
+                {
+                    lock (_gate)
+                    {
+                        _injectedAiUnitIdsByBehaviour[behaviour] = injectedUnitIds;
                     }
                 }
 
@@ -3122,6 +3171,45 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private IReadOnlyList<string> GetEffectiveAiProfileTargetUnitIds(
+            DefaultAiBehaviour behaviour,
+            ContentAiProfileDefinition definition)
+        {
+            IReadOnlyList<string> declared = GetAiProfileTargetUnitIds(definition);
+            List<string> injected = null;
+            if (behaviour != null)
+            {
+                lock (_gate)
+                {
+                    _injectedAiUnitIdsByBehaviour.TryGetValue(behaviour, out injected);
+                }
+            }
+
+            if (injected == null || injected.Count == 0)
+            {
+                return declared;
+            }
+
+            var merged = new List<string>(declared.Count + injected.Count);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < declared.Count; i++)
+            {
+                if (!String.IsNullOrWhiteSpace(declared[i]) && seen.Add(declared[i]))
+                {
+                    merged.Add(declared[i]);
+                }
+            }
+            for (int i = 0; i < injected.Count; i++)
+            {
+                if (!String.IsNullOrWhiteSpace(injected[i]) && seen.Add(injected[i]))
+                {
+                    merged.Add(injected[i]);
+                }
+            }
+
+            return merged;
+        }
+
         private List<LoadedUnit> BuildPrioritizedAiInjectionCandidates(LoadedAiProfile profile)
         {
             var result = new List<LoadedUnit>();
@@ -3129,48 +3217,46 @@ namespace RogueCommandExpansionLoader.Content
 
             lock (_gate)
             {
-                if (profile != null && profile.Definition != null)
+                // 1. Primary profile unit/building entries
+                AppendProfileDeclaredCandidatesLocked(profile, seenIds, result);
+
+                // 2. Sibling profiles sharing the same nativeTemplateId (interleaved by pack)
+                var siblingIds = new List<string>();
+                string activeTemplate = profile != null && profile.Definition != null
+                    ? profile.Definition.nativeTemplateId
+                    : null;
+                if (!String.IsNullOrWhiteSpace(activeTemplate))
                 {
-                    if (profile.Definition.unitEntries != null)
+                    foreach (LoadedAiProfile candidateProfile in _aiProfiles.Values)
                     {
-                        for (int i = 0; i < profile.Definition.unitEntries.Length; i++)
+                        if (candidateProfile == null || ReferenceEquals(candidateProfile, profile) ||
+                            candidateProfile.Definition == null)
                         {
-                            var entry = profile.Definition.unitEntries[i];
-                            if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
-                            {
-                                continue;
-                            }
-
-                            LoadedUnit profileUnit;
-                            if (_units.TryGetValue(entry.unitId.Trim(), out profileUnit) &&
-                                profileUnit != null && seenIds.Add(profileUnit.Id))
-                            {
-                                result.Add(profileUnit);
-                            }
+                            continue;
                         }
-                    }
 
-                    if (profile.Definition.productionBuildingEntries != null)
-                    {
-                        for (int i = 0; i < profile.Definition.productionBuildingEntries.Length; i++)
+                        if (!String.IsNullOrWhiteSpace(candidateProfile.Definition.nativeTemplateId) &&
+                            String.Equals(candidateProfile.Definition.nativeTemplateId.Trim(),
+                                activeTemplate.Trim(), StringComparison.OrdinalIgnoreCase))
                         {
-                            var entry = profile.Definition.productionBuildingEntries[i];
-                            if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
-                            {
-                                continue;
-                            }
-
-                            LoadedUnit profileUnit;
-                            if (_units.TryGetValue(entry.unitId.Trim(), out profileUnit) &&
-                                profileUnit != null && seenIds.Add(profileUnit.Id))
-                            {
-                                result.Add(profileUnit);
-                            }
+                            CollectProfileDeclaredUnitIds(candidateProfile.Definition, siblingIds);
                         }
                     }
                 }
 
-                var fallbackCandidates = new List<LoadedUnit>();
+                List<string> interleavedSiblings = ScheduledBaseBuildLimitPolicy.InterleaveEntityIdsByPack(siblingIds);
+                for (int i = 0; i < interleavedSiblings.Count; i++)
+                {
+                    LoadedUnit siblingUnit;
+                    if (_units.TryGetValue(interleavedSiblings[i], out siblingUnit) &&
+                        siblingUnit != null && seenIds.Add(siblingUnit.Id))
+                    {
+                        result.Add(siblingUnit);
+                    }
+                }
+
+                // 3. Remaining isAllowedForAi units across all active packs, interleaved round-robin by pack
+                var fallbackIds = new List<string>();
                 foreach (LoadedUnit unit in _units.Values)
                 {
                     if (unit == null || unit.IsProductionBuilding || unit.Definition == null || seenIds.Contains(unit.Id))
@@ -3194,21 +3280,172 @@ namespace RogueCommandExpansionLoader.Content
 
                     if (allowedForAi)
                     {
-                        fallbackCandidates.Add(unit);
+                        fallbackIds.Add(unit.Id);
                     }
                 }
 
-                fallbackCandidates.Sort((left, right) => StringComparer.Ordinal.Compare(left.Id, right.Id));
-                for (int i = 0; i < fallbackCandidates.Count; i++)
+                fallbackIds.Sort(StringComparer.Ordinal);
+                List<string> interleavedFallbacks = ScheduledBaseBuildLimitPolicy.InterleaveEntityIdsByPack(fallbackIds);
+                for (int i = 0; i < interleavedFallbacks.Count; i++)
                 {
-                    if (seenIds.Add(fallbackCandidates[i].Id))
+                    LoadedUnit fallbackUnit;
+                    if (_units.TryGetValue(interleavedFallbacks[i], out fallbackUnit) &&
+                        fallbackUnit != null && seenIds.Add(fallbackUnit.Id))
                     {
-                        result.Add(fallbackCandidates[i]);
+                        result.Add(fallbackUnit);
                     }
                 }
             }
 
             return result;
+        }
+
+        private void AppendProfileDeclaredCandidatesLocked(
+            LoadedAiProfile profile,
+            HashSet<string> seenIds,
+            List<LoadedUnit> target)
+        {
+            if (profile == null || profile.Definition == null)
+            {
+                return;
+            }
+
+            var declaredIds = new List<string>();
+            CollectProfileDeclaredUnitIds(profile.Definition, declaredIds);
+            for (int i = 0; i < declaredIds.Count; i++)
+            {
+                LoadedUnit unit;
+                if (_units.TryGetValue(declaredIds[i], out unit) && unit != null && seenIds.Add(unit.Id))
+                {
+                    target.Add(unit);
+                }
+            }
+        }
+
+        private static void CollectProfileDeclaredUnitIds(ContentAiProfileDefinition definition, List<string> target)
+        {
+            if (definition == null)
+            {
+                return;
+            }
+
+            if (definition.unitEntries != null)
+            {
+                for (int i = 0; i < definition.unitEntries.Length; i++)
+                {
+                    var entry = definition.unitEntries[i];
+                    if (entry != null && !String.IsNullOrWhiteSpace(entry.unitId))
+                    {
+                        target.Add(entry.unitId.Trim());
+                    }
+                }
+            }
+
+            if (definition.productionBuildingEntries != null)
+            {
+                for (int i = 0; i < definition.productionBuildingEntries.Length; i++)
+                {
+                    var entry = definition.productionBuildingEntries[i];
+                    if (entry != null && !String.IsNullOrWhiteSpace(entry.unitId))
+                    {
+                        target.Add(entry.unitId.Trim());
+                    }
+                }
+            }
+        }
+
+        private void WarmPlayerDeckUnitAndFactoryPools(DefaultAiBehaviour behaviour)
+        {
+            try
+            {
+                string combatKey = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name + ":" +
+                    (behaviour != null ? behaviour.GetInstanceID().ToString(CultureInfo.InvariantCulture) : "0");
+                lock (_gate)
+                {
+                    if (String.Equals(_playerPoolsWarmedCombatId, combatKey, StringComparison.Ordinal))
+                    {
+                        return;
+                    }
+                    _playerPoolsWarmedCombatId = combatKey;
+                }
+
+                Type gameType = typeof(DefaultAiBehaviour).Assembly.GetType("Game", false, false);
+                PropertyInfo cardsInDeckProperty = gameType == null
+                    ? null
+                    : gameType.GetProperty("CardsInDeck", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                IEnumerable<string> cardsInDeck = cardsInDeckProperty == null
+                    ? null
+                    : cardsInDeckProperty.GetValue(null, null) as IEnumerable<string>;
+                if (cardsInDeck == null)
+                {
+                    return;
+                }
+
+                int warmedFactories = 0;
+                int warmedUnits = 0;
+                var warmedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string cardId in cardsInDeck)
+                {
+                    if (String.IsNullOrWhiteSpace(cardId))
+                    {
+                        continue;
+                    }
+
+                    string trimmedId = cardId.Trim();
+                    LoadedUnit directUnit = null;
+                    LoadedUnit producedUnit = null;
+                    lock (_gate)
+                    {
+                        _units.TryGetValue(trimmedId, out directUnit);
+                        if (directUnit != null && directUnit.IsProductionBuilding)
+                        {
+                            foreach (LoadedUnit candidate in _units.Values)
+                            {
+                                if (candidate != null && !candidate.IsProductionBuilding &&
+                                    String.Equals(candidate.ProductionFactoryId, directUnit.Id, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    producedUnit = candidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (directUnit == null)
+                    {
+                        continue;
+                    }
+
+                    if (warmedIds.Add(directUnit.Id))
+                    {
+                        int quota = directUnit.IsProductionBuilding ? 1 : Math.Max(2, directUnit.PrespawnCount);
+                        if (RuntimeGameplayCommandDirector.TryWarmPrespawnPool(directUnit.Id, quota).Success)
+                        {
+                            if (directUnit.IsProductionBuilding) warmedFactories++;
+                            else warmedUnits++;
+                        }
+                    }
+
+                    if (producedUnit != null && warmedIds.Add(producedUnit.Id))
+                    {
+                        int unitQuota = Math.Max(2, producedUnit.PrespawnCount);
+                        if (RuntimeGameplayCommandDirector.TryWarmPrespawnPool(producedUnit.Id, unitQuota).Success)
+                        {
+                            warmedUnits++;
+                        }
+                    }
+                }
+
+                if (warmedFactories > 0 || warmedUnits > 0)
+                {
+                    Log("Pre-warming de mazo jugador: " + warmedFactories + " fábrica(s) y " +
+                        warmedUnits + " unidad(es) mod pre-calentadas.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("No se pudo pre-calentar el mazo mod del jugador: " + ex.Message);
+            }
         }
 
         private void AppendNativeAiDeckEntry(IList deck, string entityId, int countAtStart, int maxLiving)

@@ -2475,5 +2475,61 @@ internal static partial class ValidationTestRunner
             if (hadArtillery) EntityBalancingStore.BuildingEntityIds.Add("sample-native:heavy-artillery");
         }
     }),
+    ("multi-pack AI candidate interleaving alternates packs round-robin and deduplicates", () =>
+    {
+        var input = new[]
+        {
+            "sample-native:arachnid-hexapod",
+            "sample-native:assault-walker",
+            "sample-native:heavy-artillery",
+            "tactical-operations:arc-lance-walker",
+            "tactical-operations:bulwark-siege-tank",
+            "sample-native:heavy-artillery"
+        };
+
+        List<string> interleaved = ScheduledBaseBuildLimitPolicy.InterleaveEntityIdsByPack(input);
+        var expected = new[]
+        {
+            "sample-native:arachnid-hexapod",
+            "tactical-operations:arc-lance-walker",
+            "sample-native:assault-walker",
+            "tactical-operations:bulwark-siege-tank",
+            "sample-native:heavy-artillery"
+        };
+
+        if (interleaved.Count != expected.Length)
+        {
+            throw new InvalidOperationException($"Expected {expected.Length} interleaved IDs, got {interleaved.Count}.");
+        }
+
+        for (int i = 0; i < expected.Length; i++)
+        {
+            if (interleaved[i] != expected[i])
+            {
+                throw new InvalidOperationException($"Expected interleaved[{i}]='{expected[i]}', got '{interleaved[i]}'.");
+            }
+        }
+    }),
+    ("auto-attached tactical-skill-activation default parameters pass bounded parser", () =>
+    {
+        ContentModuleParameter[] defaults = new[]
+        {
+            new ContentModuleParameter { name = "baseIndex", value = "-1" },
+            new ContentModuleParameter { name = "cooldownSeconds", value = "4.0" },
+            new ContentModuleParameter { name = "enemyTriggerRadiusCells", value = "10.0" },
+            new ContentModuleParameter { name = "minManaRatio", value = "0.5" }
+        };
+
+        if (!TacticalSkillActivationParameterParser.TryParse(defaults, out TacticalSkillActivationSettings parsed, out string? diag))
+        {
+            throw new InvalidOperationException("Expected auto-attached skill defaults to parse: " + diag);
+        }
+
+        if (parsed.BaseIndex != -1 || Math.Abs(parsed.CooldownSeconds - 4.0f) > 0.001f ||
+            Math.Abs(parsed.EnemyTriggerRadiusCells - 10.0f) > 0.001f || Math.Abs(parsed.MinManaRatio - 0.5f) > 0.001f)
+        {
+            throw new InvalidOperationException("Auto-attached skill settings did not match expected bounded values.");
+        }
+    }),
     };
 }

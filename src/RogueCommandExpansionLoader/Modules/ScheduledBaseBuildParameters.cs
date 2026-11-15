@@ -276,5 +276,63 @@ namespace RogueCommandExpansionLoader.Modules
 
             return firstModValid >= 0 ? firstModValid : firstNativeValid;
         }
+
+        /// <summary>
+        /// Interleaves namespaced entity IDs round-robin by pack prefix (before ':') so multiple active packs
+        /// receive balanced representation rather than alphabetical starvation.
+        /// </summary>
+        public static List<string> InterleaveEntityIdsByPack(IReadOnlyList<string> orderedIds)
+        {
+            var result = new List<string>();
+            if (orderedIds == null || orderedIds.Count == 0)
+            {
+                return result;
+            }
+
+            var packOrder = new List<string>();
+            var buckets = new Dictionary<string, Queue<string>>(StringComparer.OrdinalIgnoreCase);
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int i = 0; i < orderedIds.Count; i++)
+            {
+                string id = orderedIds[i];
+                if (String.IsNullOrWhiteSpace(id) || !seen.Add(id))
+                {
+                    continue;
+                }
+
+                int colonIndex = id.IndexOf(':');
+                string packPrefix = colonIndex > 0 ? id.Substring(0, colonIndex) : String.Empty;
+                Queue<string> queue;
+                if (!buckets.TryGetValue(packPrefix, out queue))
+                {
+                    queue = new Queue<string>();
+                    buckets.Add(packPrefix, queue);
+                    packOrder.Add(packPrefix);
+                }
+
+                queue.Enqueue(id);
+            }
+
+            bool remaining = true;
+            while (remaining)
+            {
+                remaining = false;
+                for (int i = 0; i < packOrder.Count; i++)
+                {
+                    Queue<string> queue = buckets[packOrder[i]];
+                    if (queue.Count > 0)
+                    {
+                        result.Add(queue.Dequeue());
+                        if (queue.Count > 0)
+                        {
+                            remaining = true;
+                        }
+                    }
+                }
+            }
+
+            return result;
+        }
     }
 }
