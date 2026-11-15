@@ -194,3 +194,5 @@ After successful data-only composition the empty staging parent is removed with 
 `check_pack_dependencies` reports unnamespaced references encountered in typed unit/profile/factory fields under `unverifiedNativeReferences`; an empty unresolved list alone does not verify those IDs against the native registry.
 
 Composition rejects duplicate `packId` values between the result and `--dependency-pack` inputs, even if their entity IDs differ. Dependency packs remain separate runtime requirements and must be installed alongside the composed result.
+
+The composition CLI prints the transitive `packId` list that must be installed separately and warns about unverified native references in the composed pack. This report does not copy dependency packs.

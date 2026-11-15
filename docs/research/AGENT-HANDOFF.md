@@ -2966,3 +2966,7 @@ The dependency report now lists unnamespaced typed unit/profile/factory referenc
 ## 2026-11-15 — Composition pack identity conflicts
 
 Composition now rejects a missing or duplicate `packId` among the resulting pack and explicit dependency packs, even when entity IDs do not collide. Dependency packs resolve references but remain separate runtime requirements; they are not copied into the output. Thirty targeted tests passed. Native catalog verification, destination concurrency/cleanup and full-suite visual failures remain open.
+
+## 2026-11-15 — Composition dependency disclosure
+
+Composition now prints the transitive external `packId` dependencies required alongside the result and warns about typed native references that remain unverified. Dependency packs are still separate and not copied. Thirty targeted tests passed. Native catalog verification, output path safety/cleanup and full-suite visual failures remain open.

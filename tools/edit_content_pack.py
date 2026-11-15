@@ -2152,6 +2152,20 @@ def main(argv: list[str] | None = None) -> int:
             for row in failures:
                 print(f"{row['name']}: referencias sin resolver {row['unresolvedReferences']}, ambiguas {row['ambiguousReferences']}", file=sys.stderr)
             return 1
+        composed_row = next(row for row in report["packs"] if row["name"] == "composed")
+        required = {row["name"] for row in report["packs"] if row["name"] in composed_row["resolvedBy"]}
+        while True:
+            expanded = required | {provider for row in report["packs"] if row["name"] in required for provider in row["resolvedBy"]}
+            if expanded == required:
+                break
+            required = expanded
+        required.discard("composed")
+        if required:
+            print("Packs externos requeridos (instalar junto al resultado): " +
+                  ", ".join(sorted(packs[name]["packId"] for name in required)))
+        native = composed_row["unverifiedNativeReferences"]
+        if native:
+            print("Referencias nativas sin verificar: " + ", ".join(native), file=sys.stderr)
 
     if args.validate_after:
         from tools.validate_balance_overrides import validate_balance

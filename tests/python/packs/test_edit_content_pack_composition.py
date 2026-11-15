@@ -102,11 +102,12 @@ class CompositionEditTests(unittest.TestCase):
             source.write_text(json.dumps(pack), encoding="utf-8")
             dependency.write_text(json.dumps(provider), encoding="utf-8")
             arguments = ["--pack", str(source), "--operation", "extract-units", "--unit-ids", "ns:alpha", "--out-dir", str(output)]
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            with contextlib.redirect_stdout(io.StringIO()) as output_text, contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(1, EDIT.main(arguments))
                 self.assertFalse(output.exists())
                 self.assertEqual(0, EDIT.main(arguments + ["--dependency-pack", str(dependency)]))
             self.assertTrue((output / "content.json").is_file())
+            self.assertIn("other:pack", output_text.getvalue())
 
     def test_composition_rejects_duplicate_pack_id_even_without_entity_collisions(self) -> None:
         pack = self._pack()
