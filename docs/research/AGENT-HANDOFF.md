@@ -3053,3 +3053,7 @@ A standalone `SetFileInformationByHandle(FileRenameInfo)` no-replace directory r
 ### Stage sharing prototype follow-up (2026-11-15)
 
 A scoped share-delete experiment for the stage allowed the long-lived DELETE handle and blocked external renames, but the full composition module repeatedly failed two batch output assertions even though those tests passed individually. The prototype was removed. Reproduction requires the whole module, not isolated batch tests; inspect order-dependent state and actual published paths before retrying. After restoration, composition and secure-read passed 30 tests with one skip.
+
+### Broad card scope reporting (2026-11-15)
+
+The composition CLI warns about filter-only cards and records `broadFilterCards` in its dependency report, including cards already in the destination. Composition and secure-read modules passed 31 tests with one skip. Windows handle integration remains unresolved; the earlier full-module batch anomaly needs further reproduction.

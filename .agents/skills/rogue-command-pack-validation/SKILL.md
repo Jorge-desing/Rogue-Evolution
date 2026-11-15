@@ -218,3 +218,5 @@ New `pack` and `source-N` staging directories are created exclusively; preexisti
 Windows handle-based stage rename requires DELETE access. Current guarded directory opens omit FILE_SHARE_DELETE, so a long-lived DELETE-capable stage handle conflicts with subsequent guarded opens (WinError 32). Coordinate sharing on the exact guarded stage without relaxing ancestor protections before implementing handle publication; a standalone rename prototype is not integration evidence.
 
 A scoped stage share-delete prototype passed isolated batch tests but failed batch output assertions when the complete composition module ran; it was removed. Reproduce against the whole module and inspect published paths and order-dependent state before reuse.
+
+The composition CLI lists filter-only relics/upgrades on stderr and records them in `composition-dependencies.json` as `broadFilterCards`; the list describes possible broad effects, not proof of runtime matching.

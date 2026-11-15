@@ -2209,7 +2209,15 @@ def main(argv: list[str] | None = None) -> int:
         native = composed_row["unverifiedNativeReferences"]
         if native:
             print("Referencias nativas sin verificar: " + ", ".join(native), file=sys.stderr)
+        broad_cards = sorted(f"{section}:{_entity_key(card)}"
+                             for section in ("relics", "upgrades")
+                             for card in _as_list(updated.get(section)) if isinstance(card, dict) and _entity_key(card)
+                             if any(not _as_list(change.get("onlyForTheseEntityIds"))
+                                    for change in _as_list(card.get("cardChanges")) if isinstance(change, dict)))
+        if broad_cards:
+            print("Cartas con filtros generales que pueden afectar otras entidades: " + ", ".join(broad_cards), file=sys.stderr)
         composition_report = {"schemaVersion": 1, "packId": updated.get("packId"),
+                              "broadFilterCards": broad_cards,
                               "requiredPackIds": sorted(packs[name]["packId"] for name in required),
                               "unverifiedNativeReferences": native}
 

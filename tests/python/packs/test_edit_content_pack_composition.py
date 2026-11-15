@@ -212,6 +212,20 @@ class CompositionEditTests(unittest.TestCase):
         self.assertEqual([], errors)
         self.assertEqual("ns:role", imported["relics"][0]["id"])
 
+    def test_composition_reports_broad_filter_cards(self) -> None:
+        pack = self._pack()
+        pack["relics"] = [{"id": "ns:role", "cardChanges": [{"cardMustHaveOneOfTheseRoles": ["Tank"]}]}]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root / "source.json", root / "output"
+            source.write_text(json.dumps(pack), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as errors:
+                with patch("tools.write_composed_pack.write_composed_pack", return_value=output) as writer:
+                    result = EDIT.main(["--pack", str(source), "--operation", "extract-units", "--unit-ids", "ns:alpha", "--out-dir", str(output)])
+            self.assertEqual(0, result)
+            self.assertIn("relics:ns:role", errors.getvalue())
+            self.assertEqual(["relics:ns:role"], writer.call_args.args[3]["broadFilterCards"])
+
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()
         extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])
