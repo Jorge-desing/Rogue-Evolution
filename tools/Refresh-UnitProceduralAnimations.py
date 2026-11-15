@@ -164,6 +164,8 @@ def refresh_unit(unit_name: str, blend_name: str, leg_type: str | None, fire_pro
             if "Bone_Hull" in fc.data_path:
                 walk_act.fcurves.remove(fc)
         armature.animation_data.action = None
+        for track in list(armature.animation_data.nla_tracks):
+            armature.animation_data.nla_tracks.remove(track)
     _verify_bone_root_stationary(actions)
 
     meshes, sockets = _collect_export_objects(armature)
