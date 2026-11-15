@@ -2930,3 +2930,7 @@ Staged manifest reads, existing bundle comparisons and post-copy hash checks now
 ## 2026-11-15 — Output directory handle experiment
 
 An attempted directory-handle guard was rejected: a Windows test renamed the guarded directory despite the expected sharing restriction. The attempted code was reverted; no safety claim is established. Investigate native handle semantics and anchor publication by verified directory handles before integrating. Existing composition safety and full-suite visual failures remain open.
+
+## 2026-11-15 — Windows directory sharing correction
+
+A direct Win32 experiment showed directory handles opened with access 0 or FILE_READ_ATTRIBUTES allowed rename despite share mode excluding delete; GENERIC_READ blocked it with WinError 32. `open_pack_file` now opens its directory handles with GENERIC_READ. Focused suite: 26 passed and one symlink privilege skip (27 total). The earlier output-root guard experiment was reverted and still needs integration with this corrected access; do not claim publication root is protected. Full suite visual failures remain open.

@@ -40,7 +40,9 @@ def open_pack_file(root: str | Path, relative: str, *, create: bool = False):
             for part in [None] + directories:
                 if part is not None:
                     current /= part
-                handle = create_file(str(current), 0, 3, None, 3, 0x02200000, None)
+                # A zero-access directory handle does not enforce delete-sharing
+                # restrictions on Windows. GENERIC_READ makes the guard effective.
+                handle = create_file(str(current), 0x80000000, 3, None, 3, 0x02200000, None)
                 if handle == ctypes.c_void_p(-1).value:
                     raise ctypes.WinError(ctypes.get_last_error())
                 handles.append(handle)

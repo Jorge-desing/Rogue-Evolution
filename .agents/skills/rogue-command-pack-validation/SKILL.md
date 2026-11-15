@@ -178,3 +178,5 @@ Bundle transfer creates destination files exclusively through `open_pack_file(..
 Staged bundle, manifest and content.json creation now uses exclusive guarded handles. Directory creation, existing-file comparisons, manifest source reads and publication root still require a complete concurrency audit.
 
 Staged manifest reads and bundle comparisons use guarded pack-file handles; the manifest merger accepts bytes so it does not reopen a checked path. Directory creation and publication root stability remain under review.
+
+Windows directory guards require `GENERIC_READ`: a zero-access CreateFile handle did not prevent directory renames despite excluding delete sharing. The guarded pack reader now uses read access. Output-root publication still needs its own handle-based integration.
