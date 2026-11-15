@@ -909,7 +909,8 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             method = str(params["methodName"])
             args = json.loads(str(params.get("args", "[]")))
             calls.append((method, args))
-            payload = json.dumps({"kind": "groupCommandResult", "success": True})
+            payload = json.dumps({"kind": "groupCommandResult", "success": True,
+                                  "dispatchedCount": 2, "affectedUnitCount": 2})
             return json.dumps({
                 "status": "ok",
                 "message": f"Called '{method}' with {len(args)} args. ReturnValue: {payload}",

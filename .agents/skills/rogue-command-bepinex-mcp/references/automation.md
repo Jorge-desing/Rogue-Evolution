@@ -102,7 +102,7 @@ Replace the illustrative unit key `42` and coordinates `(10,20)` below with the 
 
 ## Verify and recover
 
-`stopReason` is null for a successful sequence, otherwise `{code, step}` identifies the first failure (or exhausted budget). A failed wait, an incomplete battlefield plan whose dispatch started, or a partial group/formation/stance/assault action stops subsequent actions even with `stopOnFailure=false`; inspect the affected units before replanning. Direct group calls can report `success=true` for partial dispatch, so compare counts with the requested units. An uncertain native effect also stops unconditionally. `stopOnFailure=false` never authorizes automatic recovery or replay.
+`stopReason` is null for a successful sequence, otherwise `{code, step}` identifies the first failure (or exhausted budget). A failed wait, an incomplete battlefield plan whose dispatch started, or a partial group/formation/stance/assault action stops subsequent actions even with `stopOnFailure=false`; inspect the affected units before replanning. Direct group calls preserve native `success` but also expose `complete`, `partial`, `expectedUnitCount` and `postconditionInspectionRequired`; incomplete or unquantified results are MCP errors. An uncertain native effect also stops unconditionally. `stopOnFailure=false` never authorizes automatic recovery or replay.
 
 Example: after an uncertain native UI call, inspect this read-only result in a new request and decide whether the intended value is already present. Do not replay the stopped sequence.
 

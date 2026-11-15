@@ -226,6 +226,17 @@ class StateWaitTests(unittest.TestCase):
             self.assertFalse(result.get("isError", False))
             call.assert_called_once_with("OrderUnitMoveJson", ["42", 30.0, 40.0, True])
 
+    def test_direct_group_response_exposes_partial_dispatch(self):
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true,"dispatchedCount":1}'):
+            response = SERVER.execute_tool("diagnostics_order_group_command", {"entityKeyIds": ["11", "12"], "commandType": "Stop"})
+        payload = json.loads(response["content"][0]["text"])
+        self.assertTrue(response["isError"])
+        self.assertTrue(payload["success"])
+        self.assertTrue(payload["partial"])
+        self.assertFalse(payload["complete"])
+        self.assertTrue(payload["postconditionInspectionRequired"])
+        self.assertEqual(2, payload["expectedUnitCount"])
+
     def test_partial_group_actions_stop_even_when_native_result_says_success(self):
         cases = [
             ("diagnostics_order_group_command", {"entityKeyIds": ["11", "12"], "commandType": "Stop"}, {"dispatchedCount": 1}),

@@ -3167,3 +3167,7 @@ Group-action sequence handling also stops when the returned dispatch count is mi
 ### MCP catalog size and full suite (2026-11-15)
 
 Full Python `all` initially failed because the expanded mixed-plan schema pushed the default tools/list result to 98,366 bytes, exceeding the existing 98,000-byte test limit. The schema now points to `automation.md` for complete command fields; the agent skill directs readers there. No tools or diagnostics were disabled. The targeted module passed and full Python `all` then passed in 43.91 s. The HTTP endpoint answered a read-only game-process query with `running=false`. This supersedes the earlier claim that the catalog itself contains the full command guide.
+
+### Direct group action outcomes (2026-11-15)
+
+Direct MCP group, formation, group stance and coordinated-assault calls now preserve the native result while adding `expectedUnitCount`, `complete`, `partial`, and `postconditionInspectionRequired`; incomplete or unquantified outcomes are MCP errors. Sequences also stop on any non-complete group outcome. Automation/diagnostics modules passed 99 tests after the final refinement. Full Python `all` passed in 42.84 s but began before that final refinement. No live orders were issued. This supersedes the prior statement that direct calls expose only native success semantics.

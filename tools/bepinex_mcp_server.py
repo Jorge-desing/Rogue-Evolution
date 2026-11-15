@@ -415,6 +415,26 @@ def _tool_response(text: str, is_error: bool = False) -> dict[str, Any]:
     }
 
 
+
+def _group_action_response(text: str, count_field: str, expected: int) -> dict[str, Any]:
+    """Expose partial native group effects without losing the original result fields."""
+    try:
+        payload = json.loads(text)
+    except (TypeError, ValueError):
+        return _tool_response(text, is_error=True)
+    if not isinstance(payload, dict):
+        return _tool_response(text, is_error=True)
+    count = payload.get(count_field)
+    known_count = type(count) is int and count >= 0
+    complete = expected > 0 and known_count and count == expected and payload.get("success") is True
+    partial = known_count and count > 0 and not complete
+    inspect = not complete
+    payload["expectedUnitCount"] = expected
+    payload["complete"] = complete
+    payload["partial"] = partial if known_count else None
+    payload["postconditionInspectionRequired"] = inspect
+    return _tool_response(json.dumps(payload, ensure_ascii=False), is_error=not complete)
+
 def _component_detail_value(details: dict[str, Any], name: str) -> Any:
     value = details.get(name)
     if isinstance(value, dict) and "value" in value:
@@ -1169,10 +1189,9 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                         expected_count = min(expected_count, max(1, min(16, resolved_arguments.get("maxAttackers", 8))))
                     actual_count = parsed_step.get(count_field)
                     partial_group = expected_count > 0 and (
-                        (type(actual_count) is int and actual_count < expected_count
-                         and (actual_count > 0 or parsed_step.get("success") is True))
-                        or (type(actual_count) is int and actual_count > 0 and parsed_step.get("success") is False)
-                        or type(actual_count) is not int
+                        type(actual_count) is not int
+                        or actual_count != expected_count
+                        or parsed_step.get("success") is not True
                     )
                 uncertain = isinstance(parsed_step, dict) and (
                     partial_group
@@ -1790,7 +1809,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "OrderCoordinatedAssaultCsvJson",
                 [target_key, attacker_keys_csv, max_attackers],
             )
-            return _tool_response(res)
+            return _group_action_response(res, "dispatchedAttackerCount", min(len(attacker_keys), max(1, min(16, max_attackers))))
         elif name == "diagnostics_order_retreat":
             e_key = str(arguments.get("entityKeyId", ""))
             tx = float(arguments.get("threatX", 0.0))
@@ -1955,7 +1974,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             z = float(arguments.get("targetZ", 0.0))
             keys_csv = ";".join(str(k).strip() for k in keys)
             res = _call_diagnostics_method("OrderGroupCommandCsvJson", [keys_csv, cmd_type, x, z])
-            return _tool_response(res)
+            return _group_action_response(res, "dispatchedCount", len(keys))
 
         elif name == "diagnostics_order_battlefield_plan":
             try:
@@ -1973,7 +1992,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             spacing = float(arguments.get("spacing", 4.0))
             keys_csv = ";".join(str(k).strip() for k in keys)
             res = _call_diagnostics_method("OrderFormationMoveCsvJson", [keys_csv, f_type, x, z, spacing])
-            return _tool_response(res)
+            return _group_action_response(res, "dispatchedCount", len(keys))
 
         elif name == "diagnostics_run_synthetic_gameplay_scenario":
             unit_ids_csv = str(arguments.get("unitIdsCsv", "")).replace(",", ";")
@@ -1998,7 +2017,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             s_name = str(arguments.get("stanceName", "Standard"))
             keys_csv = ";".join(str(k).strip() for k in keys)
             res = _call_diagnostics_method("OrderGroupTacticalStanceCsvJson", [keys_csv, s_name])
-            return _tool_response(res)
+            return _group_action_response(res, "affectedUnitCount", len(keys))
 
         elif name == "diagnostics_get_tactical_stance_census":
             res = _call_diagnostics_method("GetTacticalStanceCensusJson")
