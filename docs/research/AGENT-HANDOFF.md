@@ -2830,3 +2830,7 @@ Local evidence: MCP Python tests: 98 passed; Release loader build: zero warnings
 ## 2026-11-15 — Pack editor collision and PowerShell host module
 
 The editor rejects `rename-unit` and `duplicate-unit` when the generated factory ID collides with another unit or factory, without changing the pack. `CanonicalVisualBuildProvenance.ps1` imports the Utility module from the current `$PSHOME`, resolving the five Windows PowerShell 5.1 failures caused by inheriting a PowerShell 7 module path. Local checks: `python -m unittest discover -s tests/python/packs -t .` passed 219/219; log `artifacts/pack-editor-suite.log`. No loader source or game runtime was changed. Continue the general capability audit and preserve unrelated visual authoring work.
+
+## 2026-11-15 — Remove-unit synergy references
+
+The pack editor removes the deleted unit ID from remaining units' synergy targets, preserving other targets and the synergy itself; an empty target list has no runtime effect. Local packs suite: 220/220 passed (`artifacts/pack-synergy-suite.log`). No runtime gameplay was exercised. Game was closed and the Release DLL was redeployed with matching SHA-256 `3F6F0F8205B76441453DBBE7B29AE016FC320384F0571939C20F459EF1568129`; backup and manifest in `artifacts/synergy-editor-deploy-20261115-092416/`. Next audit `purge-dangling`: it currently compares IDs only to the local pack, although native and cross-pack references can be valid; avoid using it on such packs until its resolution contract is corrected.

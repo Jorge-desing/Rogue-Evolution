@@ -202,3 +202,4 @@ Native crystal harvesters now map positive `resourceGathering.gatherRate` to row
 ## Unit editor identity
 
 `python -m tools.edit_content_pack` checks the generated production-building ID against existing unit and factory IDs before `rename-unit` or `duplicate-unit`; a collision leaves the pack unchanged. Supply a new unit ID that gives both the unit and its derived factory unique IDs.
+- When removing a unit through the pack editor, references in remaining units' `synergies[].targetUnitIds` are removed while other targets and the synergy definition are preserved. An empty target list produces no runtime synergy effect.

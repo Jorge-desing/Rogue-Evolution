@@ -197,6 +197,15 @@ def remove_unit(pack: dict, unit_id: str) -> tuple[dict, list[str]]:
             return [v for v in value if not (isinstance(v, str) and v in removed_ids)]
         return value
 
+    # A synergy targets produced-unit IDs. Preserve other targets and the
+    # synergy itself; an empty target list has no runtime effect.
+    for remaining_unit in _as_list(updated.get("units")):
+        if not isinstance(remaining_unit, dict):
+            continue
+        for synergy in _as_list(remaining_unit.get("synergies")):
+            if isinstance(synergy, dict) and isinstance(synergy.get("targetUnitIds"), list):
+                synergy["targetUnitIds"] = _purge_id_list(synergy["targetUnitIds"])
+
     # Stages: purge unitIds and blueprint pool unitIds
     for stage in _as_list(updated.get("stages")):
         if not isinstance(stage, dict):

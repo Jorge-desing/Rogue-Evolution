@@ -136,6 +136,15 @@ class AdvancedEditTests(unittest.TestCase):
         params_str = str(profile.get("modules", {}))
         self.assertNotIn(factory_id, params_str)
 
+    def test_remove_unit_cleans_synergy_targets_without_losing_other_targets(self) -> None:
+        pack = self._pack()
+        pack["units"].append({"id": "ns:ally", "productionBuilding": {"id": "ns:ally-factory"},
+                              "synergies": [{"id": "ns:link", "statName": "damage",
+                                             "targetUnitIds": ["ns:alpha", "ns:ally", "*"]}]})
+        updated, _ = EDIT.remove_unit(pack, "ns:alpha")
+        self.assertEqual(["ns:ally", "*"], updated["units"][0]["synergies"][0]["targetUnitIds"])
+        self.assertEqual(["ns:alpha", "ns:ally", "*"], pack["units"][1]["synergies"][0]["targetUnitIds"])
+
 
 if __name__ == "__main__":
     unittest.main()

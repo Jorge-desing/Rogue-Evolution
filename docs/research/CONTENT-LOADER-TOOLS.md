@@ -71,6 +71,8 @@ Descubrimiento: `--operations-json` imprime el catálogo completo (JSON) y sale 
 
 `duplicate-unit` y `rename-unit` generan también el ID de la fábrica; rechazan la operación sin modificar el pack si ese ID coincide con otra unidad o fábrica.
 
+`remove` retira el ID de la unidad eliminada de las sinergias de las unidades restantes, conservando los demás objetivos y la definición de la sinergia. Una lista vacía no aplica efectos en runtime.
+
 **Etapas** · `add-stage` (stage) · `remove-stage` (stageId) · `rename-stage` · `clone-stage` · `set-map-size` (stageId, min, max — 1..128) · `add-pool`/`remove-pool` (stageId, poolId, unitIds) · `set-stage-param` (stageId, name, value) · `set-landscape` (stageId, seed, mapSize impar, nativeTemplateId)
 
 **Perfiles AI** · `add-ai-profile`/`remove-ai-profile`/`rename-ai-profile`/`clone-ai-profile` · `set-ai-field` (profileId, field, value) · `set-ai-param` (profileId, moduleId, name, value) · `add-ai-module`/`remove-ai-module`
