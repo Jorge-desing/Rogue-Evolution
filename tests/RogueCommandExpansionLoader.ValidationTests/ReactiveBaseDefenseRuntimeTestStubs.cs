@@ -57,6 +57,7 @@ public static class SetStatusEffect
 
 public sealed class EntityController : MonoBehaviour
 {
+    public GameObject shieldGameObject;
     public enum ChangeableParameter { CanNotBeTargetedByAi }
     public float UntargetableUntilForTest { get; private set; }
     public void ChangeParameter(ChangeableParameter parameter, float endTimestamp)

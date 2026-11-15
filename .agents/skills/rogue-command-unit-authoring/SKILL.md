@@ -52,6 +52,8 @@ Positive `productionQueue.buildTime` supplies the product's native ProductionDur
 
 Authoritative guide for creating and reviewing modded units, balance variants, factory pairings, and reward pool bindings.
 
+For unit geometry, apply the [3D model authoring skill](../rogue-command-3d-model-authoring/SKILL.md): derive each unit's shell and functional Exact Boolean cuts from its own role and verify assembly seating and clearance. Bulwark v15 is a technical reference, not a design to duplicate.
+
 ---
 
 ## 1. Unit Construction Routes
@@ -191,3 +193,8 @@ Native crystal harvesters now map positive `resourceGathering.gatherRate` to row
 - Keep the inspection and `diagnostics_find_building_placement` read-only. Never patch around `BuildingPlacementHelper.IsPlacementValid` or queue a factory on occupied cells to make a QA attempt pass. A search can find no site when a global native requirement fails even after a local obstruction is cleared.
 - A concrete Profile3 placement pass found the Sentinel factory footprint over two cells occupied by the newly placed RoboCrystalMill and two cells containing crystals. The accepted `(-175,-165)` site passed all native cell and spacing checks before commit; the mill and factory then appeared in the player factory census, and the mill produced eight harvesters. This is live placement evidence from the previously installed C1AE DLL; the occupant-identity fields added in 1.20.10 are not proven live by that run. See `docs/research/PLACEMENT-OBSTRUCTION-IDENTITY-2026-11-11.md`.
 - Loader 1.20.10 per-cell `occupantEntities` was read in a live native preflight. One map `Building` cell plus secondary fog across the full four-cell Sentinel footprint caused rejection; all occupant arrays were empty, so only the field's empty behavior is verified and non-empty live-controller identities still need a matching scenario. Do not bypass native occupancy or fog checks. Separately, unique command keys were verified live on 1.20.10 for same-product Walker diagnostics. These diagnostic results do not establish accepted 1.20.10 placement, production, or AI execution.
+
+## Native Shield Faction Color Sync (2026-11-15)
+
+- Native `EntityController.shieldGameObject` prefabs bake faction-specific shield shaders (`PCXBaseTank` uses `"Shader Graphs/EntityShieldShader"` / `"ShieldFor AI EntityMaterial 1"` for blue Player shields, while `LightningTank` uses `"Shader Graphs/EntityShieldShader2"` / `"ShieldForEntityMaterial"` for red AI shields), and `EntityFactory.ReplaceMaterial` only swaps `materialToReplace` (`EntityZPlayerColor`).
+- `RogueCommandExpansionLoader.Runtime.Visual.RuntimeShieldColorSync` (wired into `RuntimeHooks` instantiation/reuse hooks and `RuntimeVisualDirector.RefreshFactionColorTint`) automatically synchronizes `shieldGameObject` renderer materials to match `IsControlledByPlayer` vs `IsControlledByAi` across first spawn and pool reuse.

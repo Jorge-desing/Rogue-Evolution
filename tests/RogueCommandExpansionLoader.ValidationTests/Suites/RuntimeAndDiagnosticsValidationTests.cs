@@ -3711,6 +3711,77 @@ internal static partial class ValidationTestRunner
             foreach (var entry in saved) Resources.LoadedResourcesForTest.Add(entry.Key, entry.Value);
         }
     }),
+    ("shield color sync swaps enemy red shield shader to player blue shield shader and vice versa", () =>
+    {
+        var savedObjects = new List<UnityEngine.Object>(UnityEngine.Object.NativeControlTestObjects);
+        RuntimeShieldColorSync.ResetCacheForTests();
+        try
+        {
+            var playerShader = new Shader { name = RuntimeShieldColorSync.PlayerShieldShaderName };
+            var aiShader = new Shader { name = RuntimeShieldColorSync.AiShieldShaderName };
+            var playerShieldMat = new Material { name = "ShieldFor AI EntityMaterial 1", shader = playerShader };
+            var aiShieldMat = new Material { name = "ShieldForEntityMaterial", shader = aiShader };
+            UnityEngine.Object.NativeControlTestObjects = new UnityEngine.Object[] { playerShieldMat, aiShieldMat };
+
+            if (!RuntimeShieldColorSync.ShouldReplaceShieldShader(true, false, RuntimeShieldColorSync.AiShieldShaderName, out string target) ||
+                target != RuntimeShieldColorSync.PlayerShieldShaderName)
+            {
+                throw new InvalidOperationException("Player entity with AI shield shader should target PlayerShieldShaderName.");
+            }
+
+            if (RuntimeShieldColorSync.ShouldReplaceShieldShader(true, false, RuntimeShieldColorSync.PlayerShieldShaderName, out _))
+            {
+                throw new InvalidOperationException("Player entity already using PlayerShieldShaderName should not be replaced.");
+            }
+
+            if (!RuntimeShieldColorSync.ShouldReplaceShieldShader(false, true, RuntimeShieldColorSync.PlayerShieldShaderName, out target) ||
+                target != RuntimeShieldColorSync.AiShieldShaderName)
+            {
+                throw new InvalidOperationException("AI entity with Player shield shader should target AiShieldShaderName.");
+            }
+
+            if (RuntimeShieldColorSync.ShouldReplaceShieldShader(false, false, RuntimeShieldColorSync.AiShieldShaderName, out _))
+            {
+                throw new InvalidOperationException("Neutral entity shield should not be replaced.");
+            }
+
+            var entityGo = new GameObject("QA_Surge_Player");
+            var entity = entityGo.AddComponent<EntityController>();
+            entity.IsControlledByPlayer = true;
+            var shieldGo = new GameObject("ShieldSphere");
+            var shieldRenderer = shieldGo.AddComponent<MeshRenderer>();
+            shieldRenderer.sharedMaterials = new[] { aiShieldMat };
+            entity.shieldGameObject = shieldGo;
+
+            if (!RuntimeShieldColorSync.SyncShieldVisuals(entity))
+            {
+                throw new InvalidOperationException("SyncShieldVisuals should report updated=true when swapping AI shield to Player shield.");
+            }
+
+            if (shieldRenderer.sharedMaterials[0] != playerShieldMat)
+            {
+                throw new InvalidOperationException("Player entity shield material was not swapped to the player shield material.");
+            }
+
+            if (RuntimeShieldColorSync.SyncShieldVisuals(entity))
+            {
+                throw new InvalidOperationException("SyncShieldVisuals should be idempotent when shield shader already matches faction.");
+            }
+
+            // Simulate pooling reuse as AI: should swap back to AI shield material.
+            entity.IsControlledByPlayer = false;
+            entity.IsControlledByAi = true;
+            if (!RuntimeShieldColorSync.SyncShieldVisuals(entity) || shieldRenderer.sharedMaterials[0] != aiShieldMat)
+            {
+                throw new InvalidOperationException("Reused AI entity shield material was not swapped back to the AI shield material.");
+            }
+        }
+        finally
+        {
+            RuntimeShieldColorSync.ResetCacheForTests();
+            UnityEngine.Object.NativeControlTestObjects = savedObjects.ToArray();
+        }
+    }),
     ("support auras reach damaged allies after full-health or healing-blocked candidates", () =>
     {
         ExistingControllers.Instance.Reset();

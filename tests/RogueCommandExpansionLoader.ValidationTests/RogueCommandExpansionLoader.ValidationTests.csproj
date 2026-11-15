@@ -203,6 +203,8 @@
              Link="Runtime/NativeEconomyFactoryTranspilers.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeFactionColorResolver.cs"
              Link="Runtime/Visual/RuntimeFactionColorResolver.cs" />
+    <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeShieldColorSync.cs"
+             Link="Runtime/Visual/RuntimeShieldColorSync.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Visual/WeaponShotFeedbackTracker.cs"
              Link="Runtime/Visual/WeaponShotFeedbackTracker.cs" />
     <Compile Include="../../src/RogueCommandExpansionLoader/Runtime/Ai/AiUnitSnapshot.cs"

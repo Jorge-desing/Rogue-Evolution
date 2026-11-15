@@ -1962,6 +1962,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
         {
             Color color;
             _factionColorTint = RuntimeFactionColorResolver.TryResolve(_entity, out color) ? color : (Color?)null;
+            RuntimeShieldColorSync.SyncShieldVisuals(_entity);
         }
 
         private RendererTintBaseline GetOrCaptureTintBaseline(Renderer renderer)

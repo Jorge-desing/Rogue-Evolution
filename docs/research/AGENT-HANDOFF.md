@@ -1,5 +1,12 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Allied/Enemy Shield Color Sync Fix (`RuntimeShieldColorSync`, 2026-11-15)
+
+- **Root Cause & Fix (`VERIFIED IN LIVE STEAM RUNTIME` + `OFFLINE C# SUITE PASS`):**
+  - Native templates bake faction-specific shield shaders onto `EntityController.shieldGameObject` (`PCXBaseTank` uses `"Shader Graphs/EntityShieldShader"` / `"ShieldFor AI EntityMaterial 1"` which renders **blue**, while `LightningTank` uses `"Shader Graphs/EntityShieldShader2"` / `"ShieldForEntityMaterial"` which renders **red**). `EntityFactory.ReplaceMaterial` only swaps `materialToReplace` (`EntityZPlayerColor`), leaving `SurgeArcTank` (`nativeTemplateId: "LightningTank"`) with a **red** enemy shield when spawned as `Player`.
+  - Added [`RuntimeShieldColorSync`](file:///c:/Users/Alex/Documents/Mod%20Rogue%20Command/src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeShieldColorSync.cs) and wired it into `RuntimeHooks` (`AfterInstantiateEntity`, `OnEntityHasBeenInstantiatedForReuseTranspiler`, `OnEntityResetForReuseTranspiler`) and `RuntimeVisualDirector.RefreshFactionColorTint()`, swapping shield renderer materials between `EntityShieldShader` (`Player`) and `EntityShieldShader2` (`AI`) with lazy `PCXBaseTank`/`LightningTank` prefab fallback.
+  - **Verification:** Release plugin build `0/0` warnings/errors; C# `ValidationTests` `612/613` passed (`1` expected Windows symlink skip); deployed `RogueCommandExpansionLoader.dll` (SHA-256 `4707F47663C6011105E9D23B65699973CD72B569A9D568364A787974060233C1`, `MATCH=True`); verified in live Steam `Profile2` via `diagnostics_get_visual_material_census`: `sample-native:surge-tank` (`Player`, id `74`) now uses `"Shader Graphs/EntityShieldShader"` (`"ShieldFor AI EntityMaterial 1 (Instance)"`), and `tactical-operations:bulwark-siege-tank` (`AI`, id `75`) uses `"Shader Graphs/EntityShieldShader2"` (`"ShieldForEntityMaterial (Instance)"`).
+
 ## Material Maker 1.7 PBR Evolution, Overlapping FBX UV Fix & Skill Sync (2026-11-15)
 
 - **Scope & Status (`OFFLINE SUITES PASS` + `UNITY/PACK AUDIT PASS` + `DEPLOYED TO STEAM`; live Steam visual re-check pending):**

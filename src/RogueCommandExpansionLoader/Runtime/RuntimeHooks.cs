@@ -1750,6 +1750,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 SafeCall(delegate
                 {
                     Visual.RuntimeVisualDirector.AttachIfApplicable(result);
+                    Visual.RuntimeShieldColorSync.ApplyIfApplicable(result);
                     RuntimeUnitMechanicsDirector.AttachIfApplicable(result);
                     RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(result);
                 });
@@ -1837,6 +1838,7 @@ namespace RogueCommandExpansionLoader.Runtime
             {
                 Visual.RuntimeVisualDirector.AttachIfApplicable(entityObj);
                 Visual.RuntimeVisualDirector.OnEntityReused(entityObj);
+                Visual.RuntimeShieldColorSync.ApplyIfApplicable(entityObj);
                 RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
                 RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
             });
@@ -2834,6 +2836,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 // native stack pool, where OnHasBeenInstantiatedForReuse is not called.
                 // Reset visuals here after factory initialization for both new and reused units.
                 Visual.RuntimeVisualDirector.OnEntityReused(entityObj);
+                Visual.RuntimeShieldColorSync.ApplyIfApplicable(entityObj);
                 RuntimeUnitMechanicsDirector.AttachIfApplicable(entityObj);
                 RuntimeGameplayCommandDirector.ApplyAiProfileUnitDefaultsToEntity(entityObj);
             });
