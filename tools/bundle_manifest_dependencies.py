@@ -52,13 +52,13 @@ def resolve_bundle_dependencies(manifest_path: str | Path | bytes, bundle_names:
     return ordered
 
 
-def merge_bundle_manifests(manifest_paths: list[str | Path]) -> bytes:
+def merge_bundle_manifests(manifest_paths: list[str | Path | bytes]) -> bytes:
     """Combine disjoint Unity manifest tables, preserving hashes and dependency edges."""
     import UnityPy
 
     if not manifest_paths:
         raise ValueError("Se requiere al menos un manifest")
-    environments = [UnityPy.load(Path(path).read_bytes()) for path in manifest_paths]
+    environments = [UnityPy.load(path if isinstance(path, bytes) else Path(path).read_bytes()) for path in manifest_paths]
     objects = [[obj for obj in env.objects if obj.type.name == "AssetBundleManifest"] for env in environments]
     if any(len(group) != 1 for group in objects):
         raise ValueError("Cada bundle debe contener exactamente un AssetBundleManifest")

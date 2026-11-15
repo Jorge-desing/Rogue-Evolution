@@ -2922,3 +2922,7 @@ Bundle transfer now creates each destination file exclusively through the same n
 ## 2026-11-15 — Guard staged composition file creation
 
 The composed writer now creates staged bundles, combined manifest and content.json exclusively through non-reparse directory handles instead of direct pathname writes. Focused suite: 26 passed and one Windows symlink-privilege skip (27 total). Parent directory creation, existing-file comparison, manifest reads and publication root still need concurrency review. Full suite visual failures remain open.
+
+## 2026-11-15 — Guard staged reads and comparisons
+
+Staged manifest reads, existing bundle comparisons and post-copy hash checks now use guarded pack-file handles; manifest merging consumes the captured bytes instead of reopening paths. Focused suite: 26 passed and one symlink privilege skip (27 total). Directory creation and publication root stability still require review; full Python suite visual failures remain open.

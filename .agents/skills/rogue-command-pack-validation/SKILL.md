@@ -176,3 +176,5 @@ On bundle-copy failure, all newly created files and directories are retained and
 Bundle transfer creates destination files exclusively through `open_pack_file(..., create=True)`: Windows holds non-reparse parent directories without delete sharing and opens the file without sharing; POSIX uses directory-relative `O_NOFOLLOW|O_EXCL`. Parent directory creation, staging publication and cleanup still require their own concurrency review.
 
 Staged bundle, manifest and content.json creation now uses exclusive guarded handles. Directory creation, existing-file comparisons, manifest source reads and publication root still require a complete concurrency audit.
+
+Staged manifest reads and bundle comparisons use guarded pack-file handles; the manifest merger accepts bytes so it does not reopen a checked path. Directory creation and publication root stability remain under review.

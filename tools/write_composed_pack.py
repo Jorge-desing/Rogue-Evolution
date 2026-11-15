@@ -5,12 +5,13 @@ import json
 import os
 import ctypes
 import errno
+import hashlib
 from pathlib import Path, PureWindowsPath
 import shutil
 import tempfile
 
 from tools.bundle_manifest_dependencies import merge_bundle_manifests
-from tools.pack_bundle_transfer import _sha256, copy_bundle_transfer, plan_bundle_transfer
+from tools.pack_bundle_transfer import copy_bundle_transfer, plan_bundle_transfer
 from tools.secure_pack_read import open_pack_file
 from tools.validate_content_pack import validate_pack
 
@@ -35,6 +36,14 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
     raise OSError(errno.ENOTSUP, "Publicación atómica sin reemplazo no soportada")
 
 
+def _guarded_hash(root: Path, relative: str) -> str:
+    digest = hashlib.sha256()
+    with open_pack_file(root, relative) as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], output: str | Path) -> Path:
     """Write a new pack directory; existing destinations are never intentionally replaced.
 
@@ -53,20 +62,20 @@ def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], out
     try:
         stage = Path(temporary) / "pack"
         stage.mkdir()
-        manifest_sources: dict[str, Path] = {}
+        manifest_sources: dict[str, bytes] = {}
         for index, (root, source_pack) in enumerate(bundle_sources):
             isolated = Path(temporary) / f"source-{index}"
             isolated.mkdir()
             copy_bundle_transfer(root, isolated, source_pack)
-            manifest_path = isolated.joinpath(*PureWindowsPath(source_pack["assetBundleManifestPath"]).parts)
-            manifest_sources.setdefault(_sha256(manifest_path), manifest_path)
+            with open_pack_file(isolated, source_pack["assetBundleManifestPath"]) as stream:
+                manifest_bytes = stream.read()
+            manifest_sources.setdefault(hashlib.sha256(manifest_bytes).hexdigest(), manifest_bytes)
             for bundle in source_pack["assetBundles"]:
                 relative = PureWindowsPath(bundle["path"])
-                src = isolated.joinpath(*relative.parts)
                 target = stage.joinpath(*relative.parts)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if target.exists():
-                    if _sha256(target) != _sha256(src):
+                    if _guarded_hash(stage, bundle["path"]) != _guarded_hash(isolated, bundle["path"]):
                         raise ValueError(f"Archivo de bundle en conflicto: {relative}")
                 else:
                     with open_pack_file(isolated, bundle["path"]) as input_stream, open_pack_file(stage, bundle["path"], create=True) as output_stream:
@@ -77,7 +86,7 @@ def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], out
             if target_manifest.exists():
                 raise ValueError("La ruta del manifest coincide con un bundle")
             manifests = list(manifest_sources.values())
-            manifest_bytes = manifests[0].read_bytes() if len(manifests) == 1 else merge_bundle_manifests(manifests)
+            manifest_bytes = manifests[0] if len(manifests) == 1 else merge_bundle_manifests(manifests)
             with open_pack_file(stage, pack["assetBundleManifestPath"], create=True) as output_stream:
                 output_stream.write(manifest_bytes)
         with open_pack_file(stage, "content.json", create=True) as output_stream:

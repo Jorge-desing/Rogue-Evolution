@@ -19,6 +19,14 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _pack_sha256(root: Path, relative: str) -> str:
+    digest = hashlib.sha256()
+    with open_pack_file(root, relative) as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
 def plan_bundle_transfer(source_root: str | Path, destination_root: str | Path, pack: dict) -> list[dict]:
     """Check complete source manifest and destination conflicts without writing files.
 
@@ -68,7 +76,7 @@ def plan_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
                 digest.update(block)
         source_hash = digest.hexdigest()
         exists = target.exists()
-        if exists and (not target.is_file() or _sha256(target) != source_hash):
+        if exists and (not target.is_file() or _pack_sha256(destination, relative) != source_hash):
             raise ValueError(f"Archivo de destino en conflicto: {relative}")
         result.append({"path": relative, "sha256": source_hash, "alreadyPresent": exists})
     return result
@@ -106,7 +114,7 @@ def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
                     output_stream.write(block)
                 output_stream.flush()
                 os.fsync(output_stream.fileno())
-            if _sha256(target) != row["sha256"]:
+            if _pack_sha256(destination, row["path"]) != row["sha256"]:
                 raise ValueError(f"El archivo cambió durante la copia: {row['path']}")
             created_files[-1] = (target, (info.st_dev, info.st_ino), row["sha256"])
         final = plan_bundle_transfer(source, destination, pack)
