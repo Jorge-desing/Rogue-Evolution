@@ -81,6 +81,18 @@ class CompositionEditTests(unittest.TestCase):
                     self.fail("Existing stage must not be reused")
             self.assertEqual("preserve", (root / "pack/user-data").read_text(encoding="utf-8"))
 
+    def test_existing_random_staging_parent_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            existing = root / (".rogue-compose-" + "a" * 32)
+            existing.mkdir()
+            (existing / "user-data").write_text("preserve", encoding="utf-8")
+            with patch("tools.write_composed_pack.secrets.token_hex", return_value="a" * 32):
+                with self.assertRaises(RuntimeError):
+                    write_composed_pack(self._pack(), [], root / "output")
+            self.assertEqual("preserve", (existing / "user-data").read_text(encoding="utf-8"))
+            self.assertFalse((root / "output").exists())
+
     def test_atomic_publish_never_replaces_concurrent_destination(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

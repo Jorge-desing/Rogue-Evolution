@@ -244,3 +244,5 @@ Before publication the composed writer checks the expected hashes of its copied 
 On Windows the pack stage is now created exclusively and opened without delete sharing in one NtCreateFile operation, while the parent is guarded; this closes the former create-to-first-guard gap. UNC output paths are explicitly unsupported. The guard stays until publication handoff, where identity is checked again. Concurrent edits to child files after their final hash check and POSIX path races remain open.
 
 After successful publication on Windows, empty staging-parent cleanup opens the directory without delete sharing, checks its volume/file ID and uses handle-based deletion; replaced or nonempty directories remain reported. POSIX now retains even empty staging parents because pathname-only cleanup cannot establish the same guarantee.
+
+The random `.rogue-compose-*` staging parent is also created exclusively with its initial non-delete-sharing handle in one Windows operation. Name collisions fail without reuse. POSIX creates mode 0700 but its creation-to-guard and pathname publication races remain unverified.

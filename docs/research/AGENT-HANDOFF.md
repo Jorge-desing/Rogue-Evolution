@@ -3117,3 +3117,7 @@ With atomic Windows stage creation, extracted `sample-native:scout-tank` to `art
 ### Verified empty staging cleanup (2026-11-15)
 
 Windows cleanup of a successful composition now removes the original empty staging parent only by an identity-checked directory handle; a substituted empty directory is retained and reported. POSIX conservatively retains the parent. Bundle/composition modules passed 42 tests, including replacement injection. Concurrent stage-content mutation after final hash and POSIX path publication remain open.
+
+### Atomic staging-parent creation (2026-11-15)
+
+The random staging parent now uses the same atomic create-and-guard operation as the child on Windows; collisions preserve the existing directory. POSIX creation uses mode 0700 and still needs race-safe handling. The composition module passed 36 tests after the collision test was added; full Python `all` passed in 37.40 s, started before that test-only addition. Stage-file mutation after the final hash and POSIX publication/rollback remain open.

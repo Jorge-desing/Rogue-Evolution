@@ -8,7 +8,7 @@ import errno
 import hashlib
 from pathlib import Path, PureWindowsPath
 import shutil
-import tempfile
+import secrets
 import warnings
 from contextlib import contextmanager
 
@@ -138,12 +138,14 @@ def _remove_empty_staging_parent(path: Path, identity: tuple[int, int]) -> bool:
 
 
 @contextmanager
-def _created_stage(parent: Path):
+def _created_stage(parent: Path, name: str = "pack"):
     """Create the Windows stage and acquire its non-delete-sharing handle atomically."""
-    stage = parent / "pack"
+    if not name or name in (".", "..") or PureWindowsPath(name).name != name:
+        raise ValueError("Nombre de directorio temporal inválido")
+    stage = parent / name
     if os.name != "nt":
-        _make_stage_dir(parent, "pack", exist_ok=False)
-        with open_pack_file(parent, "pack", directory=True):
+        stage.mkdir(mode=0o700)
+        with open_pack_file(parent, name, directory=True):
             yield stage
         return
     from ctypes import wintypes
@@ -212,11 +214,11 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
         raise ValueError("El directorio padre del destino debe existir")
     # Keep failed staging directories for inspection: automatic recursive cleanup
     # could remove files changed by another process after an error.
-    temporary = tempfile.mkdtemp(prefix=".rogue-compose-", dir=output_path.parent)
+    temporary = output_path.parent / (".rogue-compose-" + secrets.token_hex(16))
     try:
         # Hold the staging parent across all writes and publication. On Windows
         # this prevents its rename or replacement while its path is in use.
-        with open_pack_file(output_path.parent, Path(temporary).name, directory=True):
+        with _created_stage(output_path.parent, temporary.name):
             temporary_info = Path(temporary).stat()
             temporary_identity = (temporary_info.st_dev, temporary_info.st_ino)
             # Creation and the first stage guard are one operation on Windows.
