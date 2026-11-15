@@ -439,6 +439,21 @@ def _battlefield_plan_response(text: str) -> dict[str, Any]:
                           is_error=payload.get("success") is not True or payload.get("completionStatus") == "unknown")
 
 
+def _single_battlefield_response(text: str) -> dict[str, Any]:
+    """Preserve the native result and stop on an unknown or failed order outcome."""
+    try:
+        payload = json.loads(text, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+    except (TypeError, ValueError):
+        return _unreadable_mutation_response(text)
+    if not isinstance(payload, dict):
+        return _unreadable_mutation_response(text)
+    if type(payload.get("success")) is not bool and payload.get("completionStatus") != "not_started":
+        payload["completionStatus"] = "unknown"
+    if payload.get("success") is not True and payload.get("completionStatus") != "not_started":
+        payload["postconditionInspectionRequired"] = True
+    return _tool_response(json.dumps(payload, ensure_ascii=False), is_error=payload.get("success") is not True)
+
+
 def _group_action_response(text: str, count_field: str, expected: int) -> dict[str, Any]:
     """Expose partial native group effects without losing the original result fields."""
     try:
@@ -1745,7 +1760,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             if arguments.get("replaceCurrent", False):
                 args.append(True)
             res = _call_diagnostics_method("OrderUnitMoveJson", args)
-            return _tool_response(res)
+            return _single_battlefield_response(res)
 
         elif name == "diagnostics_order_place_building":
             x = float(arguments.get("worldX", 0.0))
@@ -1795,7 +1810,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             e_key = str(arguments.get("entityKeyId", ""))
             t_key = str(arguments.get("targetEntityKeyId", ""))
             res = _call_diagnostics_method("OrderUnitAttackJson", [e_key, t_key])
-            return _tool_response(res)
+            return _single_battlefield_response(res)
 
         elif name == "diagnostics_order_unit_tactical_pulse":
             e_key = str(arguments.get("entityKeyId", ""))
@@ -1843,7 +1858,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                 "OrderRetreatJson",
                 [e_key, tx, tz, dist],
             )
-            return _tool_response(res)
+            return _single_battlefield_response(res)
         elif name == "diagnostics_order_active_skill":
             e_key = str(arguments.get("entityKeyId", ""))
             t_key = arguments.get("targetEntityKeyId")
@@ -1852,7 +1867,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             has_pos = tx is not None and tz is not None
             args = [e_key, str(t_key) if t_key is not None else "", float(tx or 0.0), float(tz or 0.0), bool(has_pos)]
             res = _call_diagnostics_method("OrderUnitActiveSkillJson", args)
-            return _tool_response(res)
+            return _single_battlefield_response(res)
 
         elif name == "diagnostics_adjust_vitality":
             e_key = str(arguments.get("entityKeyId", ""))
@@ -1980,7 +1995,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             x = float(arguments.get("targetX", 0.0))
             z = float(arguments.get("targetZ", 0.0))
             res = _call_diagnostics_method("OrderUnitAttackMoveJson", [e_key, x, z])
-            return _tool_response(res)
+            return _single_battlefield_response(res)
 
         elif name == "diagnostics_order_unit_patrol":
             e_key = str(arguments.get("entityKeyId", ""))
@@ -1989,7 +2004,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             waypoint_x_csv = ";".join(str(float(v)) for v in wx)
             waypoint_z_csv = ";".join(str(float(v)) for v in wz)
             res = _call_diagnostics_method("OrderUnitPatrolCsvJson", [e_key, waypoint_x_csv, waypoint_z_csv])
-            return _tool_response(res)
+            return _single_battlefield_response(res)
 
         elif name == "diagnostics_order_group_command":
             keys = arguments.get("entityKeyIds") or []
@@ -2034,7 +2049,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             e_key = str(arguments.get("entityKeyId", ""))
             s_name = str(arguments.get("stanceName", "Standard"))
             res = _call_diagnostics_method("OrderUnitTacticalStanceJson", [e_key, s_name])
-            return _tool_response(res)
+            return _single_battlefield_response(res)
 
         elif name == "diagnostics_order_group_tactical_stance":
             keys = arguments.get("entityKeyIds") or []
@@ -2074,13 +2089,13 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             e_key = arguments.get("entityKeyId")
             args = [str(e_key)] if e_key is not None else []
             res = _call_diagnostics_method("OrderUnitHoldPositionJson", args)
-            return _tool_response(res)
+            return _single_battlefield_response(res)
 
         elif name == "diagnostics_order_unit_stop":
             e_key = arguments.get("entityKeyId")
             args = [str(e_key)] if e_key is not None else []
             res = _call_diagnostics_method("OrderUnitStopJson", args)
-            return _tool_response(res)
+            return _single_battlefield_response(res)
 
         elif name == "diagnostics_reveal_fog_of_war":
             res = _call_diagnostics_method("RevealFogOfWarJson")

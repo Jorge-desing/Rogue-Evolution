@@ -501,7 +501,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         calls: list[str] = []
         def fake_diagnostics_method(method: str, _args: list[object] | None = None) -> str:
             calls.append(method)
-            if method == "OrderUnitMoveJson":
+            if method == "GetGameTimeScaleJson":
                 return json.dumps({"success": False, "error": "entity not found"})
             raise AssertionError(f"unexpected bridge call: {method}")
 
@@ -519,7 +519,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
             failed_source = SERVER.execute_tool("automation_run_sequence", {
                 "stopOnFailure": False,
                 "steps": [
-                    {"tool": "diagnostics_order_unit_move", "arguments": {"entityKeyId": "missing-unit", "destinationX": 1, "destinationZ": 2}},
+                    {"tool": "diagnostics_get_game_time_scale"},
                     {
                         "tool": "diagnostics_order_unit_move",
                         "arguments": {
@@ -537,7 +537,7 @@ class RuntimeDiagnosticsTests(unittest.TestCase):
         self.assertIn("earlier step", forward_payload["error"])
         self.assertFalse(failed_payload["results"][1]["success"])
         self.assertIn("did not succeed", failed_payload["results"][1]["error"])
-        self.assertEqual(["OrderUnitMoveJson"], calls)
+        self.assertEqual(["GetGameTimeScaleJson"], calls)
 
     def test_later_invalid_nested_reference_blocks_all_steps(self) -> None:
         with mock.patch.object(SERVER, "_call_diagnostics_method") as bridge:

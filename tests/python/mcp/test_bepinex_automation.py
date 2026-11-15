@@ -243,6 +243,21 @@ class StateWaitTests(unittest.TestCase):
                 self.assertEqual(1, call.call_count)
                 self.assertEqual("uncertain_effect", outcome["stopReason"]["code"])
 
+    def test_unreadable_single_order_stops_sequence(self):
+        args = {"entityKeyId": "11", "destinationX": 1, "destinationZ": 2}
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value="broken reply") as call:
+            direct = SERVER.execute_tool("diagnostics_order_unit_move", args)
+            payload = json.loads(direct["content"][0]["text"])
+            self.assertTrue(direct["isError"])
+            self.assertEqual("unknown", payload["completionStatus"])
+            call.reset_mock()
+            response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
+                {"tool": "diagnostics_order_unit_move", "arguments": args},
+                {"tool": "diagnostics_get_navigator_state"}]})
+            result = json.loads(response["content"][0]["text"])
+            self.assertEqual(1, call.call_count)
+            self.assertEqual("uncertain_effect", result["stopReason"]["code"])
+
     def test_direct_group_response_exposes_partial_dispatch(self):
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true,"dispatchedCount":1}'):
             response = SERVER.execute_tool("diagnostics_order_group_command", {"entityKeyIds": ["11", "12"], "commandType": "Stop"})

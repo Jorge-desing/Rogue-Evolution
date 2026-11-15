@@ -131,3 +131,5 @@ An incomplete mixed battlefield plan with `dispatchStarted=true` always stops an
 Automation sequences inspect native dispatched/affected counts for group commands, formations, group stances and coordinated assaults, stopping on partial or unquantified results even when `stopOnFailure=false`. Direct group calls preserve native `success` but mark incomplete results as MCP errors and add completion/inspection fields; inspect those fields and the native counts.
 
 Mixed-plan and group mutations with unreadable or non-object responses return an MCP error with `completionStatus=unknown`, the original `rawResponse`, and `postconditionInspectionRequired=true`. A plan response missing dispatch state is likewise unknown unless explicitly not started. Inspect current state before retrying.
+
+Individual battlefield move, attack, attack-move, patrol, retreat, active-skill, stance, hold and stop calls also return structured unknown completion for unreadable/non-object responses. Failed outcomes require postcondition inspection unless explicitly `not_started`; sequences stop accordingly.

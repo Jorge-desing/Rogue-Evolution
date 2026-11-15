@@ -3175,3 +3175,9 @@ Direct MCP group, formation, group stance and coordinated-assault calls now pres
 ### Unreadable battlefield mutation responses (2026-11-15)
 
 Mixed-plan and group MCP calls now preserve unreadable/non-object raw responses as structured unknown completion requiring postcondition inspection; sequences stop instead of continuing. A plan lacking dispatch state is unknown unless explicitly not started. The automation/diagnostics modules passed 100 tests after the final strict-JSON refinement; full Python `all` passed in 43.37 s, started before that final refinement. No live orders were issued.
+
+### Individual battlefield response recovery (2026-11-15)
+
+Individual MCP move, attack, attack-move, patrol, retreat, active-skill, stance, hold and stop responses now preserve unreadable responses as unknown completion and flag failed outcomes for postcondition inspection unless explicitly not started. The sequence stops accordingly. Automation/diagnostics modules passed 101 tests. A prior failed-reference test now uses a failed read-only getter because a failed mutation correctly stops immediately. No live orders were issued.
+
+Full Python `all` passed after the individual-response changes in 46.40 seconds.

@@ -115,3 +115,5 @@ For changes observed asynchronously, wait on the exact current value field from 
 Agent sessions, heartbeats and resource locks are advisory coordination for cooperating agents. They do not make a snapshot atomic with a later action, prevent other callers from mutating the game, or restore an expired session automatically. Release owned locks and temporary observers using their exact returned identifiers when the task finishes.
 
 Malformed mixed-plan or group-mutation responses preserve `rawResponse` and are reported as unknown completion; sequences stop and require postcondition inspection even when continuation was requested.
+
+The same unknown-response and postcondition rule applies to individual battlefield moves, attacks, patrols, retreats, active skills, stances, holds and stops. A failed native result is not an instruction to retry.
