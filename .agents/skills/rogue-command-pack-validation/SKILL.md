@@ -216,3 +216,5 @@ During composed-pack writing, the staging parent is held through a non-reparse h
 New `pack` and `source-N` staging directories are created exclusively; preexisting children cause failure and are preserved. This does not prevent replacement after creation.
 
 Windows handle-based stage rename requires DELETE access. Current guarded directory opens omit FILE_SHARE_DELETE, so a long-lived DELETE-capable stage handle conflicts with subsequent guarded opens (WinError 32). Coordinate sharing on the exact guarded stage without relaxing ancestor protections before implementing handle publication; a standalone rename prototype is not integration evidence.
+
+A scoped stage share-delete prototype passed isolated batch tests but failed batch output assertions when the complete composition module ran; it was removed. Reproduce against the whole module and inspect published paths and order-dependent state before reuse.

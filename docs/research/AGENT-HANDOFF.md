@@ -3049,3 +3049,7 @@ New pack and source staging children now fail if the name already exists, preser
 ### Windows handle publication investigation (2026-11-15)
 
 A standalone `SetFileInformationByHandle(FileRenameInfo)` no-replace directory rename succeeded on this host. Holding a DELETE-capable stage handle across the current writer fails when `open_pack_file` reopens that directory without delete sharing (WinError 32). The prototype was removed; existing behavior is restored. Composition and secure-read modules passed 30 tests with one skip after restoration. Next, coordinate share modes for the exact protected stage while retaining ancestor guards, then test replacement and competing-destination races. POSIX and rollback remain open.
+
+### Stage sharing prototype follow-up (2026-11-15)
+
+A scoped share-delete experiment for the stage allowed the long-lived DELETE handle and blocked external renames, but the full composition module repeatedly failed two batch output assertions even though those tests passed individually. The prototype was removed. Reproduction requires the whole module, not isolated batch tests; inspect order-dependent state and actual published paths before retrying. After restoration, composition and secure-read passed 30 tests with one skip.
