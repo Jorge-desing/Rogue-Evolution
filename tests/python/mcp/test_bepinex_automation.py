@@ -243,6 +243,15 @@ class StateWaitTests(unittest.TestCase):
                 self.assertEqual("uncertain_effect", payload["stopReason"]["code"])
                 self.assertTrue(payload["results"][0]["postconditionInspectionRequired"])
 
+    def test_group_failure_without_dispatch_count_requires_inspection(self):
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":false,"error":"missing outcome"}') as call:
+            response = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
+                {"tool": "diagnostics_order_group_command", "arguments": {"entityKeyIds": ["11", "12"], "commandType": "Stop"}},
+                {"tool": "diagnostics_get_navigator_state"}]})
+        payload = json.loads(response["content"][0]["text"])
+        self.assertEqual(1, call.call_count)
+        self.assertEqual("uncertain_effect", payload["stopReason"]["code"])
+
     def test_partial_battlefield_plan_stops_even_when_continuation_requested(self):
         plan = {"kind": "battlefieldOrderPlanResult", "success": False, "dispatchStarted": True,
                 "acceptedOrderCount": 1, "partialOrderCount": 1, "actions": []}

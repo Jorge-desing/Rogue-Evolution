@@ -128,4 +128,4 @@ On 2026-11-15 the configured local HTTP frontend was absent and was started with
 
 An incomplete mixed battlefield plan with `dispatchStarted=true` always stops an automation sequence, even with `stopOnFailure=false`, and marks postcondition inspection required. Refresh affected units before replanning; already dispatched orders are not rolled back.
 
-Automation sequences inspect native dispatched/affected counts for group commands, formations, group stances and coordinated assaults, stopping on partial or unquantified successful results even when `stopOnFailure=false`. Direct calls can still report success for partial results; inspect their counts.
+Automation sequences inspect native dispatched/affected counts for group commands, formations, group stances and coordinated assaults, stopping on partial or unquantified results even when `stopOnFailure=false`. Direct calls can still report success for partial results; inspect their counts.

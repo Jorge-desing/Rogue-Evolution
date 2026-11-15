@@ -3161,3 +3161,5 @@ The MCP sequence executor now stops on an incomplete battlefield plan when dispa
 ### Partial group actions in sequences (2026-11-15)
 
 Native group, formation, group stance and coordinated-assault results may report success after affecting only part of the requested units. `automation_run_sequence` now checks their dispatched/affected counts against the requested bounded count, stops and requires inspection on partial or unquantified success, regardless of `stopOnFailure`. Direct calls retain native semantics and require count inspection. Automation module passed 26 tests; no live orders were issued.
+
+Group-action sequence handling also stops when the returned dispatch count is missing or malformed, including error replies, because the extent of any effect cannot be established. The automation module passed 27 tests after this refinement.

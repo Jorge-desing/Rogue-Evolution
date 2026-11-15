@@ -1172,7 +1172,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                         (type(actual_count) is int and actual_count < expected_count
                          and (actual_count > 0 or parsed_step.get("success") is True))
                         or (type(actual_count) is int and actual_count > 0 and parsed_step.get("success") is False)
-                        or (parsed_step.get("success") is True and type(actual_count) is not int)
+                        or type(actual_count) is not int
                     )
                 uncertain = isinstance(parsed_step, dict) and (
                     partial_group
