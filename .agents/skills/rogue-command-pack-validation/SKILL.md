@@ -166,3 +166,5 @@ Composed pack publication now uses an atomic no-replace rename (Windows `os.rena
 `tools.secure_pack_read.open_pack_file` opens pack manifests and source bundle files through non-reparse directory handles. On Windows directories are held without delete sharing during the read and the file without write/delete sharing; POSIX uses directory-relative `O_NOFOLLOW` handles. The source bundle transfer uses this helper. The isolated destination still needs a complete concurrency review.
 
 The external dependency analyzer also tracks `units[].upgrades[].targetUnitId` and `upgrades[].mustNotHaveOneOfTheseEntityIds` at their actual schema locations.
+
+Bundle-transfer rollback checks the original file identity and expected hash before removing completed copies; incomplete or changed files are retained and reported. This is not yet race-free: the check and unlink remain separate, and temporary-directory cleanup needs separate review.

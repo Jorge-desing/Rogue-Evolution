@@ -2902,3 +2902,7 @@ The staged writer copies each source bundle set into an isolated subdirectory, c
 ## 2026-11-15 — Additional composition references
 
 `check_pack_dependencies.external_references` now detects unit upgrade targets and upgrade-level excluded entity IDs; those fields were previously omitted or inspected only inside card changes. Local targeted checks: 32 passed, one Windows symlink privilege skip (33 total). Destination staging and rollback, remaining reference coverage and full-suite failures remain open. No game runtime test.
+
+## 2026-11-15 — Bundle rollback ownership checks (in progress)
+
+Bundle copy rollback records file identity and only removes completed files whose identity and SHA-256 still match; incomplete, changed or inaccessible copies are retained and reported along with the original error. The focused suite passed 25 cases with one symlink-privilege skip. Remaining: the identity/hash check and unlink are not atomic, and the composed writer's TemporaryDirectory cleanup may remove retained staged files; destination handles, cleanup and full reference coverage require further work. Do not treat rollback as race-safe or the user request as complete.

@@ -78,7 +78,7 @@ def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
     """Copy a checked bundle set without replacing existing files; roll back new files on failure."""
     source, destination = Path(source_root), Path(destination_root)
     plan = plan_bundle_transfer(source, destination, pack)
-    created_files: list[Path] = []
+    created_files: list[tuple[Path, tuple[int, int], str | None]] = []
     created_dirs: list[Path] = []
     try:
         for row in plan:
@@ -100,24 +100,40 @@ def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
                     pass
             target /= parts[-1]
             with open_pack_file(source, row["path"]) as input_stream, target.open("xb") as output_stream:
-                created_files.append(target)
+                info = os.fstat(output_stream.fileno())
+                created_files.append((target, (info.st_dev, info.st_ino), None))
                 for block in iter(lambda: input_stream.read(1024 * 1024), b""):
                     output_stream.write(block)
                 output_stream.flush()
                 os.fsync(output_stream.fileno())
             if _sha256(target) != row["sha256"]:
                 raise ValueError(f"El archivo cambió durante la copia: {row['path']}")
+            created_files[-1] = (target, (info.st_dev, info.st_ino), row["sha256"])
         final = plan_bundle_transfer(source, destination, pack)
         if any(not item["alreadyPresent"] or item["sha256"] != original["sha256"]
                for item, original in zip(final, plan)):
             raise ValueError("El conjunto de bundles cambió durante la transferencia")
         return plan
-    except Exception:
-        for path in reversed(created_files):
-            path.unlink(missing_ok=True)
+    except Exception as original:
+        retained = []
+        for path, identity, expected_hash in reversed(created_files):
+            try:
+                info = path.lstat()
+                if (expected_hash is None or (info.st_dev, info.st_ino) != identity or
+                    not stat.S_ISREG(info.st_mode) or getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT or
+                    _sha256(path) != expected_hash):
+                    retained.append(str(path))
+                    continue
+                path.unlink()
+            except FileNotFoundError:
+                continue
+            except OSError:
+                retained.append(str(path))
         for path in reversed(created_dirs):
             try:
                 path.rmdir()
             except OSError:
                 pass
+        if retained:
+            raise RuntimeError(f"Reversión incompleta; archivos conservados: {', '.join(retained)}; error original: {original}") from original
         raise

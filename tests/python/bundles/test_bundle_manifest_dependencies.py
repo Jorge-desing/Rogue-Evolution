@@ -87,6 +87,21 @@ class BundleManifestDependencyTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     plan_bundle_transfer(source, target, pack)
 
+    def test_failed_copy_reports_and_preserves_incomplete_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, target = root / "source", root / "target"
+            (source / "bundles").mkdir(parents=True)
+            target.mkdir()
+            (source / "bundles/a.bundle").write_bytes(b"bundle")
+            (source / "bundles/manifest.bundle").write_bytes(b"manifest")
+            pack = {"assetBundleManifestPath": "bundles/manifest.bundle",
+                    "assetBundles": [{"id": "ns:a", "path": "bundles/a.bundle"}]}
+            with patch("tools.pack_bundle_transfer.resolve_bundle_dependencies"), patch("tools.pack_bundle_transfer.os.fsync", side_effect=OSError("simulated")):
+                with self.assertRaisesRegex(RuntimeError, "Reversión incompleta"):
+                    copy_bundle_transfer(source, target, pack)
+            self.assertEqual(b"bundle", (target / "bundles/a.bundle").read_bytes())
+
 
 if __name__ == "__main__":
     unittest.main()
