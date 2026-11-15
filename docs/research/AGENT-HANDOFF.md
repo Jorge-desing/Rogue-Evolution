@@ -3137,3 +3137,7 @@ The composition sidecar now records successful rename-enabled imports in `rename
 ### External profile ambiguity (2026-11-15)
 
 When a supplied dependency stage references an original AI profile ID renamed during import, composition now aborts before publishing rather than silently binding it to the existing destination profile. Resolve the external pack explicitly. Composition/dependency modules passed 50 tests; the final edit only ignores malformed non-string IDs in this ambiguity scan. Windows post-hash and POSIX publication/rollback remain open.
+
+### Real-bundle conflict import and suite (2026-11-15)
+
+Full Python `all` passed in 36.89 s after conflict import and external ambiguity handling. An isolated copy of tactical-operations with deliberately conflicting sample-native stage/profile IDs was imported with `--rename-conflicts` into `artifacts/composition-real-conflicts-20261115`. The report contains both mappings, the imported stage references the renamed profile, local validation passed and UnityPy read both bundle names from the merged manifest. Source fixture: `artifacts/conflict-source-20261115`; retained writer copy: `artifacts/.rogue-compose-eec1f527403371054723bf4c220c450b`. No live runtime acceptance is implied.
