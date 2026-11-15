@@ -11,6 +11,7 @@ import tempfile
 
 from tools.bundle_manifest_dependencies import merge_bundle_manifests
 from tools.pack_bundle_transfer import _sha256, copy_bundle_transfer, plan_bundle_transfer
+from tools.secure_pack_read import open_pack_file
 from tools.validate_content_pack import validate_pack
 
 
@@ -68,15 +69,19 @@ def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], out
                     if _sha256(target) != _sha256(src):
                         raise ValueError(f"Archivo de bundle en conflicto: {relative}")
                 else:
-                    shutil.copyfile(src, target)
+                    with open_pack_file(isolated, bundle["path"]) as input_stream, open_pack_file(stage, bundle["path"], create=True) as output_stream:
+                        shutil.copyfileobj(input_stream, output_stream, 1024 * 1024)
         if manifest_sources:
             target_manifest = stage.joinpath(*PureWindowsPath(pack["assetBundleManifestPath"]).parts)
             target_manifest.parent.mkdir(parents=True, exist_ok=True)
             if target_manifest.exists():
                 raise ValueError("La ruta del manifest coincide con un bundle")
             manifests = list(manifest_sources.values())
-            target_manifest.write_bytes(manifests[0].read_bytes() if len(manifests) == 1 else merge_bundle_manifests(manifests))
-        (stage / "content.json").write_text(json.dumps(pack, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            manifest_bytes = manifests[0].read_bytes() if len(manifests) == 1 else merge_bundle_manifests(manifests)
+            with open_pack_file(stage, pack["assetBundleManifestPath"], create=True) as output_stream:
+                output_stream.write(manifest_bytes)
+        with open_pack_file(stage, "content.json", create=True) as output_stream:
+            output_stream.write((json.dumps(pack, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
         errors = validate_pack(str(stage))
         if errors:
             raise ValueError("Pack compuesto inválido: " + "; ".join(errors))

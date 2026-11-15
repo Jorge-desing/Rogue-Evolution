@@ -2918,3 +2918,7 @@ Bundle-transfer failure handling no longer unlinks created paths after checking 
 ## 2026-11-15 — Handle-based destination file creation
 
 Bundle transfer now creates each destination file exclusively through the same non-reparse directory handle walk used for reads. Windows holds parent directories without delete sharing and creates the file without sharing; POSIX uses directory-relative `O_NOFOLLOW|O_EXCL`. Focused suite: 26 passed, one symlink privilege skip (27 total), including no-overwrite and blocked directory rename while writing. Directory creation before handle acquisition, staged writer operations and cleanup still need concurrency review; full suite visual failures remain open.
+
+## 2026-11-15 — Guard staged composition file creation
+
+The composed writer now creates staged bundles, combined manifest and content.json exclusively through non-reparse directory handles instead of direct pathname writes. Focused suite: 26 passed and one Windows symlink-privilege skip (27 total). Parent directory creation, existing-file comparison, manifest reads and publication root still need concurrency review. Full suite visual failures remain open.
