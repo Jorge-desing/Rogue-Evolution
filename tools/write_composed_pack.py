@@ -10,6 +10,7 @@ from pathlib import Path, PureWindowsPath
 import shutil
 import tempfile
 import warnings
+from contextlib import contextmanager
 
 from tools.bundle_manifest_dependencies import merge_bundle_manifests
 from tools.pack_bundle_transfer import copy_bundle_transfer, plan_bundle_transfer
@@ -101,6 +102,58 @@ def _make_stage_dir(parent: Path, name: str, *, exist_ok: bool = True) -> Path:
         return child
 
 
+@contextmanager
+def _created_stage(parent: Path):
+    """Create the Windows stage and acquire its non-delete-sharing handle atomically."""
+    stage = parent / "pack"
+    if os.name != "nt":
+        _make_stage_dir(parent, "pack", exist_ok=False)
+        with open_pack_file(parent, "pack", directory=True):
+            yield stage
+        return
+    from ctypes import wintypes
+    class UnicodeString(ctypes.Structure):
+        _fields_ = [("length", wintypes.USHORT), ("maximum", wintypes.USHORT), ("buffer", wintypes.LPWSTR)]
+    class ObjectAttributes(ctypes.Structure):
+        _fields_ = [("length", wintypes.ULONG), ("root", wintypes.HANDLE),
+                    ("name", ctypes.POINTER(UnicodeString)), ("attributes", wintypes.ULONG),
+                    ("security", ctypes.c_void_p), ("quality", ctypes.c_void_p)]
+    class IoStatus(ctypes.Structure):
+        _fields_ = [("status", ctypes.c_void_p), ("information", ctypes.c_size_t)]
+    ntdll = ctypes.WinDLL("ntdll")
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    ntdll.NtCreateFile.argtypes = [ctypes.POINTER(wintypes.HANDLE), wintypes.ULONG,
+                                  ctypes.POINTER(ObjectAttributes), ctypes.POINTER(IoStatus),
+                                  ctypes.c_void_p, wintypes.ULONG, wintypes.ULONG, wintypes.ULONG,
+                                  wintypes.ULONG, ctypes.c_void_p, wintypes.ULONG]
+    ntdll.NtCreateFile.restype = ctypes.c_long
+    ntdll.RtlNtStatusToDosError.argtypes = [ctypes.c_long]
+    ntdll.RtlNtStatusToDosError.restype = wintypes.ULONG
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    absolute = str(stage.absolute())
+    if absolute.startswith("\\\\"):
+        raise ValueError("La creación protegida de etapa no admite rutas UNC")
+    name = "\\??\\" + absolute
+    raw = ctypes.create_unicode_buffer(name)
+    length = len(name.encode("utf-16-le"))
+    if length > 65532:
+        raise ValueError("Ruta de etapa demasiado larga")
+    text = UnicodeString(length, length + 2, ctypes.cast(raw, wintypes.LPWSTR))
+    attrs = ObjectAttributes(ctypes.sizeof(ObjectAttributes), None, ctypes.pointer(text), 0x40, None, None)
+    status = IoStatus()
+    handle = wintypes.HANDLE()
+    # FILE_CREATE, FILE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT |
+    # FILE_OPEN_REPARSE_POINT. The parent and ancestors are already guarded.
+    result = ntdll.NtCreateFile(ctypes.byref(handle), 0x80100000, ctypes.byref(attrs),
+                                ctypes.byref(status), None, 0, 3, 2, 0x200021, None, 0)
+    if result < 0:
+        raise ctypes.WinError(ntdll.RtlNtStatusToDosError(result))
+    try:
+        yield stage
+    finally:
+        kernel.CloseHandle(handle)
+
+
 def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], output: str | Path,
                         dependency_report: dict | None = None) -> Path:
     """Write a new pack directory; existing destinations are never intentionally replaced.
@@ -129,11 +182,9 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
         # Hold the staging parent across all writes and publication. On Windows
         # this prevents its rename or replacement while its path is in use.
         with open_pack_file(output_path.parent, Path(temporary).name, directory=True):
-            stage = _make_stage_dir(Path(temporary), "pack", exist_ok=False)
-            # Hold the child against replacement while populating and validating.
-            # Publication reopens it and compares this identity after releasing
-            # the guard, so a replacement in that handoff is rejected.
-            with open_pack_file(Path(temporary), "pack", directory=True):
+            # Creation and the first stage guard are one operation on Windows.
+            # Publication compares identity after releasing that guard.
+            with _created_stage(Path(temporary)) as stage:
                 stage_info = stage.stat()
                 stage_identity = (stage_info.st_dev, stage_info.st_ino)
                 manifest_sources: dict[str, bytes] = {}

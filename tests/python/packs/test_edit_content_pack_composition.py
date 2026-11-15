@@ -16,7 +16,7 @@ from tests.python.helpers import load_tool_module
 
 EDIT = load_tool_module("edit_content_pack")
 SCAFFOLD = load_tool_module("scaffold_pack")
-from tools.write_composed_pack import _make_stage_dir, _publish_no_replace, write_composed_pack
+from tools.write_composed_pack import _created_stage, _make_stage_dir, _publish_no_replace, write_composed_pack
 from tools.validate_content_pack import validate_pack
 
 
@@ -64,6 +64,19 @@ class CompositionEditTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 _make_stage_dir(root, "pack", exist_ok=False)
             self.assertEqual("preserve", (root / "pack" / "user-data").read_text(encoding="utf-8"))
+
+    @unittest.skipUnless(os.name == "nt", "Windows atomic directory creation")
+    def test_created_stage_is_locked_at_creation_and_never_reuses_existing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with _created_stage(root) as stage:
+                with self.assertRaises(OSError):
+                    stage.rename(root / "moved")
+                (stage / "user-data").write_text("preserve", encoding="utf-8")
+            with self.assertRaises(OSError):
+                with _created_stage(root):
+                    self.fail("Existing stage must not be reused")
+            self.assertEqual("preserve", (root / "pack/user-data").read_text(encoding="utf-8"))
 
     def test_atomic_publish_never_replaces_concurrent_destination(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

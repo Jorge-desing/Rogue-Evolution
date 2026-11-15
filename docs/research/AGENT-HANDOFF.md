@@ -3105,3 +3105,7 @@ The composed writer records expected SHA-256 values for bundles, merged manifest
 ### Guarded real-bundle composition (2026-11-15)
 
 Re-extracted `sample-native:scout-tank` with the current Windows guarded writer to `artifacts/composition-real-pack-guarded-20261115`. Publication succeeded, pack validation passed, the transferred `sample-native-expansion.bundle` SHA-256 matched its source, and Unity manifest dependency inspection matched the declared bundle exactly. The retained temporary source copy is `artifacts/.rogue-compose-hhe_i0lv`; preserve pending explicit inspection. Sixteen native templates remain unverified. This is local evidence, not an in-game test; stage content races and POSIX behavior remain open.
+
+### Atomic Windows stage creation (2026-11-15)
+
+The Windows writer now creates the stage exclusively and acquires its non-delete-sharing directory handle atomically using NtCreateFile, while its parent is guarded. A regression confirms immediate rename protection and no reuse of an existing child. UNC destinations fail explicitly. Composition/secure-read passed 38 tests with one skip; full Python `all` passed in 36.02 s. The prior Windows create-to-guard gap is closed; concurrent child-file changes after the final hash check and POSIX safety remain open.
