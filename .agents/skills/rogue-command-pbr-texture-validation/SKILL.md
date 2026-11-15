@@ -73,10 +73,12 @@ The builder may correct stale `.meta` settings during a rebuild. Report the post
 
 A texture set passes the local authoring contract when all four files have expected names and compatible dimensions, metallic and smoothness occupy the expected channels, the Unity importer preserves linear data and alpha, the prefab material binds the maps to the intended shader, and the imported mesh retains RGBA vertex colors. Mark UV seam quality and final color appearance as visually reviewed only when inspected in Unity; mark in-game appearance only after an actual runtime check.
 
-## Canonical Module Import Checks
+## Canonical Module & Atlas UV/Material Import Checks
 
 - `CanonicalVisualModuleBuilder` checks all four maps are 2048x2048, verifies effective importer color-space/alpha/normal settings after reimport, builds the `RogueCommand/VehiclePBR_VertexWear` material variant, and confirms imported module meshes retain one RGBA vertex color per vertex.
+- `audit_material_maker_output.py` enforces `luminanceMean >= 72.0` (`ALBEDO_MIN_MEAN = 72`, avoiding dark-plate URP crush), tracks `lowFreqBlotchStd` / `lowFreqBlotchRatio`, and requires `hasPlateVariationNode` + `plateVariationConnected` when `schemaVersion >= 3`.
+- Verify Level 1 `.fbx` and per-LOD meshes inside `_LODs.fbx` pack cleanly into non-overlapping atlas UVs (`total_uv_area <= 1.0` per LOD for single-atlas units/factories), exclude `PreviewFloor` / `PreviewFloorMat`, and bind factory & unit companion `LODGroup` renderers to the canonical `_PBR.mat` (except explicit multi-material assets such as `BulwarkFoundry`).
 - It also rejects scripts/gameplay components in module prefabs and reopens the AssetBundles to verify their serialized `assetName` keys. Run `tools/validate_content_bundle_references.py` on each built pack so every `visualVariants[].modules[].assetName` resolves in the unit's declared bundle.
 - Before bundle build, it matches each declared Level 2 module to its generated role/manifest row and requires the owning Level 1 primary prefab to contain exactly one matching canonical `Socket_Hardpoint_<Slot>`; duplicate or noncanonical hardpoints fail the build.
-- Rebuild through `tools/Build-CanonicalVisualModules.ps1` before import/reference acceptance. Run the reference validator against `artifacts/canonical-two-level/validation-packs/`; versioned bundles under `content/packs/*/bundles/` may be earlier snapshots.
+- Rebuild through `tools/Build-CanonicalVisualModules.ps1` before import/reference acceptance. Run `tools/validate_content_bundle_references.py` against promoted pack manifests (`content/packs/<pack>`) or staged packs, and check `tools/audit_unity_build.py --strict` against the `unity-builder.log` and rebuilt `.bundle` files.
 - These are local Unity/import and serialized-bundle checks. A contact sheet or passing bundle audit does not establish that a live unit selected the expected variant or rendered it in a Steam match.

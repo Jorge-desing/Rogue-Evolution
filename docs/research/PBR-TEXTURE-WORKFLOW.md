@@ -94,11 +94,12 @@ The current shader keyword is `_METALLICSPECGLOSSMAP`; its source and `VehiclePr
 
 ## Acceptance checklist
 
-- All four maps exist with exact suffixes and matching dimensions.
-- UV islands have sufficient padding and no visible seams, missing regions, or accidental overlaps.
+- All four maps exist with exact suffixes and matching dimensions (`2048x2048`).
+- Material Maker `.ptex` templates conform to `schemaVersion: 3` (`plate_variation_opacity: 0.08`, `blend_type=0` Mix) with `luminanceMean >= 72.0` (`ALBEDO_MIN_MEAN = 72`) and calibrated hue-preserving URP palettes.
+- UV islands have sufficient padding (`dilate_px=8`), synthesized island bevel/cavity/RNM normals, non-overlapping packed atlas coverage (`total_uv_area <= 1.0` per LOD), zero `PreviewFloor` leakage, and no visible seams, missing regions, or emissive bleed.
 - Metallic is in `MetallicGloss.R`; smoothness (`1 - roughness`) is in `MetallicGloss.A`; the texture is linear and alpha is preserved.
 - Albedo/Emission are sRGB and Normal is imported as a normal map.
-- Prefab material uses the expected shader and map keyword, and the mesh retains its RGBA vertex colors and required sockets.
+- Prefab material uses the expected shader (`RogueCommand/VehiclePBR_VertexWear`) and map keyword across both base and `LODGroup` renderers (units and factories), and the mesh retains its RGBA vertex colors and required sockets.
 - Unit color, material separation, and emissive accents remain legible at RTS scale.
 - Evidence level is stated accurately: static, local Unity, or in-game runtime.
 

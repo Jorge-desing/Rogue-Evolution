@@ -454,6 +454,11 @@ namespace RogueCommandExpansion.Authoring
                     int transformCountBefore = prefabContents.GetComponentsInChildren<Transform>(true).Length;
                     bool materialUpdated = EnsureAllRenderersUsePrefabVertexWearMaterial(prefabContents);
                     bool lodUpdated = VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents);
+                    if (EnsureFreshCompanionLodGroupIfStale(prefabContents, modelObject, unitNames[i]))
+                    {
+                        lodUpdated = true;
+                        EnsureAllRenderersUsePrefabVertexWearMaterial(prefabContents);
+                    }
                     VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, modelObject);
                     VehiclePrefabBuilder.SetupAnimatorIfAvailable(
                         prefabContents,
@@ -512,11 +517,24 @@ namespace RogueCommandExpansion.Authoring
                 }
                 try
                 {
-                    if (VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents))
+                    bool materialUpdated = EnsureAllRenderersUsePrefabVertexWearMaterial(prefabContents);
+                    bool lodUpdated = VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents);
+                    if (factoryNames[i] != "BulwarkFoundry")
+                    {
+                        Transform modelTransform = GetUniqueNamedTransform(prefabContents, factoryNames[i] + "Model", false);
+                        GameObject modelObj = modelTransform != null ? modelTransform.gameObject : prefabContents;
+                        if (EnsureFreshCompanionLodGroupIfStale(prefabContents, modelObj, factoryNames[i]))
+                        {
+                            lodUpdated = true;
+                            EnsureAllRenderersUsePrefabVertexWearMaterial(prefabContents);
+                        }
+                    }
+                    if (materialUpdated || lodUpdated)
                     {
                         bool saved;
                         PrefabUtility.SaveAsPrefabAsset(prefabContents, factoryPrefabPaths[i], out saved);
-                        if (!saved) throw new InvalidOperationException("Could not save LOD ownership: " + factoryPrefabPaths[i]);
+                        if (!saved) throw new InvalidOperationException("Could not save factory PBR/LOD updates: " + factoryPrefabPaths[i]);
+                        NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, factoryPrefabPaths[i])));
                     }
                     ValidateLevelOnePbrAndLodContract(prefabContents, factoryPrefabPaths[i], factoryNames[i]);
                 }
@@ -553,10 +571,9 @@ namespace RogueCommandExpansion.Authoring
             Debug.Log("[CanonicalLevelOneVisuals] Validated " + prefabPath + ".");
         }
 
-        private static bool EnsureAllRenderersUsePrefabVertexWearMaterial(GameObject prefab)
+        private static Material FindCanonicalVertexWearMaterial(GameObject prefab)
         {
             Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
-            Material canonicalMat = null;
             for (int i = 0; i < renderers.Length; i++)
             {
                 Renderer r = renderers[i];
@@ -573,13 +590,50 @@ namespace RogueCommandExpansion.Authoring
                     if (mats[m] != null && mats[m].shader != null &&
                         String.Equals(mats[m].shader.name, VertexWearShaderName, StringComparison.Ordinal))
                     {
-                        canonicalMat = mats[m];
+                        return mats[m];
+                    }
+                }
+            }
+            return null;
+        }
+
+        private static bool EnsureFreshCompanionLodGroupIfStale(GameObject prefab, GameObject modelObject, string assetName)
+        {
+            LODGroup lodGroup = prefab.GetComponent<LODGroup>();
+            bool stale = lodGroup == null || lodGroup.lodCount < 3;
+            if (!stale)
+            {
+                LOD[] lods = lodGroup.GetLODs();
+                for (int l = 0; l < lods.Length; l++)
+                {
+                    Renderer[] lr = lods[l].renderers;
+                    if (lr == null || lr.Length == 0 || Array.Exists(lr, r => r == null))
+                    {
+                        stale = true;
                         break;
                     }
                 }
-                if (canonicalMat != null) break;
             }
+            if (!stale)
+            {
+                Transform lodChild = prefab.transform.Find(assetName + "LODGeometry");
+                if (lodChild != null && lodChild.GetComponentsInChildren<Renderer>(true).Length > 40)
+                {
+                    stale = true;
+                }
+            }
+            if (!stale) return false;
+
+            Material canonicalMat = FindCanonicalVertexWearMaterial(prefab);
+            VehiclePrefabBuilder.SetupCompanionLodGroup(prefab, modelObject, assetName, canonicalMat);
+            return true;
+        }
+
+        private static bool EnsureAllRenderersUsePrefabVertexWearMaterial(GameObject prefab)
+        {
+            Material canonicalMat = FindCanonicalVertexWearMaterial(prefab);
             if (canonicalMat == null) return false;
+            Renderer[] renderers = prefab.GetComponentsInChildren<Renderer>(true);
 
             bool changed = false;
             for (int i = 0; i < renderers.Length; i++)

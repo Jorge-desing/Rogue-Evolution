@@ -88,6 +88,14 @@ foreach ($preset in $uniquePresets) {
             break
         }
     }
+    if ($allPresent -and (Test-Path -LiteralPath $templatePath -PathType Leaf)) {
+        $tplContent = Get-Content -LiteralPath $templatePath -Raw
+        if ($tplContent -notmatch "plate_variation_opacity" -or $tplContent -notmatch '"schemaVersion"\s*:\s*3') {
+            $allPresent = $false
+        }
+    } else {
+        $allPresent = $false
+    }
     if ($allPresent -and -not $Force) {
         continue
     }

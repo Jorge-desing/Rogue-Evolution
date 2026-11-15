@@ -134,6 +134,35 @@ class MaterialMakerPbrPackingTests(unittest.TestCase):
         self.assertGreater(int(np.mean(composed["Emission"][emissive_mask, 2])), 200)
         self.assertEqual(int(np.max(composed["Emission"][tread_mask])), 0)
 
+    def test_albedo_min_mean_floor_and_hybrid_island_bevel_synthesis(self) -> None:
+        self.assertEqual(72, PACKER.ALBEDO_MIN_MEAN)
+
+        triangles = np.array([[0.15, 0.15, 0.85, 0.15, 0.50, 0.85]], dtype=np.float32)
+        regions = np.array([HYBRID.REGION_PRIMARY_ARMOR], dtype=np.uint8)
+        mask = HYBRID.rasterize_uv_region_mask(triangles, regions, resolution=64)
+        flat_nrm = np.tile(np.array([128, 128, 255], dtype=np.uint8), (64, 64, 1))
+        tiles = {
+            "Albedo": np.full((64, 64, 3), 108, dtype=np.uint8),
+            "Metallic": np.full((64, 64), 12, dtype=np.uint8),
+            "Roughness": np.full((64, 64), 118, dtype=np.uint8),
+            "Normal": flat_nrm,
+            "Emission": np.zeros((64, 64, 3), dtype=np.uint8),
+        }
+        composed = HYBRID.compose_hybrid_scalar_maps(
+            mask,
+            tiles,
+            tiles,
+            primary_tint_rgb=(20, 22, 26),
+            warning_rgb=(226, 148, 28),
+            emissive_rgb=(30, 220, 255),
+        )
+        armor_mask = mask == HYBRID.REGION_PRIMARY_ARMOR
+        self.assertGreaterEqual(float(np.mean(composed["Albedo"][..., :3])), 72.0)
+        self.assertGreaterEqual(float(np.mean(composed["Albedo"][armor_mask, :3])), 72.0)
+        self.assertTrue(
+            np.any((composed["Normal"][armor_mask, 0] != 128) | (composed["Normal"][armor_mask, 1] != 128))
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

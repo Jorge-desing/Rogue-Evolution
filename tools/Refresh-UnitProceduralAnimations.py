@@ -63,7 +63,7 @@ UNIT_SPECS: list[tuple[str, str, str | None, str, dict]] = [
 
 
 def _collect_export_objects(armature: bpy.types.Object) -> tuple[list[bpy.types.Object], list[bpy.types.Object]]:
-    """Collect base render/collider meshes (excluding _LOD1/_LOD2 clones) and sockets."""
+    """Collect base render/collider meshes (excluding _LOD1/_LOD2 clones and preview floors) and sockets."""
     meshes: list[bpy.types.Object] = []
     sockets: list[bpy.types.Object] = []
     for obj in bpy.data.objects:
@@ -71,7 +71,14 @@ def _collect_export_objects(armature: bpy.types.Object) -> tuple[list[bpy.types.
             continue
         if obj.type == "MESH":
             upper = obj.name.upper()
-            if upper.endswith("_LOD1") or upper.endswith("_LOD2") or "_LOD1_" in upper or "_LOD2_" in upper:
+            if (
+                upper.endswith("_LOD1")
+                or upper.endswith("_LOD2")
+                or "_LOD1_" in upper
+                or "_LOD2_" in upper
+                or upper.startswith("PREVIEW")
+                or "PREVIEWFLOOR" in upper
+            ):
                 continue
             meshes.append(obj)
         elif obj.type == "EMPTY" and (
@@ -79,6 +86,25 @@ def _collect_export_objects(armature: bpy.types.Object) -> tuple[list[bpy.types.
         ):
             sockets.append(obj)
     return meshes, sockets
+
+
+def _compute_total_uv_area(objects: list[bpy.types.Object]) -> float:
+    total = 0.0
+    for obj in objects:
+        if obj.type != "MESH":
+            continue
+        uv = obj.data.uv_layers.active
+        if uv is None:
+            continue
+        uvs = uv.data
+        for poly in obj.data.polygons:
+            if len(poly.loop_indices) < 3:
+                continue
+            u0, v0 = uvs[poly.loop_indices[0]].uv
+            u1, v1 = uvs[poly.loop_indices[1]].uv
+            u2, v2 = uvs[poly.loop_indices[2]].uv
+            total += 0.5 * abs((u1 - u0) * (v2 - v0) - (u2 - u0) * (v1 - v0))
+    return total
 
 
 def _verify_bone_root_stationary(actions: dict[str, bpy.types.Action]) -> None:
@@ -151,9 +177,48 @@ def refresh_unit(unit_name: str, blend_name: str, leg_type: str | None, fire_pro
     tmp_dir.mkdir(parents=True, exist_ok=True)
     tmp_fbx = tmp_dir / f"{unit_name}.fbx"
     try:
+        visual_meshes = [
+            obj for obj in meshes
+            if "_COLLIDER" not in obj.name.upper()
+            and not obj.name.endswith("_ShieldBubble")
+            and not any(m and "previewfloor" in m.name.lower() for m in obj.data.materials)
+        ]
+        aux_meshes = [
+            obj for obj in meshes
+            if "_COLLIDER" in obj.name.upper() or obj.name.endswith("_ShieldBubble")
+        ]
+        uv_area = _compute_total_uv_area(visual_meshes)
+        if len(visual_meshes) > 12 or uv_area > 1.25:
+            visual_meshes = rmk.batch_and_join_by_material(
+                visual_meshes,
+                prefix=unit_name,
+                smooth_by_angle=True,
+                weighted_normals=True,
+                unity_batch_names=True,
+            )
+            for b_obj in visual_meshes:
+                if b_obj.type == "MESH" and not any(m.type == "ARMATURE" for m in b_obj.modifiers):
+                    arm_mod = b_obj.modifiers.new(name="Armature", type="ARMATURE")
+                    arm_mod.object = armature
+            # Keep every Batch_* mesh origin at world (0,0,0) so local/BVHTree
+            # coordinates match world space (required by Level 2 host probes).
+            bpy.context.scene.cursor.location = (0.0, 0.0, 0.0)
+            for b_obj in visual_meshes:
+                if b_obj.type == "MESH" and b_obj.location.length > 1e-6:
+                    bpy.context.view_layer.objects.active = b_obj
+                    with bpy.context.temp_override(
+                        object=b_obj,
+                        active_object=b_obj,
+                        selected_objects=[b_obj],
+                        selected_editable_objects=[b_obj],
+                    ):
+                        bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+            rmk.unwrap_atlas_uvs(visual_meshes)
+
+        export_meshes = visual_meshes + aux_meshes
         rmk.export_unity_fbx(
             tmp_fbx,
-            meshes + [armature] + sockets,
+            export_meshes + [armature] + sockets,
             include_empties=True,
             include_armature=True,
             bake_anim=True,

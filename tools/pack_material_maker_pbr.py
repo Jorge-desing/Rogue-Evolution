@@ -34,8 +34,8 @@ SMOOTHNESS_LUT = [min(255 - i, MAX_SMOOTHNESS) for i in range(256)]
 SMOOTHNESS_LUT_U8 = np.array(SMOOTHNESS_LUT, dtype=np.uint8)
 # Statistics are sampled on a downscaled copy so the report stays cheap on 4K atlases.
 STATS_SAMPLE_SIZE = 64
-# sRGB albedo plausibility window for non-metal surfaces (charcoal .. fresh snow).
-ALBEDO_MIN_MEAN = 30
+# sRGB albedo plausibility window for URP metallic/dielectric PBR surfaces.
+ALBEDO_MIN_MEAN = 72
 ALBEDO_MAX_MEAN = 240
 NORMAL_LENGTH_TOLERANCE = 0.12
 FLAT_STDDEV = 0.75
@@ -312,6 +312,27 @@ def metallic_midtone_ratio(metallic: Image.Image) -> float:
     return float(mid / max(1, arr.size))
 
 
+def _image_luma_values(image: Image.Image, size: tuple[int, int]) -> list[int]:
+    resample = getattr(Image, "Resampling", Image).BILINEAR
+    resized = image.convert("L").resize((STATS_SAMPLE_SIZE, STATS_SAMPLE_SIZE), resample)
+    if size != (STATS_SAMPLE_SIZE, STATS_SAMPLE_SIZE):
+        resized = resized.resize(size, resample)
+    getter = getattr(resized, "get_flattened_data", None)
+    if callable(getter):
+        return list(getter())
+    return list(resized.getdata())
+
+
+def _compute_low_freq_blotch_ratio(image: Image.Image) -> float:
+    luma_64 = _image_luma_values(image, (STATS_SAMPLE_SIZE, STATS_SAMPLE_SIZE))
+    luma_8 = _image_luma_values(image, (8, 8))
+    mean_64 = sum(luma_64) / max(1, len(luma_64))
+    std_64 = (sum((v - mean_64) ** 2 for v in luma_64) / max(1, len(luma_64))) ** 0.5
+    mean_8 = sum(luma_8) / max(1, len(luma_8))
+    std_8 = (sum((v - mean_8) ** 2 for v in luma_8) / max(1, len(luma_8))) ** 0.5
+    return round(std_8 / max(std_64, 1e-6), 4)
+
+
 def _evaluate_report_image(label: str, image: Image.Image, stats: dict[str, object], warnings: list[str]) -> None:
     gray_or_rgb = image.convert("RGB") if label in {"Albedo", "Normal", "Emission"} else image.convert("L")
     stats[label] = channel_stats(gray_or_rgb)
@@ -319,6 +340,7 @@ def _evaluate_report_image(label: str, image: Image.Image, stats: dict[str, obje
         if max(stats[label]["stddev"]) < FLAT_STDDEV:
             warnings.append(f"{label} is flat (no variation); possible blank or failed export")
     if label == "Albedo":
+        stats[label]["lowFreqBlotchRatio"] = _compute_low_freq_blotch_ratio(gray_or_rgb)
         mean = sum(stats[label]["mean"]) / 3.0
         if not ALBEDO_MIN_MEAN <= mean <= ALBEDO_MAX_MEAN:
             warnings.append(

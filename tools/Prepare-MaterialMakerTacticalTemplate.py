@@ -1594,6 +1594,106 @@ EMISSION_PROFILES: dict[str, tuple[tuple[float, float, float], float, float]] = 
     "orbital_phased_array_comm": ((0.12, 0.65, 1.0), 0.40, 2.3),
 }
 
+FULL_METAL_PRESETS: frozenset[str] = frozenset(
+    {
+        "gunmetal_chassis",
+        "orbital_titanium",
+        "solar_gold_radiator",
+        "battleship_tungsten",
+        "beryllium_mirror_hull",
+        "fusion_reactor_core_plating",
+        "neosteel_command_citadel",
+        "ion_thruster_titanium_grate",
+        "tungsten_heavy_flak_plating",
+        "zero_g_docking_alloy",
+        "dreadnought_adamantine_hull",
+        "salvage_reclamation_ironclad",
+        "orbital_phased_array_comm",
+        "quantum_hyperdrive_alloy",
+        "pulsar_magnetic_shield",
+        "cryogenic_fuel_shroud",
+    }
+)
+
+
+def _lift_rgb_luma(
+    rgb: tuple[float, float, float],
+    min_mean: float,
+    max_channel: float = 0.96,
+) -> tuple[float, float, float]:
+    """Lift overly dark linear/sRGB gradient stops while preserving hue ratios."""
+    r, g, b = float(rgb[0]), float(rgb[1]), float(rgb[2])
+    cur = (r + g + b) / 3.0
+    if cur >= min_mean:
+        return (round(r, 4), round(g, 4), round(b, 4))
+    if cur <= 1e-4:
+        val = round(min_mean, 4)
+        return (val, val, val)
+    scale = min(min_mean / cur, 2.4)
+    residual = max(0.0, min_mean - cur * scale)
+    return (
+        round(min(max_channel, r * scale + residual), 4),
+        round(min(max_channel, g * scale + residual), 4),
+        round(min(max_channel, b * scale + residual), 4),
+    )
+
+
+def _calibrate_presets_for_urp(presets: dict[str, dict[str, object]]) -> None:
+    """Calibrate palettes to monotonic readable URP reflectance and physical metallic masks."""
+    for preset_name, cfg in presets.items():
+        is_metal = preset_name in FULL_METAL_PRESETS
+        min_palette_mean = 0.44 if is_metal else 0.36
+        min_stop_luma = 0.36 if is_metal else 0.28
+
+        raw_palette = tuple(cfg["plate_palette"])  # type: ignore[arg-type]
+        lifted_rgbs = [_lift_rgb_luma(rgb, min_stop_luma) for _, rgb in raw_palette]
+        overall_mean = sum(sum(c) / 3.0 for c in lifted_rgbs) / max(1, len(lifted_rgbs))
+        if overall_mean < min_palette_mean:
+            boost = min_palette_mean - overall_mean
+            lifted_rgbs = [
+                (
+                    round(min(0.96, c[0] + boost), 4),
+                    round(min(0.96, c[1] + boost), 4),
+                    round(min(0.96, c[2] + boost), 4),
+                )
+                for c in lifted_rgbs
+            ]
+
+        # Monotonic ascending sort eliminates alternating dark/bright blotches across plate IDs.
+        positions = sorted(float(pos) for pos, _ in raw_palette)
+        ordered_rgbs = sorted(
+            lifted_rgbs,
+            key=lambda c: 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2],
+        )
+        cfg["plate_palette"] = tuple(zip(positions, ordered_rgbs))
+
+        raw_seams = tuple(cfg["seam_tint"])  # type: ignore[arg-type]
+        cfg["seam_tint"] = tuple(
+            (float(pos), _lift_rgb_luma(rgb, 0.12 if idx == 0 else 0.20, max_channel=0.55))
+            for idx, (pos, rgb) in enumerate(raw_seams)
+        )
+
+        if is_metal:
+            cfg["metallic_curve"] = (
+                (0.0, (0.04, 0.04, 0.04)),
+                (0.04, (0.07, 0.07, 0.07)),
+                (0.07, (0.96, 0.96, 0.96)),
+                (1.0, (0.93, 0.93, 0.93)),
+            )
+        else:
+            cfg["metallic_curve"] = (
+                (0.0, (0.04, 0.04, 0.04)),
+                (0.04, (0.06, 0.06, 0.06)),
+                (0.07, (0.94, 0.94, 0.94)),
+                (0.12, (0.90, 0.90, 0.90)),
+                (0.16, (0.08, 0.08, 0.08)),
+                (1.0, (0.06, 0.06, 0.06)),
+            )
+        cfg.setdefault("plate_variation_amount", 0.08)
+
+
+_calibrate_presets_for_urp(PRESETS)
+
 
 def color(r: float, g: float, b: float) -> dict[str, object]:
     return {"a": 1.0, "b": round(float(b), 4), "g": round(float(g), 4), "r": round(float(r), 4), "type": "Color"}
@@ -1675,18 +1775,23 @@ def build_template_project(
     project = _load_example_template(example_path)
     project["label"] = preset["label"]
     project["name"] = preset["name"]
-    project["rogueCommandQuality"] = {
-        "profile": "tactical-hd-v2",
-        "authoringTool": "Material Maker 1.7",
-        "shader": "RogueCommand/VehiclePBR_VertexWear",
-        "microDetail": "multi-scale-normal-and-roughness",
-        "mapContract": ["Albedo", "MetallicGloss", "Normal", "Emission"],
-    }
-
     normal_strength = float(cast(float, preset.get("normal_strength", 0.38)))
     micro_scale = int(cast(int, preset.get("micro_perlin_scale", 96)))
     micro_blend_amount = float(cast(float, preset.get("micro_blend_amount", 0.12)))
     micro_roughness_amount = float(cast(float, preset.get("micro_roughness_amount", 0.10)))
+    plate_variation_amount = float(cast(float, preset.get("plate_variation_amount", 0.08)))
+
+    project["rogueCommandQuality"] = {
+        "profile": "tactical-hd-v2",
+        "schemaVersion": 3,
+        "authoringTool": "Material Maker 1.7",
+        "shader": "RogueCommand/VehiclePBR_VertexWear",
+        "microDetail": "multi-scale-normal-and-roughness",
+        "mapContract": ["Albedo", "MetallicGloss", "Normal", "Emission"],
+        "plateVariationOpacity": plate_variation_amount,
+        "urpLinearCalibrated": True,
+        "metallicRole": "metal" if preset_name in FULL_METAL_PRESETS else "coated_bevel_metal",
+    }
 
     nodes = project.get("nodes", [])
     for node in nodes:
@@ -1705,11 +1810,15 @@ def build_template_project(
             parameters["amount"] = float(preset.get("warp_amount", 0.0025))
             parameters["eps"] = 0.015
         elif name == "Perlin":
-            # Balanced isotropic aerospace micro-grain (smooth CNC finish without streaky banding).
+            # Smooth aerospace micro-grain without streaky banding or blotches.
             parameters["scale_x"] = int(preset.get("perlin_scale_x", 12))
             parameters["scale_y"] = int(preset.get("perlin_scale_y", 12))
-            parameters["iterations"] = 4
-            parameters["persistence"] = 0.50
+            parameters["iterations"] = 3
+            parameters["persistence"] = 0.42
+        elif name == "blend_1":
+            # Attenuated mix over Bricks plate IDs (replaces unmasked multiply that mottled plates).
+            parameters["amount"] = plate_variation_amount
+            parameters["blend_type"] = 0
         elif name == "blend_2":
             # Crisp panel bevel geometry blended with subtle satin metal micro-relief.
             parameters["amount"] = float(preset.get("micro_relief_amount", 0.035))
@@ -1746,6 +1855,14 @@ def build_template_project(
 
     _ensure_node(
         nodes,
+        "plate_variation_opacity",
+        "uniform_greyscale",
+        (140.0, 320.0),
+        {"color": plate_variation_amount},
+    )
+
+    _ensure_node(
+        nodes,
         "micro_perlin",
         "perlin",
         (480.0, 520.0),
@@ -1758,6 +1875,13 @@ def build_template_project(
     )
     _ensure_node(
         nodes,
+        "base_detail_opacity",
+        "uniform_greyscale",
+        (250.0, 520.0),
+        {"color": float(preset.get("micro_relief_amount", 0.08))},
+    )
+    _ensure_node(
+        nodes,
         "micro_detail_blend",
         "blend",
         (700.0, 520.0),
@@ -1765,10 +1889,26 @@ def build_template_project(
     )
     _ensure_node(
         nodes,
+        "micro_detail_opacity",
+        "uniform_greyscale",
+        (480.0, 600.0),
+        {"color": micro_blend_amount},
+    )
+    _ensure_node(
+        nodes,
         "micro_roughness_blend",
         "blend",
         (920.0, 240.0),
         {"amount": micro_roughness_amount, "blend_type": 0},
+    )
+    # Material Maker 1.7's blend shader reads the mask from input 2; its
+    # serialized amount alone does not attenuate an unconnected mask.
+    _ensure_node(
+        nodes,
+        "micro_roughness_opacity",
+        "uniform_greyscale",
+        (700.0, 300.0),
+        {"color": micro_roughness_amount},
     )
     project["rogueCommandQuality"].update(
         {
@@ -1822,6 +1962,8 @@ def build_template_project(
                 "micro_detail_blend",
                 "micro_roughness_blend",
                 "normal_map_2",
+                "blend_1",
+                "blend_2",
             )
         )
     ]
@@ -1867,17 +2009,29 @@ def build_template_project(
     )
     connections.extend(
         [
+            {"from": "Perlin", "from_port": 0, "to": "blend_1", "to_port": 0},
+            {"from": "graph", "from_port": 1, "to": "blend_1", "to_port": 1},
+            {"from": "plate_variation_opacity", "from_port": 0, "to": "blend_1", "to_port": 2},
+            {"from": "Perlin", "from_port": 0, "to": "blend_2", "to_port": 0},
+            {"from": "Warp", "from_port": 0, "to": "blend_2", "to_port": 1},
+            {"from": "base_detail_opacity", "from_port": 0, "to": "blend_2", "to_port": 2},
             {
                 "from": "blend_2",
                 "from_port": 0,
                 "to": "micro_detail_blend",
-                "to_port": 0,
+                "to_port": 1,
             },
             {
                 "from": "micro_perlin",
                 "from_port": 0,
                 "to": "micro_detail_blend",
-                "to_port": 1,
+                "to_port": 0,
+            },
+            {
+                "from": "micro_detail_opacity",
+                "from_port": 0,
+                "to": "micro_detail_blend",
+                "to_port": 2,
             },
             {
                 "from": "micro_detail_blend",
@@ -1889,13 +2043,19 @@ def build_template_project(
                 "from": "colorize_4",
                 "from_port": 0,
                 "to": "micro_roughness_blend",
-                "to_port": 0,
+                "to_port": 1,
             },
             {
                 "from": "micro_perlin",
                 "from_port": 0,
                 "to": "micro_roughness_blend",
-                "to_port": 1,
+                "to_port": 0,
+            },
+            {
+                "from": "micro_roughness_opacity",
+                "from_port": 0,
+                "to": "micro_roughness_blend",
+                "to_port": 2,
             },
             {
                 "from": "micro_roughness_blend",

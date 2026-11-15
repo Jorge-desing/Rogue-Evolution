@@ -96,8 +96,16 @@ def main() -> None:
         raise RuntimeError(f"{exc}. Diagnostic report: {report_path}") from exc
 
     try:
+        batched = rmk.batch_and_join_by_material(
+            meshes,
+            prefix=ASSET_ID,
+            smooth_by_angle=True,
+            weighted_normals=True,
+            unity_batch_names=True,
+        )
+        rmk.unwrap_atlas_uvs(batched)
         ratios = rmk.lod_ratios_from_budget(asset_budget, source_triangles)
-        lods = rmk.generate_lod_chain(meshes, prefix=ASSET_ID, lod_levels=ratios)
+        lods = rmk.generate_lod_chain(batched, prefix=ASSET_ID, lod_levels=ratios, lod_name_first=True)
         budget_summary = rmk.summarize_lod_budget(asset_budget, lods)
         report["calibrationStatus"] = "uncalibrated"
         report["geometryBudgetStatus"] = "UNCALIBRATED_USER_AUTHORIZED"
@@ -110,6 +118,23 @@ def main() -> None:
 
         candidate_dir = ROOT / "artifacts" / "overlord-hq-factory-build" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         candidate_dir.mkdir(parents=True, exist_ok=False)
+        sockets = [
+            obj for obj in bpy.context.scene.objects
+            if obj.type == "EMPTY" and (obj.name.startswith("Socket_") or obj.name.startswith("FirePoint_"))
+        ]
+        base_fbx_target = MODEL_DIR / f"{ASSET_ID}.fbx"
+        candidate_base = candidate_dir / f"{ASSET_ID}.fbx"
+        rmk.export_unity_fbx(
+            candidate_base,
+            list(batched) + sockets,
+            include_empties=True,
+            asset_id=ASSET_ID,
+            prevalidated_budget=asset_budget,
+        )
+        if candidate_base.is_file():
+            tmp_base = base_fbx_target.with_name(base_fbx_target.name + ".tmp")
+            shutil.copy2(candidate_base, tmp_base)
+            os.replace(tmp_base, base_fbx_target)
         candidate_lods = candidate_dir / f"{ASSET_ID}_LODs.fbx"
         rmk.export_unity_fbx(
             candidate_lods,

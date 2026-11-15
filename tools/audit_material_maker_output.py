@@ -120,7 +120,28 @@ def build_quality_report(
                 "channels": len(image.getbands()),
                 "stats": _channel_stats(image.convert("RGBA" if suffix == "MetallicGloss" else "RGB")),
             }
-            if suffix == "MetallicGloss":
+            if suffix == "Albedo":
+                rgb_means = entry["stats"].get("mean", [0.0, 0.0, 0.0])
+                entry["luminanceMean"] = round(
+                    0.2126 * float(rgb_means[0])
+                    + 0.7152 * float(rgb_means[1])
+                    + 0.0722 * float(rgb_means[2]),
+                    4,
+                )
+                resample = getattr(Image, "Resampling", Image).BILINEAR
+                luma_8_img = (
+                    image.convert("L")
+                    .resize((64, 64), resample)
+                    .resize((8, 8), resample)
+                )
+                luma_8_getter = getattr(luma_8_img, "get_flattened_data", None)
+                luma_8 = list(luma_8_getter() if callable(luma_8_getter) else luma_8_img.getdata())
+                mean_8 = sum(luma_8) / max(1, len(luma_8))
+                entry["lowFreqBlotchStd"] = round(
+                    (sum((v - mean_8) ** 2 for v in luma_8) / max(1, len(luma_8))) ** 0.5,
+                    4,
+                )
+            elif suffix == "MetallicGloss":
                 entry.update(_metallic_gloss_metrics(image))
             elif suffix == "Normal":
                 entry.update(_normal_metrics(image))
@@ -175,10 +196,18 @@ def build_quality_report(
         {},
     )
     material_parameters = material_node.get("parameters", {}) if isinstance(material_node, dict) else {}
-    quality_profile = (
-        ptex.get("rogueCommandQuality", {}).get("profile", "")
-        if ptex
-        else ""
+    quality_meta = ptex.get("rogueCommandQuality", {}) if isinstance(ptex, dict) else {}
+    quality_profile = quality_meta.get("profile", "") if isinstance(quality_meta, dict) else ""
+    quality_schema_version = int(quality_meta.get("schemaVersion", 0) or 0) if isinstance(quality_meta, dict) else 0
+    plate_variation_connected = (
+        isinstance(connections, list)
+        and any(
+            isinstance(c, dict)
+            and c.get("from") == "plate_variation_opacity"
+            and c.get("to") == "blend_1"
+            and int(c.get("to_port", -1)) == 2
+            for c in connections
+        )
     )
 
     workspace_directory = Path(workspace_path) if workspace_path is not None else directory
@@ -212,7 +241,10 @@ def build_quality_report(
         "hasMicroPerlinNode": "micro_perlin" in node_names,
         "microDetailConnected": micro_detail_connected,
         "microRoughnessConnected": micro_roughness_connected,
+        "hasPlateVariationNode": "plate_variation_opacity" in node_names,
+        "plateVariationConnected": plate_variation_connected,
         "qualityProfile": quality_profile,
+        "qualitySchemaVersion": quality_schema_version,
         "emissionEnergy": material_parameters.get("emission_energy", 0),
         "normalNodePresent": "normal_map_2" in node_names,
     }
@@ -220,6 +252,8 @@ def build_quality_report(
     failures: list[str] = []
     if len(dimensions) != 1:
         failures.append("map-dimensions-differ")
+    if float(maps["Albedo"].get("luminanceMean", 0.0)) < 72.0:
+        failures.append("albedo-too-dark-for-urp")
     if maps["MetallicGloss"].get("rgbMaxDelta", 1) != 0:
         failures.append("metallic-gloss-rgb-not-identical")
     if maps["MetallicGloss"].get("smoothnessAlphaNonzeroFraction", 0) <= 0:
@@ -242,6 +276,8 @@ def build_quality_report(
         failures.append("procedural-micro-normal-graph-not-connected")
     if ptex is not None and not micro_roughness_connected:
         failures.append("procedural-micro-roughness-graph-not-connected")
+    if ptex is not None and quality_schema_version >= 3 and not plate_variation_connected:
+        failures.append("procedural-plate-variation-graph-not-connected")
     if ptex is not None and float(material_parameters.get("emission_energy", 0)) <= 0.0:
         failures.append("procedural-emission-energy-not-positive")
     if workspace and not three_d["singleSubmeshForPaint"]:

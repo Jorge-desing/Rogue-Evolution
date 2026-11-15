@@ -93,6 +93,8 @@ def extract_unit_uv_regions(unit_name: str, models_dir: Path, output_dir: Path) 
         if obj.type == "MESH"
         and "_COLLIDER" not in obj.name.upper()
         and "_SHIELDBUBBLE" not in obj.name.upper()
+        and "PREVIEW" not in obj.name.upper()
+        and not any(m and "previewfloor" in m.name.lower() for m in obj.data.materials)
         and "LOD1" not in obj.name.upper()
         and "LOD2" not in obj.name.upper()
     ]

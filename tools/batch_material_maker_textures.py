@@ -40,6 +40,7 @@ REQUIRED_TEMPLATE_TOKENS = (
     "micro_perlin",
     "micro_detail_blend",
     "micro_roughness_blend",
+    "plate_variation_opacity",
     "tactical-hd-v2",
 )
 PRESET_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]*$")

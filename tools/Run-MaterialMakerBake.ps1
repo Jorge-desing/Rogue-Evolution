@@ -190,6 +190,7 @@ if (-not $needsPrepare -and -not $templateWasExplicit -and (Test-Path $template)
         $existingContent -notmatch "micro_perlin" -or
         $existingContent -notmatch "micro_detail_blend" -or
         $existingContent -notmatch "micro_roughness_blend" -or
+        $existingContent -notmatch "plate_variation_opacity" -or
         $existingContent -notmatch "tactical-hd-v2") {
         $needsPrepare = $true
     }

@@ -83,6 +83,32 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
             self.assertEqual(1, len(detail_connections), preset)
             self.assertEqual(1, len(roughness_connections), preset)
             self.assertEqual(1, len(material_roughness_connections), preset)
+            normal_inputs = {
+                (c.get("from"), c.get("to_port"))
+                for c in project.get("connections", [])
+                if c.get("to") == "micro_detail_blend"
+            }
+            self.assertEqual({("micro_perlin", 0), ("blend_2", 1),
+                              ("micro_detail_opacity", 2)}, normal_inputs, preset)
+            base_inputs = {(c.get("from"), c.get("to_port"))
+                           for c in project.get("connections", []) if c.get("to") == "blend_2"}
+            self.assertEqual({("Perlin", 0), ("Warp", 1),
+                              ("base_detail_opacity", 2)}, base_inputs, preset)
+            normal_opacity = next(n for n in project["nodes"] if n.get("name") == "micro_detail_opacity")
+            self.assertAlmostEqual(float(project["rogueCommandQuality"]["microNormalBlend"]),
+                                   float(normal_opacity["parameters"]["color"]), places=3, msg=preset)
+            # Material Maker 1.7 blend ports are foreground, background, mask.
+            blend_inputs = {
+                (c.get("from"), c.get("to_port"))
+                for c in project.get("connections", [])
+                if c.get("to") == "micro_roughness_blend"
+            }
+            self.assertEqual({("micro_perlin", 0), ("colorize_4", 1),
+                              ("micro_roughness_opacity", 2)}, blend_inputs, preset)
+            opacity = next(n for n in project["nodes"] if n.get("name") == "micro_roughness_opacity")
+            self.assertEqual("uniform_greyscale", opacity["type"], preset)
+            self.assertAlmostEqual(float(project["rogueCommandQuality"]["microRoughnessBlend"]),
+                                   float(opacity["parameters"]["color"]), places=3, msg=preset)
 
     def test_all_presets_wire_bimodal_metallic_node(self) -> None:
         if not TEMPLATE_BUILDER.EXAMPLE.is_file():
@@ -145,6 +171,45 @@ class MaterialMakerWorkflowConfigTests(unittest.TestCase):
             self.assertTrue((ws / "paint-workspace.json").is_file())
             self.assertTrue(manifest["singleSubmeshForPaint"])
             self.assertTrue(manifest["productionMeshUntouched"])
+
+    def test_all_presets_wire_plate_variation_and_calibrated_urp_palettes(self) -> None:
+        if not TEMPLATE_BUILDER.EXAMPLE.is_file():
+            self.skipTest("Material Maker 1.7 example is not staged locally")
+        for preset_name, preset in sorted(TEMPLATE_BUILDER.PRESETS.items()):
+            lumas = [
+                0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]
+                for _, rgb in preset["plate_palette"]
+            ]
+            rgb_means = [sum(rgb) / 3.0 for _, rgb in preset["plate_palette"]]
+            self.assertEqual(lumas, sorted(lumas), f"Preset {preset_name} plate_palette must be monotonic")
+            mean_rgb = sum(rgb_means) / len(rgb_means)
+            mean_luma = sum(lumas) / len(lumas)
+            self.assertGreaterEqual(mean_rgb, 0.359, f"Preset {preset_name} palette RGB mean {mean_rgb:.3f} < 0.359")
+            self.assertGreaterEqual(mean_luma, 0.30, f"Preset {preset_name} palette luma {mean_luma:.3f} < 0.30")
+            if preset_name in TEMPLATE_BUILDER.FULL_METAL_PRESETS:
+                self.assertGreaterEqual(mean_rgb, 0.439, f"Metal preset {preset_name} palette RGB mean < 0.439")
+
+            project = TEMPLATE_BUILDER.build_template_project(preset_name=preset_name, size_power=10)
+            qmeta = project.get("rogueCommandQuality", {})
+            self.assertGreaterEqual(int(qmeta.get("schemaVersion", 0)), 3)
+            self.assertTrue(qmeta.get("urpLinearCalibrated"))
+
+            nodes = {n.get("name"): n for n in project.get("nodes", [])}
+            self.assertIn("plate_variation_opacity", nodes, preset_name)
+            self.assertEqual("uniform_greyscale", nodes["plate_variation_opacity"].get("type"))
+            self.assertLessEqual(float(nodes["plate_variation_opacity"]["parameters"]["color"]), 0.12)
+            self.assertEqual(0, nodes["blend_1"]["parameters"].get("blend_type"), preset_name)
+
+            blend1_inputs = {
+                (c.get("from"), c.get("to_port"))
+                for c in project.get("connections", [])
+                if c.get("to") == "blend_1"
+            }
+            self.assertEqual(
+                {("Perlin", 0), ("graph", 1), ("plate_variation_opacity", 2)},
+                blend1_inputs,
+                preset_name,
+            )
 
 
 if __name__ == "__main__":

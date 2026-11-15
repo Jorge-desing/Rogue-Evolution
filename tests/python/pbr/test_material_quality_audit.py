@@ -88,6 +88,48 @@ class MaterialQualityAuditTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 AUDIT.build_quality_report(root, "Missing")
 
+    def test_audit_rejects_dark_albedo_and_unconnected_v3_plate_variation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prefix = "Crushed"
+            Image.new("RGB", (16, 16), (40, 42, 46)).save(root / f"{prefix}_Albedo.png")
+            Image.new("RGBA", (16, 16), (255, 255, 255, 190)).save(root / f"{prefix}_MetallicGloss.png")
+            Image.new("RGB", (16, 16), (128, 128, 255)).save(root / f"{prefix}_Normal.png")
+            Image.new("RGB", (16, 16), (0, 0, 0)).save(root / f"{prefix}_Emission.png")
+            (root / f"{prefix}.ptex").write_text(
+                json.dumps(
+                    {
+                        "rogueCommandQuality": {"profile": "tactical-hd-v2", "schemaVersion": 3},
+                        "nodes": [
+                            {"name": "Material", "parameters": {"emission_energy": 2.0}},
+                            {"name": "colorize_metallic"},
+                            {"name": "colorize_emission"},
+                            {"name": "edge_detect_emission"},
+                            {"name": "micro_perlin"},
+                            {"name": "normal_map_2"},
+                        ],
+                        "connections": [
+                            {"from": "colorize_metallic", "to": "Material", "to_port": 1},
+                            {"from": "colorize_emission", "to": "Material", "to_port": 5},
+                            {"from": "edge_detect_emission", "to": "colorize_emission", "to_port": 0},
+                            {"from": "micro_perlin", "to": "micro_detail_blend", "to_port": 0},
+                            {"from": "micro_perlin", "to": "micro_roughness_blend", "to_port": 0},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = AUDIT.build_quality_report(root, prefix)
+            self.assertFalse(report["qualityGate"]["passed"])
+            self.assertLess(report["maps"]["Albedo"]["luminanceMean"], 72.0)
+            self.assertIn("lowFreqBlotchStd", report["maps"]["Albedo"])
+            self.assertIn("albedo-too-dark-for-urp", report["qualityGate"]["failures"])
+            self.assertIn(
+                "procedural-plate-variation-graph-not-connected",
+                report["qualityGate"]["failures"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
