@@ -3085,3 +3085,7 @@ Windows rollback now also checks files interrupted before flush completed: match
 ### Native template coverage and real-pack composition (2026-11-15)
 
 An extraction of `sample-native:scout-tank` to `artifacts/composition-real-pack-20261115` succeeded, validated locally and contained 9 units, 3 stages, 3 profiles, 1 relic and 1 bundle. This exposed missing native-template reporting: the analyzer now reports unit, factory, building, stage, landscape and AI templates as unverified. The previously emitted sidecar predates that fix and must be regenerated for current coverage. Dependency/composition modules passed 42 tests. This is not live gameplay evidence. Stage publication and POSIX safety remain open.
+
+### Regenerated composition evidence (2026-11-15)
+
+Regenerated `sample-native:scout-tank` extraction into `artifacts/composition-real-pack-native-templates-20261115`; the CLI reported 16 unverified native templates, the sidecar contains all 16 and its content SHA-256 matches. `tools.validate_content_pack` passed; no external pack IDs were required. The earlier output remains preserved and its sidecar predates template reporting. These are local checks, not live game acceptance.
