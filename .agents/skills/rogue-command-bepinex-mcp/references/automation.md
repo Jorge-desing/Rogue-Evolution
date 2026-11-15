@@ -66,6 +66,8 @@ Supported order shapes:
 
 The dispatcher requires the active `Game` scene, resolves every actor uniquely, and rejects the plan before dispatch if an actor is missing, ambiguous, destroyed, not a player-controlled unit, or reused by another order. `Attack` and `CoordinatedAssault` also require a live hostile target. Native dispatch follows the plan order in one Unity-thread callback. The response includes an item for each command and separates `accepted`, `complete`, and `partial`; if a native command fails after dispatch begins, later independent orders still run and earlier orders cannot be rolled back. Inspect `dispatchResult` and the plan counts before deciding what to replan.
 
+Entity-key resolution requires a complete read of the live controller registries. If a registry cannot be enumerated, resolution returns no match instead of treating a partial census as proof of uniqueness. Refresh the state and diagnose the registry before issuing another order.
+
 This is a one-shot command surface, not a game-side autopilot. The outside agent owns the observe → decide → dispatch → observe loop. Use fresh battlefield state after each plan; use `automation_run_sequence` when later commands depend on arrival, health, mana, or another changing condition. Do not put two orders for the same unit in one plan to simulate a queue; use the native order sequence and state waits instead.
 
 Example mixed order call (replace every key and coordinate with current live values):

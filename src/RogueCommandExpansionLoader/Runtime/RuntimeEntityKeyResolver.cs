@@ -82,7 +82,9 @@ namespace RogueCommandExpansionLoader.Runtime
             }
             catch
             {
-                // Keep already collected candidates; callers still fail closed on ambiguity.
+                // A partial census cannot establish uniqueness: an unread registry may
+                // contain another entity with the same key.
+                candidates.Clear();
             }
 
             return candidates;
@@ -114,15 +116,7 @@ namespace RogueCommandExpansionLoader.Runtime
                 return;
             }
 
-            int instanceId;
-            try
-            {
-                instanceId = candidate.GetInstanceID();
-            }
-            catch
-            {
-                return;
-            }
+            int instanceId = candidate.GetInstanceID();
 
             if (seenInstanceIds.Add(instanceId))
             {

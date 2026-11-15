@@ -17,6 +17,22 @@ internal static partial class ValidationTestRunner
 {
     internal static IEnumerable<(string Name, Action Run)> GetRuntimeAndDiagnosticsValidationTests() => new (string Name, Action Run)[]
     {
+    ("entity key resolution rejects an incomplete registry", () =>
+    {
+        var existing = ExistingControllers.Instance;
+        existing.Reset();
+        try
+        {
+            var unit = new EntityController { UniqueEntityId = 712, IsControlledByPlayer = true, IsUnit = true };
+            existing.PlayerUnits().Add(unit);
+            if (!ReferenceEquals(RuntimeEntityKeyResolver.FindUniqueEntityByKey(existing, "712"), unit))
+                throw new Exception("A complete registry must resolve the unit.");
+            existing.ThrowOnAiBuildings = true;
+            if (RuntimeEntityKeyResolver.FindUniqueEntityByKey(existing, "712") != null)
+                throw new Exception("A partial registry must not establish a unique entity.");
+        }
+        finally { existing.Reset(); }
+    }),
     ("temporary taunt resumes only its own expired order", () =>
     {
         float saved = UnityEngine.Time.time;
