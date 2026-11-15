@@ -164,3 +164,5 @@ Composition now combines disjoint Unity manifests in the staging directory and c
 Composed pack publication now uses an atomic no-replace rename (Windows `os.rename`, Linux `renameat2` with `RENAME_NOREPLACE`); existing destinations are preserved even if they appear just before publication. Source path opening still requires race-resistant handles before the workflow is production-ready.
 
 `tools.secure_pack_read.open_pack_file` opens pack manifests and source bundle files through non-reparse directory handles. On Windows directories are held without delete sharing during the read and the file without write/delete sharing; POSIX uses directory-relative `O_NOFOLLOW` handles. The source bundle transfer uses this helper. The isolated destination still needs a complete concurrency review.
+
+The external dependency analyzer also tracks `units[].upgrades[].targetUnitId` and `upgrades[].mustNotHaveOneOfTheseEntityIds` at their actual schema locations.

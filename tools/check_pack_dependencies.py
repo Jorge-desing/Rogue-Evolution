@@ -66,6 +66,9 @@ def external_references(pack: dict) -> set[str]:
     for unit in _as_list(pack.get("units")):
         if isinstance(unit, dict):
             _add(unit.get("copyUpgradesToEntityId"))
+            for upgrade in _as_list(unit.get("upgrades")):
+                if isinstance(upgrade, dict):
+                    _add(upgrade.get("targetUnitId"))
             for synergy in _as_list(unit.get("synergies")):
                 if isinstance(synergy, dict):
                     for value in _as_list(synergy.get("targetUnitIds")):
@@ -99,6 +102,8 @@ def external_references(pack: dict) -> set[str]:
     for relic in _as_list(pack.get("relics")) + _as_list(pack.get("upgrades")):
         if not isinstance(relic, dict):
             continue
+        for value in _as_list(relic.get("mustNotHaveOneOfTheseEntityIds")):
+            _add(value)
         for change in _as_list(relic.get("cardChanges")):
             if isinstance(change, dict):
                 for key in ("onlyForTheseEntityIds", "entityIdsNotAllowed", "mustNotHaveOneOfTheseEntityIds"):

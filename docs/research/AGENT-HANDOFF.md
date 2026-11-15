@@ -2898,3 +2898,7 @@ The staged writer copies each source bundle set into an isolated subdirectory, c
 ## 2026-11-15 — Full Python suite and composition review continuation
 
 `python -m tools.run_python_tests` finished unsuccessful in 67.36 seconds; full report `artifacts/python-tests/report.json`. Two cases failed: Bulwark ERA host-fit test observed current FBX hash `5bda18797919dc2155a56f855333c61730d59596b37420fbf258965dd62a3948` instead of pinned `1e7af7c4ecea592a970b188eb39054eb32b9f369b2b7b75753dd30760ff24ed1`; Arachnid export test found zero expected independent clips rather than five. Visual source and FBX files are concurrently modified; inspect their owning authoring work before changing fixtures or hashes. The user requested destination/rollback security, complete reference coverage and remaining checks for pack composition; these remain open. No production changes were made during this observation.
+
+## 2026-11-15 — Additional composition references
+
+`check_pack_dependencies.external_references` now detects unit upgrade targets and upgrade-level excluded entity IDs; those fields were previously omitted or inspected only inside card changes. Local targeted checks: 32 passed, one Windows symlink privilege skip (33 total). Destination staging and rollback, remaining reference coverage and full-suite failures remain open. No game runtime test.

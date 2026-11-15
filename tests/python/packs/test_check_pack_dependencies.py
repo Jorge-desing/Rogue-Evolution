@@ -53,6 +53,14 @@ class CheckPackDependenciesTests(unittest.TestCase):
         report = DEPS.analyze_dependencies(packs)
         self.assertEqual([], report["packs"][0]["externalReferences"])
 
+    def test_unit_upgrade_and_upgrade_exclusion_dependencies_are_reported(self) -> None:
+        pack = _packs()["scaffold"]
+        pack["units"][0]["upgrades"] = [{"targetUnitId": "external:next"}]
+        pack["upgrades"] = [{"id": "ns:upgrade", "mustNotHaveOneOfTheseEntityIds": ["external:blocked"]}]
+        refs = DEPS.external_references(pack)
+        self.assertIn("external:next", refs)
+        self.assertIn("external:blocked", refs)
+
     def test_synergy_profile_dependencies_module_and_ambiguous_providers(self) -> None:
         packs = _packs()
         dependent = SCAFFOLD.generate_scaffold("other:pack", "beta")
