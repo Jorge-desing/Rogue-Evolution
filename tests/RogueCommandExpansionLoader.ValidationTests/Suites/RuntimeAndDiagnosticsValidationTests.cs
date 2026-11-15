@@ -3735,8 +3735,8 @@ internal static partial class ValidationTestRunner
         {
             var playerShader = new Shader { name = RuntimeShieldColorSync.PlayerShieldShaderName };
             var aiShader = new Shader { name = RuntimeShieldColorSync.AiShieldShaderName };
-            var playerShieldMat = new Material { name = "ShieldFor AI EntityMaterial 1", shader = playerShader };
-            var aiShieldMat = new Material { name = "ShieldForEntityMaterial", shader = aiShader };
+            var playerShieldMat = new Material { name = "ShieldForEntityMaterial", shader = playerShader };
+            var aiShieldMat = new Material { name = "ShieldFor AI EntityMaterial 1", shader = aiShader };
             UnityEngine.Object.NativeControlTestObjects = new UnityEngine.Object[] { playerShieldMat, aiShieldMat };
 
             if (!RuntimeShieldColorSync.ShouldReplaceShieldShader(true, false, RuntimeShieldColorSync.AiShieldShaderName, out string target) ||

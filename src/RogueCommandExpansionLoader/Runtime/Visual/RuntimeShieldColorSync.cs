@@ -11,8 +11,8 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
     /// </summary>
     public static class RuntimeShieldColorSync
     {
-        public const string PlayerShieldShaderName = "Shader Graphs/EntityShieldShader";
-        public const string AiShieldShaderName = "Shader Graphs/EntityShieldShader2";
+        public const string PlayerShieldShaderName = "Shader Graphs/EntityShieldShader2";
+        public const string AiShieldShaderName = "Shader Graphs/EntityShieldShader";
 
         private static FieldInfo _shieldGameObjectField;
         private static bool _shieldGameObjectFieldLookedUp;
@@ -151,7 +151,7 @@ namespace RogueCommandExpansionLoader.Runtime.Visual
             if (found == null)
             {
                 found = LoadMaterialFromReferenceTemplate(
-                    isPlayer ? "PCXBaseTank" : "LightningTank",
+                    isPlayer ? "LightningTank" : "PCXBaseTank",
                     targetShaderName);
             }
 

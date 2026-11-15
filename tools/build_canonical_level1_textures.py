@@ -208,7 +208,7 @@ def _stabilize_tile_grooves(
         + 0.7152 * tile_rgb[..., 1]
         + 0.0722 * tile_rgb[..., 2]
     )
-    target_floor = floor_luma * (1.0 - 0.35 * groove_weight)
+    target_floor = floor_luma * (1.0 - 0.15 * groove_weight)
     needs_lift = luma < target_floor
     if not np.any(needs_lift):
         return tile_rgb
@@ -217,6 +217,12 @@ def _stabilize_tile_grooves(
     scale[needs_lift] = target_floor[needs_lift] / np.maximum(luma[needs_lift], 8.0)
     out = np.clip(out * np.minimum(scale, 4.0)[..., None], 0.0, 255.0)
     return out
+
+
+def _soften_tile_contrast(tile_rgb: np.ndarray, keep_detail: float = 0.50) -> np.ndarray:
+    """Compress high-contrast blotches/mortar streaks while preserving micro-surface grain."""
+    mean_rgb = np.mean(tile_rgb, axis=(0, 1), keepdims=True)
+    return np.clip(mean_rgb * (1.0 - keep_detail) + tile_rgb * keep_detail, 0.0, 255.0)
 
 
 def _lift_tint_for_urp(rgb: Tuple[int, int, int], min_mean: float) -> np.ndarray:
@@ -251,8 +257,8 @@ def compose_hybrid_scalar_maps(
     g_nrm = gunmetal_tiles["Normal"]
 
     bevel_ring, seam_cavity, bevel_height, groove_weight = _compute_uv_island_bevel_fields(region_mask)
-    p_alb_stab = _stabilize_tile_grooves(p_alb, groove_weight, floor_luma=76.0)
-    g_alb_stab = _stabilize_tile_grooves(g_alb, groove_weight, floor_luma=88.0)
+    p_alb_stab = _soften_tile_contrast(_stabilize_tile_grooves(p_alb, groove_weight, floor_luma=126.0), keep_detail=0.45)
+    g_alb_stab = _soften_tile_contrast(_stabilize_tile_grooves(g_alb, groove_weight, floor_luma=112.0), keep_detail=0.55)
 
     # Fill gutter background with muted Material Maker base tone while keeping alpha=0
     # outside UV islands so Voronoi UV dilation still bleeds exact edge texels out by
@@ -274,21 +280,21 @@ def compose_hybrid_scalar_maps(
     # 1: Primary armor (Material Maker primary preset + URP-calibrated role tint cohesion)
     m = region_mask == REGION_PRIMARY_ARMOR
     if np.any(m):
-        tint = _lift_tint_for_urp(primary_tint_rgb, 96.0)
-        blended = np.clip(p_alb_stab * 0.72 + tint * 0.28 * grain, 52.0, 238.0).astype(np.uint8)
+        tint = _lift_tint_for_urp(primary_tint_rgb, 108.0)
+        blended = np.clip(p_alb_stab * 0.42 + tint * 0.58 * grain, 64.0, 238.0).astype(np.uint8)
         albedo[m, :3] = blended[m]
-        metallic[m] = p_met[m]
-        roughness[m] = np.clip(p_rgh[m], 48, 210)
+        metallic[m] = np.where(p_met[m] >= 128, 16, 4).astype(np.uint8)
+        roughness[m] = np.clip(p_rgh[m], 64, 210)
         normal[m] = p_nrm[m]
 
     # 2: Light armor (lifted contrasting panel plating derived from MM primary preset)
     m = region_mask == REGION_LIGHT_ARMOR
     if np.any(m):
-        tint = _lift_tint_for_urp(primary_tint_rgb, 134.0)
-        lifted = np.clip(p_alb_stab * 0.74 + tint * 0.26 * grain + 38.0, 74.0, 244.0).astype(np.uint8)
+        tint = _lift_tint_for_urp(primary_tint_rgb, 146.0)
+        lifted = np.clip(p_alb_stab * 0.42 + tint * 0.58 * grain + 28.0, 84.0, 244.0).astype(np.uint8)
         albedo[m, :3] = lifted[m]
-        metallic[m] = p_met[m]
-        roughness[m] = np.clip(p_rgh[m].astype(np.int16) - 14, 40, 196).astype(np.uint8)
+        metallic[m] = np.where(p_met[m] >= 128, 16, 4).astype(np.uint8)
+        roughness[m] = np.clip(p_rgh[m].astype(np.int16) - 10, 52, 196).astype(np.uint8)
         normal[m] = p_nrm[m]
 
     # 3: Gunmetal structural mechanical steel (MM gunmetal_chassis, URP F0 floor)

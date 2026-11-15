@@ -1,5 +1,18 @@
 # Rogue Command Content Expansion — Agent Handoff & Technical Baseline
 
+## Live Steam Bug Fixes: Shield Color Swap, Visual Overlay Physics Strip & Level 1 Texture Cleanup (2026-11-15)
+
+- **Scope & Status (`OFFLINE SUITES PASS` + `DEPLOYED TO STEAM` + `VERIFIED IN LIVE STEAM RUNTIME`):**
+  - **Allied/Enemy Shield Color Fix (`src/RogueCommandExpansionLoader/Runtime/Visual/RuntimeShieldColorSync.cs`, `tests/RogueCommandExpansionLoader.ValidationTests/Suites/RuntimeAndDiagnosticsValidationTests.cs`):** Fixed inverted shield shader/template mapping so Player units use `"Shader Graphs/EntityShieldShader2"` (`"ShieldForEntityMaterial"`, `"LightningTank"`) **BLUE** and AI units use `"Shader Graphs/EntityShieldShader"` (`"ShieldFor AI EntityMaterial 1"`, `"PCXBaseTank"`) **RED**.
+  - **Visual Overlay Physics Strip (`src/RogueCommandExpansionLoader/Content/ContentPackRuntimeLoader.cs`):** Added `StripVisualOverlayPhysics(visualClone)` after `UnityEngine.Object.Instantiate(visualTemplate, target, false)` to disable and `DestroyImmediate(..., true)` any `Collider` or `Rigidbody` inside `*Visual.prefab` overlays, eliminating PhysX depenetration (units rolling on terrain or mechs slowly levitating upward).
+  - **Level 1 Texture Cleanliness & `ArachnidHexapod.fbx.meta` (`tools/build_canonical_level1_textures.py`, `unity/.../Models/ArachnidHexapod.fbx.meta`):** Raised `_stabilize_tile_grooves` `floor_luma` (`126.0`/`112.0`), softened `0.15 * groove_weight` + `_soften_tile_contrast`, lifted painted armor tint (`58%` tint / `42%` MM tile) with binary dielectric metallic (`<= 16`, preserving `>= 224` on `GUNMETAL`/`WHEEL_METAL`/chamfer bevels), and fixed `ArachnidHexapod.fbx.meta` `takeName` so `Action_Idle`/`Action_Walk` import into `sample-native-expansion.bundle`.
+  - **Verification:**
+    - `Build-CanonicalVisualModules.ps1 -SkipBlender -SkipTextures -SkipLevelOneRefresh -SkipAnimationMatrix -PackageLoader` -> exit `0` (`RogueCommandExpansionLoader-1.20.10.zip`).
+    - `python -m tools.run_python_tests` -> `877/877` passed (`unit` `387 + 340 + 98`, `blender` `52`, `46.15s`).
+    - `dotnet run --project tests/RogueCommandExpansionLoader.ValidationTests/RogueCommandExpansionLoader.ValidationTests.csproj -c Release -- .` -> `613/614` passed (`1` Windows symlink skip).
+    - Deployed to Steam with SHA-256 parity: `RogueCommandExpansionLoader.dll` (`7D9CAFE916C2FC1E0EAA0973FB9E8B55BEBD07E3F95287886E0D7D208E0BE450`), `sample-native-expansion.bundle` (`CE5CACFDD394B4AF66353450D76D7F6A3788C1FE39A6C856BD197527E2761DD2`), `tactical-operations.bundle` (`58AF865AB6D628327C2C72CC0AA254068F36C365D3DC76D827FD273BEFBF901C`).
+    - Live Steam `Profile2` (`artifacts/runtime-smoke/steam-verify-fixes-20261115T184531Z/`): Spawned 7 units (`sample-native:surge-tank`, `scout-tank`, `overlord-command-hq`, `assault-walker`, `tactical-operations:sentinel-relay`, `skyguard-sam`, `arc-lance-walker`); after 5s all 7 remained at exact spawned `(x, z)` coordinates, `ColliderAuditCensus` confirmed `11/11` units have `colliderCount: 1, triggerColliderCount: 1, solidColliderCount: 0` (`RCL_Visual_*` colliders = `0`), and `SurgeArcTank` (`191`) + `SentinelRelay` (`195`) `ShieldSphere` renderers bound `ShieldForEntityMaterial (Instance)` (`Shader Graphs/EntityShieldShader2`). Restored `Profile2` (`safe_to_finalize: true`).
+
 ## Level 1 v2 Canonical Chassis Readability & Pipeline Sync (2026-11-15)
 
 - **Scope & Status (`OFFLINE SUITES PASS` + `UNITY/PACK AUDIT PASS` + `DEPLOYED TO STEAM` + `VERIFIED IN LIVE STEAM RUNTIME`):**

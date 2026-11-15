@@ -2624,9 +2624,15 @@ namespace RogueCommandExpansionLoader.Content
         {
             DefaultAiBehaviour behaviour = gameBehaviour as DefaultAiBehaviour;
             LoadedAiProfile profile;
-            if (!TryGetAiProfile(behaviour, out profile))
+            bool isNativeTemplateFallback;
+            if (!TryGetAiProfile(behaviour, out profile, out isNativeTemplateFallback))
             {
                 return;
+            }
+
+            if (isNativeTemplateFallback)
+            {
+                InjectAllowedAiUnitsIntoNativeBases(behaviour, profile);
             }
 
             var bound = new BoundAiRuntimeBehaviour(null, null, profile.Id);
@@ -2720,46 +2726,7 @@ namespace RogueCommandExpansionLoader.Content
                     RuntimeGameplayCommandDirector.TrySetAiDoctrine(profile.Definition.doctrine, mult);
                 }
                 RuntimeGameplayCommandDirector.ApplyActiveAiUnitDefaultsToAiUnits();
-                // Apply AI overrides from units referenced in this profile and warm their pre-spawn pools
-                if (profile.Definition.unitEntries != null)
-                {
-                    foreach (var entry in profile.Definition.unitEntries)
-                    {
-                        if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
-                        {
-                            continue;
-                        }
-                        LoadedUnit unit;
-                        _units.TryGetValue(entry.unitId, out unit);
-                        int warmQuota = Math.Min(50, Math.Max(
-                            entry.countAtStart,
-                            (unit != null && unit.Definition != null && unit.Definition.prespawnCount.HasValue)
-                                ? unit.Definition.prespawnCount.Value
-                                : 0));
-                        if (warmQuota > 0)
-                        {
-                            RuntimeGameplayCommandDirector.TryWarmPrespawnPool(entry.unitId, warmQuota);
-                        }
-                        if (unit != null && unit.Definition != null && unit.Definition.aiOverrides != null)
-                        {
-                            foreach (var ovr in unit.Definition.aiOverrides)
-                            {
-                                if (ovr == null || String.IsNullOrWhiteSpace(ovr.parameter))
-                                {
-                                    continue;
-                                }
-                                if (_mutationManager.MutateActiveAiBehaviour(behaviour, ovr.parameter, ovr.value))
-                                {
-                                    _mutationSuccessCount++;
-                                }
-                                else
-                                {
-                                    _mutationFailureCount++;
-                                }
-                            }
-                        }
-                    }
-                }
+                WarmAiProfileUnitAndFactoryPools(behaviour, profile);
                 bool stillRegistered = false;
                 lock (_gate)
                 {
@@ -2980,9 +2947,251 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private void InjectAllowedAiUnitsIntoNativeBases(DefaultAiBehaviour behaviour, LoadedAiProfile profile)
+        {
+            if (behaviour == null || _aiBasesField == null || _aiBaseEntitiesInDeckField == null ||
+                _aiDeckEntryType == null || _aiDeckEntryEntityIdField == null)
+            {
+                return;
+            }
+
+            try
+            {
+                IList aiBases = _aiBasesField.GetValue(behaviour) as IList;
+                if (aiBases == null || aiBases.Count == 0)
+                {
+                    return;
+                }
+
+                var existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                IList primaryDeck = null;
+                for (int b = 0; b < aiBases.Count; b++)
+                {
+                    object aiBase = aiBases[b];
+                    if (aiBase == null)
+                    {
+                        continue;
+                    }
+
+                    IList deckEntries = _aiBaseEntitiesInDeckField.GetValue(aiBase) as IList;
+                    if (deckEntries == null)
+                    {
+                        continue;
+                    }
+
+                    if (primaryDeck == null)
+                    {
+                        primaryDeck = deckEntries;
+                    }
+
+                    for (int i = 0; i < deckEntries.Count; i++)
+                    {
+                        object entry = deckEntries[i];
+                        if (entry == null)
+                        {
+                            continue;
+                        }
+
+                        string existingId = _aiDeckEntryEntityIdField.GetValue(entry) as string;
+                        if (!String.IsNullOrWhiteSpace(existingId))
+                        {
+                            existingIds.Add(existingId.Trim());
+                        }
+                    }
+                }
+
+                if (primaryDeck == null)
+                {
+                    return;
+                }
+
+                var candidates = new List<LoadedUnit>();
+                lock (_gate)
+                {
+                    foreach (LoadedUnit unit in _units.Values)
+                    {
+                        if (unit == null || unit.IsProductionBuilding || unit.Definition == null)
+                        {
+                            continue;
+                        }
+
+                        bool allowedForAi = unit.Definition.isAllowedForAi;
+                        if (!allowedForAi && _allowedForAiField != null && unit.BalanceRow != null)
+                        {
+                            try
+                            {
+                                object val = _allowedForAiField.GetValue(unit.BalanceRow);
+                                if (val is bool bVal && bVal)
+                                {
+                                    allowedForAi = true;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        if (allowedForAi)
+                        {
+                            candidates.Add(unit);
+                        }
+                    }
+                }
+
+                candidates.Sort((left, right) => StringComparer.Ordinal.Compare(left.Id, right.Id));
+                int injectedCount = 0;
+                const int maxAutoInjectedPerNativeBase = 6;
+                for (int i = 0; i < candidates.Count && injectedCount < maxAutoInjectedPerNativeBase; i++)
+                {
+                    LoadedUnit unit = candidates[i];
+                    string deckEntityId = !String.IsNullOrWhiteSpace(unit.ProductionFactoryId)
+                        ? unit.ProductionFactoryId.Trim()
+                        : unit.Id;
+
+                    if (existingIds.Contains(deckEntityId) || existingIds.Contains(unit.Id))
+                    {
+                        continue;
+                    }
+
+                    object newEntry = Activator.CreateInstance(_aiDeckEntryType);
+                    _aiDeckEntryEntityIdField.SetValue(newEntry, deckEntityId);
+                    if (_aiDeckEntryStartingInAscensionLevelField != null)
+                    {
+                        _aiDeckEntryStartingInAscensionLevelField.SetValue(newEntry, 0);
+                    }
+                    if (_aiDeckEntryCountPerStageField != null)
+                    {
+                        object countPerStage = Activator.CreateInstance(_aiDeckEntryCountPerStageField.FieldType);
+                        if (countPerStage is IList counts)
+                        {
+                            counts.Add(new Vector2Int(0, 2));
+                            _aiDeckEntryCountPerStageField.SetValue(newEntry, countPerStage);
+                        }
+                    }
+
+                    primaryDeck.Add(newEntry);
+                    existingIds.Add(deckEntityId);
+                    existingIds.Add(unit.Id);
+                    injectedCount++;
+
+                    if (!String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
+                    {
+                        RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.ProductionFactoryId, 2);
+                    }
+                    RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.Id, Math.Max(2, unit.PrespawnCount));
+                }
+
+                if (injectedCount > 0)
+                {
+                    Log("Enlace híbrido IA (" + (profile != null ? profile.Id : "native") + "): inyectadas " +
+                        injectedCount + " unidad(es)/fábrica(s) mod en " + behaviour.gameObject.name + ".");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("No se pudo inyectar unidades mod en DefaultAiBehaviour nativo: " + ex.Message);
+            }
+        }
+
+        private void WarmAiProfileUnitAndFactoryPools(DefaultAiBehaviour behaviour, LoadedAiProfile profile)
+        {
+            if (profile == null || profile.Definition == null)
+            {
+                return;
+            }
+
+            if (profile.Definition.unitEntries != null)
+            {
+                foreach (var entry in profile.Definition.unitEntries)
+                {
+                    if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
+                    {
+                        continue;
+                    }
+
+                    LoadedUnit unit;
+                    lock (_gate)
+                    {
+                        _units.TryGetValue(entry.unitId, out unit);
+                    }
+
+                    int warmQuota = Math.Min(50, Math.Max(
+                        entry.countAtStart,
+                        (unit != null && unit.Definition != null && unit.Definition.prespawnCount.HasValue)
+                            ? unit.Definition.prespawnCount.Value
+                            : 0));
+                    if (warmQuota > 0)
+                    {
+                        RuntimeGameplayCommandDirector.TryWarmPrespawnPool(entry.unitId, warmQuota);
+                    }
+
+                    if (unit != null && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
+                    {
+                        RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.ProductionFactoryId, 2);
+                    }
+
+                    if (unit != null && unit.Definition != null && unit.Definition.aiOverrides != null)
+                    {
+                        foreach (var ovr in unit.Definition.aiOverrides)
+                        {
+                            if (ovr == null || String.IsNullOrWhiteSpace(ovr.parameter))
+                            {
+                                continue;
+                            }
+                            if (_mutationManager.MutateActiveAiBehaviour(behaviour, ovr.parameter, ovr.value))
+                            {
+                                _mutationSuccessCount++;
+                            }
+                            else
+                            {
+                                _mutationFailureCount++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (profile.Definition.productionBuildingEntries != null)
+            {
+                foreach (var entry in profile.Definition.productionBuildingEntries)
+                {
+                    if (entry == null || String.IsNullOrWhiteSpace(entry.unitId))
+                    {
+                        continue;
+                    }
+
+                    LoadedUnit unit;
+                    lock (_gate)
+                    {
+                        _units.TryGetValue(entry.unitId, out unit);
+                    }
+
+                    int unitQuota = Math.Min(50, Math.Max(
+                        2,
+                        (unit != null && unit.Definition != null && unit.Definition.prespawnCount.HasValue)
+                            ? unit.Definition.prespawnCount.Value
+                            : 4));
+                    RuntimeGameplayCommandDirector.TryWarmPrespawnPool(entry.unitId, unitQuota);
+
+                    if (unit != null && !String.IsNullOrWhiteSpace(unit.ProductionFactoryId))
+                    {
+                        int factoryQuota = Math.Min(50, Math.Max(1, entry.count));
+                        RuntimeGameplayCommandDirector.TryWarmPrespawnPool(unit.ProductionFactoryId, factoryQuota);
+                    }
+                }
+            }
+        }
+
         private bool TryGetAiProfile(DefaultAiBehaviour behaviour, out LoadedAiProfile profile)
         {
+            return TryGetAiProfile(behaviour, out profile, out _);
+        }
+
+        private bool TryGetAiProfile(
+            DefaultAiBehaviour behaviour,
+            out LoadedAiProfile profile,
+            out bool isNativeTemplateFallback)
+        {
             profile = null;
+            isNativeTemplateFallback = false;
             // LoadScene sets the spawned instance's AI tag after Instantiate and before
             // the first Update-driven Init hook; the prefab asset itself need not carry it.
             if (behaviour == null || behaviour.gameObject == null ||
@@ -3000,8 +3209,103 @@ namespace RogueCommandExpansionLoader.Content
 
             lock (_gate)
             {
-                return _aiProfilesByResourceName.TryGetValue(aiResourceName, out profile);
+                if (_aiProfilesByResourceName.TryGetValue(aiResourceName, out profile))
+                {
+                    return true;
+                }
+
+                // Hybrid fallback 1: match a registered profile whose nativeTemplateId matches the native AI prefab.
+                LoadedAiProfile bestTemplateMatch = null;
+                LoadedAiProfile bestGeneralFallback = null;
+                foreach (LoadedAiProfile candidate in _aiProfiles.Values)
+                {
+                    if (candidate == null || candidate.Definition == null)
+                    {
+                        continue;
+                    }
+
+                    string templateId = candidate.Definition.nativeTemplateId;
+                    if (!String.IsNullOrWhiteSpace(templateId) &&
+                        String.Equals(templateId.Trim(), aiResourceName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (bestTemplateMatch == null || (!candidate.ScopeToReferencedStages && bestTemplateMatch.ScopeToReferencedStages))
+                        {
+                            bestTemplateMatch = candidate;
+                        }
+                    }
+
+                    if (!candidate.ScopeToReferencedStages &&
+                        candidate.ModuleIds != null &&
+                        candidate.ModuleIds.Length > 0 &&
+                        bestGeneralFallback == null)
+                    {
+                        bestGeneralFallback = candidate;
+                    }
+                }
+
+                if (bestTemplateMatch != null)
+                {
+                    profile = bestTemplateMatch;
+                    isNativeTemplateFallback = true;
+                    return true;
+                }
+
+                if (bestGeneralFallback != null)
+                {
+                    profile = bestGeneralFallback;
+                    isNativeTemplateFallback = true;
+                    return true;
+                }
+
+                return false;
             }
+        }
+
+        public int ReconcileActiveAiBehaviours()
+        {
+            int reconciled = 0;
+            try
+            {
+                DefaultAiBehaviour[] activeBehaviours = UnityEngine.Object.FindObjectsOfType<DefaultAiBehaviour>();
+                if (activeBehaviours == null || activeBehaviours.Length == 0)
+                {
+                    return 0;
+                }
+
+                for (int i = 0; i < activeBehaviours.Length; i++)
+                {
+                    DefaultAiBehaviour behaviour = activeBehaviours[i];
+                    if (behaviour == null || behaviour.gameObject == null ||
+                        !String.Equals(behaviour.gameObject.tag, "AI", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    bool alreadyBound;
+                    lock (_gate)
+                    {
+                        alreadyBound = _boundAiBehaviours.ContainsKey(behaviour);
+                    }
+
+                    if (!alreadyBound)
+                    {
+                        OnAiBehaviourInitialized(behaviour);
+                        lock (_gate)
+                        {
+                            if (_boundAiBehaviours.ContainsKey(behaviour))
+                            {
+                                reconciled++;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("No se pudo reconciliar DefaultAiBehaviour activos: " + ex.Message);
+            }
+
+            return reconciled;
         }
 
         private void SafeDestroyAiRuntimeBehaviour(BoundAiRuntimeBehaviour bound, string profileId)
@@ -4915,11 +5219,6 @@ namespace RogueCommandExpansionLoader.Content
                     profiles[i].Definition.startingUnitVeterancyRank,
                     false,
                     GetAiProfileTargetUnitIds(profiles[i].Definition));
-                if (!String.IsNullOrWhiteSpace(profiles[i].Definition.doctrine))
-                {
-                    float mult = profiles[i].Definition.aggressionMultiplier ?? 1.0f;
-                    RuntimeGameplayCommandDirector.TrySetAiDoctrine(profiles[i].Definition.doctrine, mult);
-                }
             }
 
             for (int i = 0; i < stages.Count; i++)
@@ -6346,6 +6645,7 @@ namespace RogueCommandExpansionLoader.Content
             }
 
             visualClone.name = "RCL_Visual_" + unit.id.Replace(':', '_');
+            StripVisualOverlayPhysics(visualClone);
             visualClone.transform.localPosition = Vector3.zero;
             visualClone.transform.localRotation = Quaternion.identity;
             visualClone.transform.localScale = Vector3.one;
@@ -6389,6 +6689,41 @@ namespace RogueCommandExpansionLoader.Content
 
             ApplyFallbackVisualMaterial(visualClone, fallbackMaterial, unit, packageName, ownerLabel);
             visualClone.SetActive(true);
+        }
+
+        private static void StripVisualOverlayPhysics(GameObject visualClone)
+        {
+            if (visualClone == null)
+            {
+                return;
+            }
+
+            Collider[] colliders = visualClone.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider collider = colliders[i];
+                if (collider == null)
+                {
+                    continue;
+                }
+
+                collider.enabled = false;
+                UnityEngine.Object.DestroyImmediate(collider, true);
+            }
+
+            Rigidbody[] rigidbodies = visualClone.GetComponentsInChildren<Rigidbody>(true);
+            for (int i = 0; i < rigidbodies.Length; i++)
+            {
+                Rigidbody rb = rigidbodies[i];
+                if (rb == null)
+                {
+                    continue;
+                }
+
+                rb.isKinematic = true;
+                rb.detectCollisions = false;
+                UnityEngine.Object.DestroyImmediate(rb, true);
+            }
         }
 
         private static void ValidateNativeRigRetargetPaths(
