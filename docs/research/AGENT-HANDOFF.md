@@ -3125,3 +3125,7 @@ The random staging parent now uses the same atomic create-and-guard operation as
 ### External broad-card scope (2026-11-15)
 
 Composition now reports filter-only relics/upgrades in required external dependency packs, including transitively required packs, in `dependencyBroadFilterCards` and stderr. The three-pack test exercises this alongside native-reference reporting; composition/dependency modules passed 49 tests. This is potential scope, not runtime matching evidence. Windows post-hash content races and POSIX publication/rollback remain open.
+
+### Stage and AI import conflict resolution (2026-11-15)
+
+`import-units --rename-conflicts` and batch `renameConflicts: true` rename conflicting selected source profiles/stages to unused `-import-N` IDs and update source stage-profile bindings. The CLI prints the mapping. Existing destination definitions and the source files remain untouched; external packs are not rewritten. Tests cover source preservation, bindings, batch and CLI. Composition module passed 37 tests after the final change; full Python `all` passed in 36.95 s before the final selection refinement. Stage-content post-hash and POSIX safety remain open.

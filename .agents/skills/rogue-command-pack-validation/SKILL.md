@@ -248,3 +248,5 @@ After successful publication on Windows, empty staging-parent cleanup opens the 
 The random `.rogue-compose-*` staging parent is also created exclusively with its initial non-delete-sharing handle in one Windows operation. Name collisions fail without reuse. POSIX creates mode 0700 but its creation-to-guard and pathname publication races remain unverified.
 
 The composition CLI also lists filter-only cards in required external packs, including transitive dependencies, under `dependencyBroadFilterCards` keyed by pack ID. This describes possible cross-pack effects; actual matching remains runtime-dependent.
+
+Use `import-units --rename-conflicts` (batch `renameConflicts: true`) to retain selected incoming stage/AI profile definitions with conflicting IDs under deterministic `-import-N` names; source stage bindings follow renamed profiles. Inspect the printed mapping and any external dependencies, which are not rewritten. Other conflict types still fail.

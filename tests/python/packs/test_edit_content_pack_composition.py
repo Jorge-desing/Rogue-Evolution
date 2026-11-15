@@ -361,6 +361,38 @@ class CompositionEditTests(unittest.TestCase):
             self.assertIn("relics:ns:role", errors.getvalue())
             self.assertEqual(["relics:ns:role"], writer.call_args.args[3]["broadFilterCards"])
 
+    def test_import_can_rename_conflicting_profiles_and_stages(self) -> None:
+        destination = self._pack()
+        source = SCAFFOLD.generate_scaffold("other:pack", "beta", stage_slug="sb", ai_slug="ab")
+        source["aiProfiles"][0]["id"] = destination["aiProfiles"][0]["id"]
+        source["stages"][0]["id"] = destination["stages"][0]["id"]
+        source["stages"][0]["aiProfileIds"] = [destination["aiProfiles"][0]["id"]]
+        old_profile = source["aiProfiles"][0]["id"]
+        old_stage = source["stages"][0]["id"]
+        renamed, mappings = EDIT.rename_import_conflicts(destination, source)
+        self.assertNotEqual(old_profile, mappings["aiProfiles"][old_profile])
+        self.assertNotEqual(old_stage, mappings["stages"][old_stage])
+        self.assertEqual([mappings["aiProfiles"][old_profile]], renamed["stages"][0]["aiProfileIds"])
+        self.assertEqual(old_profile, source["aiProfiles"][0]["id"])
+        imported, errors = EDIT.import_units(destination, renamed, ["other:beta"])
+        self.assertEqual([], errors)
+        self.assertIn(mappings["stages"][old_stage], [row["id"] for row in imported["stages"]])
+        with contextlib.redirect_stdout(io.StringIO()):
+            batched, errors = EDIT.apply_edits(destination, [{"op": "import-units", "source": source, "unitIds": ["other:beta"], "renameConflicts": True}])
+        self.assertEqual([], errors)
+        self.assertIn(mappings["aiProfiles"][old_profile], [row["id"] for row in batched["aiProfiles"]])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dest_file, source_file, output = root / "dest.json", root / "source.json", root / "out"
+            dest_file.write_text(json.dumps(destination), encoding="utf-8")
+            source_file.write_text(json.dumps(source), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()) as text_out, contextlib.redirect_stderr(io.StringIO()):
+                code = EDIT.main(["--pack", str(dest_file), "--operation", "import-units", "--source-pack", str(source_file), "--unit-ids", "other:beta", "--out-dir", str(output), "--rename-conflicts"])
+            self.assertEqual(0, code)
+            result = json.loads((output / "content.json").read_text(encoding="utf-8"))
+            self.assertIn(mappings["stages"][old_stage], [row["id"] for row in result["stages"]])
+            self.assertIn(mappings["aiProfiles"][old_profile], text_out.getvalue())
+
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()
         extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])

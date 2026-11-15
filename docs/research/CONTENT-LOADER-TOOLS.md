@@ -127,3 +127,5 @@ El grafo de `LevelMap` incluye un nodo jefe especial en `(LevelMap.LevelCount, 0
 ## Reglas de evidencia
 
 Tests, validaciones de schema y registry: evidencia **local** únicamente. No prueban registro en runtime, ofertas, producción, render ni aceptación Steam.
+
+For `import-units`, `--rename-conflicts` preserves conflicting selected source AI profiles and stages under deterministic `-import-N` IDs and updates source-stage profile bindings. Batch operations use `"renameConflicts": true`. The CLI prints the mapping; external dependency packs are not rewritten, so review their references. Without the option conflicts fail as before. Unit, factory, building, relic and bundle conflicts are not renamed.

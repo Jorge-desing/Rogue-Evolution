@@ -867,7 +867,11 @@ def apply_edits(
                 if not d:
                     current = candidate
             elif name == "import-units":
-                current, d = import_units(current, op.get("source", {}), op.get("unitIds", []))
+                source = op.get("source", {})
+                if op.get("renameConflicts"):
+                    source, mappings = rename_import_conflicts(current, source, op.get("unitIds", []))
+                    print("IDs de origen renombrados: " + json.dumps(mappings, ensure_ascii=False))
+                current, d = import_units(current, source, op.get("unitIds", []))
             else:
                 d = [f"op desconocida '{name}'"]
         except Exception as exc:  # keep the batch running per-op
@@ -1010,6 +1014,34 @@ def extract_units_to_pack(
 
     # The caller may edit the extracted pack independently of its source.
     return json.loads(json.dumps(extracted)), []
+
+
+def rename_import_conflicts(destination: dict, source: dict, unit_ids: list[str] | None = None) -> tuple[dict, dict[str, dict[str, str]]]:
+    """Rename conflicting source AI profiles and stages, updating stage-profile bindings."""
+    from tools.check_pack_dependencies import defined_ids
+    candidate = json.loads(json.dumps(source))
+    used = defined_ids(destination) | defined_ids(candidate)
+    mappings = {"aiProfiles": {}, "stages": {}}
+    selected = None
+    if unit_ids is not None:
+        _, stages, profiles, _, _, _ = _composition_closure(candidate, unit_ids)
+        selected = {"aiProfiles": profiles, "stages": stages}
+    for section, rename in (("aiProfiles", rename_ai_profile), ("stages", rename_stage)):
+        existing = {_entity_key(row): row for row in _as_list(destination.get(section)) if _entity_key(row)}
+        for row in list(_as_list(candidate.get(section))):
+            old = _entity_key(row)
+            if not old or (selected is not None and old not in selected[section]) or old not in existing or existing[old] == row:
+                continue
+            index = 1
+            while f"{old}-import-{index}" in used:
+                index += 1
+            new = f"{old}-import-{index}"
+            candidate, errors = rename(candidate, old, new)
+            if errors:
+                raise ValueError("; ".join(errors))
+            used.add(new)
+            mappings[section][old] = new
+    return candidate, mappings
 
 
 def import_units(
@@ -1727,6 +1759,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--unit-id", help="ID de la unidad")
     parser.add_argument("--unit-ids", nargs="+", help="Unidades seleccionadas para extracción")
     parser.add_argument("--source-pack", help="Directorio o content.json del pack de origen para import-units")
+    parser.add_argument("--rename-conflicts", action="store_true", help="Renombra etapas/perfiles de origen en conflicto durante import-units")
     parser.add_argument("--dependency-pack", action="append", default=[], help="Pack externo disponible para resolver referencias; se puede repetir")
     parser.add_argument("--unit-json", help="Ruta a un unit.json (para add)")
     parser.add_argument("--stage-ids", nargs="*", default=None,
@@ -1832,6 +1865,13 @@ def main(argv: list[str] | None = None) -> int:
         if source_error:
             print(source_error, file=sys.stderr)
             return 2
+        if args.rename_conflicts:
+            try:
+                source_pack, mappings = rename_import_conflicts(pack, source_pack, args.unit_ids)
+            except ValueError as exc:
+                print(f"No se pudieron resolver conflictos: {exc}", file=sys.stderr)
+                return 1
+            print("IDs de origen renombrados: " + json.dumps(mappings, ensure_ascii=False))
         updated, diagnostics = import_units(pack, source_pack, args.unit_ids)
         if diagnostics:
             for diagnostic in diagnostics:
