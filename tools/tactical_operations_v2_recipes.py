@@ -28,6 +28,8 @@ TOOLS_DIR = REPO_ROOT / "tools"
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
 
+import RogueModelKit as rmk
+
 TARGET_UNITS_V2 = (
     "ArcLanceWalker",
     "TidebreakerHovercraft",
@@ -896,6 +898,53 @@ def build_sculpted_wheel_fender_set(
     return stays
 
 
+def _add_tactical_armor_plate(
+    name: str,
+    size: tuple[float, float, float],
+    center: tuple[float, float, float],
+    host: bpy.types.Object | None,
+    mat: bpy.types.Material,
+    *,
+    bevel: float = 0.012,
+    rotation: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    clearance: float = -0.006,
+    seat_downward: bool = True,
+    recipe_tag: str = "tacops_l1_armor_plate",
+) -> bpy.types.Object:
+    """Create or rebuild a beveled tactical-operations armor/warning plate seated on host."""
+    existing = bpy.data.objects.get(name)
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
+    obj = make_chamfered_box_mesh(name, size, center, mat, bevel=bevel, rotation=rotation)
+    obj[RECIPE_PROP] = recipe_tag
+    if host is not None:
+        if seat_downward:
+            seat_cluster_downward([obj], [host], clearance=clearance, max_drop=0.8)
+        else:
+            snap_object_to_nearest(obj, [host], embed=abs(clearance), max_dist=0.4)
+    return obj
+
+
+def _finalize_tactical_vertex_shading(prefix: str) -> None:
+    """Apply Pass 1 zenith-boosted vertex wear + ensure UV/Color across unit render meshes."""
+    render_objs = [
+        o for o in bpy.data.objects
+        if o.type == "MESH"
+        and o.name.startswith(prefix)
+        and "_COLLIDER" not in o.name
+        and not o.name.endswith("_ShieldBubble")
+        and not o.name.lower().startswith("preview")
+    ]
+    for obj in render_objs:
+        ensure_uv_and_color_layers(obj.data, force_smart_uv=False)
+    if render_objs:
+        rmk.bake_advanced_vertex_shading(
+            render_objs,
+            wear_level="field_tested",
+            structural_wear_mask=True,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Unit V2 Sculpting + Exact Boolean Recipes
 # ---------------------------------------------------------------------------
@@ -1131,7 +1180,18 @@ def apply_arc_lance_walker_v2() -> list[str]:
                 louver_count=2,
                 recipe_tag=f"emitter_vent_{tag}",
             )
-    notes.append("Legs, claws & emitter pedestal upgraded")
+    if torso is not None:
+        _, _, t_y0, t_y1, _, t_z1 = world_bounds(torso)
+        _add_tactical_armor_plate(
+            f"{prefix}Armor_TorsoCrownShield", (0.56, 0.44, 0.042), (0.0, (t_y0 + t_y1) * 0.5, t_z1 + 0.03),
+            torso, l_armor, bevel=0.010, recipe_tag="arclance_l1_torso_crown",
+        )
+        _add_tactical_armor_plate(
+            f"{prefix}Warning_TorsoBrowTrim", (0.44, 0.10, 0.026), (0.0, t_y1 - 0.10, t_z1 + 0.03),
+            torso, warning, bevel=0.006, recipe_tag="arclance_l1_warning_trim",
+        )
+    _finalize_tactical_vertex_shading(prefix)
+    notes.append("Legs, claws, emitter pedestal, and L1 armor plates upgraded")
     return notes
 
 
@@ -1352,6 +1412,17 @@ def apply_tidebreaker_hovercraft_v2() -> list[str]:
         ordered_smoke = [smoke_base] + [o for o in smoke_r if o is not smoke_base]
         seat_cluster_downward(ordered_smoke, [hull], clearance=-0.004, max_drop=1.5)
 
+    if hull is not None:
+        _, _, h_y0, h_y1, _, h_z1 = world_bounds(hull)
+        _add_tactical_armor_plate(
+            f"{prefix}Armor_GlacisLightPlate", (0.76, 0.38, 0.040), (0.0, h_y1 - 0.34, h_z1 + 0.02),
+            hull, l_armor, bevel=0.010, rotation=(-0.14, 0.0, 0.0), recipe_tag="tidebreaker_l1_glacis",
+        )
+        _add_tactical_armor_plate(
+            f"{prefix}Warning_BowTrim", (0.64, 0.12, 0.024), (0.0, h_y1 - 0.14, h_z1 + 0.01),
+            hull, warning, bevel=0.006, recipe_tag="tidebreaker_l1_warning_trim",
+        )
+    _finalize_tactical_vertex_shading(prefix)
     return notes
 
 
@@ -1556,6 +1627,21 @@ def apply_field_medic_rover_v2() -> list[str]:
             seat_cluster_downward(periscope_objs, [nose], clearance=-0.005, max_drop=1.5)
 
     notes.append(f"4 curved fenders + {stay_total} raycast stays + DualGun breech cuts + RollCage/deck anchors")
+    l_armor = resolve_unit_material(prefix, "LightArmor")
+    w_armor = resolve_unit_material(prefix, "Warning")
+    if cab_shell is not None:
+        _, _, c_y0, c_y1, _, c_z1 = world_bounds(cab_shell)
+        _add_tactical_armor_plate(
+            f"{prefix}Armor_CabRoofShield", (0.72, 0.56, 0.040), (0.0, (c_y0 + c_y1) * 0.5, c_z1 + 0.03),
+            cab_shell, l_armor, bevel=0.010, recipe_tag="fieldmedic_l1_cab_roof",
+        )
+    if nose is not None:
+        _, _, n_y0, n_y1, _, n_z1 = world_bounds(nose)
+        _add_tactical_armor_plate(
+            f"{prefix}Warning_NoseTrim", (0.58, 0.14, 0.026), (0.0, n_y1 - 0.18, n_z1 + 0.02),
+            nose, w_armor, bevel=0.006, recipe_tag="fieldmedic_l1_warning_trim",
+        )
+    _finalize_tactical_vertex_shading(prefix)
     return notes
 
 
@@ -1769,6 +1855,19 @@ def apply_skyguard_sam_v2() -> list[str]:
         _shift_objects([pylon], dz=-0.015)
 
     notes.append(f"Stabilizer jacks seated + 6 sculpted 6x6 fenders + {stay_count} raycast stays + APS/lugs/rack seated")
+    l_armor = resolve_unit_material(prefix, "LightArmor")
+    w_armor = resolve_unit_material(prefix, "Warning")
+    if cab is not None:
+        _, _, c_y0, c_y1, _, c_z1 = world_bounds(cab)
+        _add_tactical_armor_plate(
+            f"{prefix}Armor_CabRoofShield", (0.96, 0.56, 0.044), (0.0, (c_y0 + c_y1) * 0.5, c_z1 + 0.03),
+            cab, l_armor, bevel=0.012, recipe_tag="skyguard_l1_cab_roof",
+        )
+        _add_tactical_armor_plate(
+            f"{prefix}Warning_CabBrowTrim", (0.88, 0.14, 0.026), (0.0, c_y1 - 0.14, c_z1 + 0.02),
+            cab, w_armor, bevel=0.006, recipe_tag="skyguard_l1_warning_trim",
+        )
+    _finalize_tactical_vertex_shading(prefix)
     return notes
 
 
@@ -2042,6 +2141,19 @@ def apply_salvage_hauler_v2() -> list[str]:
         _shift_objects(rack_objs, dx=0.05, dz=-0.22)
 
     notes.append(f"ToolLocker, CraneSlewBase, TrackSkirts carved + {stay_count} raycast stays + chassis/roadwheel anchors")
+    l_armor = resolve_unit_material(prefix, "LightArmor")
+    w_armor = resolve_unit_material(prefix, "Warning")
+    if deck is not None:
+        _, _, d_y0, d_y1, _, d_z1 = world_bounds(deck)
+        _add_tactical_armor_plate(
+            f"{prefix}Armor_DeckLightShield", (1.10, 0.72, 0.044), (0.0, d_y1 - 0.56, d_z1 + 0.03),
+            deck, l_armor, bevel=0.012, recipe_tag="salvage_l1_deck_shield",
+        )
+        _add_tactical_armor_plate(
+            f"{prefix}Warning_DeckBrowTrim", (0.94, 0.14, 0.026), (0.0, d_y1 - 0.16, d_z1 + 0.02),
+            deck, w_armor, bevel=0.006, recipe_tag="salvage_l1_warning_trim",
+        )
+    _finalize_tactical_vertex_shading(prefix)
     return notes
 
 
@@ -2134,6 +2246,19 @@ def apply_sentinel_relay_v2() -> list[str]:
         )
         stay_count += len(stays)
     notes.append(f"4 curved fenders + {stay_count} raycast stays seated")
+    l_armor = resolve_unit_material(prefix, "LightArmor")
+    w_armor = resolve_unit_material(prefix, "Warning")
+    if cowl is not None:
+        _, _, c_y0, c_y1, _, c_z1 = world_bounds(cowl)
+        _add_tactical_armor_plate(
+            f"{prefix}Armor_CowlLightShield", (0.88, 0.64, 0.042), (0.0, (c_y0 + c_y1) * 0.5, c_z1 + 0.03),
+            cowl, l_armor, bevel=0.010, recipe_tag="sentinel_l1_cowl_shield",
+        )
+        _add_tactical_armor_plate(
+            f"{prefix}Warning_CowlBrowTrim", (0.76, 0.14, 0.026), (0.0, c_y1 - 0.14, c_z1 + 0.02),
+            cowl, w_armor, bevel=0.006, recipe_tag="sentinel_l1_warning_trim",
+        )
+    _finalize_tactical_vertex_shading(prefix)
     return notes
 
 

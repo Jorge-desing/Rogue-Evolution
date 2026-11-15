@@ -910,10 +910,6 @@ ACTIVE_UNIT_WAVE14_ARCHETYPE_PROFILES: dict[str, dict[str, object]] = {
             ("Chassis_ForkDamper_R", (0.16, 0.56, 0.86), (0.16, 0.78, 0.38), 0.030, 0.020),
             ("Chassis_RearMonoShock", (0.0, -0.22, 0.72), (0.0, -0.62, 0.42), 0.036, 0.022),
         ],
-        "ammo_chutes": [
-            ("Weapon_TwinGunChute_L", (-0.22, 0.12, 0.78), (-0.26, 0.52, 0.74), 0.075, 0.028, 0.04, -0.02),
-            ("Weapon_TwinGunChute_R", (0.22, 0.12, 0.78), (0.26, 0.52, 0.74), 0.075, 0.028, 0.04, 0.02),
-        ],
         "radiators": (1.40, 0.68, 0.64, 4),
         "bike_hardware": True,
         "weld_seams": [
@@ -1257,21 +1253,21 @@ def apply_wave14_archetype_details(
         result.extend([
             rmk.make_cylinder(
                 f"{prefix}Chassis_BrakeRotor_F", 0.16, 0.018,
-                (-0.08, 0.78, 0.36), gunmetal,
+                (-0.136, 0.78, 0.36), gunmetal,
                 rotation=(0.0, math.radians(90.0), 0.0), vertices=14, bevel=0.003,
             ),
             rmk.make_cylinder(
                 f"{prefix}Chassis_BrakeRotor_R", 0.16, 0.018,
-                (0.08, -0.78, 0.36), gunmetal,
+                (0.136, -0.78, 0.36), gunmetal,
                 rotation=(0.0, math.radians(90.0), 0.0), vertices=14, bevel=0.003,
             ),
             rmk.make_box(
                 f"{prefix}Chassis_BrakeCaliper_F", (0.042, 0.085, 0.065),
-                (-0.09, 0.68, 0.44), warning, bevel=0.006,
+                (-0.149, 0.68, 0.44), warning, bevel=0.006,
             ),
             rmk.make_box(
                 f"{prefix}Chassis_BrakeCaliper_R", (0.042, 0.085, 0.065),
-                (0.09, -0.68, 0.44), warning, bevel=0.006,
+                (0.149, -0.68, 0.44), warning, bevel=0.006,
             ),
             rmk.make_box(
                 f"{prefix}Chassis_ForkClamp_Upper", (0.36, 0.09, 0.036),
@@ -1282,6 +1278,48 @@ def apply_wave14_archetype_details(
                 (0.0, 0.62, 0.68), armor, bevel=0.006,
             ),
         ])
+
+        # Recess each caliper around its disc, then connect it to the existing
+        # fork/frame. Cuts happen before rigging and use Blender built-ins.
+        for tag, start, end in (
+            ("F", (-0.17, 0.6435, 0.4665), (-0.367656, 0.653545, 0.544175)),
+            ("R", (0.17, -0.7165, 0.4135), (0.400740, -0.7165, 0.4135)),
+        ):
+            rotor = bpy.data.objects[f"{prefix}Chassis_BrakeRotor_{tag}"]
+            caliper = bpy.data.objects[f"{prefix}Chassis_BrakeCaliper_{tag}"]
+            bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=0.162, depth=0.022,
+                location=rotor.location, rotation=(0, math.pi / 2, 0))
+            cutter = bpy.context.object
+            bpy.context.view_layer.objects.active = caliper
+            cut = caliper.modifiers.new("Rotor_clearance", "BOOLEAN")
+            cut.operation, cut.solver, cut.object = "DIFFERENCE", "EXACT", cutter
+            bpy.ops.object.modifier_move_to_index(modifier=cut.name, index=0)
+            bpy.ops.object.modifier_apply(modifier=cut.name)
+            bpy.data.objects.remove(cutter, do_unlink=True)
+
+            a, b = Vector(start), Vector(end)
+            delta = b - a
+            bpy.ops.mesh.primitive_cube_add(size=1, location=(a + b) / 2)
+            bracket = bpy.context.object
+            bracket.name = f"{prefix}Chassis_BrakeBracket_{tag}"
+            bracket.dimensions = (0.025, 0.025, delta.length + 0.012)
+            bracket.rotation_euler = delta.to_track_quat("Z", "Y").to_euler()
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            bracket.data.materials.append(gunmetal)
+            if tag == "R":
+                host = bpy.data.objects.get("StrikeBikeChassis_ShockStrut_Rear_R")
+                if host is None:
+                    raise ValueError("Strike Bike rear shock is required for brake clearance")
+                cutter = host.copy()
+                cutter.data = host.data.copy()
+                bpy.context.collection.objects.link(cutter)
+                cutter.scale *= 1.10
+                bpy.context.view_layer.objects.active = bracket
+                cut = bracket.modifiers.new("Shock_clearance", "BOOLEAN")
+                cut.operation, cut.solver, cut.object = "DIFFERENCE", "EXACT", cutter
+                bpy.ops.object.modifier_apply(modifier=cut.name)
+                bpy.data.objects.remove(cutter, do_unlink=True)
+            result.append(bracket)
 
     if profile.get("hover_thrusters") and not _has_object(prefix, "Hover_ThrustShroud_"):
         for side, tag in ((-1, "L"), (1, "R")):

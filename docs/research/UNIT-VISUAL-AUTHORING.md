@@ -6,6 +6,8 @@
 
 **Current policy:** Load the [3D model authoring skill](../../.agents/skills/rogue-command-3d-model-authoring/SKILL.md) and [repository rules](../../AGENTS.md) before authoring. The global policy makes geometry calibration diagnostic. Build with the required uncalibrated status when applicable, record Blender faces and exported triangles separately, and preserve the source when producing a candidate. Treat fixed caps and prior gating decisions below as historical context.
 
+The fleet-wide hard-surface direction uses Bulwark v15 as a construction reference: adapt multi-station shell forms and functional Exact Boolean cuts to each unit, then verify physical assembly fit and motion as described in the skill. Individual cuts and silhouettes are not copied. This direction does not establish that existing assets have already passed those checks.
+
 ## Current models
 
 | Unit ID | Native template and visual root | Editable Blender source | Builder | Unity FBX | Source parts → FBX batches | Blender bounds (W × L × H) |

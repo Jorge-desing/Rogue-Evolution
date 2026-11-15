@@ -440,6 +440,40 @@ def _trim_box_parts_outside_belt(
                 _shift_objects([obj], Vector((x_outer_min - x0, 0.0, 0.0)))
 
 
+def _add_beveled_armor_plate(
+    name: str,
+    size: tuple[float, float, float],
+    center: tuple[float, float, float],
+    host: bpy.types.Object | None,
+    mat: bpy.types.Material,
+    *,
+    bevel: float = 0.014,
+    rotation: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    embed: float = 0.005,
+    seat_downward: bool = True,
+    recipe_tag: str = "level1_armor_plate",
+) -> bpy.types.Object:
+    """Create or rebuild a beveled armor/warning plate seated cleanly onto host."""
+    existing = bpy.data.objects.get(name)
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
+    obj = make_chamfered_box_mesh(
+        name,
+        size,
+        center,
+        mat,
+        bevel=bevel,
+        rotation=rotation,
+    )
+    tag_v2_recipe(obj, recipe_tag)
+    if host is not None:
+        if seat_downward:
+            seat_object_downward_to_target(obj, host, embed=embed)
+        else:
+            snap_object_to_nearest(obj, host, embed=embed)
+    return obj
+
+
 # ---------------------------------------------------------------------------
 # 1. SandlanceScout v2
 # ---------------------------------------------------------------------------
@@ -728,7 +762,35 @@ def apply_sandlance_scout_v2() -> list[str]:
                 _set_obj_world_center(obj, Vector((sx * 0.70, c.y, c.z)))
                 snap_object_to_nearest(obj, hull, embed=0.005)
 
-    notes.append("Boolean pockets + external hardware + axle stays seated")
+    # 5. Level-1 RTS readability: LightArmor glacis/turret/skirt plates & Warning deck chevrons
+    w_armor = resolve_vehicle_material(unit, "warning")
+    _add_beveled_armor_plate(
+        "ScoutArmor_GlacisLightPlate", (0.76, 0.38, 0.040), (0.0, 0.82, 0.78),
+        hull, l_armor, bevel=0.012, rotation=(-0.18, 0.0, 0.0), seat_downward=True,
+        recipe_tag="sandlance_l1_glacis_plate",
+    )
+    _add_beveled_armor_plate(
+        "ScoutArmor_TurretRoofPlate", (0.54, 0.56, 0.036), (0.0, -0.18, 1.16),
+        low_turret, l_armor, bevel=0.010, recipe_tag="sandlance_l1_turret_roof",
+    )
+    for side, sx in (("L", -1.0), ("R", 1.0)):
+        _add_beveled_armor_plate(
+            f"ScoutArmor_TurretCheek_{side}", (0.11, 0.44, 0.14), (sx * 0.46, -0.12, 1.07),
+            low_turret, l_armor, bevel=0.010, seat_downward=False,
+            recipe_tag="sandlance_l1_turret_cheek",
+        )
+        _add_beveled_armor_plate(
+            f"ScoutWarning_DeckChevron_{side}", (0.10, 0.36, 0.024), (sx * 0.36, -0.52, 0.92),
+            deck, w_armor, bevel=0.006, recipe_tag="sandlance_l1_warning_chevron",
+        )
+        belt = bpy.data.objects.get(f"ScoutTreads_Belt_{side}")
+        _add_beveled_armor_plate(
+            f"ScoutArmor_SideSkirtPlate_{side}", (0.045, 1.56, 0.16), (sx * 1.04, -0.04, 0.46),
+            belt, l_armor, bevel=0.008, seat_downward=False,
+            recipe_tag="sandlance_l1_side_skirt",
+        )
+
+    notes.append("Boolean pockets + external hardware + axle stays + L1 armor plates seated")
     _finalize_all_mesh_attributes(unit, unit)
     return notes
 
@@ -1065,7 +1127,30 @@ def apply_colossus_siege_v2() -> list[str]:
                 Vector((x_target, cy + 0.211 * math.cos(ang), cz + 0.211 * math.sin(ang))),
             )
 
-    notes.append("Pockets, hardware seating, and axle connections complete")
+    # 4. Level-1 RTS readability: LightArmor glacis/turret/bustle shields & Warning sponson trim
+    w_armor = resolve_vehicle_material(unit, "warning")
+    _add_beveled_armor_plate(
+        "ColossusArmor_GlacisReactivePlate", (1.04, 0.42, 0.050), (0.0, 1.04, 0.80),
+        hull, l_armor, bevel=0.014, rotation=(-0.14, 0.0, 0.0), seat_downward=True,
+        recipe_tag="colossus_l1_glacis_plate",
+    )
+    _add_beveled_armor_plate(
+        "ColossusArmor_TurretRoofShield", (0.92, 0.84, 0.045), (0.0, 0.05, 1.35),
+        turret_base, l_armor, bevel=0.012, recipe_tag="colossus_l1_turret_roof",
+    )
+    for side, sx in (("L", -1.0), ("R", 1.0)):
+        _add_beveled_armor_plate(
+            f"ColossusArmor_BustleSidePlate_{side}", (0.08, 0.50, 0.18), (sx * 0.44, -0.46, 1.22),
+            turret_bustle, l_armor, bevel=0.010, seat_downward=False,
+            recipe_tag="colossus_l1_bustle_plate",
+        )
+        sponson = bpy.data.objects.get(f"ColossusArmor_Sponson_{side}")
+        _add_beveled_armor_plate(
+            f"ColossusWarning_SponsonTrim_{side}", (0.14, 0.64, 0.028), (sx * 1.08, 0.88, 0.90),
+            sponson, w_armor, bevel=0.006, recipe_tag="colossus_l1_warning_trim",
+        )
+
+    notes.append("Pockets, hardware seating, axle connections, and L1 armor plates complete")
     _finalize_all_mesh_attributes(unit, unit)
     return notes
 
@@ -1244,7 +1329,26 @@ def apply_skirmish_strike_bike_v2() -> list[str]:
                 _shift_objects([dog], Vector((0.0, 0.0, 0.025)))
                 seat_object_downward_to_target(dog, hatch, embed=0.002)
 
-    notes.append("StrikeBike pockets, fork/swingarm clearances, and hardware seated")
+    # 5. Level-1 RTS readability: LightArmor fairing crest, battery shrouds & Warning nose fin
+    w_armor = resolve_vehicle_material(unit, "warning")
+    _add_beveled_armor_plate(
+        "StrikeBikeArmor_FairingCrest", (0.32, 0.42, 0.040), (0.0, 0.48, 1.19),
+        front_fairing, l_armor, bevel=0.010, rotation=(-0.18, 0.0, 0.0),
+        recipe_tag="strikebike_l1_fairing_crest",
+    )
+    _add_beveled_armor_plate(
+        "StrikeBikeWarning_NoseFin", (0.18, 0.22, 0.024), (0.0, 0.72, 1.14),
+        front_fairing, w_armor, bevel=0.006, rotation=(-0.25, 0.0, 0.0),
+        recipe_tag="strikebike_l1_warning_fin",
+    )
+    for side, sx in (("L", -1.0), ("R", 1.0)):
+        _add_beveled_armor_plate(
+            f"StrikeBikeArmor_BatteryShroud_{side}", (0.05, 0.56, 0.16), (sx * 0.27, -0.10, 0.98),
+            battery_pod, l_armor, bevel=0.008, seat_downward=False,
+            recipe_tag="strikebike_l1_battery_shroud",
+        )
+
+    notes.append("StrikeBike pockets, fork/swingarm clearances, hardware, and L1 armor plates seated")
     _finalize_all_mesh_attributes(unit, unit)
     return notes
 
@@ -1440,7 +1544,29 @@ def apply_surge_arc_tank_v2() -> list[str]:
         if bus_grp:
             _shift_objects(bus_grp, Vector((sx * 0.10, 0.0, 0.195)))
 
-    notes.append("Visor pocket, road axles, shackles, and stabilizer clearances applied")
+    # 5. Level-1 RTS readability: LightArmor glacis/deck/sponson plates & Warning deck stripes
+    w_armor = resolve_vehicle_material(unit, "warning")
+    _add_beveled_armor_plate(
+        "SurgeArcTankArmor_GlacisLightPlate", (0.84, 0.38, 0.044), (0.0, 0.96, 0.78),
+        hull, l_armor, bevel=0.012, rotation=(-0.14, 0.0, 0.0), seat_downward=True,
+        recipe_tag="surgearc_l1_glacis_plate",
+    )
+    for side, sx in (("L", -1.0), ("R", 1.0)):
+        _add_beveled_armor_plate(
+            f"SurgeArcTankArmor_DeckCheekPlate_{side}", (0.14, 1.12, 0.042), (sx * 0.46, -0.05, 1.01),
+            upper_deck, l_armor, bevel=0.010, recipe_tag="surgearc_l1_deck_cheek",
+        )
+        _add_beveled_armor_plate(
+            f"SurgeArcTankWarning_DeckStripe_{side}", (0.12, 0.34, 0.024), (sx * 0.46, 0.36, 1.02),
+            upper_deck, w_armor, bevel=0.006, recipe_tag="surgearc_l1_warning_stripe",
+        )
+        _add_beveled_armor_plate(
+            f"SurgeArcTankArmor_SponsonShield_{side}", (0.06, 1.50, 0.14), (sx * 0.63, -0.05, 0.88),
+            upper_deck, l_armor, bevel=0.008, seat_downward=False,
+            recipe_tag="surgearc_l1_sponson_shield",
+        )
+
+    notes.append("Visor pocket, road axles, shackles, stabilizer clearances, and L1 armor plates applied")
     _finalize_all_mesh_attributes(unit, unit)
     return notes
 
@@ -1743,7 +1869,28 @@ def apply_overlord_command_hq_v2() -> list[str]:
                 _set_obj_world_center(obj, Vector((sx * 0.78, c.y, 0.58)))
                 snap_object_to_nearest(obj, chassis, embed=0.005)
 
-    notes.append(f"8 sculpted wheel-arch fenders + {stay_total} stays; Turret/Gatling elevated to cab roof")
+    # 7. Level-1 RTS readability: LightArmor cab/shelter roof shields, side ribs & Warning brow trim
+    w_armor = resolve_vehicle_material(unit, "warning")
+    _add_beveled_armor_plate(
+        "OverlordCommandHQArmor_CabRoofShield", (1.26, 0.96, 0.046), (0.0, 1.18, 1.65),
+        cab, l_armor, bevel=0.012, recipe_tag="overlord_l1_cab_roof",
+    )
+    _add_beveled_armor_plate(
+        "OverlordCommandHQArmor_ShelterRoofDeck", (1.42, 1.84, 0.052), (0.0, -0.78, 2.07),
+        shelter, l_armor, bevel=0.014, recipe_tag="overlord_l1_shelter_roof",
+    )
+    _add_beveled_armor_plate(
+        "OverlordCommandHQWarning_CabBrowTrim", (1.18, 0.14, 0.028), (0.0, 1.96, 1.56),
+        cab, w_armor, bevel=0.006, recipe_tag="overlord_l1_warning_brow",
+    )
+    for side, sx in (("L", -1.0), ("R", 1.0)):
+        _add_beveled_armor_plate(
+            f"OverlordCommandHQArmor_ShelterSideRib_{side}", (0.06, 1.86, 0.22), (sx * 0.91, -0.78, 1.62),
+            shelter, p_armor, bevel=0.010, seat_downward=False,
+            recipe_tag="overlord_l1_shelter_rib",
+        )
+
+    notes.append(f"8 sculpted wheel-arch fenders + {stay_total} stays; Turret/Gatling elevated; L1 armor plates seated")
     _finalize_all_mesh_attributes(unit, unit)
     return notes
 

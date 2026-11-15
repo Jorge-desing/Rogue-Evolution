@@ -284,11 +284,11 @@ def compose_hybrid_scalar_maps(
     # 2: Light armor (lifted contrasting panel plating derived from MM primary preset)
     m = region_mask == REGION_LIGHT_ARMOR
     if np.any(m):
-        tint = _lift_tint_for_urp(primary_tint_rgb, 118.0)
-        lifted = np.clip(p_alb_stab * 0.78 + tint * 0.22 * grain + 28.0, 64.0, 240.0).astype(np.uint8)
+        tint = _lift_tint_for_urp(primary_tint_rgb, 134.0)
+        lifted = np.clip(p_alb_stab * 0.74 + tint * 0.26 * grain + 38.0, 74.0, 244.0).astype(np.uint8)
         albedo[m, :3] = lifted[m]
         metallic[m] = p_met[m]
-        roughness[m] = np.clip(p_rgh[m].astype(np.int16) - 10, 42, 200).astype(np.uint8)
+        roughness[m] = np.clip(p_rgh[m].astype(np.int16) - 14, 40, 196).astype(np.uint8)
         normal[m] = p_nrm[m]
 
     # 3: Gunmetal structural mechanical steel (MM gunmetal_chassis, URP F0 floor)
@@ -359,8 +359,8 @@ def compose_hybrid_scalar_maps(
         rgh_f[non_emissive] += 18.0 * seam_cavity[non_emissive]
 
         if np.any(metal_bevel_regions):
-            alb_f[metal_bevel_regions] += (24.0 * bevel_ring[metal_bevel_regions])[..., None]
-            rgh_f[metal_bevel_regions] -= 22.0 * bevel_ring[metal_bevel_regions]
+            alb_f[metal_bevel_regions] += (28.0 * bevel_ring[metal_bevel_regions])[..., None]
+            rgh_f[metal_bevel_regions] -= 24.0 * bevel_ring[metal_bevel_regions]
             chamfer_hits = metal_bevel_regions & (bevel_ring > 0.45)
             metallic[chamfer_hits] = np.maximum(metallic[chamfer_hits], 224)
 

@@ -157,3 +157,12 @@ report={
 }
 (OUT / 'geometry-report.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
 print('FOUNDRY_GEOMETRY_BUILT', json.dumps(report))
+
+cli_args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+if '--promote' in cli_args:
+    import shutil
+    promo_dir = ROOT / 'unity' / 'RogueCommandAssetAuthoring' / 'Assets' / 'TacticalOperations' / 'Models'
+    promo_dir.mkdir(parents=True, exist_ok=True)
+    promo_lods = promo_dir / 'BulwarkFoundry_LODs.fbx'
+    shutil.copy2(fbx, promo_lods)
+    print(f'FOUNDRY_PROMOTED {promo_lods}')

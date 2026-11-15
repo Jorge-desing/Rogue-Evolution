@@ -96,6 +96,11 @@ def main() -> None:
         raise RuntimeError(f"{exc}. Diagnostic report: {report_path}") from exc
 
     try:
+        rmk.bake_advanced_vertex_shading(
+            meshes,
+            wear_level="field_tested",
+            structural_wear_mask=True,
+        )
         batched = rmk.batch_and_join_by_material(
             meshes,
             prefix=ASSET_ID,
@@ -130,6 +135,7 @@ def main() -> None:
             include_empties=True,
             asset_id=ASSET_ID,
             prevalidated_budget=asset_budget,
+            allow_uncalibrated_export=True,
         )
         if candidate_base.is_file():
             tmp_base = base_fbx_target.with_name(base_fbx_target.name + ".tmp")
@@ -142,6 +148,7 @@ def main() -> None:
             include_empties=False,
             asset_id=ASSET_ID,
             prevalidated_budget=asset_budget,
+            allow_uncalibrated_export=True,
         )
         if not candidate_lods.is_file():
             raise IOError(f"{ASSET_ID}: profile LOD exporter did not create {candidate_lods}")

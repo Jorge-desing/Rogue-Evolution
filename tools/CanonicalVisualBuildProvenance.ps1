@@ -338,7 +338,12 @@ function Get-CanonicalPhaseInputHash {
                 'tools/tactical_operations_v2_recipes.py',
                 'tools/Build-SampleNativeVehiclesV2SourceBlends.py',
                 'tools/Build-SampleNativeWalkersV2SourceBlends.py',
-                'tools/Build-TacticalOperationsV2SourceBlends.py'
+                'tools/Build-TacticalOperationsV2SourceBlends.py',
+                'tools/Refresh-UnitProceduralAnimations.py',
+                'tools/Build-ArachnidHexapodFactoryModel.py',
+                'tools/Build-OverlordCommandHQFactoryModel.py',
+                'tools/overlord_hq_factory_hardflow_recipe.py',
+                'tools/Build-BulwarkFoundryModel.py'
             )
             $includeLevelOneSourceBlends = $true
         }

@@ -11,7 +11,7 @@ metadata:
 
 Symmetric biped chains with matching bone rolls and forward pole targets use the same +90 degree IK pole angle. Check both evaluated knees and exported poses; a reversed sign flips one knee.
 
-For Ironclad and Arc Lance, Blender generates one biped Walk take and aliases Drive in memory. Unity importer metadata maps both named clips to the real Walk take, retaining their IDs; verify imported curves and controller references after rebuilding. This is not a visual gait or runtime test.
+For Ironclad, Arc Lance and Atlas, Blender generates one biped Walk take and aliases Drive in memory. Unity importer metadata maps both named clips to the real Walk take, retaining their IDs; verify imported curves and controller references after rebuilding. This is not a visual gait or runtime test.
 
 Use this skill for Unity Animator/AnimationClip integration and mechanical animation on Rogue Command vehicles and units. Apply animation principles to RTS camera scale, native movement, and the project's verified runtime hooks; do not copy browser/CSS timing rules literally. For walker gait and armature construction, use [Mech Rigging](../rogue-command-mech-rigging-authoring/SKILL.md). For particle effects, use [VFX Authoring](../rogue-command-vfx-authoring/SKILL.md). For mesh, sockets, and FBX work, use [3D Model Authoring](../rogue-command-3d-model-authoring/SKILL.md).
 
@@ -155,6 +155,13 @@ When a rigged model does not render at all (invisible mesh, zero-extent SMR boun
 
 ## Animation Validation Matrix (Integrated 6-Phase Pipeline)
 
+Atlas Unity importer selects simple FBX `Idle` and `Walk` takes for its named clips; strict Unity audit eliminated its recorded seam issues. Retain clip IDs and inspect takes and gait before applying this to other assets.
+
+The 2026-11-14 strict offline rerun passed after Atlas, Ironclad, Arc Lance, Bastion and Arachnid selected endpoint-matching simple FBX Idle/Walk takes. Preserve clip IDs and verify takes after rebuilding; Steam and visual gait remain separate evidence.
+
+The matrix report retains full phase stdout and stderr. Its phase 1–2 currently runs algorithm unit tests, not individual source-model motion measurements; perform per-asset checks separately. An earlier strict run failed with 138 Unity issues; see the handoff for the subsequent take-selection recheck and remaining runtime evidence.
+
+
 Enforce every phase of the Rogue Command animation validation matrix before claiming completion:
 
 | Phase | Tool / Script | Contract Verified |
@@ -168,15 +175,16 @@ Enforce every phase of the Rogue Command animation validation matrix before clai
 
 ## Validation commands
 
-Run from the repository root through `terminal`, using the project Python environment:
+Run the unified 6-phase matrix orchestrator first from the repository root (`terminal`), then individual phase commands or Steam runtime validation as needed:
 
 ```text
-terminal(command=".venv/Scripts/python.exe -m tools.validate_fbx_animation_pipeline unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/IroncladWalker.fbx unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/BulwarkSiegeTank.fbx")
+terminal(command=".venv/Scripts/python.exe -m tools.run_animation_validation_matrix --output artifacts/animation-qa/matrix-report.json")
+terminal(command=".venv/Scripts/python.exe -m tools.validate_fbx_animation_pipeline --all-units")
 terminal(command=".venv/Scripts/python.exe -m tools.run_python_tests --output artifacts/animation-qa/python-tests-report.json")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_mech_rigging.py --pack content/packs/sample-native-expansion --json")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_vfx_assets.py --pack content/packs/sample-native-expansion --json")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/sample-native-expansion")
-terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe -B -m unittest tests.python.rigging.test_tactical_animation_hold_and_easing tests.python.rigging.test_tactical_animation_improvements tests.python.rigging.test_attack_clip_authoring_contract tests.python.bundles.test_mech_rigging_bundle tests.python.rigging.test_tactical_walker_rigging_contract tests.python.rigging.test_unit_animation_algorithms")
+terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe -B -m unittest tests.python.rigging.test_tactical_animation_hold_and_easing tests.python.rigging.test_tactical_animation_improvements tests.python.rigging.test_attack_clip_authoring_contract tests.python.bundles.test_mech_rigging_bundle tests.python.rigging.test_tactical_walker_rigging_contract tests.python.rigging.test_unit_animation_algorithms tests.python.rigging.test_animation_validation_matrix")
 terminal(command="PYTHONPATH=.venv/Lib/site-packages .venv/Scripts/python.exe tools/validate_content_bundle_references.py content/packs/tactical-operations")
 ```
 

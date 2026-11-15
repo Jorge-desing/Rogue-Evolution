@@ -561,6 +561,17 @@ namespace RogueCommandExpansion.Authoring
             // Only construct LODGroup if LOD0 and LOD1 are both present and distinct.
             if (hasRequiredLods)
             {
+                // The imported FBX can carry its own LODGroup. Its renderers are
+                // reassigned to the prefab root below, so remove that competing
+                // controller from the instantiated hierarchy, never the FBX asset.
+                var selectedRenderers = new HashSet<Renderer>(lod0Renderers);
+                selectedRenderers.UnionWith(lod1Renderers);
+                selectedRenderers.UnionWith(lod2Renderers);
+                RemoveImportedLodGroups(modelInstance, root, selectedRenderers);
+                if (lodInstance != null && lodInstance != modelInstance)
+                {
+                    RemoveImportedLodGroups(lodInstance, root, selectedRenderers);
+                }
                 LODGroup lodGroup = root.GetComponent<LODGroup>();
                 if (lodGroup == null)
                 {
@@ -582,6 +593,55 @@ namespace RogueCommandExpansion.Authoring
             else
             {
                 throw new InvalidDataException("Profile-driven LODGroup is incomplete for " + modelInstance.name + ": " + failureReason);
+            }
+        }
+
+        internal static bool RemoveConflictingNestedLodGroups(GameObject root)
+        {
+            LODGroup primary = root.GetComponent<LODGroup>();
+            if (primary == null) return false;
+            var owned = new HashSet<Renderer>();
+            foreach (LOD level in primary.GetLODs())
+                foreach (Renderer renderer in level.renderers)
+                    if (renderer != null) owned.Add(renderer);
+            bool changed = false;
+            foreach (LODGroup nested in root.GetComponentsInChildren<LODGroup>(true))
+            {
+                if (nested == null || nested == primary) continue;
+                var members = new HashSet<Renderer>();
+                foreach (LOD level in nested.GetLODs())
+                    foreach (Renderer renderer in level.renderers)
+                        if (renderer != null) members.Add(renderer);
+                bool shared = false;
+                foreach (Renderer renderer in members)
+                    if (owned.Contains(renderer)) shared = true;
+                if (!shared) continue;
+                foreach (Renderer renderer in members)
+                    if (!owned.Contains(renderer) && renderer.enabled)
+                        throw new InvalidDataException("Nested LODGroup has enabled renderers not owned by root: " + nested.name);
+                UnityEngine.Object.DestroyImmediate(nested);
+                changed = true;
+            }
+            return changed;
+        }
+
+        private static void RemoveImportedLodGroups(GameObject instance, GameObject root, HashSet<Renderer> selected)
+        {
+            foreach (LODGroup imported in instance.GetComponentsInChildren<LODGroup>(true))
+            {
+                if (imported == null || imported.gameObject == root) continue;
+                var members = new HashSet<Renderer>();
+                foreach (LOD level in imported.GetLODs())
+                    foreach (Renderer renderer in level.renderers)
+                        if (renderer != null) members.Add(renderer);
+                bool shared = false;
+                foreach (Renderer renderer in members)
+                    if (selected.Contains(renderer)) shared = true;
+                if (!shared) continue;
+                foreach (Renderer renderer in members)
+                    if (!selected.Contains(renderer) && renderer.enabled)
+                        throw new InvalidDataException("Imported LODGroup has enabled renderers outside root selection: " + imported.name);
+                UnityEngine.Object.DestroyImmediate(imported);
             }
         }
 
@@ -1457,10 +1517,19 @@ namespace RogueCommandExpansion.Authoring
 
             bool hasMovementParameter = driveState != null && EnsureAnimatorParameter(
                 controller, "RCL_IsMoving", AnimatorControllerParameterType.Bool);
+            bool hasSpeedMultiplierParameter = driveState != null && EnsureAnimatorFloatParameter(
+                controller, "RCL_SpeedMultiplier", 1.0f);
             bool hasFireParameter = fireState != null && EnsureAnimatorParameter(
                 controller, "RCL_Fire", AnimatorControllerParameterType.Trigger);
             bool hasDeathParameter = deathState != null && EnsureAnimatorParameter(
                 controller, "RCL_Death", AnimatorControllerParameterType.Trigger);
+
+            if (hasSpeedMultiplierParameter)
+            {
+                driveState.speed = 1.0f;
+                driveState.speedParameter = "RCL_SpeedMultiplier";
+                driveState.speedParameterActive = true;
+            }
 
             if (hasMovementParameter && driveState != idleState)
             {
@@ -1471,6 +1540,8 @@ namespace RogueCommandExpansion.Authoring
             if (fireState != null && idleState != null && hasFireParameter)
             {
                 EnsureAnyStateTriggerTransition(stateMachine, fireState, "RCL_Fire");
+                EnsureAnyStateTransitionCondition(
+                    stateMachine, fireState, "RCL_IsMoving", AnimatorConditionMode.IfNot, hasMovementParameter);
                 // Add the conditioned locomotion exit before the fallback idle exit.
                 // Unity evaluates transitions in serialized order; this prevents a
                 // shot from interrupting a moving unit and leaving it in a static pose.
@@ -1481,6 +1552,10 @@ namespace RogueCommandExpansion.Authoring
                 }
                 EnsureExitTransition(fireState, idleState);
             }
+
+            ConfigureUpperBodyFireRecoilLayer(
+                controller,
+                hasMovementParameter && hasFireParameter ? fireClip : null);
 
             if (deathState != null && hasDeathParameter)
             {
@@ -1517,20 +1592,11 @@ namespace RogueCommandExpansion.Authoring
         }
 
         private static bool HasBodyDrivenFireRecoilClip(AnimationClip clip)
-            bool hasSpeedMultiplierParameter = driveState != null && EnsureAnimatorFloatParameter(
-                controller, "RCL_SpeedMultiplier", 1.0f);
         {
             if (clip == null) return false;
             bool bodyPosition = false;
             bool weaponMotion = false;
             EditorCurveBinding[] bindings = AnimationUtility.GetCurveBindings(clip);
-            if (hasSpeedMultiplierParameter)
-            {
-                driveState.speed = 1.0f;
-                driveState.speedParameter = "RCL_SpeedMultiplier";
-                driveState.speedParameterActive = true;
-            }
-
             foreach (EditorCurveBinding binding in bindings)
             {
                 string path = binding.path ?? string.Empty;
@@ -1540,8 +1606,6 @@ namespace RogueCommandExpansion.Authoring
                     property.IndexOf("Euler", StringComparison.OrdinalIgnoreCase) >= 0;
                 AnimationCurve curve = AnimationUtility.GetEditorCurve(clip, binding);
                 bool dynamicCurve = HasMeaningfulCurveVariation(curve);
-                EnsureAnyStateTransitionCondition(
-                    stateMachine, fireState, "RCL_IsMoving", AnimatorConditionMode.IfNot, hasMovementParameter);
                 if ((path.IndexOf("Bone_Hull", StringComparison.OrdinalIgnoreCase) >= 0 ||
                      path.IndexOf("Bone_Pelvis", StringComparison.OrdinalIgnoreCase) >= 0) &&
                     positionCurve && dynamicCurve)
@@ -1553,10 +1617,6 @@ namespace RogueCommandExpansion.Authoring
                     dynamicCurve)
                 {
                     weaponMotion = true;
-            ConfigureUpperBodyFireRecoilLayer(
-                controller,
-                hasMovementParameter && hasFireParameter ? fireClip : null);
-
                 }
             }
 
@@ -1785,66 +1845,6 @@ namespace RogueCommandExpansion.Authoring
             return true;
         }
 
-        private static void EnsureStateTransition(
-            AnimatorState source,
-            AnimatorState destination,
-            string parameterName,
-            AnimatorConditionMode condition,
-            float duration)
-        {
-            if (source == null || destination == null) return;
-            foreach (AnimatorStateTransition existing in source.transitions)
-            {
-                if (existing.destinationState == destination && HasTransitionCondition(existing, parameterName, condition)) return;
-            }
-
-            AnimatorStateTransition transition = source.AddTransition(destination);
-            transition.hasExitTime = false;
-            transition.duration = duration;
-            transition.AddCondition(condition, 0f, parameterName);
-        }
-
-        private static void RemoveStateTransitionsWithConditionExcept(
-            AnimatorState source,
-            string parameterName,
-            AnimatorConditionMode condition,
-            AnimatorState destination)
-        {
-            if (source == null) return;
-
-            bool keptExpectedTransition = false;
-            foreach (AnimatorStateTransition existing in source.transitions)
-            {
-                if (!HasTransitionCondition(existing, parameterName, condition)) continue;
-                if (existing.destinationState == destination && !keptExpectedTransition)
-                {
-                    keptExpectedTransition = true;
-                    continue;
-                }
-                source.RemoveTransition(existing);
-            }
-        }
-
-        private static void EnsureAnyStateTriggerTransition(
-            AnimatorStateMachine stateMachine,
-            AnimatorState destination,
-            string parameterName)
-        {
-            if (stateMachine == null || destination == null) return;
-            foreach (AnimatorStateTransition existing in stateMachine.anyStateTransitions)
-            {
-                if (existing.destinationState == destination && HasTransitionCondition(existing, parameterName, AnimatorConditionMode.If)) return;
-            }
-
-            AnimatorStateTransition transition = stateMachine.AddAnyStateTransition(destination);
-            transition.hasExitTime = false;
-            transition.duration = 0.05f;
-            transition.canTransitionToSelf = false;
-            transition.AddCondition(AnimatorConditionMode.If, 0f, parameterName);
-        }
-
-        private static void EnsureExitTransition(AnimatorState source, AnimatorState destination)
-        {
         private static bool EnsureAnimatorFloatParameter(
             AnimatorController controller,
             string parameterName,
@@ -1981,6 +1981,66 @@ namespace RogueCommandExpansion.Authoring
             controller.layers = layers;
         }
 
+        private static void EnsureStateTransition(
+            AnimatorState source,
+            AnimatorState destination,
+            string parameterName,
+            AnimatorConditionMode condition,
+            float duration)
+        {
+            if (source == null || destination == null) return;
+            foreach (AnimatorStateTransition existing in source.transitions)
+            {
+                if (existing.destinationState == destination && HasTransitionCondition(existing, parameterName, condition)) return;
+            }
+
+            AnimatorStateTransition transition = source.AddTransition(destination);
+            transition.hasExitTime = false;
+            transition.duration = duration;
+            transition.AddCondition(condition, 0f, parameterName);
+        }
+
+        private static void RemoveStateTransitionsWithConditionExcept(
+            AnimatorState source,
+            string parameterName,
+            AnimatorConditionMode condition,
+            AnimatorState destination)
+        {
+            if (source == null) return;
+
+            bool keptExpectedTransition = false;
+            foreach (AnimatorStateTransition existing in source.transitions)
+            {
+                if (!HasTransitionCondition(existing, parameterName, condition)) continue;
+                if (existing.destinationState == destination && !keptExpectedTransition)
+                {
+                    keptExpectedTransition = true;
+                    continue;
+                }
+                source.RemoveTransition(existing);
+            }
+        }
+
+        private static void EnsureAnyStateTriggerTransition(
+            AnimatorStateMachine stateMachine,
+            AnimatorState destination,
+            string parameterName)
+        {
+            if (stateMachine == null || destination == null) return;
+            foreach (AnimatorStateTransition existing in stateMachine.anyStateTransitions)
+            {
+                if (existing.destinationState == destination && HasTransitionCondition(existing, parameterName, AnimatorConditionMode.If)) return;
+            }
+
+            AnimatorStateTransition transition = stateMachine.AddAnyStateTransition(destination);
+            transition.hasExitTime = false;
+            transition.duration = 0.05f;
+            transition.canTransitionToSelf = false;
+            transition.AddCondition(AnimatorConditionMode.If, 0f, parameterName);
+        }
+
+        private static void EnsureExitTransition(AnimatorState source, AnimatorState destination)
+        {
             if (source == null || destination == null) return;
             foreach (AnimatorStateTransition existing in source.transitions)
             {

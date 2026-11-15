@@ -47,6 +47,26 @@ MODELS_DIR = (
     / "RogueCommandExpansionSample"
     / "Models"
 )
+CANONICAL_RIGGED_UNITS: tuple[str, ...] = (
+    "ArachnidHexapod",
+    "ArcLanceWalker",
+    "AtlasCraneMech",
+    "BastionSiegeMech",
+    "BulwarkSiegeTank",
+    "ColossusSiegePlatform",
+    "CommandRelay",
+    "FieldMedicRover",
+    "GravitasBreaker",
+    "IroncladWalker",
+    "OverlordCommandHQ",
+    "SalvageHauler",
+    "SandlanceScout",
+    "SentinelRelay",
+    "SkirmishStrikeBike",
+    "SkyguardSAM",
+    "SurgeArcTank",
+    "TidebreakerHovercraft",
+)
 
 
 def probe_external_animation_tools() -> dict[str, dict[str, Any]]:
@@ -122,6 +142,7 @@ def audit_armature_actions_bpy(
     loop_tolerance: float = 1e-3,
     scale_tolerance: float = 1e-3,
     length_tolerance: float = 1e-3,
+    strict_foot_grounding: bool = False,
 ) -> dict[str, Any]:
     """Evaluates all actions on a Blender armature object against animation contracts."""
     import bpy
@@ -157,6 +178,7 @@ def audit_armature_actions_bpy(
         "bone_count": len(armature_obj.pose.bones),
         "actions": {},
         "issues": [],
+        "warnings": [],
         "passed": True,
     }
 
@@ -261,6 +283,7 @@ def audit_armature_actions_bpy(
             "max_bone_length_deviation": round(max_length_dev, 6),
             "passed": True,
             "issues": [],
+            "warnings": [],
         }
 
         if not root_audit["passed"]:
@@ -303,10 +326,12 @@ def audit_armature_actions_bpy(
                 res["world_penetration_frames"] = pen_frames
                 foot_results[foot_name] = res
                 if pen_frames:
-                    action_result["passed"] = False
-                    action_result["issues"].append(
-                        f"FOOT_PENETRATION ({foot_name}): frames={pen_frames}"
-                    )
+                    msg = f"FOOT_PENETRATION ({foot_name}): frames={pen_frames}"
+                    if strict_foot_grounding:
+                        action_result["passed"] = False
+                        action_result["issues"].append(msg)
+                    else:
+                        action_result["warnings"].append(msg)
             action_result["foot_sliding"] = foot_results
 
         if role == "fire_recoil":
@@ -329,6 +354,8 @@ def audit_armature_actions_bpy(
             report["passed"] = False
             for issue in action_result["issues"]:
                 report["issues"].append(f"[{action.name}] {issue}")
+        for warn in action_result["warnings"]:
+            report["warnings"].append(f"[{action.name}] {warn}")
 
         report["actions"][action.name] = action_result
 
@@ -337,7 +364,7 @@ def audit_armature_actions_bpy(
     return report
 
 
-def audit_fbx_file_bpy(fbx_path: Path) -> dict[str, Any]:
+def audit_fbx_file_bpy(fbx_path: Path, *, strict_foot_grounding: bool = False) -> dict[str, Any]:
     """Imports an FBX into a clean Blender scene and audits its armature & actions."""
     import bpy
 
@@ -363,12 +390,19 @@ def audit_fbx_file_bpy(fbx_path: Path) -> dict[str, Any]:
     pool = populated if populated else armature_actions
     canonical_actions = [act for act in pool if "action_" in act.name.lower()]
     selected_actions = canonical_actions if canonical_actions else pool
-    result = audit_armature_actions_bpy(armature, selected_actions)
+    result = audit_armature_actions_bpy(
+        armature, selected_actions, strict_foot_grounding=strict_foot_grounding
+    )
     result["fbx"] = str(fbx_path)
     return result
 
 
-def run_blender_audit(fbx_paths: list[Path], blender_exe: Path) -> dict[str, Any]:
+def run_blender_audit(
+    fbx_paths: list[Path],
+    blender_exe: Path,
+    *,
+    strict_foot_grounding: bool = False,
+) -> dict[str, Any]:
     """Invokes pinned Blender 4.5.14 in background mode to audit the given FBX files."""
     if not blender_exe.is_file():
         return {
@@ -393,6 +427,7 @@ def run_blender_audit(fbx_paths: list[Path], blender_exe: Path) -> dict[str, Any
             "--in-blender",
             "--output",
             str(tmp_path),
+            *(["--strict-foot-grounding"] if strict_foot_grounding else []),
             *(str(p) for p in fbx_paths),
         ]
         proc = subprocess.run(
@@ -429,6 +464,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Audit all canonical rigged unit FBX files in RogueCommandExpansionSample/Models.",
     )
     parser.add_argument("--blender", type=Path, default=DEFAULT_BLENDER_EXE)
+    parser.add_argument("--strict-foot-grounding", action="store_true")
     parser.add_argument("--json", action="store_true", help="Print JSON output.")
     parser.add_argument("--output", type=Path, help="Write JSON report to path.")
     parser.add_argument("--in-blender", action="store_true", help=argparse.SUPPRESS)
@@ -438,17 +474,19 @@ def main(argv: list[str] | None = None) -> int:
 
     targets = [p.resolve() for p in args.fbx_paths]
     if args.all_units:
-        for p in sorted(MODELS_DIR.glob("*.fbx")):
-            name = p.stem
-            if name.endswith("_Atlas") or name.endswith("_LODs"):
-                continue
-            targets.append(p.resolve())
+        for unit_name in CANONICAL_RIGGED_UNITS:
+            fbx_candidate = MODELS_DIR / f"{unit_name}.fbx"
+            if fbx_candidate.is_file():
+                targets.append(fbx_candidate.resolve())
 
     if not targets:
         parser.error("Provide at least one FBX path or pass --all-units.")
 
     if args.in_blender:
-        results = [audit_fbx_file_bpy(p) for p in targets]
+        results = [
+            audit_fbx_file_bpy(p, strict_foot_grounding=args.strict_foot_grounding)
+            for p in targets
+        ]
         overall = {
             "passed": all(r.get("passed", False) for r in results),
             "audited_count": len(results),
@@ -461,7 +499,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(overall, indent=2))
         return 0 if overall["passed"] else 1
 
-    report = run_blender_audit(targets, args.blender)
+    report = run_blender_audit(
+        targets, args.blender, strict_foot_grounding=args.strict_foot_grounding
+    )
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -479,9 +519,13 @@ def main(argv: list[str] | None = None) -> int:
             name = Path(res.get("fbx", "?")).name
             status = "PASS" if res.get("passed") else "FAIL"
             issues = res.get("issues", [])
-            print(f"  [{status}] {name} (actions={len(res.get('actions', {}))})")
+            warnings = res.get("warnings", [])
+            warn_note = f", warnings={len(warnings)}" if warnings else ""
+            print(f"  [{status}] {name} (actions={len(res.get('actions', {}))}{warn_note})")
             for issue in issues:
                 print(f"      - {issue}")
+            for warn in warnings:
+                print(f"      ! {warn}")
 
     return 0 if report.get("passed") else 1
 

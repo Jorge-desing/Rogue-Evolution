@@ -862,6 +862,12 @@ def apply_edits(
             elif name == "purge-dangling":
                 current, removed = purge_dangling_references(current, op.get("unitIds", []), op.get("profileIds", []))
                 d = [f"referencia eliminada: {value}" for value in removed]
+            elif name == "extract-units":
+                candidate, d = extract_units_to_pack(current, op.get("unitIds", []))
+                if not d:
+                    current = candidate
+            elif name == "import-units":
+                current, d = import_units(current, op.get("source", {}), op.get("unitIds", []))
             else:
                 d = [f"op desconocida '{name}'"]
         except Exception as exc:  # keep the batch running per-op
@@ -870,6 +876,53 @@ def apply_edits(
             all_diagnostics.append(f"ops[{index}] {name}: {item}")
 
     return current, all_diagnostics
+
+
+def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set[str], set[str]]:
+    """Compute local unit/stage/profile dependencies until no new IDs are found."""
+    units = _unit_index(pack)
+    factories = {_entity_key(unit.get("productionBuilding")): uid for uid, unit in units.items()
+                 if isinstance(unit.get("productionBuilding"), dict)}
+    stages = {_entity_key(row): row for row in _as_list(pack.get("stages")) if _entity_key(row)}
+    profiles = {_entity_key(row): row for row in _as_list(pack.get("aiProfiles")) if _entity_key(row)}
+    if not isinstance(unit_ids, list) or not unit_ids or any(not isinstance(uid, str) or uid not in units for uid in unit_ids):
+        raise ValueError("unitIds debe contener unidades existentes del pack origen")
+    if len(set(unit_ids)) != len(unit_ids):
+        raise ValueError("unitIds contiene unidades repetidas")
+
+    def strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for child in value.values():
+                yield from strings(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from strings(child)
+
+    selected_units, selected_stages, selected_profiles = set(unit_ids), set(), set()
+    while True:
+        previous = (len(selected_units), len(selected_stages), len(selected_profiles))
+        selected_entity_ids = selected_units | {fid for fid, uid in factories.items() if uid in selected_units and fid}
+        for pid, profile in profiles.items():
+            if set(strings(profile)) & selected_entity_ids:
+                selected_profiles.add(pid)
+        for sid, stage in stages.items():
+            refs = set(strings({key: stage.get(key) for key in ("unitIds", "blueprintPoolEntries", "aiProfileIds")}))
+            if refs & (selected_units | selected_profiles):
+                selected_stages.add(sid)
+        rows = ([units[uid] for uid in selected_units] + [stages[sid] for sid in selected_stages] +
+                [profiles[pid] for pid in selected_profiles])
+        for row in rows:
+            for ref in strings(row):
+                if ref in units:
+                    selected_units.add(ref)
+                if ref in factories:
+                    selected_units.add(factories[ref])
+                if ref in profiles:
+                    selected_profiles.add(ref)
+        if previous == (len(selected_units), len(selected_stages), len(selected_profiles)):
+            return selected_units, selected_stages, selected_profiles
 
 
 def extract_units_to_pack(
@@ -895,7 +948,10 @@ def extract_units_to_pack(
     if "schemaVersion" in source:
         extracted["schemaVersion"] = source["schemaVersion"]
 
-    wanted = set(unit_ids)
+    try:
+        wanted, stage_ids, profile_ids = _composition_closure(source, unit_ids)
+    except ValueError as exc:
+        return {}, [str(exc)]
     extracted["units"] = [
         u for u in _as_list(source.get("units")) if _entity_key(u) in wanted
     ]
@@ -904,30 +960,25 @@ def extract_units_to_pack(
     for stage in _as_list(source.get("stages")):
         if not isinstance(stage, dict):
             continue
-        stage_units = set(_as_list(stage.get("unitIds")))
-        if stage_units & wanted:
+        if _entity_key(stage) in stage_ids:
             stages.append(stage)
-    if stages:
-        extracted["stages"] = stages
+    extracted["stages"] = stages
 
-    wanted_profiles = set()
-    for stage in stages:
-        wanted_profiles.update(_as_list(stage.get("aiProfileIds")))
     profiles = []
     for profile in _as_list(source.get("aiProfiles")):
         if not isinstance(profile, dict):
             continue
-        if _entity_key(profile) in wanted_profiles:
+        if _entity_key(profile) in profile_ids:
             profiles.append(profile)
-    if profiles:
-        extracted["aiProfiles"] = profiles
+    extracted["aiProfiles"] = profiles
 
     # bundles: only those whose produced units are extracted
     # (keep assetBundles empty unless units declare assetBundleId)
-    has_bundle_units = any(
-        u.get("assetBundleId") for u in extracted["units"]
-    )
-    extracted["assetBundles"] = list(_as_list(source.get("assetBundles"))) if has_bundle_units else []
+    # A Unity manifest must exactly match every declared bundle, including
+    # shared dependencies that need not appear in content-level assetBundleId fields.
+    extracted["assetBundles"] = list(_as_list(source.get("assetBundles")))
+    if source.get("assetBundleManifestPath"):
+        extracted["assetBundleManifestPath"] = source["assetBundleManifestPath"]
 
     # The caller may edit the extracted pack independently of its source.
     return json.loads(json.dumps(extracted)), []
@@ -946,6 +997,11 @@ def import_units(
     diagnostics: list[str] = []
 
     src_index = _unit_index(src)
+    try:
+        closure_units, closure_stages, closure_profiles = _composition_closure(src, unit_ids)
+    except ValueError as exc:
+        return updated, [str(exc)]
+    unit_ids = [uid for uid in src_index if uid in closure_units]
     existing = _unit_index(updated)
     existing_factories = _factory_index(updated)
 
@@ -975,34 +1031,70 @@ def import_units(
     if diagnostics:
         return updated, diagnostics
 
-    for unit in to_import:
-        updated.setdefault("units", []).append(json.loads(json.dumps(unit)))
-
-    wanted = set(unit_ids)
-    # import stages that reference the imported units (if not already present)
-    existing_stages = {
-        _entity_key(s) for s in _as_list(updated.get("stages")) if isinstance(s, dict)
-    }
+    stages = []
     for stage in _as_list(src.get("stages")):
         if not isinstance(stage, dict):
             continue
-        if set(_as_list(stage.get("unitIds"))) & wanted and _entity_key(stage) not in existing_stages:
-            updated.setdefault("stages", []).append(json.loads(json.dumps(stage)))
-            existing_stages.add(_entity_key(stage))
+        if _entity_key(stage) in closure_stages:
+            stages.append(stage)
 
-    existing_profiles = {
-        _entity_key(p) for p in _as_list(updated.get("aiProfiles")) if isinstance(p, dict)
-    }
-    wanted_profiles = set()
-    for stage in _as_list(updated.get("stages")):
-        if isinstance(stage, dict):
-            wanted_profiles.update(_as_list(stage.get("aiProfileIds")))
-    for profile in _as_list(src.get("aiProfiles")):
-        if not isinstance(profile, dict):
-            continue
-        if _entity_key(profile) in wanted_profiles and _entity_key(profile) not in existing_profiles:
-            updated.setdefault("aiProfiles", []).append(json.loads(json.dumps(profile)))
-            existing_profiles.add(_entity_key(profile))
+    profiles = [profile for profile in _as_list(src.get("aiProfiles"))
+                if isinstance(profile, dict) and _entity_key(profile) in closure_profiles]
+
+    def bundle_refs(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "assetBundleId" and isinstance(child, str) and child:
+                    yield child
+                yield from bundle_refs(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from bundle_refs(child)
+
+    needed_bundles = set(bundle_refs(to_import + stages + profiles))
+    source_bundles = {_entity_key(bundle): bundle for bundle in _as_list(src.get("assetBundles")) if _entity_key(bundle)}
+    destination_bundles = {_entity_key(bundle): bundle for bundle in _as_list(updated.get("assetBundles")) if _entity_key(bundle)}
+    for bundle_id in sorted(needed_bundles):
+        source_bundle = source_bundles.get(bundle_id)
+        if source_bundle is None:
+            diagnostics.append(f"bundle '{bundle_id}' no está declarado en el pack origen")
+        elif bundle_id in destination_bundles and destination_bundles[bundle_id] != source_bundle:
+            diagnostics.append(f"bundle '{bundle_id}' tiene contenido distinto en el pack destino")
+
+    # The loader requires declarations to match the original Unity manifest in
+    # full; keep even shared bundles not directly mentioned by content rows.
+    if needed_bundles:
+        if not src.get("assetBundleManifestPath"):
+            diagnostics.append("el pack origen no declara assetBundleManifestPath")
+        for bundle_id, bundle in source_bundles.items():
+            if bundle_id in destination_bundles and destination_bundles[bundle_id] != bundle:
+                diagnostics.append(f"bundle '{bundle_id}' tiene contenido distinto en el pack destino")
+        needed_bundles = set(source_bundles)
+
+    for section, incoming in (("stages", stages), ("aiProfiles", profiles)):
+        existing_rows = {_entity_key(row): row for row in _as_list(updated.get(section)) if _entity_key(row)}
+        for row in incoming:
+            key = _entity_key(row)
+            if key in existing_rows and existing_rows[key] != row:
+                diagnostics.append(f"{section}: conflicto de contenido para '{key}'")
+
+    source_manifest = src.get("assetBundleManifestPath")
+    target_manifest = updated.get("assetBundleManifestPath")
+    if diagnostics:
+        return updated, diagnostics
+
+    updated.setdefault("units", []).extend(json.loads(json.dumps(to_import)))
+    for section, incoming in (("stages", stages), ("aiProfiles", profiles)):
+        existing_ids = {_entity_key(row) for row in _as_list(updated.get(section)) if _entity_key(row)}
+        for row in incoming:
+            if _entity_key(row) not in existing_ids:
+                updated.setdefault(section, []).append(json.loads(json.dumps(row)))
+                existing_ids.add(_entity_key(row))
+    for bundle_id in sorted(needed_bundles):
+        if bundle_id not in destination_bundles:
+            updated.setdefault("assetBundles", []).append(json.loads(json.dumps(source_bundles[bundle_id])))
+    if needed_bundles and source_manifest and not target_manifest:
+        updated["assetBundleManifestPath"] = source_manifest
 
     return updated, []
 
@@ -1543,8 +1635,10 @@ def _load_pack(path_str: str) -> tuple[dict | None, str | None]:
     if not p.is_file():
         return None, f"Archivo no encontrado: {p}"
     try:
-        return json.loads(p.read_text(encoding="utf-8")), None
-    except json.JSONDecodeError as exc:
+        from tools.secure_pack_read import open_pack_file
+        with open_pack_file(p.parent, p.name) as stream:
+            return json.load(stream), None
+    except (OSError, ValueError, UnicodeError) as exc:
         return None, f"JSON inválido: {exc}"
 
 
@@ -1583,12 +1677,15 @@ def main(argv: list[str] | None = None) -> int:
             "add-bundle", "remove-bundle", "duplicate-unit",
             "add-upgrade", "remove-upgrade", "set-upgrade-field",
             "set-upgrade-card-change", "set-landscape", "set-unit-assets",
-            "set-pack-id", "set-schema-version", "purge-dangling",
+            "set-pack-id", "set-schema-version", "purge-dangling", "extract-units", "import-units",
             "batch",
         ],
         required=False,
     )
     parser.add_argument("--unit-id", help="ID de la unidad")
+    parser.add_argument("--unit-ids", nargs="+", help="Unidades seleccionadas para extracción")
+    parser.add_argument("--source-pack", help="Directorio o content.json del pack de origen para import-units")
+    parser.add_argument("--dependency-pack", action="append", default=[], help="Pack externo disponible para resolver referencias; se puede repetir")
     parser.add_argument("--unit-json", help="Ruta a un unit.json (para add)")
     parser.add_argument("--stage-ids", nargs="*", default=None,
                         help="Etapas donde registrar la unidad (add)")
@@ -1672,9 +1769,35 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     updated = None
+    script = None
+    composition_sources = []
     diagnostics: list[str] = []
 
-    if args.operation == "add":
+    if args.operation == "extract-units":
+        if not args.unit_ids:
+            print("--unit-ids es obligatorio para extract-units", file=sys.stderr)
+            return 2
+        updated, diagnostics = extract_units_to_pack(pack, args.unit_ids)
+        if diagnostics:
+            for diagnostic in diagnostics:
+                print(f"  ! {diagnostic}", file=sys.stderr)
+            return 1
+    elif args.operation == "import-units":
+        if not args.unit_ids or not args.source_pack:
+            print("--unit-ids y --source-pack son obligatorios para import-units", file=sys.stderr)
+            return 2
+        source_pack, source_error = _load_pack(args.source_pack)
+        if source_error:
+            print(source_error, file=sys.stderr)
+            return 2
+        updated, diagnostics = import_units(pack, source_pack, args.unit_ids)
+        if diagnostics:
+            for diagnostic in diagnostics:
+                print(f"  ! {diagnostic}", file=sys.stderr)
+            return 1
+        origin = Path(args.source_pack)
+        composition_sources.append((origin if origin.is_dir() else origin.parent, source_pack))
+    elif args.operation == "add":
         if not args.unit_json:
             print("--unit-json es obligatorio para add", file=sys.stderr)
             return 2
@@ -1967,7 +2090,24 @@ def main(argv: list[str] | None = None) -> int:
         if not isinstance(script, list):
             print("El script debe ser una lista de operaciones", file=sys.stderr)
             return 2
+        for row in script:
+            if isinstance(row, dict) and row.get("op") == "import-units":
+                source_path = row.get("sourcePath")
+                if not isinstance(source_path, str) or not source_path:
+                    print("import-units en batch requiere sourcePath", file=sys.stderr)
+                    return 2
+                source_pack, source_error = _load_pack(source_path)
+                if source_error:
+                    print(source_error, file=sys.stderr)
+                    return 2
+                row["source"] = source_pack
+                origin = Path(source_path)
+                composition_sources.append((origin if origin.is_dir() else origin.parent, source_pack))
         updated, diagnostics = apply_edits(pack, script)
+        if diagnostics and any(isinstance(row, dict) and row.get("op") in ("extract-units", "import-units") for row in script):
+            for diagnostic in diagnostics:
+                print(f"  ! {diagnostic}", file=sys.stderr)
+            return 1
 
     if diagnostics:
         for d in diagnostics:
@@ -1976,6 +2116,32 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         # operaciones que dejan el pack sin cambios válidos no escriben
         if args.operation in ("remove",) and any("no existe" in d for d in diagnostics):
+            return 1
+
+    is_composition = args.operation in ("extract-units", "import-units") or (args.operation == "batch" and any(
+        isinstance(row, dict) and row.get("op") in ("extract-units", "import-units") for row in script))
+    if is_composition:
+        from tools.check_pack_dependencies import analyze_dependencies, defined_ids
+        packs = {"composed": updated}
+        for index, dependency_path in enumerate(args.dependency_pack):
+            dependency, dependency_error = _load_pack(dependency_path)
+            if dependency_error:
+                print(dependency_error, file=sys.stderr)
+                return 2
+            packs[f"dependency-{index}"] = dependency
+        seen = set()
+        for name, dependency in packs.items():
+            ids = defined_ids(dependency)
+            overlap = seen & ids
+            if overlap:
+                print(f"IDs duplicados entre packs: {', '.join(sorted(overlap))}", file=sys.stderr)
+                return 1
+            seen.update(ids)
+        report = analyze_dependencies(packs)
+        failures = [row for row in report["packs"] if row["unresolvedReferences"] or row["ambiguousReferences"]]
+        if failures:
+            for row in failures:
+                print(f"{row['name']}: referencias sin resolver {row['unresolvedReferences']}, ambiguas {row['ambiguousReferences']}", file=sys.stderr)
             return 1
 
     if args.validate_after:
@@ -1994,7 +2160,21 @@ def main(argv: list[str] | None = None) -> int:
         print("(dry-run: no se escribió)")
         return 0
 
-    written = write_pack(updated, args.out_dir)
+    if is_composition:
+        from tools.write_composed_pack import write_composed_pack
+        source_path = Path(args.pack)
+        source_root = source_path if source_path.is_dir() else source_path.parent
+        composition_sources.insert(0, (source_root, pack))
+        final_bundles = {_entity_key(bundle) for bundle in _as_list(updated.get("assetBundles")) if _entity_key(bundle)}
+        composition_sources = [(root, source) for root, source in composition_sources
+                               if { _entity_key(bundle) for bundle in _as_list(source.get("assetBundles")) if _entity_key(bundle) } & final_bundles]
+        try:
+            written = write_composed_pack(updated, composition_sources, args.out_dir) / "content.json"
+        except (OSError, ValueError, KeyError) as exc:
+            print(f"No se pudo escribir el pack compuesto: {exc}", file=sys.stderr)
+            return 1
+    else:
+        written = write_pack(updated, args.out_dir)
     print(f"Pack escrito en {written}")
     return 0
 

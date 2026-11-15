@@ -895,6 +895,12 @@ def apply_forsyth_cache_optimize_bpy(obj: Any, cache_size: int = 32) -> float:
             mesh.color_attributes.active_color = attr
 
     if vgroup_names:
+        # Blender can discard the object's group definitions when geometry is
+        # cleared. Recreate them in their original order before restoring the
+        # per-vertex deform weights captured above.
+        for vg_name in vgroup_names:
+            if obj.vertex_groups.get(vg_name) is None:
+                obj.vertex_groups.new(name=vg_name)
         for vi, weights in enumerate(vgroup_weights):
             for vg_name, weight in weights:
                 vg = obj.vertex_groups.get(vg_name)

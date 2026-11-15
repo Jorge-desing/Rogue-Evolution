@@ -8040,7 +8040,7 @@ def bake_advanced_vertex_shading(
 
     ex_v = [Vector(e) for e in (exhaust_locs or [])]
     muz_v = Vector(muzzle_loc) if muzzle_loc is not None else None
-    min_convex_angle = math.radians(35.0)
+    min_convex_angle = math.radians(32.0)
 
     for obj in objects:
         if obj.type != "MESH" or not obj.data.polygons:
@@ -8082,6 +8082,10 @@ def bake_advanced_vertex_shading(
                         edge_w = (0.55 + 0.45 * sharpness) * wear_mult
                         if structural_wear_mask and wear_level not in ("none", "pristine"):
                             edge_w = 0.70 + 0.30 * sharpness
+                        # Emphasize upward-facing convex armor crests for RTS silhouette readability
+                        avg_n = (normal_mat @ (f1.normal + f2.normal))
+                        if avg_n.length > 1e-4 and avg_n.normalized().z > 0.25 and wear_mult > 0.0:
+                            edge_w = min(1.0, max(edge_w, 0.78) + 0.16 * sharpness)
                         if structural_wear_mask:
                             for face in edge.link_faces:
                                 for v in edge.verts:
@@ -8763,25 +8767,41 @@ def export_unity_fbx(
     if include_armature:
         obj_types.add("ARMATURE")
 
-    bpy.ops.export_scene.fbx(
-        filepath=str(fbx_path),
-        use_selection=True,
-        object_types=obj_types,
-        apply_unit_scale=True,
-        apply_scale_options="FBX_SCALE_NONE",
-        use_mesh_modifiers=True,
-        mesh_smooth_type="FACE",
-        path_mode="AUTO",
-        axis_forward="-Z",
-        axis_up="Y",
-        bake_space_transform=False,
-        add_leaf_bones=False,
-        use_custom_props=False,
-        bake_anim=bake_anim,
-        bake_anim_use_all_actions=bake_anim,
-        bake_anim_use_nla_strips=bake_anim,
-        bake_anim_step=1.0,
-    )
+    import os as _os
+    import time as _time
+
+    tmp_fbx_path = fbx_path.with_name(f".{fbx_path.stem}.{_os.getpid()}.tmp.fbx")
+    try:
+        bpy.ops.export_scene.fbx(
+            filepath=str(tmp_fbx_path),
+            use_selection=True,
+            object_types=obj_types,
+            apply_unit_scale=True,
+            apply_scale_options="FBX_SCALE_NONE",
+            use_mesh_modifiers=True,
+            mesh_smooth_type="FACE",
+            path_mode="AUTO",
+            axis_forward="-Z",
+            axis_up="Y",
+            bake_space_transform=False,
+            add_leaf_bones=False,
+            use_custom_props=False,
+            bake_anim=bake_anim,
+            bake_anim_use_all_actions=bake_anim,
+            bake_anim_use_nla_strips=bake_anim,
+            bake_anim_step=1.0,
+        )
+        for attempt in range(5):
+            try:
+                tmp_fbx_path.replace(fbx_path)
+                break
+            except OSError:
+                if attempt == 4:
+                    raise
+                _time.sleep(0.25)
+    finally:
+        if tmp_fbx_path.exists():
+            tmp_fbx_path.unlink(missing_ok=True)
 
     if generate_profiled_lods:
         lod_dict = generate_lod_chain(mesh_objects, prefix=asset_id, lod_levels=ratios, lod_name_first=True)
@@ -12945,10 +12965,29 @@ def _bake_pbr_texture_atlas_impl(
             bpy.ops.object.bake(type="DIFFUSE", pass_filter={"COLOR"})
         except Exception as e2:
             print(f"Warning: Diffuse bake: {e2}")
+    def _save_image_atomic(img_obj, dest_path: Path, file_format: str = "PNG") -> None:
+        import os as _os
+        import time as _time
+        tmp_path = dest_path.with_name(f".{dest_path.stem}.{_os.getpid()}.tmp{dest_path.suffix}")
+        try:
+            img_obj.filepath_raw = str(tmp_path)
+            img_obj.file_format = file_format
+            img_obj.save()
+            for attempt in range(5):
+                try:
+                    tmp_path.replace(dest_path)
+                    break
+                except OSError:
+                    if attempt == 4:
+                        raise
+                    _time.sleep(0.25)
+            img_obj.filepath_raw = str(dest_path)
+        finally:
+            if tmp_path.exists():
+                tmp_path.unlink(missing_ok=True)
+
     albedo_path = output_dir / f"{prefix}_Albedo.png"
-    img_albedo.filepath_raw = str(albedo_path)
-    img_albedo.file_format = "PNG"
-    img_albedo.save()
+    _save_image_atomic(img_albedo, albedo_path, "PNG")
     maps["albedo"] = albedo_path
 
     albedo_alpha_mask = None
@@ -12968,9 +13007,7 @@ def _bake_pbr_texture_atlas_impl(
     except Exception as e:
         print(f"Warning: Emission bake: {e}")
     emission_path = output_dir / f"{prefix}_Emission.png"
-    img_emission.filepath_raw = str(emission_path)
-    img_emission.file_format = "PNG"
-    img_emission.save()
+    _save_image_atomic(img_emission, emission_path, "PNG")
     maps["emission"] = emission_path
 
     # 3. Bake Normal Map
@@ -12980,9 +13017,7 @@ def _bake_pbr_texture_atlas_impl(
     except Exception as e:
         print(f"Warning: Normal bake: {e}")
     normal_path = output_dir / f"{prefix}_Normal.png"
-    img_normal.filepath_raw = str(normal_path)
-    img_normal.file_format = "PNG"
-    img_normal.save()
+    _save_image_atomic(img_normal, normal_path, "PNG")
     maps["normal"] = normal_path
 
     # 4. Bake Roughness (Grayscale)
@@ -13065,9 +13100,7 @@ def _bake_pbr_texture_atlas_impl(
         img_metallic.pixels = packed
 
     metallic_path = output_dir / f"{prefix}_MetallicGloss.png"
-    img_metallic.filepath_raw = str(metallic_path)
-    img_metallic.file_format = "PNG"
-    img_metallic.save()
+    _save_image_atomic(img_metallic, metallic_path, "PNG")
     maps["metallic_gloss"] = metallic_path
 
     # Clean up temporary images

@@ -53,6 +53,19 @@ class CheckPackDependenciesTests(unittest.TestCase):
         report = DEPS.analyze_dependencies(packs)
         self.assertEqual([], report["packs"][0]["externalReferences"])
 
+    def test_synergy_profile_dependencies_module_and_ambiguous_providers(self) -> None:
+        packs = _packs()
+        dependent = SCAFFOLD.generate_scaffold("other:pack", "beta")
+        dependent["units"][0]["synergies"] = [{"targetUnitIds": ["ns:alpha"]}]
+        dependent["aiProfiles"][0]["unitDependencies"] = ["ns:alpha"]
+        dependent["aiProfiles"][0]["modules"] = [{"parameters": [{"name": "entityId", "value": "ns:alpha-factory"}]}]
+        packs["dependent"] = dependent
+        packs["duplicate"] = SCAFFOLD.generate_scaffold("ns:other", "alpha")
+        row = next(item for item in DEPS.analyze_dependencies(packs)["packs"] if item["name"] == "dependent")
+        self.assertIn("ns:alpha", row["externalReferences"])
+        self.assertIn("ns:alpha-factory", row["externalReferences"])
+        self.assertIn("ns:alpha", row["ambiguousReferences"])
+
     def test_real_packs_resolve(self) -> None:
         sample_native = json.loads(SAMPLE_NATIVE_PATH.read_text(encoding="utf-8"))
         packs = {"sample-native-expansion": sample_native}

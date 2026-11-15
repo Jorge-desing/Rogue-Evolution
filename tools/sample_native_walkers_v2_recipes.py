@@ -30,6 +30,7 @@ from tactical_operations_v2_recipes import (
     cut_visor_pocket_around_housing,
     ensure_single_material,
     ensure_uv_and_color_layers,
+    make_chamfered_box_mesh,
     make_faceted_cylinder,
     remove_objects_matching,
     resolve_unit_material,
@@ -494,6 +495,45 @@ def _finalize_mesh_standards(
             ensure_single_material(obj, resolve_unit_material(unit_name, role))
         if optimize_forsyth and len(obj.data.polygons) > 0:
             mga.apply_forsyth_cache_optimize_bpy(obj, cache_size=32)
+    rmk.bake_advanced_vertex_shading(
+        meshes,
+        wear_level="field_tested",
+        structural_wear_mask=True,
+    )
+
+
+def _add_walker_armor_plate(
+    name: str,
+    size: tuple[float, float, float],
+    center: tuple[float, float, float],
+    host: bpy.types.Object | None,
+    mat: bpy.types.Material,
+    *,
+    bevel: float = 0.012,
+    rotation: tuple[float, float, float] = (0.0, 0.0, 0.0),
+    clearance: float = -0.008,
+    seat_downward: bool = True,
+    recipe_tag: str = "walker_l1_armor_plate",
+) -> bpy.types.Object:
+    """Create or rebuild a beveled walker/factory armor plate seated cleanly onto host."""
+    existing = bpy.data.objects.get(name)
+    if existing is not None:
+        bpy.data.objects.remove(existing, do_unlink=True)
+    obj = make_chamfered_box_mesh(
+        name,
+        size,
+        center,
+        mat,
+        bevel=bevel,
+        rotation=rotation,
+    )
+    _tag_object(obj, recipe_tag)
+    if host is not None:
+        if seat_downward:
+            seat_object_downward_to_target(obj, [host], clearance=clearance, max_drop=0.6)
+        else:
+            snap_object_to_nearest(obj, [host], embed=abs(clearance), max_dist=0.4)
+    return obj
 
 
 def _validate_rigid_weights_1_0(meshes: Sequence[bpy.types.Object], armature: bpy.types.Object | None) -> list[str]:
@@ -632,6 +672,24 @@ def apply_ironclad_walker_v2(
             recipe_tag="ironclad_reactor_recess",
         )
 
+    # 5b. Level-1 RTS readability: LightArmor chest/shoulder plates & Warning chest strip
+    l_armor = resolve_unit_material(unit_name, "LightArmor")
+    w_armor = resolve_unit_material(unit_name, "Warning")
+    _add_walker_armor_plate(
+        f"{unit_name}Armor_ChestLightShield", (0.56, 0.06, 0.24), (0.0, 0.34, 2.02),
+        chest, l_armor, bevel=0.010, seat_downward=False, recipe_tag="ironclad_l1_chest_shield",
+    )
+    _add_walker_armor_plate(
+        f"{unit_name}Warning_ChestStrip", (0.42, 0.035, 0.06), (0.0, 0.36, 1.82),
+        chest, w_armor, bevel=0.006, seat_downward=False, recipe_tag="ironclad_l1_warning_strip",
+    )
+    for side, sh in (("L", sh_l), ("R", sh_r)):
+        sx = -1.0 if side == "L" else 1.0
+        _add_walker_armor_plate(
+            f"{unit_name}Armor_ShoulderCrown_{side}", (0.24, 0.36, 0.045), (sx * 0.56, 0.0, 2.36),
+            sh, l_armor, bevel=0.008, recipe_tag="ironclad_l1_shoulder_crown",
+        )
+
     # 6. Re-assign rigid 1.0 weights after Booleans if rigged
     meshes = _collect_meshes(unit_name)
     if armature is not None:
@@ -640,6 +698,9 @@ def apply_ironclad_walker_v2(
             meshes,
             armature,
             [
+                ("ChestLightShield", "Bone_TurretYaw"),
+                ("ChestStrip", "Bone_TurretYaw"),
+                ("ShoulderCrown_", "Bone_TurretYaw"),
                 ("HipActuator_L", "Bone_Thigh_L"),
                 ("HipActuator_R", "Bone_Thigh_R"),
                 ("AnkleDamper_L", "Bone_Shin_L"),
@@ -938,6 +999,27 @@ def apply_atlas_crane_mech_v2(
     if visor_housing is not None and torso is not None:
         cut_visor_pocket_around_housing(torso, visor_housing, margin=0.008, recipe_tag="atlas_visor_pocket")
 
+    # 5b. Level-1 RTS readability: LightArmor torso crown, bustle shield & Warning boom trim
+    l_armor = resolve_unit_material(unit_name, "LightArmor")
+    w_armor = resolve_unit_material(unit_name, "Warning")
+    _add_walker_armor_plate(
+        f"{unit_name}Armor_TorsoCrownPlate", (0.68, 0.52, 0.045), (0.0, 0.05, 2.32),
+        torso, l_armor, bevel=0.010, recipe_tag="atlas_l1_torso_crown",
+    )
+    if rear_bustle is not None:
+        _, _, rb_y0, rb_y1, _, rb_z1 = world_bounds(rear_bustle)
+        _add_walker_armor_plate(
+            f"{unit_name}Armor_BustleShield", (0.56, 0.24, 0.045), (0.0, (rb_y0 + rb_y1) * 0.5, rb_z1 + 0.04),
+            rear_bustle, l_armor, bevel=0.010, seat_downward=True, recipe_tag="atlas_l1_bustle_shield",
+        )
+    if crane_jib is not None:
+        jb_c = world_center(crane_jib)
+        _, _, _, _, _, jb_z1 = world_bounds(crane_jib)
+        _add_walker_armor_plate(
+            f"{unit_name}Warning_BoomTrim", (0.14, 0.44, 0.032), (jb_c.x, 0.38, jb_z1 + 0.01),
+            crane_jib, w_armor, bevel=0.006, recipe_tag="atlas_l1_warning_boom",
+        )
+
     # 6. Prepare/preserve Atlas ankle damper clearance + foot/thigh stays + rigid 1.0 reweight
     if armature is not None:
         from atlas_damper_clearance_recipe import prepare_atlas_damper_clearance
@@ -948,6 +1030,9 @@ def apply_atlas_crane_mech_v2(
             meshes,
             armature,
             [
+                ("TorsoCrownPlate", "Bone_TurretYaw"),
+                ("BustleShield", "Bone_TurretYaw"),
+                ("BoomTrim", "Bone_Pelvis"),
                 ("FootAnkleSupport_L", "Bone_Foot_L"),
                 ("FootAnkleSupport_R", "Bone_Foot_R"),
                 ("HeelClaw_L", "Bone_Foot_L"),
@@ -1345,6 +1430,22 @@ def apply_bastion_siege_mech_v2(
     if visor_housing is not None and base_shell is not None:
         cut_visor_pocket_around_housing(base_shell, visor_housing, margin=0.008, recipe_tag="bastion_visor_pocket")
 
+    # 9b. Level-1 RTS readability: LightArmor glacis/turret roof shields & Warning glacis trim
+    l_armor = resolve_unit_material(unit_name, "LightArmor")
+    w_armor = resolve_unit_material(unit_name, "Warning")
+    _add_walker_armor_plate(
+        f"{unit_name}Armor_GlacisLightPlate", (0.92, 0.40, 0.050), (0.0, 0.92, 0.88),
+        hull, l_armor, bevel=0.012, rotation=(-0.18, 0.0, 0.0), recipe_tag="bastion_l1_glacis_plate",
+    )
+    _add_walker_armor_plate(
+        f"{unit_name}Armor_TurretRoofShield", (0.84, 0.72, 0.045), (0.0, -0.08, 1.56),
+        base_shell, l_armor, bevel=0.012, recipe_tag="bastion_l1_turret_roof",
+    )
+    _add_walker_armor_plate(
+        f"{unit_name}Warning_GlacisTrim", (0.76, 0.12, 0.028), (0.0, 1.12, 0.78),
+        hull, w_armor, bevel=0.006, recipe_tag="bastion_l1_warning_trim",
+    )
+
     # 10. Re-assign rigid 1.0 weights after Booleans and bind subassemblies accurately
     meshes = _collect_meshes(unit_name) + _collect_meshes("BastionArmor")
     if armature is not None:
@@ -1353,6 +1454,9 @@ def apply_bastion_siege_mech_v2(
             meshes,
             armature,
             [
+                ("GlacisLightPlate", "Bone_Hull"),
+                ("GlacisTrim", "Bone_Hull"),
+                ("TurretRoofShield", "Bone_TurretYaw"),
                 ("CarapaceDamper", "Bone_Hull"),
                 ("HipSponsonBridge", "Bone_Hull"),
                 ("WeldSeam_", "Bone_Hull"),
@@ -1666,6 +1770,21 @@ def apply_arachnid_hexapod_v2(
                 recipe_tag="arachnid_missile_bays",
             )
 
+    # 4b. Level-1 RTS readability: LightArmor carapace chevrons & Warning missile cradle trim
+    l_armor = resolve_unit_material(unit_name, "LightArmor")
+    w_armor = resolve_unit_material(unit_name, "Warning")
+    if carapace is not None:
+        _, _, _, _, _, c_z1 = world_bounds(carapace)
+        for side, sx in (("L", -1.0), ("R", 1.0)):
+            _add_walker_armor_plate(
+                f"{unit_name}Armor_CarapaceChevron_{side}", (0.22, 0.44, 0.046), (sx * 0.50, 0.72, c_z1 + 0.04),
+                carapace, l_armor, bevel=0.010, recipe_tag="arachnid_l1_carapace_chevron",
+            )
+    _add_walker_armor_plate(
+        f"{unit_name}Warning_CradleTrim", (0.68, 0.14, 0.030), (0.0, -0.18, 1.80),
+        missile_cradle, w_armor, bevel=0.006, recipe_tag="arachnid_l1_warning_trim",
+    )
+
     # 5. Ensure ML/MR bones, preserve orientation normalization, and re-assign rigid 1.0 weights
     meshes = _collect_meshes(unit_name)
     if armature is not None:
@@ -1676,6 +1795,8 @@ def apply_arachnid_hexapod_v2(
             meshes,
             armature,
             [
+                ("CarapaceChevron_", "Bone_Hull"),
+                ("CradleTrim", "Bone_TurretPitch"),
                 ("MidHip_ML", "Bone_Thigh_ML"),
                 ("MidThigh_ML", "Bone_Thigh_ML"),
                 ("HydraulicRam_ML", "Bone_Thigh_ML"),
@@ -1846,6 +1967,23 @@ def apply_arachnid_hexapod_factory_v2(
                 direction=(0.0, 1.0, 0.0),
                 tag=f"factory_conduit_collar_{side}",
             )
+
+    # 5. Level-1 RTS readability: LightArmor carapace ribs & Warning bay header trim
+    l_armor = resolve_unit_material(asset_id, "LightArmor")
+    w_armor = resolve_unit_material(asset_id, "Warning")
+    if hall is not None:
+        _, _, _, _, _, h_z1 = world_bounds(hall)
+        for side, sx in (("L", -1.0), ("R", 1.0)):
+            _add_walker_armor_plate(
+                f"{asset_id}_CarapaceRib_{side}", (0.32, 2.60, 0.16), (sx * 1.15, -0.20, h_z1 + 0.08),
+                hall, l_armor, bevel=0.025, clearance=-0.02, recipe_tag="factory_l1_carapace_rib",
+            )
+    if header is not None:
+        _, _, _, hd_y1, _, hd_z1 = world_bounds(header)
+        _add_walker_armor_plate(
+            f"{asset_id}_HeaderWarningTrim", (1.80, 0.18, 0.08), (0.0, hd_y1 - 0.08, hd_z1 + 0.02),
+            header, w_armor, bevel=0.014, clearance=-0.015, recipe_tag="factory_l1_warning_trim",
+        )
 
     meshes = _collect_meshes(asset_id)
     _finalize_mesh_standards(meshes, asset_id)

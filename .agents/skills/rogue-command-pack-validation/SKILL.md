@@ -140,3 +140,27 @@ Scope exact-body duplicate scans to discoverable test methods. Identical `pass` 
 The editor routes `rename-stage`, `clone-stage`, `rename-ai-profile`, and `clone-ai-profile` through CLI and batch; supply a namespaced `newId`. The advertised extract/import helpers are Python-only and their dependency closure is not yet established.
 
 The Python composition helpers return independent extracted data and reject duplicate or cross-kind unit/factory IDs during import. They do not yet resolve full dependency closure or copy bundle files; review the resulting manifest and assets before use.
+
+Unit import includes asset bundle declarations referenced by imported units, factories, stages and profiles, and rejects incompatible bundle, stage, profile and manifest declarations atomically. This changes manifest data only; bundle files and full dependency closure still require separate handling.
+
+`tools.bundle_manifest_dependencies.resolve_bundle_dependencies` reads the Unity manifest with UnityPy and resolves a dependency-first transitive bundle list, rejecting missing bundles, malformed indexes and cycles. It is not yet connected to composition or file transfer.
+
+`tools.pack_bundle_transfer` currently provides an intermediate full-manifest plan and copy helper. It compares all declared bundle names with Unity's manifest, checks pack-relative paths and existing-file hashes, and rolls back newly copied files on ordinary failures. It is not yet wired into composition and does not establish safety against concurrent path replacement; do not use it as the final package writer until that is addressed.
+
+Composition now computes a conservative local dependency closure across units, factories, stage pools and AI profiles. Imports preserve all declarations of a needed source Unity manifest, and reject destination bundle sets needing a combined manifest. External references, transactional file writing and CLI/batch remain unresolved; do not treat it as complete package composition.
+
+Composition closure includes local AI profiles that reference a selected unit or its factory and their associated stages, even when the stage does not directly list the unit. Review the complete connected selection; external references and package publication still require resolution.
+
+`extract-units` now has an experimental CLI/batch route that stages a new output directory, copies the complete source Unity bundle set, and validates schema and manifest before publication. External dependency resolution and concurrent path replacement protection remain open; do not treat this as completed composition. Import routing remains unimplemented.
+
+`import-units` now has experimental CLI (`--source-pack`, `--unit-ids`) and batch (`sourcePath`, `unitIds`) routes using a newly staged output pack and copying complete compatible bundle sets. The Unity manifest reader loads bytes to release Windows file handles. External dependency resolution, manifest rebuilding for distinct bundle sets and concurrent path replacement protection remain unfinished; do not treat composition as complete.
+
+Composition accepts repeated `--dependency-pack` arguments and rejects missing namespaced providers and duplicate IDs across supplied packs. The dependency analyzer now includes synergy targets, AI unitDependencies and entityId/unitId module parameters, and reports ambiguous providers. Native unnamespaced IDs are not verified against the game registry; reference coverage and safe publication remain incomplete.
+
+`merge_bundle_manifests` can build a disjoint combined Unity manifest while preserving hashes and dependency edges. An isolated Unity 2021.3.45f2 Editor probe loaded the combined sample-native/tactical manifest and read both hashes and dependency lists (`artifacts/composition-manifest-study/unity-check.log`); this is local Editor evidence, not in-game acceptance. The merge is not yet wired into package composition; duplicate bundle names are rejected.
+
+Composition now combines disjoint Unity manifests in the staging directory and copies both complete bundle sets; names duplicated across different manifests are rejected. A real sample-native plus tactical import passed schema and exact manifest-name checks. Dependency-bearing synthetic manifest edges were preserved in a local test; in-game acceptance and concurrent path safety remain open.
+
+Composed pack publication now uses an atomic no-replace rename (Windows `os.rename`, Linux `renameat2` with `RENAME_NOREPLACE`); existing destinations are preserved even if they appear just before publication. Source path opening still requires race-resistant handles before the workflow is production-ready.
+
+`tools.secure_pack_read.open_pack_file` opens pack manifests and source bundle files through non-reparse directory handles. On Windows directories are held without delete sharing during the read and the file without write/delete sharing; POSIX uses directory-relative `O_NOFOLLOW` handles. The source bundle transfer uses this helper. The isolated destination still needs a complete concurrency review.

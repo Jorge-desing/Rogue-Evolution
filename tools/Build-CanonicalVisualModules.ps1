@@ -178,6 +178,22 @@ function Get-ExpectedLevelOneModelOutputs {
         )) {
             [void]$outputs.Add((Join-Path $repoRoot "content/source-art/$name"))
         }
+        foreach ($unit in @(
+            "SandlanceScout",
+            "ColossusSiegePlatform",
+            "SkirmishStrikeBike",
+            "SurgeArcTank",
+            "OverlordCommandHQ",
+            "IroncladWalker",
+            "AtlasCraneMech",
+            "BastionSiegeMech",
+            "ArachnidHexapod",
+            "ArachnidHexapodFactory",
+            "OverlordCommandHQFactory"
+        )) {
+            [void]$outputs.Add((Join-Path $repoRoot "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/$unit.fbx"))
+            [void]$outputs.Add((Join-Path $repoRoot "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/${unit}_LODs.fbx"))
+        }
     }
     if ($TargetPacks -contains "tactical-operations") {
         foreach ($name in @(
@@ -190,6 +206,18 @@ function Get-ExpectedLevelOneModelOutputs {
         )) {
             [void]$outputs.Add((Join-Path $repoRoot "content/source-art/$name"))
         }
+        foreach ($unit in @(
+            "ArcLanceWalker",
+            "TidebreakerHovercraft",
+            "FieldMedicRover",
+            "SkyguardSAM",
+            "SalvageHauler",
+            "SentinelRelay"
+        )) {
+            [void]$outputs.Add((Join-Path $repoRoot "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/$unit.fbx"))
+            [void]$outputs.Add((Join-Path $repoRoot "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models/${unit}_LODs.fbx"))
+        }
+        [void]$outputs.Add((Join-Path $repoRoot "unity/RogueCommandAssetAuthoring/Assets/TacticalOperations/Models/BulwarkFoundry_LODs.fbx"))
     }
     return @($outputs)
 }
@@ -474,7 +502,7 @@ function Invoke-BlenderScript {
                     $_
                 }
             } |
-            Tee-Object -FilePath $LogFilePath
+            Tee-Object -FilePath $LogFilePath | Out-Host
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousEap
@@ -1032,6 +1060,78 @@ try {
             }
             [void]$ranScripts.Add("tests/python/authoring/test_sample_native_v2_surface_fit.py")
             [void]$logs.Add($surfaceFitLog)
+
+            foreach ($builderRel in @(
+                "tools/Build-SandlanceScoutRiggedModel.py",
+                "tools/Build-ColossusSiegeRiggedModel.py",
+                "tools/Build-SkirmishStrikeBikeRiggedModel.py",
+                "tools/Build-SurgeArcTankRiggedModel.py",
+                "tools/Build-OverlordCommandHQRiggedModel.py",
+                "tools/Build-IroncladWalkerModel.py",
+                "tools/Build-AtlasCraneMechModel.py",
+                "tools/Build-BastionSiegeMechModel.py",
+                "tools/Build-ArachnidHexapodRiggedModel.py",
+                "tools/Build-ArachnidHexapodFactoryModel.py",
+                "tools/Build-OverlordCommandHQFactoryModel.py"
+            )) {
+                $builderPath = Join-Path $repoRoot $builderRel
+                $builderSlug = [System.IO.Path]::GetFileNameWithoutExtension($builderRel)
+                $builderLog = Join-Path $logDirectory "level1-$builderSlug.log"
+                Write-Host "Syncing Level 1 model/rig/FBX via $builderRel."
+                $rc = Invoke-BlenderScript -ScriptPath $builderPath -LogFilePath $builderLog -FactoryStartup
+                if ($rc -ne 0) {
+                    throw "Level 1 builder $builderRel failed with exit code $rc. Log: $builderLog"
+                }
+                [void]$ranScripts.Add($builderRel)
+                [void]$logs.Add($builderLog)
+            }
+        }
+
+        if ($Packs -contains "tactical-operations") {
+            foreach ($builderRel in @(
+                "tools/Build-ArcLanceWalkerModel.py",
+                "tools/Build-TidebreakerHovercraftModel.py",
+                "tools/Build-FieldMedicRoverModel.py",
+                "tools/Build-SkyguardSAMModel.py",
+                "tools/Build-SalvageHaulerModel.py",
+                "tools/Build-SentinelRelayModel.py"
+            )) {
+                $builderPath = Join-Path $repoRoot $builderRel
+                $builderSlug = [System.IO.Path]::GetFileNameWithoutExtension($builderRel)
+                $builderLog = Join-Path $logDirectory "level1-$builderSlug.log"
+                Write-Host "Syncing Level 1 model/rig/FBX via $builderRel."
+                $rc = Invoke-BlenderScript -ScriptPath $builderPath -LogFilePath $builderLog -FactoryStartup
+                if ($rc -ne 0) {
+                    throw "Level 1 builder $builderRel failed with exit code $rc. Log: $builderLog"
+                }
+                [void]$ranScripts.Add($builderRel)
+                [void]$logs.Add($builderLog)
+            }
+
+            $foundryBuilder = Join-Path $repoRoot "tools/Build-BulwarkFoundryModel.py"
+            $foundryLog = Join-Path $logDirectory "level1-Build-BulwarkFoundryModel.log"
+            Write-Host "Syncing BulwarkFoundry FBX via tools/Build-BulwarkFoundryModel.py --promote."
+            $rc = Invoke-BlenderScript -ScriptPath $foundryBuilder -LogFilePath $foundryLog -ScriptArgs @("--promote") -FactoryStartup
+            if ($rc -ne 0) {
+                throw "Level 1 builder tools/Build-BulwarkFoundryModel.py failed with exit code $rc. Log: $foundryLog"
+            }
+            [void]$ranScripts.Add("tools/Build-BulwarkFoundryModel.py")
+            [void]$logs.Add($foundryLog)
+        }
+
+        $refreshScript = Join-Path $repoRoot "tools/Refresh-UnitProceduralAnimations.py"
+        $refreshLog = Join-Path $logDirectory "level1-refresh-procedural-animations.log"
+        Write-Host "Refreshing procedural animations & exporting Unity FBX/LODs for packs: $($Packs -join ', ')."
+        $rc = Invoke-BlenderScript -ScriptPath $refreshScript -LogFilePath $refreshLog -ScriptArgs (@("--packs") + $Packs) -FactoryStartup
+        if ($rc -ne 0) {
+            throw "Refresh-UnitProceduralAnimations.py failed with exit code $rc. Log: $refreshLog"
+        }
+        [void]$ranScripts.Add("tools/Refresh-UnitProceduralAnimations.py")
+        [void]$logs.Add($refreshLog)
+
+        $uvCacheDir = Join-Path $repoRoot "artifacts/level1-uv-cache"
+        if (Test-Path -LiteralPath $uvCacheDir) {
+            Remove-Item -LiteralPath $uvCacheDir -Recurse -Force -ErrorAction SilentlyContinue
         }
 
         $expectedModelOutputs = Get-ExpectedLevelOneModelOutputs -TargetPacks $Packs

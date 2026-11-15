@@ -13,11 +13,98 @@ from tests.python.helpers import load_tool_module
 
 EDIT = load_tool_module("edit_content_pack")
 SCAFFOLD = load_tool_module("scaffold_pack")
+from tools.write_composed_pack import _publish_no_replace, write_composed_pack
 
 
 class CompositionEditTests(unittest.TestCase):
     def _pack(self) -> dict:
         return SCAFFOLD.generate_scaffold("ns:pack", "alpha", stage_slug="sa", ai_slug="aa")
+
+    def test_composed_writer_validates_before_publishing_and_preserves_existing(self) -> None:
+        pack = self._pack()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            write_composed_pack(pack, [], output)
+            self.assertEqual(pack, json.loads((output / "content.json").read_text(encoding="utf-8")))
+            with self.assertRaises(FileExistsError):
+                write_composed_pack(pack, [], output)
+            invalid = dict(pack, schemaVersion=999)
+            invalid_output = Path(directory) / "invalid"
+            with self.assertRaises(ValueError):
+                write_composed_pack(invalid, [], invalid_output)
+            self.assertFalse(invalid_output.exists())
+
+    def test_atomic_publish_never_replaces_concurrent_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stage, target = root / "stage", root / "target"
+            stage.mkdir()
+            target.mkdir()
+            (target / "user-data").write_text("preserve", encoding="utf-8")
+            with self.assertRaises(OSError):
+                _publish_no_replace(stage, target)
+            self.assertEqual("preserve", (target / "user-data").read_text(encoding="utf-8"))
+            self.assertTrue(stage.is_dir())
+
+    def test_extract_cli_writes_a_valid_new_pack(self) -> None:
+        pack = self._pack()
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "content.json"
+            output = Path(directory) / "output"
+            source.write_text(json.dumps(pack), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = EDIT.main(["--pack", str(source), "--operation", "extract-units",
+                                  "--unit-ids", "ns:alpha", "--out-dir", str(output)])
+            self.assertEqual(0, code)
+            self.assertEqual("ns:alpha", json.loads((output / "content.json").read_text(encoding="utf-8"))["units"][0]["id"])
+
+    def test_extract_batch_routes_and_publishes(self) -> None:
+        pack = self._pack()
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "content.json"
+            script = Path(directory) / "operations.json"
+            output = Path(directory) / "output"
+            source.write_text(json.dumps(pack), encoding="utf-8")
+            script.write_text(json.dumps([{"op": "extract-units", "unitIds": ["ns:alpha"]}]), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = EDIT.main(["--pack", str(source), "--operation", "batch", "--script", str(script), "--out-dir", str(output)])
+            self.assertEqual(0, code)
+            self.assertTrue((output / "content.json").is_file())
+
+    def test_import_cli_and_batch_write_new_pack(self) -> None:
+        destination = self._pack()
+        source_pack = SCAFFOLD.generate_scaffold("other:pack", "beta", stage_slug="sb", ai_slug="ab")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dest_path, source_path = root / "dest.json", root / "source.json"
+            dest_path.write_text(json.dumps(destination), encoding="utf-8")
+            source_path.write_text(json.dumps(source_pack), encoding="utf-8")
+            script = root / "operations.json"
+            script.write_text(json.dumps([{"op": "import-units", "sourcePath": str(source_path), "unitIds": ["other:beta"]}]), encoding="utf-8")
+            cases = [(["--operation", "import-units", "--source-pack", str(source_path), "--unit-ids", "other:beta"], root / "direct"),
+                     (["--operation", "batch", "--script", str(script)], root / "batch")]
+            for args, output in cases:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    code = EDIT.main(["--pack", str(dest_path), *args, "--out-dir", str(output)])
+                self.assertEqual(0, code)
+                result = json.loads((output / "content.json").read_text(encoding="utf-8"))
+                self.assertIn("other:beta", [unit["id"] for unit in result["units"]])
+
+    def test_extract_requires_explicit_external_dependency_provider(self) -> None:
+        pack = self._pack()
+        pack["units"][0]["synergies"] = [{"id": "ns:link", "statName": "damage", "targetUnitIds": ["other:beta"]}]
+        provider = SCAFFOLD.generate_scaffold("other:pack", "beta", stage_slug="sb", ai_slug="ab")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, dependency, output = root / "source.json", root / "dependency.json", root / "output"
+            source.write_text(json.dumps(pack), encoding="utf-8")
+            dependency.write_text(json.dumps(provider), encoding="utf-8")
+            arguments = ["--pack", str(source), "--operation", "extract-units", "--unit-ids", "ns:alpha", "--out-dir", str(output)]
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(1, EDIT.main(arguments))
+                self.assertFalse(output.exists())
+                self.assertEqual(0, EDIT.main(arguments + ["--dependency-pack", str(dependency)]))
+            self.assertTrue((output / "content.json").is_file())
 
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()
@@ -34,6 +121,29 @@ class CompositionEditTests(unittest.TestCase):
         pack = self._pack()
         _, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:ghost"])
         self.assertTrue(diagnostics)
+
+    def test_composition_closes_stage_ai_factory_and_synergy_dependencies(self) -> None:
+        pack = self._pack()
+        beta = SCAFFOLD.generate_scaffold("ns:pack", "beta", stage_slug="sb", ai_slug="ab")["units"][0]
+        gamma = SCAFFOLD.generate_scaffold("ns:pack", "gamma", stage_slug="sg", ai_slug="ag")["units"][0]
+        pack["units"].extend([beta, gamma])
+        pack["stages"][0]["blueprintPoolEntries"] = [{"poolId": "P", "unitIds": ["ns:beta"]}]
+        pack["aiProfiles"][0]["productionBuildingEntries"] = [{"unitId": "ns:beta"}]
+        beta["synergies"] = [{"id": "ns:s", "statName": "damage", "targetUnitIds": ["ns:gamma"]}]
+        extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])
+        self.assertEqual([], diagnostics)
+        self.assertEqual({"ns:alpha", "ns:beta", "ns:gamma"}, {row["id"] for row in extracted["units"]})
+        self.assertIn("ns:aa", {row["id"] for row in extracted["aiProfiles"]})
+
+    def test_composition_includes_profile_that_references_selected_factory(self) -> None:
+        pack = self._pack()
+        pack["stages"][0]["unitIds"] = []
+        pack["aiProfiles"][0]["modules"] = [{"moduleId": "sample:scheduled-base-build", "parameters": [
+            {"name": "entityId", "value": pack["units"][0]["productionBuilding"]["id"]}]}]
+        extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])
+        self.assertEqual([], diagnostics)
+        self.assertEqual(["ns:aa"], [row["id"] for row in extracted["aiProfiles"]])
+        self.assertEqual(["ns:sa"], [row["id"] for row in extracted["stages"]])
 
     def test_import_units_from_pack(self) -> None:
         pack = self._pack()
@@ -62,6 +172,32 @@ class CompositionEditTests(unittest.TestCase):
                 result, diagnostics = EDIT.import_units(dest, source, selected)
                 self.assertTrue(diagnostics)
                 self.assertEqual(dest, result)
+
+    def test_import_carries_bundle_declarations_and_rejects_conflicts_atomically(self) -> None:
+        dest = self._pack()
+        source = SCAFFOLD.generate_scaffold("ns:pack", "beta", stage_slug="sb", ai_slug="ab")
+        source["units"][0]["productionBuilding"]["assetBundleId"] = "ns:factory-art"
+        source["assetBundles"] = [{"id": "ns:factory-art", "path": "bundles/factory.bundle"}]
+        source["assetBundleManifestPath"] = "bundles/manifest.bundle"
+        result, diagnostics = EDIT.import_units(dest, source, ["ns:beta"])
+        self.assertEqual([], diagnostics)
+        self.assertIn(source["assetBundles"][0], result["assetBundles"])
+        self.assertEqual("bundles/manifest.bundle", result["assetBundleManifestPath"])
+        conflicting = json.loads(json.dumps(dest))
+        conflicting["assetBundles"] = [{"id": "ns:factory-art", "path": "bundles/other.bundle"}]
+        result, diagnostics = EDIT.import_units(conflicting, source, ["ns:beta"])
+        self.assertTrue(diagnostics)
+        self.assertEqual(conflicting, result)
+        missing = json.loads(json.dumps(source))
+        missing["assetBundles"] = []
+        result, diagnostics = EDIT.import_units(dest, missing, ["ns:beta"])
+        self.assertTrue(diagnostics)
+        self.assertEqual(dest, result)
+        conflicting_stage = json.loads(json.dumps(dest))
+        conflicting_stage["stages"].append({"id": "ns:sb", "unitIds": []})
+        result, diagnostics = EDIT.import_units(conflicting_stage, source, ["ns:beta"])
+        self.assertTrue(diagnostics)
+        self.assertEqual(conflicting_stage, result)
 
     def test_purge_dangling_references(self) -> None:
         pack = self._pack()

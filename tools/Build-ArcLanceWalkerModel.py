@@ -56,6 +56,10 @@ def build_arc_lance_walker_model() -> None:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     TEXTURE_DIR.mkdir(parents=True, exist_ok=True)
 
+    # Cut damper clearance before rigid skinning, preserving the source blend.
+    from ironclad_damper_clearance_recipe import cut_biped_damper_clearance
+    cut_biped_damper_clearance(UNIT_NAME)
+
     # Preserve the authored source file; the rigged, editable deliverable is a separate copy.
     armature = rmk.generate_procedural_armature(
         meshes,

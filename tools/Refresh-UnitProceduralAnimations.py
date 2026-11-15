@@ -37,10 +37,10 @@ SOURCE_ART_DIR = REPO_ROOT / "content" / "source-art"
 UNIT_SPECS: list[tuple[str, str, str | None, str, dict]] = [
     ("ArachnidHexapod", "arachnidhexapod-rigged.blend", "quad", "medium", {}),
     ("ArcLanceWalker", "arclancewalker-rigged.blend", "biped", "medium", {"locomotion_only": False}),
-    ("AtlasCraneMech", "atlas-crane-mech.blend", "biped", "walker", {}),
+    ("AtlasCraneMech", "atlas-crane-mech-v2.blend", "biped", "walker", {}),
     (
         "BastionSiegeMech",
-        "bastion-siege-mech.blend",
+        "bastion-siege-mech-v2.blend",
         "quad",
         "heavy",
         {"fire_end_frame": 15, "death_end_frame": 45},
@@ -50,7 +50,7 @@ UNIT_SPECS: list[tuple[str, str, str | None, str, dict]] = [
     ("CommandRelay", "command-relay.blend", None, "medium", {}),
     ("FieldMedicRover", "fieldmedicrover-rigged.blend", None, "light", {"locomotion_only": False}),
     ("GravitasBreaker", "gravitas-breaker.blend", None, "heavy", {}),
-    ("IroncladWalker", "ironclad-walker.blend", "biped", "walker", {}),
+    ("IroncladWalker", "ironclad-walker-v2.blend", "biped", "walker", {}),
     ("OverlordCommandHQ", "overlordcommandhq-rigged.blend", None, "heavy", {}),
     ("SalvageHauler", "salvagehauler-rigged.blend", None, "heavy", {"locomotion_only": False}),
     ("SandlanceScout", "sandlancescout-rigged.blend", None, "light", {}),
@@ -229,21 +229,53 @@ def refresh_unit(unit_name: str, blend_name: str, leg_type: str | None, fire_pro
         )
         for generated in tmp_dir.glob(f"{unit_name}*.fbx"):
             dest = MODELS_DIR / generated.name
-            shutil.move(str(generated), str(dest))
+            generated.replace(dest)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         gc.collect()
     print(f"[REFRESHED] {unit_name}: actions={len(actions)}, meshes={len(meshes)}, sockets={len(sockets)} -> {fbx_path.name}")
 
 
+PACK_UNITS: dict[str, set[str]] = {
+    "sample-native-expansion": {
+        "ArachnidHexapod",
+        "AtlasCraneMech",
+        "BastionSiegeMech",
+        "ColossusSiegePlatform",
+        "IroncladWalker",
+        "OverlordCommandHQ",
+        "SandlanceScout",
+        "SkirmishStrikeBike",
+        "SurgeArcTank",
+    },
+    "tactical-operations": {
+        "ArcLanceWalker",
+        "BulwarkSiegeTank",
+        "CommandRelay",
+        "FieldMedicRover",
+        "GravitasBreaker",
+        "SalvageHauler",
+        "SentinelRelay",
+        "SkyguardSAM",
+        "TidebreakerHovercraft",
+    },
+}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Refresh Layer-1 procedural animations across units.")
     parser.add_argument("--start-index", type=int, default=0, help="Start index in UNIT_SPECS.")
     parser.add_argument("--units", nargs="*", help="Optional explicit unit names to refresh.")
+    parser.add_argument("--packs", nargs="*", help="Optional canonical pack ids to filter units.")
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     args = parser.parse_args(argv)
 
     specs = UNIT_SPECS[args.start_index :]
+    if args.packs:
+        pack_wanted: set[str] = set()
+        for pack_id in args.packs:
+            pack_wanted |= PACK_UNITS.get(pack_id.strip(), set())
+        specs = [s for s in specs if s[0] in pack_wanted]
     if args.units:
         wanted = {u.strip() for u in args.units}
         specs = [s for s in specs if s[0] in wanted]
