@@ -137,6 +137,7 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
                 stage_info = stage.stat()
                 stage_identity = (stage_info.st_dev, stage_info.st_ino)
                 manifest_sources: dict[str, bytes] = {}
+                expected_files: dict[str, str] = {}
                 for index, (root, source_pack) in enumerate(bundle_sources):
                     isolated = _make_stage_dir(Path(temporary), f"source-{index}", exist_ok=False)
                     copy_bundle_transfer(root, isolated, source_pack)
@@ -146,6 +147,7 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
                     for bundle in source_pack["assetBundles"]:
                         relative = PureWindowsPath(bundle["path"])
                         target = stage.joinpath(*relative.parts)
+                        expected_files[bundle["path"]] = _guarded_hash(isolated, bundle["path"])
                         _make_stage_dir(stage, relative.parts[0])
                         if target.exists():
                             if _guarded_hash(stage, bundle["path"]) != _guarded_hash(isolated, bundle["path"]):
@@ -162,17 +164,24 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
                     manifest_bytes = manifests[0] if len(manifests) == 1 else merge_bundle_manifests(manifests)
                     with open_pack_file(stage, pack["assetBundleManifestPath"], create=True) as output_stream:
                         output_stream.write(manifest_bytes)
+                    expected_files[pack["assetBundleManifestPath"]] = hashlib.sha256(manifest_bytes).hexdigest()
                 content_bytes = (json.dumps(pack, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
                 with open_pack_file(stage, "content.json", create=True) as output_stream:
                     output_stream.write(content_bytes)
+                expected_files["content.json"] = hashlib.sha256(content_bytes).hexdigest()
                 if dependency_report is not None:
                     dependency_report = dict(dependency_report, contentSha256=hashlib.sha256(content_bytes).hexdigest())
+                    report_bytes = (json.dumps(dependency_report, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
                     with open_pack_file(stage, "composition-dependencies.json", create=True) as output_stream:
-                        output_stream.write((json.dumps(dependency_report, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+                        output_stream.write(report_bytes)
+                    expected_files["composition-dependencies.json"] = hashlib.sha256(report_bytes).hexdigest()
                 errors = validate_pack(str(stage))
                 if errors:
                     raise ValueError("Pack compuesto inválido: " + "; ".join(errors))
                 plan_bundle_transfer(stage, stage, pack)
+                for relative, expected in expected_files.items():
+                    if _guarded_hash(stage, relative) != expected:
+                        raise ValueError(f"El archivo de la etapa cambió durante la composición: {relative}")
                 if output_path.exists() or output_path.is_symlink():
                     raise FileExistsError(f"El destino apareció durante la composición: {output_path}")
             _publish_no_replace(stage, output_path, stage_identity)

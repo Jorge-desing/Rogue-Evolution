@@ -131,6 +131,20 @@ class CompositionEditTests(unittest.TestCase):
                 self.assertTrue((output / "content.json").is_file())
             self.assertEqual({f"output-{index}" for index in range(12)}, {p.name for p in root.iterdir()})
 
+    def test_changed_stage_manifest_is_not_published(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "output"
+            def mutate(stage, _destination, _pack):
+                with (Path(stage) / "content.json").open("a", encoding="utf-8") as stream:
+                    stream.write(" ")
+                return []
+            with patch("tools.write_composed_pack.plan_bundle_transfer", side_effect=mutate):
+                with self.assertRaisesRegex(RuntimeError, "archivo de la etapa cambió"):
+                    write_composed_pack(self._pack(), [], output)
+            self.assertFalse(output.exists())
+            self.assertTrue(list(root.glob(".rogue-compose-*/pack/content.json")))
+
     def test_extract_cli_writes_a_valid_new_pack(self) -> None:
         pack = self._pack()
         with tempfile.TemporaryDirectory() as directory:

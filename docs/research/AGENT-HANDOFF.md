@@ -3097,3 +3097,7 @@ The writer records stage volume/file identity after creation and publishes throu
 ### Stage preparation guard (2026-11-15)
 
 The stage directory is now held without delete sharing during population and validation; publication then verifies the recorded identity on the rename handle. Tests block a rename during validation and reject replacement after guard release; composition/secure-read modules passed 36 tests with one skip. Initial creation-to-guard and concurrent stage-content mutation remain open, as do POSIX races and rollback.
+
+### Stage content snapshot check (2026-11-15)
+
+The composed writer records expected SHA-256 values for bundles, merged manifest, content and sidecar, then checks them before publication; a mismatch retains the stage and prevents output. Failure injection and bundle/composition modules passed 40 tests. A Windows probe showed that keeping a child file open while denying writes prevented parent rename even with delete sharing. Mutation after the hash check remains a race; creation-to-guard and POSIX issues also remain open.
