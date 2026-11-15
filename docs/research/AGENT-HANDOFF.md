@@ -3019,3 +3019,7 @@ The dependency report now includes unverified native copy-upgrade and card-exclu
 ### Standalone building dependency providers (2026-11-15)
 
 Entity references also resolve to separately declared `buildings`, not only units and their production factories. The combined dependency and composition modules passed 32 tests. Native IDs remain unverified, and the destination security and complete reference audit remain open.
+
+### Standalone building composition (2026-11-15)
+
+Extraction and import now include locally referenced standalone buildings and their bundles; conflicting existing entity/building IDs fail before import. Dependency and composition test modules passed 33 tests. Continue the reference coverage and destination/rollback security audit.

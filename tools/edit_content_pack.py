@@ -878,11 +878,12 @@ def apply_edits(
     return current, all_diagnostics
 
 
-def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set[str], set[str]]:
-    """Compute local unit/stage/profile dependencies until no new IDs are found."""
+def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set[str], set[str], set[str]]:
+    """Compute local unit/stage/profile/building dependencies until no new IDs are found."""
     units = _unit_index(pack)
     factories = {_entity_key(unit.get("productionBuilding")): uid for uid, unit in units.items()
                  if isinstance(unit.get("productionBuilding"), dict)}
+    buildings = {_entity_key(row): row for row in _as_list(pack.get("buildings")) if _entity_key(row)}
     stages = {_entity_key(row): row for row in _as_list(pack.get("stages")) if _entity_key(row)}
     profiles = {_entity_key(row): row for row in _as_list(pack.get("aiProfiles")) if _entity_key(row)}
     if not isinstance(unit_ids, list) or not unit_ids or any(not isinstance(uid, str) or uid not in units for uid in unit_ids):
@@ -900,9 +901,9 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
             for child in value:
                 yield from strings(child)
 
-    selected_units, selected_stages, selected_profiles = set(unit_ids), set(), set()
+    selected_units, selected_stages, selected_profiles, selected_buildings = set(unit_ids), set(), set(), set()
     while True:
-        previous = (len(selected_units), len(selected_stages), len(selected_profiles))
+        previous = (len(selected_units), len(selected_stages), len(selected_profiles), len(selected_buildings))
         selected_entity_ids = selected_units | {fid for fid, uid in factories.items() if uid in selected_units and fid}
         for pid, profile in profiles.items():
             if set(strings(profile)) & selected_entity_ids:
@@ -912,7 +913,7 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
             if refs & (selected_units | selected_profiles):
                 selected_stages.add(sid)
         rows = ([units[uid] for uid in selected_units] + [stages[sid] for sid in selected_stages] +
-                [profiles[pid] for pid in selected_profiles])
+                [profiles[pid] for pid in selected_profiles] + [buildings[bid] for bid in selected_buildings])
         for row in rows:
             for ref in strings(row):
                 if ref in units:
@@ -921,8 +922,10 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
                     selected_units.add(factories[ref])
                 if ref in profiles:
                     selected_profiles.add(ref)
-        if previous == (len(selected_units), len(selected_stages), len(selected_profiles)):
-            return selected_units, selected_stages, selected_profiles
+                if ref in buildings:
+                    selected_buildings.add(ref)
+        if previous == (len(selected_units), len(selected_stages), len(selected_profiles), len(selected_buildings)):
+            return selected_units, selected_stages, selected_profiles, selected_buildings
 
 
 def extract_units_to_pack(
@@ -949,7 +952,7 @@ def extract_units_to_pack(
         extracted["schemaVersion"] = source["schemaVersion"]
 
     try:
-        wanted, stage_ids, profile_ids = _composition_closure(source, unit_ids)
+        wanted, stage_ids, profile_ids, building_ids = _composition_closure(source, unit_ids)
     except ValueError as exc:
         return {}, [str(exc)]
     extracted["units"] = [
@@ -971,6 +974,7 @@ def extract_units_to_pack(
         if _entity_key(profile) in profile_ids:
             profiles.append(profile)
     extracted["aiProfiles"] = profiles
+    extracted["buildings"] = [row for row in _as_list(source.get("buildings")) if _entity_key(row) in building_ids]
 
     # bundles: only those whose produced units are extracted
     # (keep assetBundles empty unless units declare assetBundleId)
@@ -998,7 +1002,7 @@ def import_units(
 
     src_index = _unit_index(src)
     try:
-        closure_units, closure_stages, closure_profiles = _composition_closure(src, unit_ids)
+        closure_units, closure_stages, closure_profiles, closure_buildings = _composition_closure(src, unit_ids)
     except ValueError as exc:
         return updated, [str(exc)]
     unit_ids = [uid for uid in src_index if uid in closure_units]
@@ -1041,6 +1045,17 @@ def import_units(
     profiles = [profile for profile in _as_list(src.get("aiProfiles"))
                 if isinstance(profile, dict) and _entity_key(profile) in closure_profiles]
 
+    buildings = [row for row in _as_list(src.get("buildings"))
+                 if isinstance(row, dict) and _entity_key(row) in closure_buildings]
+    existing_buildings = {_entity_key(row): row for row in _as_list(updated.get("buildings")) if _entity_key(row)}
+    for building in buildings:
+        bid = _entity_key(building)
+        if bid in claimed or (bid in existing_buildings and existing_buildings[bid] != building):
+            diagnostics.append(f"building: conflicto de contenido para '{bid}'")
+    for uid in claimed:
+        if uid in existing_buildings:
+            diagnostics.append(f"entity: conflicto con edificio existente '{uid}'")
+
     def bundle_refs(value):
         if isinstance(value, dict):
             for key, child in value.items():
@@ -1051,7 +1066,7 @@ def import_units(
             for child in value:
                 yield from bundle_refs(child)
 
-    needed_bundles = set(bundle_refs(to_import + stages + profiles))
+    needed_bundles = set(bundle_refs(to_import + stages + profiles + buildings))
     source_bundles = {_entity_key(bundle): bundle for bundle in _as_list(src.get("assetBundles")) if _entity_key(bundle)}
     destination_bundles = {_entity_key(bundle): bundle for bundle in _as_list(updated.get("assetBundles")) if _entity_key(bundle)}
     for bundle_id in sorted(needed_bundles):
@@ -1071,7 +1086,7 @@ def import_units(
                 diagnostics.append(f"bundle '{bundle_id}' tiene contenido distinto en el pack destino")
         needed_bundles = set(source_bundles)
 
-    for section, incoming in (("stages", stages), ("aiProfiles", profiles)):
+    for section, incoming in (("stages", stages), ("aiProfiles", profiles), ("buildings", buildings)):
         existing_rows = {_entity_key(row): row for row in _as_list(updated.get(section)) if _entity_key(row)}
         for row in incoming:
             key = _entity_key(row)
@@ -1084,7 +1099,7 @@ def import_units(
         return updated, diagnostics
 
     updated.setdefault("units", []).extend(json.loads(json.dumps(to_import)))
-    for section, incoming in (("stages", stages), ("aiProfiles", profiles)):
+    for section, incoming in (("stages", stages), ("aiProfiles", profiles), ("buildings", buildings)):
         existing_ids = {_entity_key(row) for row in _as_list(updated.get(section)) if _entity_key(row)}
         for row in incoming:
             if _entity_key(row) not in existing_ids:

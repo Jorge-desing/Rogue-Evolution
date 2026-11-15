@@ -204,3 +204,5 @@ Composed output includes `composition-dependencies.json` with required external 
 A present `composition-dependencies.json` is checked by `tools.validate_content_pack` against the exact `content.json` SHA-256 and pack ID; malformed, stale or linked reports fail validation. This detects stale reports but does not verify that external packs are installed or authenticate the report.
 
 Dependency analysis also reports native `copyUpgradesToEntityId` and upgrade/relic `mustNotHaveOneOfTheseEntityIds` as unverified entity references; namespaced values require a unit, production factory, or standalone building provider. These reports do not prove native IDs exist.
+
+Composition carries referenced standalone buildings in its local closure, includes their bundle declarations during import and rejects conflicting destination definitions. Other reference families and destination race protection still require review.

@@ -132,6 +132,22 @@ class CompositionEditTests(unittest.TestCase):
             self.assertEqual(1, code)
             self.assertFalse(output.exists())
 
+    def test_composition_carries_referenced_independent_building(self) -> None:
+        source = self._pack()
+        source["units"][0]["copyUpgradesToEntityId"] = "ns:support"
+        source["buildings"] = [{"id": "ns:support", "nativeTemplateId": "native"}]
+        extracted, errors = EDIT.extract_units_to_pack(source, ["ns:alpha"])
+        self.assertEqual([], errors)
+        self.assertEqual(["ns:support"], [row["id"] for row in extracted["buildings"]])
+        destination = SCAFFOLD.generate_scaffold("other:pack", "beta", stage_slug="sb", ai_slug="ab")
+        imported, errors = EDIT.import_units(destination, source, ["ns:alpha"])
+        self.assertEqual([], errors)
+        self.assertEqual(["ns:support"], [row["id"] for row in imported["buildings"]])
+        destination["buildings"] = [{"id": "ns:support", "nativeTemplateId": "different"}]
+        unchanged, errors = EDIT.import_units(destination, source, ["ns:alpha"])
+        self.assertTrue(errors)
+        self.assertEqual(destination, unchanged)
+
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()
         extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])
