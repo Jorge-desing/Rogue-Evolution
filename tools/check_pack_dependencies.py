@@ -140,9 +140,12 @@ def analyze_dependencies(packs: dict) -> dict:
         )
         ambiguous = sorted(ref for ref in external if len(providers.get(ref, [])) > 1)
         typed_refs: set[tuple[str, str]] = set()
+        native_refs: set[tuple[str, str]] = set()
         def add(value, kind):
             if _is_namespaced(value):
                 typed_refs.add((value, kind))
+            elif isinstance(value, str) and value.strip() and value != "*":
+                native_refs.add((value, kind))
         for unit in _as_list(_as_dict(packs[name]).get("units")):
             if isinstance(unit, dict):
                 for upgrade in _as_list(unit.get("upgrades")):
@@ -186,6 +189,7 @@ def analyze_dependencies(packs: dict) -> dict:
             "resolvedBy": resolved_by,
             "unresolvedReferences": unresolved,
             "ambiguousReferences": ambiguous,
+            "unverifiedNativeReferences": [f"{value} ({kind})" for value, kind in sorted(native_refs)],
         })
     return {
         "counts": {
@@ -235,7 +239,8 @@ def main(argv: list[str] | None = None) -> int:
         for row in report["packs"]:
             print(f"  {row['name']}: externas={row['externalReferences']} "
                   f"resueltopor={row['resolvedBy']} "
-                  f"pendientes={row['unresolvedReferences']} ambiguas={row['ambiguousReferences']}")
+                  f"pendientes={row['unresolvedReferences']} ambiguas={row['ambiguousReferences']} "
+                  f"nativasSinVerificar={row['unverifiedNativeReferences']}")
     return 1 if report["counts"]["unresolvedReferences"] or report["counts"]["ambiguousReferences"] else 0
 
 

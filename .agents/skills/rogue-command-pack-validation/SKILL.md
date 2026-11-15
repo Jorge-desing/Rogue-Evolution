@@ -190,3 +190,5 @@ Dependency analysis verifies that unit references resolve to unit definitions an
 Typed dependency resolution treats `sample:scheduled-base-build` `entityId` as a production factory and card-change `onlyForTheseEntityIds`/`entityIdsNotAllowed` as unit references, matching loader validation. Other generic entity fields still require separate analysis.
 
 After successful data-only composition the empty staging parent is removed with `rmdir`; when source copies remain, the writer reports the retained staging path as a warning. No recursive cleanup occurs.
+
+`check_pack_dependencies` reports unnamespaced references encountered in typed unit/profile/factory fields under `unverifiedNativeReferences`; an empty unresolved list alone does not verify those IDs against the native registry.

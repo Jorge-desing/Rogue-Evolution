@@ -52,6 +52,7 @@ class CheckPackDependenciesTests(unittest.TestCase):
         packs["scaffold"]["stages"][0]["unitIds"] = ["PCXBaseTank"]
         report = DEPS.analyze_dependencies(packs)
         self.assertEqual([], report["packs"][0]["externalReferences"])
+        self.assertIn("PCXBaseTank (unit)", report["packs"][0]["unverifiedNativeReferences"])
 
     def test_unit_upgrade_and_upgrade_exclusion_dependencies_are_reported(self) -> None:
         pack = _packs()["scaffold"]
