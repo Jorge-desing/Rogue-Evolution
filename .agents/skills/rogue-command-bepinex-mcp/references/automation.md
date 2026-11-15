@@ -17,7 +17,7 @@ Snapshots and waits do not lock state or keep instance IDs current. Native actio
 
 ## State waits
 
-`automation_wait_for_state` accepts `tool`, optional `arguments`, and 1–8 `expect` checks at JSON Pointers. Allowed tools: `diagnostics_get_runtime_control_surface`, `diagnostics_get_ui_accessibility_census`, `diagnostics_get_intermission_native_panel_state`, `diagnostics_get_intermission_census`, `diagnostics_get_navigator_state`, `diagnostics_get_game_time_scale`, `diagnostics_get_intermission_reward_state`. Discovery still exposes every other tool; this list restricts automatic polling only.
+`automation_wait_for_state` accepts `tool`, optional `arguments`, and 1–8 `expect` checks at JSON Pointers. Allowed tools: `diagnostics_get_runtime_control_surface`, `diagnostics_get_ui_accessibility_census`, `diagnostics_get_intermission_native_panel_state`, `diagnostics_get_intermission_census`, `diagnostics_get_navigator_state`, `diagnostics_get_game_time_scale`, `diagnostics_get_intermission_reward_state`, `diagnostics_get_battlefield_unit_state`. Discovery still exposes every other tool; this list restricts automatic polling only.
 
 Optional `stableSamples` (1–8, default 1) requires consecutive matching reads; a missing field or mismatch resets the count. Results report `stableSamples` and `consecutiveMatches`. Use 2 or more when a transient UI state must not advance the agent; this observes stability across samples, not between them. The original timeout and sequence budget still apply.
 
@@ -97,7 +97,7 @@ For movement, put `diagnostics_order_unit_move` in a sequence with an expectatio
 Replace the illustrative unit key `42` and coordinates `(10,20)` below with the live unit and authorized destination. The initial read supplies the scene handle and confirms player ownership.
 
 ```json
-{"tool":"automation_run_sequence","arguments":{"steps":[{"tool":"diagnostics_get_battlefield_unit_state","arguments":{"entityKeyId":"42"},"expect":[{"path":"/isControlledByPlayer","equals":true}]},{"tool":"diagnostics_order_unit_move","arguments":{"entityKeyId":{"$ref":{"step":0,"path":"/entityKeyId"}},"destinationX":10,"destinationZ":20},"expect":[{"path":"/success","equals":true}]},{"tool":"automation_wait_for_state","arguments":{"tool":"diagnostics_get_battlefield_unit_state","arguments":{"entityKeyId":{"$ref":{"step":0,"path":"/entityKeyId"}},"goal":{"x":10,"z":20}},"expect":[{"path":"/withinGoal","equals":true},{"path":"/sceneHandle","equals":{"$ref":{"step":0,"path":"/sceneHandle"}}}],"stableSamples":2,"timeoutSeconds":20}}]}}
+{"tool":"automation_run_sequence","arguments":{"steps":[{"tool":"diagnostics_get_battlefield_unit_state","arguments":{"entityKeyId":"42"},"expect":[{"path":"/isControlledByPlayer","equals":true}]},{"tool":"diagnostics_order_unit_move","arguments":{"entityKeyId":{"$ref":{"step":0,"path":"/entityKeyId"}},"destinationX":10,"destinationZ":20,"replaceCurrent":true},"expect":[{"path":"/success","equals":true}]},{"tool":"automation_wait_for_state","arguments":{"tool":"diagnostics_get_battlefield_unit_state","arguments":{"entityKeyId":{"$ref":{"step":0,"path":"/entityKeyId"}},"goal":{"x":10,"z":20}},"expect":[{"path":"/withinGoal","equals":true},{"path":"/sceneHandle","equals":{"$ref":{"step":0,"path":"/sceneHandle"}}}],"stableSamples":2,"timeoutSeconds":20}}]}}
 ```
 
 ## Verify and recover

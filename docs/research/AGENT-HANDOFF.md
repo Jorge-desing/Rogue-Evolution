@@ -3141,3 +3141,7 @@ When a supplied dependency stage references an original AI profile ID renamed du
 ### Real-bundle conflict import and suite (2026-11-15)
 
 Full Python `all` passed in 36.89 s after conflict import and external ambiguity handling. An isolated copy of tactical-operations with deliberately conflicting sample-native stage/profile IDs was imported with `--rename-conflicts` into `artifacts/composition-real-conflicts-20261115`. The report contains both mappings, the imported stage references the renamed profile, local validation passed and UnityPy read both bundle names from the merged manifest. Source fixture: `artifacts/conflict-source-20261115`; retained writer copy: `artifacts/.rogue-compose-eec1f527403371054723bf4c220c450b`. No live runtime acceptance is implied.
+
+### Battlefield automation agent context (2026-11-15)
+
+The MCP automation reference now includes `diagnostics_get_battlefield_unit_state` in the read-only wait allowlist and its movement sequence uses `replaceCurrent: true`, consistent with the current schema, handler and skill. The skill entry point points agents to the battlefield wait capability. Automation/context-routing modules passed 27 tests. This corrects agent-facing documentation only; no live game execution was performed.
