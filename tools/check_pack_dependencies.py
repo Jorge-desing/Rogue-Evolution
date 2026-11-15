@@ -118,10 +118,12 @@ def analyze_dependencies(packs: dict) -> dict:
     unit_providers: dict[str, set[str]] = {}
     profile_providers: dict[str, set[str]] = {}
     factory_providers: dict[str, set[str]] = {}
+    building_providers: dict[str, set[str]] = {}
     for name, pack in packs.items():
         for entity_id in defined_ids(pack):
             providers.setdefault(entity_id, []).append(name)
         unit_providers[name] = {_entity_key(unit) for unit in _as_list(_as_dict(pack).get("units")) if _entity_key(unit)}
+        building_providers[name] = {_entity_key(building) for building in _as_list(_as_dict(pack).get("buildings")) if _entity_key(building)}
         profile_providers[name] = {_entity_key(profile) for profile in _as_list(_as_dict(pack).get("aiProfiles")) if _entity_key(profile)}
         factory_providers[name] = {_entity_key(unit.get("productionBuilding")) for unit in _as_list(_as_dict(pack).get("units"))
                                    if isinstance(unit, dict) and _entity_key(unit.get("productionBuilding"))}
@@ -179,7 +181,7 @@ def analyze_dependencies(packs: dict) -> dict:
                     if isinstance(change, dict):
                         for field in ("onlyForTheseEntityIds", "entityIdsNotAllowed"):
                             for value in _as_list(change.get(field)): add(value, "unit")
-        entity_providers = {key: unit_providers[key] | factory_providers[key] for key in unit_providers}
+        entity_providers = {key: unit_providers[key] | factory_providers[key] | building_providers[key] for key in unit_providers}
         catalogs = {"unit": unit_providers, "profile": profile_providers, "factory": factory_providers, "entity": entity_providers}
         wrong_type = sorted(f"{value} ({kind})" for value, kind in typed_refs
                             if value in providers and not any(value in ids for ids in catalogs[kind].values()))

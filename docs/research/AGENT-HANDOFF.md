@@ -3015,3 +3015,7 @@ The staged composition dependency report now records SHA-256 of the exact `conte
 ### Dependency reference reporting (2026-11-15)
 
 The dependency report now includes unverified native copy-upgrade and card-exclusion entity IDs and checks the kind of namespaced providers. The dependency and composition test modules passed together (31 tests). Other reference families, destination race protection and safe rollback remain to be reviewed.
+
+### Standalone building dependency providers (2026-11-15)
+
+Entity references also resolve to separately declared `buildings`, not only units and their production factories. The combined dependency and composition modules passed 32 tests. Native IDs remain unverified, and the destination security and complete reference audit remain open.

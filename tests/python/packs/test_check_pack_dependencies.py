@@ -70,6 +70,14 @@ class CheckPackDependenciesTests(unittest.TestCase):
         self.assertIn("NativeTarget (entity)", row["unverifiedNativeReferences"])
         self.assertIn("NativeBlocked (entity)", row["unverifiedNativeReferences"])
 
+    def test_copy_upgrade_reference_accepts_standalone_building(self) -> None:
+        pack = _packs()["scaffold"]
+        pack["units"][0]["copyUpgradesToEntityId"] = "other:building"
+        provider = {"packId": "other:pack", "buildings": [{"id": "other:building"}]}
+        row = DEPS.analyze_dependencies({"consumer": pack, "provider": provider})["packs"][0]
+        self.assertEqual([], row["unresolvedReferences"])
+        self.assertEqual(["provider"], row["resolvedBy"])
+
     def test_unit_reference_cannot_resolve_to_a_profile_or_bundle(self) -> None:
         pack = SCAFFOLD.generate_scaffold("ns:pack", "alpha")
         pack["stages"][0]["unitIds"] = ["other:thing"]
