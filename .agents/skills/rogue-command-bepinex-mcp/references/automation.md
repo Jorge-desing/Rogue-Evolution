@@ -113,3 +113,5 @@ Example: after an uncertain native UI call, inspect this read-only result in a n
 For changes observed asynchronously, wait on the exact current value field from the fresh census, then inspect `lastObservation`. Paths, labels, instance IDs and offered items expire across scenes; route/shop mutations require their native dedicated census and validation.
 
 Agent sessions, heartbeats and resource locks are advisory coordination for cooperating agents. They do not make a snapshot atomic with a later action, prevent other callers from mutating the game, or restore an expired session automatically. Release owned locks and temporary observers using their exact returned identifiers when the task finishes.
+
+Malformed mixed-plan or group-mutation responses preserve `rawResponse` and are reported as unknown completion; sequences stop and require postcondition inspection even when continuation was requested.

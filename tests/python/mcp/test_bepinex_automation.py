@@ -226,6 +226,23 @@ class StateWaitTests(unittest.TestCase):
             self.assertFalse(result.get("isError", False))
             call.assert_called_once_with("OrderUnitMoveJson", ["42", 30.0, 40.0, True])
 
+    def test_unreadable_mutation_response_is_unknown_and_stops_sequence(self):
+        orders = {"orders": [{"commandType": "Stop", "entityKeyIds": ["11"]}]}
+        for tool, args in (("diagnostics_order_battlefield_plan", orders),
+                           ("diagnostics_order_group_command", {"entityKeyIds": ["11"], "commandType": "Stop"})):
+            with self.subTest(tool=tool), mock.patch.object(SERVER, "_call_diagnostics_method", return_value="broken reply") as call:
+                direct = SERVER.execute_tool(tool, args)
+                payload = json.loads(direct["content"][0]["text"])
+                self.assertTrue(direct["isError"])
+                self.assertEqual("unknown", payload["completionStatus"])
+                self.assertEqual("broken reply", payload["rawResponse"])
+                call.reset_mock()
+                result = SERVER.execute_tool("automation_run_sequence", {"stopOnFailure": False, "steps": [
+                    {"tool": tool, "arguments": args}, {"tool": "diagnostics_get_navigator_state"}]})
+                outcome = json.loads(result["content"][0]["text"])
+                self.assertEqual(1, call.call_count)
+                self.assertEqual("uncertain_effect", outcome["stopReason"]["code"])
+
     def test_direct_group_response_exposes_partial_dispatch(self):
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true,"dispatchedCount":1}'):
             response = SERVER.execute_tool("diagnostics_order_group_command", {"entityKeyIds": ["11", "12"], "commandType": "Stop"})
@@ -286,7 +303,7 @@ class StateWaitTests(unittest.TestCase):
             {"commandType": "ActiveSkill", "entityKeyIds": ["15"],
              "arguments": {"targetX": 24, "targetZ": 33}},
         ]
-        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true,"completeOrderCount":3}') as call:
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true,"dispatchStarted":true,"completeOrderCount":3}') as call:
             response = SERVER.execute_tool("diagnostics_order_battlefield_plan", {"orders": orders})
         self.assertFalse(response.get("isError", False))
         call.assert_called_once_with(

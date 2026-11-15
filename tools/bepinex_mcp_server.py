@@ -416,14 +416,37 @@ def _tool_response(text: str, is_error: bool = False) -> dict[str, Any]:
 
 
 
+def _unreadable_mutation_response(text: Any) -> dict[str, Any]:
+    payload = {"error": "Mutation response was not a JSON object; inspect the postcondition before retrying.",
+               "completionStatus": "unknown", "postconditionInspectionRequired": True,
+               "rawResponse": text if isinstance(text, str) else str(text)}
+    return _tool_response(json.dumps(payload, ensure_ascii=False), is_error=True)
+
+
+def _battlefield_plan_response(text: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(text, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+    except (TypeError, ValueError):
+        return _unreadable_mutation_response(text)
+    if not isinstance(payload, dict):
+        return _unreadable_mutation_response(text)
+    if type(payload.get("dispatchStarted")) is not bool and payload.get("completionStatus") != "not_started":
+        payload["completionStatus"] = "unknown"
+        payload["postconditionInspectionRequired"] = True
+    elif payload.get("dispatchStarted") is True and payload.get("success") is not True:
+        payload["postconditionInspectionRequired"] = True
+    return _tool_response(json.dumps(payload, ensure_ascii=False),
+                          is_error=payload.get("success") is not True or payload.get("completionStatus") == "unknown")
+
+
 def _group_action_response(text: str, count_field: str, expected: int) -> dict[str, Any]:
     """Expose partial native group effects without losing the original result fields."""
     try:
-        payload = json.loads(text)
+        payload = json.loads(text, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
     except (TypeError, ValueError):
-        return _tool_response(text, is_error=True)
+        return _unreadable_mutation_response(text)
     if not isinstance(payload, dict):
-        return _tool_response(text, is_error=True)
+        return _unreadable_mutation_response(text)
     count = payload.get(count_field)
     known_count = type(count) is int and count >= 0
     complete = expected > 0 and known_count and count == expected and payload.get("success") is True
@@ -1195,6 +1218,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
                     )
                 uncertain = isinstance(parsed_step, dict) and (
                     partial_group
+                    or parsed_step.get("postconditionInspectionRequired") is True
                     or parsed_step.get("completionStatus") == "unknown"
                     or (parsed_step.get("nativeCallInvoked") is True and parsed_step.get("effectObserved") is False)
                     or (step_tool == "diagnostics_order_battlefield_plan"
@@ -1982,7 +2006,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             except (KeyError, TypeError, ValueError) as exc:
                 return _tool_response(json.dumps({"success": False, "error": "Battlefield orders must be valid finite JSON: " + str(exc)}), True)
             res = _call_diagnostics_method("OrderBattlefieldPlanJson", [orders_json])
-            return _tool_response(res)
+            return _battlefield_plan_response(res)
 
         elif name == "diagnostics_order_formation_move":
             keys = arguments.get("entityKeyIds") or []
