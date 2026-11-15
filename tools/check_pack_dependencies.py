@@ -117,11 +117,14 @@ def analyze_dependencies(packs: dict) -> dict:
     providers: dict[str, list[str]] = {}
     unit_providers: dict[str, set[str]] = {}
     profile_providers: dict[str, set[str]] = {}
+    factory_providers: dict[str, set[str]] = {}
     for name, pack in packs.items():
         for entity_id in defined_ids(pack):
             providers.setdefault(entity_id, []).append(name)
         unit_providers[name] = {_entity_key(unit) for unit in _as_list(_as_dict(pack).get("units")) if _entity_key(unit)}
         profile_providers[name] = {_entity_key(profile) for profile in _as_list(_as_dict(pack).get("aiProfiles")) if _entity_key(profile)}
+        factory_providers[name] = {_entity_key(unit.get("productionBuilding")) for unit in _as_list(_as_dict(pack).get("units"))
+                                   if isinstance(unit, dict) and _entity_key(unit.get("productionBuilding"))}
     rows: list[dict] = []
     total_unresolved = 0
     for name in sorted(packs):
@@ -164,8 +167,16 @@ def analyze_dependencies(packs: dict) -> dict:
                     if isinstance(module, dict):
                         for parameter in _as_list(module.get("parameters")):
                             if isinstance(parameter, dict) and parameter.get("name") == "unitId": add(parameter.get("value"), "unit")
+                            if isinstance(parameter, dict) and module.get("moduleId") == "sample:scheduled-base-build" and parameter.get("name") == "entityId": add(parameter.get("value"), "factory")
+        for relic in _as_list(_as_dict(packs[name]).get("relics")) + _as_list(_as_dict(packs[name]).get("upgrades")):
+            if isinstance(relic, dict):
+                for change in _as_list(relic.get("cardChanges")):
+                    if isinstance(change, dict):
+                        for field in ("onlyForTheseEntityIds", "entityIdsNotAllowed"):
+                            for value in _as_list(change.get(field)): add(value, "unit")
+        catalogs = {"unit": unit_providers, "profile": profile_providers, "factory": factory_providers}
         wrong_type = sorted(f"{value} ({kind})" for value, kind in typed_refs
-                            if value in providers and not any(value in ids for ids in (unit_providers if kind == "unit" else profile_providers).values()))
+                            if value in providers and not any(value in ids for ids in catalogs[kind].values()))
         unresolved = sorted(set(unresolved) | set(wrong_type))
         total_unresolved += len(unresolved)
         rows.append({

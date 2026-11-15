@@ -186,3 +186,5 @@ The composed writer holds its output parent and ancestors through non-reparse di
 Composition creates each staging child while holding its parent directory and checks the child through a non-reparse handle before writing. Windows parent renames are blocked while held; POSIX path-based creation and publication still need race-resistant directory-relative operations.
 
 Dependency analysis verifies that unit references resolve to unit definitions and stage AI profile references resolve to profiles; an ID defined only as another kind is reported unresolved. Generic entity references and native unnamespaced IDs still need their own registry-aware checks.
+
+Typed dependency resolution treats `sample:scheduled-base-build` `entityId` as a production factory and card-change `onlyForTheseEntityIds`/`entityIdsNotAllowed` as unit references, matching loader validation. Other generic entity fields still require separate analysis.

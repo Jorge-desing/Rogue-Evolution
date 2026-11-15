@@ -70,6 +70,15 @@ class CheckPackDependenciesTests(unittest.TestCase):
         row = next(row for row in report["packs"] if row["name"] == "consumer")
         self.assertIn("other:thing (unit)", row["unresolvedReferences"])
 
+    def test_scheduled_factory_and_card_target_require_correct_kinds(self) -> None:
+        pack = SCAFFOLD.generate_scaffold("ns:pack", "alpha")
+        pack["aiProfiles"][0]["modules"] = [{"moduleId": "sample:scheduled-base-build", "parameters": [
+            {"name": "entityId", "value": "ns:alpha"}]}]
+        pack["relics"] = [{"id": "ns:r", "cardChanges": [{"onlyForTheseEntityIds": ["ns:alpha-factory"]}]}]
+        row = DEPS.analyze_dependencies({"pack": pack})["packs"][0]
+        self.assertIn("ns:alpha (factory)", row["unresolvedReferences"])
+        self.assertIn("ns:alpha-factory (unit)", row["unresolvedReferences"])
+
     def test_synergy_profile_dependencies_module_and_ambiguous_providers(self) -> None:
         packs = _packs()
         dependent = SCAFFOLD.generate_scaffold("other:pack", "beta")

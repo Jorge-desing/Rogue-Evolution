@@ -2950,3 +2950,7 @@ The previously failing Bulwark host FBX has changed again: current SHA-256 `7FFB
 ## 2026-11-15 — Typed composition dependencies
 
 The dependency analyzer now checks unit references against unit definitions and stage AI references against profile definitions; a matching ID of the wrong kind is reported unresolved, including same-pack mismatches. Twenty-eight targeted tests passed and the four-pack dependency report remains resolved. Generic entity references and native unnamespaced registry checks remain open, as do destination cleanup and visual suite failures.
+
+## 2026-11-15 — Factory and card target dependency types
+
+The cross-pack analyzer now requires `sample:scheduled-base-build` `entityId` to resolve to a production factory and relic/upgrade card-change target and exclusion IDs to resolve to units, matching loader validation. Twenty-nine targeted tests passed; the four-pack dependency report remains resolved. Other generic entity fields, native IDs, destination cleanup and full-suite visual failures remain open.
