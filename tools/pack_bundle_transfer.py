@@ -82,6 +82,56 @@ def plan_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
     return result
 
 
+def _rollback_verified_windows_file(destination: Path, path: Path, identity: tuple[int, int], expected_hash: str) -> bool:
+    """Delete the opened file itself only if identity and complete contents still match."""
+    if os.name != "nt":
+        return False
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    relative_parent = path.parent.relative_to(destination)
+    guard_root, guard_name = ((destination.parent, destination.name) if not relative_parent.parts
+                              else (destination, str(relative_parent)))
+    with open_pack_file(guard_root, guard_name, directory=True):
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.c_void_p,
+                                      wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+        kernel.CreateFileW.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = kernel.CreateFileW(str(path), 0x80010000, 0, None, 3, 0x00200000, None)
+        if handle == ctypes.c_void_p(-1).value:
+            return False
+        try:
+            class Info(ctypes.Structure):
+                _fields_ = [("attributes", wintypes.DWORD), ("tag", wintypes.DWORD)]
+            kernel.GetFileInformationByHandleEx.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+            info = Info()
+            if not kernel.GetFileInformationByHandleEx(handle, 9, ctypes.byref(info), ctypes.sizeof(info)):
+                return False
+            if info.attributes & (0x10 | 0x400):
+                return False
+            fd = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+            handle = None
+            with os.fdopen(fd, "rb") as stream:
+                current = os.fstat(stream.fileno())
+                if (current.st_dev, current.st_ino) != identity:
+                    return False
+                digest = hashlib.sha256()
+                for block in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(block)
+                if digest.hexdigest() != expected_hash:
+                    return False
+                disposition = wintypes.BOOL(True)
+                kernel.SetFileInformationByHandle.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+                kernel.SetFileInformationByHandle.restype = wintypes.BOOL
+                return bool(kernel.SetFileInformationByHandle(msvcrt.get_osfhandle(stream.fileno()), 4,
+                                                               ctypes.byref(disposition), ctypes.sizeof(disposition)))
+        finally:
+            if handle is not None:
+                kernel.CloseHandle(handle)
+
+
 def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, pack: dict) -> list[dict]:
     """Copy a checked bundle set without replacing existing files; report retained files on failure."""
     source, destination = Path(source_root), Path(destination_root)
@@ -129,10 +179,16 @@ def copy_bundle_transfer(source_root: str | Path, destination_root: str | Path, 
             raise ValueError("El conjunto de bundles cambió durante la transferencia")
         return plan
     except Exception as original:
-        # Never unlink by pathname after an exception: a different process can
-        # replace it between an identity check and deletion. Retain all created
-        # paths and report them for inspection.
-        retained = [str(path) for path, _, _ in created_files]
+        # Windows disposition acts on the verified open handle, not a later
+        # pathname lookup. Incomplete, changed, locked or unsupported files stay.
+        retained = []
+        for path, identity, digest in reversed(created_files):
+            try:
+                removed = digest is not None and _rollback_verified_windows_file(destination, path, identity, digest)
+            except (OSError, ValueError):
+                removed = False
+            if not removed:
+                retained.append(str(path))
         retained.extend(str(path) for path in created_dirs)
         if retained:
             raise RuntimeError(f"Reversión incompleta; archivos conservados: {', '.join(retained)}; error original: {original}") from original

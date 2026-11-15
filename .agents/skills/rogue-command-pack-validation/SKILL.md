@@ -224,3 +224,5 @@ The composition CLI lists filter-only relics/upgrades on stderr and records them
 The Python pack validator opens `content.json` through the guarded reader and checks a composition report against the same bytes it parsed. This prevents report checking from silently using a second, different read; it does not lock the pack after validation.
 
 Composition reports `dependencyNativeReferences` by required external pack ID, including transitive providers; these native IDs remain unverified and dependency packs are not copied.
+
+On Windows, failed bundle transfer attempts to delete complete created files through an exclusively opened DELETE-capable handle only after matching recorded file identity and SHA-256. Changed, incomplete, locked or unverified files and created directories are retained and reported. POSIX retains all created paths; no recursive cleanup occurs.

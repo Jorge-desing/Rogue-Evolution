@@ -1,3 +1,4 @@
+import os
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -86,6 +87,36 @@ class BundleManifestDependencyTests(unittest.TestCase):
                 pack["assetBundles"][0]["path"] = "../outside.bundle"
                 with self.assertRaises(ValueError):
                     plan_bundle_transfer(source, target, pack)
+
+    @unittest.skipUnless(os.name == "nt", "Windows handle-based rollback")
+    def test_failed_copy_removes_only_verified_completed_file(self):
+        for mutate in (False, True):
+            with self.subTest(mutate=mutate), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source, target = root / "source", root / "target"
+                (source / "bundles").mkdir(parents=True)
+                (target / "bundles").mkdir(parents=True)
+                (source / "bundles/a.bundle").write_bytes(b"bundle")
+                (source / "bundles/manifest.bundle").write_bytes(b"manifest")
+                pack = {"assetBundleManifestPath": "bundles/manifest.bundle",
+                        "assetBundles": [{"id": "ns:a", "path": "bundles/a.bundle"}]}
+                calls = 0
+                def fail_second(fd):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 2:
+                        if mutate:
+                            (target / "bundles/a.bundle").write_bytes(b"user-edit")
+                        raise OSError("simulated")
+                with patch("tools.pack_bundle_transfer.resolve_bundle_dependencies"), patch("tools.pack_bundle_transfer.os.fsync", side_effect=fail_second):
+                    with self.assertRaisesRegex(RuntimeError, "Reversión incompleta"):
+                        copy_bundle_transfer(source, target, pack)
+                first = target / "bundles/a.bundle"
+                if mutate:
+                    self.assertEqual(b"user-edit", first.read_bytes())
+                else:
+                    self.assertFalse(first.exists())
+                self.assertTrue((target / "bundles/manifest.bundle").exists())
 
     def test_failed_copy_reports_and_preserves_incomplete_file(self):
         with tempfile.TemporaryDirectory() as directory:

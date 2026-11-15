@@ -3065,3 +3065,7 @@ The composition CLI warns about filter-only cards and records `broadFilterCards`
 ### Transitive native reference reporting (2026-11-15)
 
 The composition dependency report and stderr now expose unverified native references in required external packs, keyed by pack ID, including transitive providers. The dependency and composition modules passed 41 tests, including a three-pack chain. Windows stage identity, POSIX races and rollback remain open.
+
+### Verified Windows bundle rollback (2026-11-15)
+
+On failed transfer, Windows removes completed created files only through an exclusive open handle after identity and SHA-256 match. Incomplete or changed files and directories remain reported; POSIX retains paths. A failure-injection test verifies removal of an unchanged completed file and preservation after a concurrent edit. Bundle/composition modules passed 35 tests. Windows stage publication and POSIX races remain open.
