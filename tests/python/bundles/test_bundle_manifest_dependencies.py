@@ -90,7 +90,7 @@ class BundleManifestDependencyTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "nt", "Windows handle-based rollback")
     def test_failed_copy_removes_only_verified_completed_file(self):
-        for mutate in (False, True):
+        for mutate in ("none", "edit", "replace"):
             with self.subTest(mutate=mutate), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 source, target = root / "source", root / "target"
@@ -105,15 +105,21 @@ class BundleManifestDependencyTests(unittest.TestCase):
                     nonlocal calls
                     calls += 1
                     if calls == 2:
-                        if mutate:
+                        if mutate == "edit":
                             (target / "bundles/a.bundle").write_bytes(b"user-edit")
+                        elif mutate == "replace":
+                            replacement = target / "bundles/replacement"
+                            replacement.write_bytes(b"bundle")
+                            os.replace(replacement, target / "bundles/a.bundle")
                         raise OSError("simulated")
                 with patch("tools.pack_bundle_transfer.resolve_bundle_dependencies"), patch("tools.pack_bundle_transfer.os.fsync", side_effect=fail_second):
                     with self.assertRaisesRegex(RuntimeError, "Reversión incompleta"):
                         copy_bundle_transfer(source, target, pack)
                 first = target / "bundles/a.bundle"
-                if mutate:
+                if mutate == "edit":
                     self.assertEqual(b"user-edit", first.read_bytes())
+                elif mutate == "replace":
+                    self.assertEqual(b"bundle", first.read_bytes())
                 else:
                     self.assertFalse(first.exists())
                 self.assertTrue((target / "bundles/manifest.bundle").exists())

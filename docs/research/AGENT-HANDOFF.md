@@ -3069,3 +3069,7 @@ The composition dependency report and stderr now expose unverified native refere
 ### Verified Windows bundle rollback (2026-11-15)
 
 On failed transfer, Windows removes completed created files only through an exclusive open handle after identity and SHA-256 match. Incomplete or changed files and directories remain reported; POSIX retains paths. A failure-injection test verifies removal of an unchanged completed file and preservation after a concurrent edit. Bundle/composition modules passed 35 tests. Windows stage publication and POSIX races remain open.
+
+### Rollback replacement and full suite (2026-11-15)
+
+The Windows failure-injection test now verifies that a replacement file with identical bytes is retained when file identity changes. The bundle module passed 6 tests; full Python `all` returned successful in 36.48 s, started before this test-only update. Windows stage publication and POSIX races/rollback remain open.

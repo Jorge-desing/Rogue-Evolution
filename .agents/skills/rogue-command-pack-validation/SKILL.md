@@ -226,3 +226,5 @@ The Python pack validator opens `content.json` through the guarded reader and ch
 Composition reports `dependencyNativeReferences` by required external pack ID, including transitive providers; these native IDs remain unverified and dependency packs are not copied.
 
 On Windows, failed bundle transfer attempts to delete complete created files through an exclusively opened DELETE-capable handle only after matching recorded file identity and SHA-256. Changed, incomplete, locked or unverified files and created directories are retained and reported. POSIX retains all created paths; no recursive cleanup occurs.
+
+The Windows rollback regression also covers replacement by a different file with identical bytes: identity mismatch preserves it.
