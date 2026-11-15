@@ -222,3 +222,5 @@ A scoped stage share-delete prototype passed isolated batch tests but failed bat
 The composition CLI lists filter-only relics/upgrades on stderr and records them in `composition-dependencies.json` as `broadFilterCards`; the list describes possible broad effects, not proof of runtime matching.
 
 The Python pack validator opens `content.json` through the guarded reader and checks a composition report against the same bytes it parsed. This prevents report checking from silently using a second, different read; it does not lock the pack after validation.
+
+Composition reports `dependencyNativeReferences` by required external pack ID, including transitive providers; these native IDs remain unverified and dependency packs are not copied.

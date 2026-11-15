@@ -159,6 +159,26 @@ class CompositionEditTests(unittest.TestCase):
                 stream.write(" ")
             self.assertTrue(any("obsoleto" in error for error in validate_pack(str(output))))
 
+    def test_transitive_dependency_native_references_are_reported(self) -> None:
+        source = self._pack()
+        source["units"][0]["synergies"] = [{"id": "ns:link", "statName": "damage", "targetUnitIds": ["other:beta"]}]
+        provider = SCAFFOLD.generate_scaffold("other:pack", "beta", stage_slug="sb", ai_slug="ab")
+        provider["units"][0]["copyUpgradesToEntityId"] = "third:gamma"
+        third = SCAFFOLD.generate_scaffold("third:pack", "gamma", stage_slug="sc", ai_slug="ac")
+        third["units"][0]["copyUpgradesToEntityId"] = "NativeTarget"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            a, b, c, output = root / "source.json", root / "provider.json", root / "third.json", root / "output"
+            a.write_text(json.dumps(source), encoding="utf-8")
+            b.write_text(json.dumps(provider), encoding="utf-8")
+            c.write_text(json.dumps(third), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as stderr:
+                code = EDIT.main(["--pack", str(a), "--operation", "extract-units", "--unit-ids", "ns:alpha", "--out-dir", str(output), "--dependency-pack", str(b), "--dependency-pack", str(c)])
+            self.assertEqual(0, code)
+            report = json.loads((output / "composition-dependencies.json").read_text(encoding="utf-8"))
+            self.assertIn("NativeTarget (entity)", report["dependencyNativeReferences"]["third:pack"])
+            self.assertIn("third:pack", stderr.getvalue())
+
     def test_composition_rejects_duplicate_pack_id_even_without_entity_collisions(self) -> None:
         pack = self._pack()
         dependency = SCAFFOLD.generate_scaffold("ns:pack", "beta", stage_slug="sb", ai_slug="ab")
