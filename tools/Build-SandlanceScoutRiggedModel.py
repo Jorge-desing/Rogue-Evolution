@@ -22,7 +22,7 @@ from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_detai
 from mathutils import Vector
 
 UNIT_NAME = "SandlanceScout"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "sandlance-scout.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "sandlance-scout-v2.blend"
 RIGGED_BLEND = REPO_ROOT / "content" / "source-art" / "sandlancescout-rigged.blend"
 MODEL_DIR = (
     REPO_ROOT
@@ -67,8 +67,9 @@ def build_model():
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
-    apply_wave2_details(UNIT_NAME)
-    apply_wave34_details(UNIT_NAME)
+    if not SOURCE_BLEND.name.endswith("-v2.blend"):
+        apply_wave2_details(UNIT_NAME)
+        apply_wave34_details(UNIT_NAME)
     meshes = [
         obj for obj in bpy.context.scene.objects
         if obj.type == "MESH" and not obj.name.lower().startswith("preview")

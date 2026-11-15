@@ -15,7 +15,7 @@ from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_detai
 from mathutils import Vector
 
 UNIT_NAME = "ArachnidHexapod"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "arachnid-hexapod.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "arachnid-hexapod-v2.blend"
 RIGGED_BLEND = REPO_ROOT / "content" / "source-art" / "arachnidhexapod-rigged.blend"
 MODEL_DIR = (
     REPO_ROOT
@@ -154,6 +154,28 @@ def _clear_nla_tracks(armature: bpy.types.Object) -> None:
         armature.animation_data.nla_tracks.remove(track)
 
 
+def _push_export_nla_tracks(
+    armature: bpy.types.Object,
+    actions: dict[str, bpy.types.Action],
+) -> None:
+    """Push named NLA strips for FBX takeNames ('Idle', 'Walk', 'Drive', 'FireRecoil', 'Death').
+
+    Called only after saving RIGGED_BLEND so the saved .blend preserves zero NLA
+    tracks for Blender rig-contract checks while Unity ModelImporter receives the
+    short take names mapped in ArachnidHexapod.fbx.meta.
+    """
+    _clear_nla_tracks(armature)
+    if armature.animation_data is None:
+        armature.animation_data_create()
+    for name in ("Idle", "Drive", "Walk", "FireRecoil", "Death"):
+        act = actions.get(name)
+        if act is None:
+            continue
+        track = armature.animation_data.nla_tracks.new()
+        track.name = f"Track_{name}"
+        track.strips.new(name, 1, act)
+
+
 def _author_idle_leg_rest_pose(armature: bpy.types.Object, idle_action: bpy.types.Action) -> None:
     """Key every leg chain at rest so export cannot retain the prior Walk/Death pose."""
     if armature.animation_data is None:
@@ -189,8 +211,6 @@ def build_arachnid_hexapod_rigged_model() -> None:
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
-    apply_wave2_details(UNIT_NAME)
-    apply_wave34_details(UNIT_NAME)
     meshes = [
         obj for obj in bpy.context.scene.objects
         if obj.type == "MESH" and not obj.name.lower().startswith("preview")
@@ -208,8 +228,12 @@ def build_arachnid_hexapod_rigged_model() -> None:
     _ensure_middle_leg_bones(armature)
     _decouple_leg_chains_from_idle_hull(armature)
     _remove_leg_ik_constraints(armature)
-    rmk.normalize_arachnid_middle_leg_orientation(armature)
-    rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
+    from sample_native_walkers_v2_recipes import apply_arachnid_hexapod_v2
+    apply_arachnid_hexapod_v2(UNIT_NAME, armature=armature)
+    meshes = [
+        obj for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and not obj.name.lower().startswith("preview")
+    ]
     _retarget_leg_attachments(meshes)
     _validate_rigid_weights(meshes, armature)
 
@@ -230,19 +254,14 @@ def build_arachnid_hexapod_rigged_model() -> None:
     # batching/export.
     muzzle_socket = bpy.data.objects.get("Socket_MuzzlePrimary")
     engine_socket = bpy.data.objects.get("Socket_EngineAudio")
-    missing_vertex_color = [
-        obj for obj in meshes
-        if obj.type == "MESH" and obj.data.color_attributes.get("Color") is None
-    ]
-    if missing_vertex_color:
-        rmk.bake_advanced_vertex_shading(
-            missing_vertex_color,
-            wear_level="field_tested",
-            soot_intensity=1.0,
-            exhaust_locs=[Vector(engine_socket.location)] if engine_socket else None,
-            muzzle_loc=Vector(muzzle_socket.location) if muzzle_socket else None,
-            structural_wear_mask=True,
-        )
+    rmk.bake_advanced_vertex_shading(
+        meshes,
+        wear_level="field_tested",
+        soot_intensity=1.0,
+        exhaust_locs=[Vector(engine_socket.location)] if engine_socket else None,
+        muzzle_loc=Vector(muzzle_socket.location) if muzzle_socket else None,
+        structural_wear_mask=True,
+    )
 
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(RIGGED_BLEND))
@@ -257,12 +276,33 @@ def build_arachnid_hexapod_rigged_model() -> None:
     )
     # Refresh the PBR atlas (Albedo, MetallicGloss, Normal, Emission) so the
     # Unity VehiclePBR_VertexWear import matches the rigged mesh.
-    atlas_maps = rmk.bake_pbr_texture_atlas(
+    import os
+    import shutil
+    import time
+    bake_stage_dir = REPO_ROOT / "artifacts" / "bake-staging" / UNIT_NAME
+    if bake_stage_dir.exists():
+        shutil.rmtree(bake_stage_dir, ignore_errors=True)
+    bake_stage_dir.mkdir(parents=True, exist_ok=True)
+    staged_maps = rmk.bake_pbr_texture_atlas(
         batched_meshes,
         prefix=UNIT_NAME,
-        output_dir=TEXTURE_DIR,
+        output_dir=bake_stage_dir,
         resolution=2048,
     )
+    atlas_maps = {}
+    for map_key, src_path in staged_maps.items():
+        dst_path = TEXTURE_DIR / Path(src_path).name
+        tmp_path = dst_path.with_name(dst_path.name + ".tmp")
+        for attempt in range(20):
+            try:
+                shutil.copy2(src_path, tmp_path)
+                os.replace(tmp_path, dst_path)
+                break
+            except OSError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.25)
+        atlas_maps[map_key] = dst_path
     rmk.create_single_material_atlas_model(
         batched_meshes,
         prefix=UNIT_NAME,
@@ -284,6 +324,7 @@ def build_arachnid_hexapod_rigged_model() -> None:
             _sock.location = _loc
     create_canonical_hardpoint_sockets(UNIT_NAME)
     sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
+    _push_export_nla_tracks(armature, actions)
     rmk.export_unity_fbx(
         FBX_PATH,
         list(batched_meshes) + [armature] + sockets,

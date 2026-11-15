@@ -15,7 +15,7 @@ from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_detai
 from mathutils import Vector
 
 UNIT_NAME = "OverlordCommandHQ"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "overlord-command-hq.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "overlord-command-hq-v2.blend"
 RIGGED_BLEND = REPO_ROOT / "content" / "source-art" / "overlordcommandhq-rigged.blend"
 MODEL_DIR = (
     REPO_ROOT
@@ -41,8 +41,9 @@ def build_overlord_command_hq_model() -> None:
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND))
-    apply_wave2_details(UNIT_NAME)
-    apply_wave34_details(UNIT_NAME)
+    if not SOURCE_BLEND.name.endswith("-v2.blend"):
+        apply_wave2_details(UNIT_NAME)
+        apply_wave34_details(UNIT_NAME)
     meshes = [
         obj for obj in bpy.context.scene.objects
         if obj.type == "MESH" and not obj.name.lower().startswith("preview")
@@ -56,8 +57,8 @@ def build_overlord_command_hq_model() -> None:
     armature = rmk.generate_procedural_armature(
         meshes,
         prefix=UNIT_NAME,
-        turret_center=Vector((0.0, 1.32, 1.66)),
-        gun_pivot=Vector((0.0, 1.57, 1.81)),
+        turret_center=Vector((0.0, 1.32, 1.71)),
+        gun_pivot=Vector((0.0, 1.57, 1.91)),
         hull_deck_z=0.92,
         leg_type=None,
         with_ik=False,
@@ -67,16 +68,16 @@ def build_overlord_command_hq_model() -> None:
     _validate_rigid_weights(meshes, armature)
 
     socket_positions = {
-        "Socket_MuzzlePrimary": Vector((0.0, 1.35, 1.45)),
-        "Socket_TurretPivot": Vector((0.0, 1.32, 1.66)),
-        "Socket_TurretPitch": Vector((0.0, 1.57, 1.81)),
-        "Socket_RecoilPrimary": Vector((0.0, 0.9, 1.45)),
+        "Socket_MuzzlePrimary": Vector((0.0, 1.70, 2.21)),
+        "Socket_TurretPivot": Vector((0.0, 1.32, 1.71)),
+        "Socket_TurretPitch": Vector((0.0, 1.57, 1.91)),
+        "Socket_RecoilPrimary": Vector((0.0, 1.00, 2.21)),
         "Socket_DamageSmoke": Vector((0.0, -1.55, 1.5)),
         "Socket_DamageFire": Vector((0.0, -1.24, 1.18)),
         "Socket_GroundCenter": Vector((0.0, 0.0, 0.0)),
         "Socket_GroundContact": Vector((0.0, 0.0, 0.0)),
         "Socket_EngineAudio": Vector((0.0, -1.58, 0.86)),
-        "Socket_WeaponAudio": Vector((0.0, 1.35, 1.45)),
+        "Socket_WeaponAudio": Vector((0.0, 1.70, 2.21)),
     }
     for socket_name, location in socket_positions.items():
         socket = bpy.data.objects.get(socket_name)

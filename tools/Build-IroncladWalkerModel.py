@@ -11,11 +11,14 @@ sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import RogueModelKit as rmk
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
+from ironclad_hatch_hardflow_recipe import apply_ironclad_hatch_fit
+from ironclad_actuator_support_recipe import add_ironclad_actuator_supports
+from ironclad_damper_clearance_recipe import cut_ironclad_damper_clearance
 from mathutils import Vector
 
 
 UNIT_NAME = "IroncladWalker"
-BLEND_PATH = REPO_ROOT / "content" / "source-art" / "ironclad-walker.blend"
+BLEND_PATH = REPO_ROOT / "content" / "source-art" / "ironclad-walker-v2.blend"
 FBX_PATH = (
     REPO_ROOT
     / "unity"
@@ -191,6 +194,13 @@ def build_ironclad_walker_model() -> None:
         objects=builder.objects,
         materials={"armor": armor, "gunmetal": gunmetal, "warning": warning},
     ))
+    import bpy
+    from sample_native_walkers_v2_recipes import apply_ironclad_walker_v2
+    apply_ironclad_walker_v2(UNIT_NAME)
+    for obj in bpy.data.objects:
+        if obj.type == "MESH" and obj.name.startswith(UNIT_NAME) and obj not in builder.objects:
+            builder.objects.append(obj)
+    builder.objects = [o for o in builder.objects if o.name in bpy.data.objects]
 
     diagnostics = rmk.validate_model_mesh_quality(builder.objects)
     bounds = diagnostics["bounds"]

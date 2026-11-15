@@ -21,7 +21,7 @@ from mathutils import Vector
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 UNIT_NAME = "AtlasCraneMech"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "atlas-crane-mech.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "atlas-crane-mech-v2.blend"
 MODEL_DIR = (
     REPO_ROOT
     / "unity"
@@ -50,6 +50,8 @@ def build_model() -> None:
     if len(armatures) != 1:
         raise ValueError(f"AtlasCraneMech: expected exactly one armature, found {len(armatures)}")
     armature = armatures[0]
+    from atlas_damper_clearance_recipe import prepare_atlas_damper_clearance
+    prepare_atlas_damper_clearance(armature)
     # Remove any legacy mis-prefixed duplicate detail objects before validation.
     for stale in list(bpy.data.objects):
         if stale.name.startswith("AtlasArmor_"):
@@ -100,43 +102,22 @@ def build_model() -> None:
         if bpy.data.objects.get(socket_name) is None:
             raise ValueError(f"Expected existing canonical socket {socket_name} in authored source")
 
-    detail_objs = list(apply_wave2_details(
-        UNIT_NAME,
-        objects=meshes,
-        object_prefix="AtlasCraneMech",
-    ))
-    detail_objs.extend(apply_wave34_details(
-        UNIT_NAME,
-        objects=meshes + detail_objs,
-        object_prefix="AtlasCraneMech",
-    ))
-    for detail in detail_objs:
-        if detail.type == "MESH" and not detail.vertex_groups:
-            target_bone = "Bone_TurretYaw" if any(k in detail.name for k in ("AccessHatch", "TrunnionBracket", "Turret_")) else "Bone_Hull"
-            if target_bone not in armature.data.bones:
-                target_bone = "Bone_Hull"
-            vg = detail.vertex_groups.new(name=target_bone)
-            vg.add(list(range(len(detail.data.vertices))), 1.0, "REPLACE")
-            detail.parent = armature
-            mod = next((m for m in detail.modifiers if m.type == "ARMATURE"), None) or detail.modifiers.new(name="Armature", type="ARMATURE")
-            mod.object = armature
-        if detail not in meshes:
-            meshes.append(detail)
+    from sample_native_walkers_v2_recipes import apply_atlas_crane_mech_v2
+    apply_atlas_crane_mech_v2(UNIT_NAME, armature=armature)
+    meshes = [
+        obj for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and not obj.name.lower().startswith("preview")
+    ]
     _validate_rigid_weights(meshes, armature)
 
-    missing_vertex_color = [
-        obj for obj in meshes
-        if obj.type == "MESH" and obj.data.color_attributes.get("Color") is None
-    ]
-    if missing_vertex_color:
-        rmk.bake_advanced_vertex_shading(
-            missing_vertex_color,
-            wear_level="field_tested",
-            soot_intensity=1.0,
-            exhaust_locs=[socket_positions["Socket_EngineAudio"]],
-            muzzle_loc=socket_positions["Socket_MuzzlePrimary"],
-            structural_wear_mask=True,
-        )
+    rmk.bake_advanced_vertex_shading(
+        meshes,
+        wear_level="field_tested",
+        soot_intensity=1.0,
+        exhaust_locs=[socket_positions["Socket_EngineAudio"]],
+        muzzle_loc=socket_positions["Socket_MuzzlePrimary"],
+        structural_wear_mask=True,
+    )
     create_canonical_hardpoint_sockets(UNIT_NAME)
     bpy.context.view_layer.update()
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_BLEND))
@@ -144,7 +125,28 @@ def build_model() -> None:
     batched_meshes = rmk.batch_and_join_by_material(
         meshes, prefix=UNIT_NAME, smooth_by_angle=True, weighted_normals=True, unity_batch_names=True,
     )
-    atlas_maps = rmk.bake_pbr_texture_atlas(batched_meshes, prefix=UNIT_NAME, output_dir=TEXTURE_DIR, resolution=2048)
+    import os
+    import shutil
+    import time
+    bake_stage_dir = REPO_ROOT / "artifacts" / "bake-staging" / UNIT_NAME
+    if bake_stage_dir.exists():
+        shutil.rmtree(bake_stage_dir, ignore_errors=True)
+    bake_stage_dir.mkdir(parents=True, exist_ok=True)
+    staged_maps = rmk.bake_pbr_texture_atlas(batched_meshes, prefix=UNIT_NAME, output_dir=bake_stage_dir, resolution=2048)
+    atlas_maps = {}
+    for map_key, src_path in staged_maps.items():
+        dst_path = TEXTURE_DIR / Path(src_path).name
+        tmp_path = dst_path.with_name(dst_path.name + ".tmp")
+        for attempt in range(20):
+            try:
+                shutil.copy2(src_path, tmp_path)
+                os.replace(tmp_path, dst_path)
+                break
+            except OSError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.25)
+        atlas_maps[map_key] = dst_path
     rmk.create_single_material_atlas_model(
         batched_meshes, prefix=UNIT_NAME, texture_maps=atlas_maps, output_fbx_path=ATLAS_FBX_PATH,
     )

@@ -22,7 +22,7 @@ from mathutils import Vector
 from ActiveUnitVisualEnhancements import apply_wave2_details, apply_wave34_details
 
 UNIT_NAME = "BastionSiegeMech"
-SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "bastion-siege-mech.blend"
+SOURCE_BLEND = REPO_ROOT / "content" / "source-art" / "bastion-siege-mech-v2.blend"
 MODEL_DIR = (
     REPO_ROOT
     / "unity"
@@ -96,32 +96,22 @@ def build_model() -> None:
         if bpy.data.objects.get(socket_name) is None:
             raise ValueError(f"Expected existing canonical socket {socket_name} in authored source")
 
-    meshes.extend(apply_wave2_details(
-        UNIT_NAME,
-        objects=meshes,
-        object_prefix=UNIT_NAME,
-    ))
-    meshes.extend(apply_wave34_details(
-        UNIT_NAME,
-        objects=meshes,
-        object_prefix=UNIT_NAME,
-    ))
-    rmk.assign_rigid_mesh_weights(meshes, prefix=UNIT_NAME, armature_obj=armature, leg_type="quad")
+    from sample_native_walkers_v2_recipes import apply_bastion_siege_mech_v2
+    apply_bastion_siege_mech_v2(UNIT_NAME, armature=armature)
+    meshes = [
+        obj for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and not obj.name.lower().startswith("preview")
+    ]
     _validate_rigid_weights(meshes, armature)
 
-    missing_vertex_color = [
-        obj for obj in meshes
-        if obj.type == "MESH" and obj.data.color_attributes.get("Color") is None
-    ]
-    if missing_vertex_color:
-        rmk.bake_advanced_vertex_shading(
-            missing_vertex_color,
-            wear_level="field_tested",
-            soot_intensity=1.0,
-            exhaust_locs=[socket_positions["Socket_EngineAudio"]],
-            muzzle_loc=socket_positions["Socket_MuzzlePrimary"],
-            structural_wear_mask=True,
-        )
+    rmk.bake_advanced_vertex_shading(
+        meshes,
+        wear_level="field_tested",
+        soot_intensity=1.0,
+        exhaust_locs=[socket_positions["Socket_EngineAudio"]],
+        muzzle_loc=socket_positions["Socket_MuzzlePrimary"],
+        structural_wear_mask=True,
+    )
 
     create_canonical_hardpoint_sockets(UNIT_NAME)
     bpy.context.view_layer.update()

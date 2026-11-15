@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import RogueModelKit as rmk  # noqa: E402
 
 ASSET_ID = "ArachnidHexapodFactory"
-SOURCE_BLEND = ROOT / "content/source-art/arachnidhexapodfactory.blend"
+SOURCE_BLEND = ROOT / "content/source-art/arachnidhexapodfactory-v2.blend"
 MODEL_DIR = ROOT / "unity/RogueCommandAssetAuthoring/Assets/RogueCommandExpansionSample/Models"
 OUTPUT_FBX = MODEL_DIR / f"{ASSET_ID}_LODs.fbx"
 
@@ -57,7 +57,16 @@ def main() -> None:
     source_hash = _sha256(SOURCE_BLEND)
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE_BLEND), load_ui=False)
 
+    from sample_native_walkers_v2_recipes import apply_arachnid_hexapod_factory_v2
+    apply_arachnid_hexapod_factory_v2(ASSET_ID)
+
     meshes = _asset_meshes()
+    rmk.bake_advanced_vertex_shading(
+        meshes,
+        wear_level="field_tested",
+        soot_intensity=1.0,
+        structural_wear_mask=True,
+    )
     source_faces = sum(len(obj.data.polygons) for obj in meshes)
     source_triangles = rmk.count_mesh_triangles(meshes)
     asset_budget = rmk.resolve_geometry_budget(ASSET_ID)
