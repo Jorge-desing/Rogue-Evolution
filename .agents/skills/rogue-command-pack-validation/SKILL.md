@@ -180,3 +180,5 @@ Staged bundle, manifest and content.json creation now uses exclusive guarded han
 Staged manifest reads and bundle comparisons use guarded pack-file handles; the manifest merger accepts bytes so it does not reopen a checked path. Directory creation and publication root stability remain under review.
 
 Windows directory guards require `GENERIC_READ`: a zero-access CreateFile handle did not prevent directory renames despite excluding delete sharing. The guarded pack reader now uses read access. Output-root publication still needs its own handle-based integration.
+
+The composed writer holds its output parent and ancestors through non-reparse directory handles during staging and publication. On Windows GENERIC_READ without delete sharing blocks renaming that parent. POSIX directory handles reject symlinks but publication still uses pathnames, so concurrent ancestor rename protection is not established there.

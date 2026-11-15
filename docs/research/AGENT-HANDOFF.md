@@ -2934,3 +2934,7 @@ An attempted directory-handle guard was rejected: a Windows test renamed the gua
 ## 2026-11-15 — Windows directory sharing correction
 
 A direct Win32 experiment showed directory handles opened with access 0 or FILE_READ_ATTRIBUTES allowed rename despite share mode excluding delete; GENERIC_READ blocked it with WinError 32. `open_pack_file` now opens its directory handles with GENERIC_READ. Focused suite: 26 passed and one symlink privilege skip (27 total). The earlier output-root guard experiment was reverted and still needs integration with this corrected access; do not claim publication root is protected. Full suite visual failures remain open.
+
+## 2026-11-15 — Output parent directory guard
+
+The composed writer holds the output parent and ancestors through non-reparse directory handles throughout staging and publication. On Windows, GENERIC_READ without delete sharing blocks parent rename; the targeted test now passes. POSIX handles reject links but the final rename remains pathname-based and ancestor rename races are not ruled out. Focused suite: 27 passed and one Windows symlink privilege skip (28 total). Internal staging directory creation and cleanup still need review; full-suite visual failures remain open.

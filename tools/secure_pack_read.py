@@ -8,7 +8,7 @@ import stat
 
 
 @contextmanager
-def open_pack_file(root: str | Path, relative: str, *, create: bool = False):
+def open_pack_file(root: str | Path, relative: str, *, create: bool = False, directory: bool = False):
     """Open or exclusively create a pack-relative file without following links."""
     path = PureWindowsPath(relative)
     if not relative or path.anchor or ".." in path.parts or ":" in relative or "\x00" in relative:
@@ -51,6 +51,19 @@ def open_pack_file(root: str | Path, relative: str, *, create: bool = False):
                     raise ctypes.WinError(ctypes.get_last_error())
                 if not info.attributes & 0x10 or info.attributes & 0x400:
                     raise ValueError(f"Directorio no regular o reparse: {current}")
+            if directory:
+                current /= path.parts[-1]
+                handle = create_file(str(current), 0x80000000, 3, None, 3, 0x02200000, None)
+                if handle == ctypes.c_void_p(-1).value:
+                    raise ctypes.WinError(ctypes.get_last_error())
+                handles.append(handle)
+                info = Info()
+                if not query(handle, 9, ctypes.byref(info), ctypes.sizeof(info)):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                if not info.attributes & 0x10 or info.attributes & 0x400:
+                    raise ValueError(f"Directorio no regular o reparse: {current}")
+                yield None
+                return
             file_path = current / path.parts[-1]
             handle = create_file(str(file_path), 0x40000000 if create else 0x80000000,
                             0 if create else 1, None, 1 if create else 3, 0x00200000, None)
@@ -80,6 +93,10 @@ def open_pack_file(root: str | Path, relative: str, *, create: bool = False):
             for part in list(absolute_root.parts[1:]) + list(path.parts[:-1]):
                 current = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current)
                 descriptors.append(current)
+            if directory:
+                descriptors.append(os.open(path.parts[-1], os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=current))
+                yield None
+                return
             flags = (os.O_WRONLY | os.O_CREAT | os.O_EXCL) if create else os.O_RDONLY
             fd = os.open(path.parts[-1], flags | os.O_NOFOLLOW, 0o600, dir_fd=current)
             if not stat.S_ISREG(os.fstat(fd).st_mode):

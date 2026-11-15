@@ -48,6 +48,15 @@ class SecurePackReadTests(unittest.TestCase):
                     pass
             self.assertEqual(b"original", (root / "bundles/a.bundle").read_bytes())
 
+    def test_directory_guard_blocks_rename_on_windows(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "parent").mkdir()
+            with open_pack_file(root, "parent", directory=True):
+                if os.name == "nt":
+                    with self.assertRaises(OSError):
+                        (root / "parent").rename(root / "moved")
+
 
 if __name__ == "__main__":
     unittest.main()

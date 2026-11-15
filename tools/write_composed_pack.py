@@ -52,6 +52,13 @@ def write_composed_pack(pack: dict, bundle_sources: list[tuple[Path, dict]], out
     checked against the content schema and its referenced files.
     """
     output_path = Path(output).absolute()
+    if not output_path.parent.name:
+        raise ValueError("El directorio padre no puede ser la raíz del volumen")
+    with open_pack_file(output_path.parent.parent, output_path.parent.name, directory=True):
+        return _write_guarded(pack, bundle_sources, output_path)
+
+
+def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_path: Path) -> Path:
     if output_path.exists() or output_path.is_symlink():
         raise FileExistsError(f"El destino ya existe: {output_path}")
     if not output_path.parent.is_dir():
