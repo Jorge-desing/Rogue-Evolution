@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import tempfile
@@ -110,6 +111,7 @@ class CompositionEditTests(unittest.TestCase):
             self.assertIn("other:pack", output_text.getvalue())
             report = json.loads((output / "composition-dependencies.json").read_text(encoding="utf-8"))
             self.assertEqual(["other:pack"], report["requiredPackIds"])
+            self.assertEqual(hashlib.sha256((output / "content.json").read_bytes()).hexdigest(), report["contentSha256"])
 
     def test_composition_rejects_duplicate_pack_id_even_without_entity_collisions(self) -> None:
         pack = self._pack()

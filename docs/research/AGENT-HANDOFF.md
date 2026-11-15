@@ -3003,3 +3003,7 @@ Composition now prints the transitive external `packId` dependencies required al
 ## 2026-11-15 — Persist composition dependency report
 
 Composed output now includes `composition-dependencies.json` with the composed pack ID, transitive required external pack IDs and unverified native references. The file is written in staging before publication and is agent-facing; the loader does not enforce it or install dependency packs. Thirty-five focused tests passed. Native catalog verification, output path safety/cleanup and full-suite visual failures remain open.
+
+## 2026-11-15 — Bind composition report to content bytes
+
+The staged composition dependency report now records SHA-256 of the exact `content.json` bytes it accompanies. Agents must compare the hash before using the report; the loader does not enforce it. Thirty-five targeted tests passed. Dependency availability, native catalog, destination safety/cleanup and full-suite acceptance remain open.

@@ -107,9 +107,11 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
             manifest_bytes = manifests[0] if len(manifests) == 1 else merge_bundle_manifests(manifests)
             with open_pack_file(stage, pack["assetBundleManifestPath"], create=True) as output_stream:
                 output_stream.write(manifest_bytes)
+        content_bytes = (json.dumps(pack, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
         with open_pack_file(stage, "content.json", create=True) as output_stream:
-            output_stream.write((json.dumps(pack, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+            output_stream.write(content_bytes)
         if dependency_report is not None:
+            dependency_report = dict(dependency_report, contentSha256=hashlib.sha256(content_bytes).hexdigest())
             with open_pack_file(stage, "composition-dependencies.json", create=True) as output_stream:
                 output_stream.write((json.dumps(dependency_report, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
         errors = validate_pack(str(stage))
