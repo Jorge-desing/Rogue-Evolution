@@ -3145,3 +3145,7 @@ Full Python `all` passed in 36.89 s after conflict import and external ambiguity
 ### Battlefield automation agent context (2026-11-15)
 
 The MCP automation reference now includes `diagnostics_get_battlefield_unit_state` in the read-only wait allowlist and its movement sequence uses `replaceCurrent: true`, consistent with the current schema, handler and skill. The skill entry point points agents to the battlefield wait capability. Automation/context-routing modules passed 27 tests. This corrects agent-facing documentation only; no live game execution was performed.
+
+### Discoverable mixed-plan arguments (2026-11-15)
+
+The MCP schema for `diagnostics_order_battlefield_plan` now describes command-specific `arguments`, making the existing functionality discoverable without guessing fields. Automation/shared modules passed 27 tests, including the compact catalog size check. Server schema changes are reloadable but current client refresh and live gameplay were not verified. Stage content and POSIX safety limitations remain open.
