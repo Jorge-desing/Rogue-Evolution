@@ -26,6 +26,7 @@ class CompositionEditTests(unittest.TestCase):
             output = Path(directory) / "output"
             write_composed_pack(pack, [], output)
             self.assertEqual(pack, json.loads((output / "content.json").read_text(encoding="utf-8")))
+            self.assertFalse(list(Path(directory).glob(".rogue-compose-*")))
             with self.assertRaises(FileExistsError):
                 write_composed_pack(pack, [], output)
             invalid = dict(pack, schemaVersion=999)

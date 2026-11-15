@@ -2954,3 +2954,7 @@ The dependency analyzer now checks unit references against unit definitions and 
 ## 2026-11-15 — Factory and card target dependency types
 
 The cross-pack analyzer now requires `sample:scheduled-base-build` `entityId` to resolve to a production factory and relic/upgrade card-change target and exclusion IDs to resolve to units, matching loader validation. Twenty-nine targeted tests passed; the four-pack dependency report remains resolved. Other generic entity fields, native IDs, destination cleanup and full-suite visual failures remain open.
+
+## 2026-11-15 — Report retained composition copies
+
+After successful data-only composition, the empty staging parent is removed with `rmdir`. When bundle source copies remain or the directory is nonempty, the writer retains it and emits its path as a warning, making the disk usage visible without recursive deletion. Focused suite: 27 passed and one symlink privilege skip (28 total). Ownership-safe cleanup of nonempty copies, destination path race analysis and full-suite visual failures remain open.

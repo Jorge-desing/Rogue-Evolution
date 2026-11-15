@@ -9,6 +9,7 @@ import hashlib
 from pathlib import Path, PureWindowsPath
 import shutil
 import tempfile
+import warnings
 
 from tools.bundle_manifest_dependencies import merge_bundle_manifests
 from tools.pack_bundle_transfer import copy_bundle_transfer, plan_bundle_transfer
@@ -115,6 +116,10 @@ def _write_guarded(pack: dict, bundle_sources: list[tuple[Path, dict]], output_p
         _publish_no_replace(stage, output_path)
     except Exception as exc:
         raise RuntimeError(f"Composición fallida; etapa conservada en {temporary}: {exc}") from exc
-    # After successful publication only the isolated copies remain. Keep them
-    # as well, rather than recursively deleting content that may have changed.
+    # No source copies exist for a data-only pack, so removing the now-empty
+    # staging parent is safe and atomic. Otherwise report the retained copies.
+    try:
+        Path(temporary).rmdir()
+    except OSError:
+        warnings.warn(f"Copias temporales conservadas para inspección: {temporary}", RuntimeWarning)
     return output_path

@@ -188,3 +188,5 @@ Composition creates each staging child while holding its parent directory and ch
 Dependency analysis verifies that unit references resolve to unit definitions and stage AI profile references resolve to profiles; an ID defined only as another kind is reported unresolved. Generic entity references and native unnamespaced IDs still need their own registry-aware checks.
 
 Typed dependency resolution treats `sample:scheduled-base-build` `entityId` as a production factory and card-change `onlyForTheseEntityIds`/`entityIdsNotAllowed` as unit references, matching loader validation. Other generic entity fields still require separate analysis.
+
+After successful data-only composition the empty staging parent is removed with `rmdir`; when source copies remain, the writer reports the retained staging path as a warning. No recursive cleanup occurs.
