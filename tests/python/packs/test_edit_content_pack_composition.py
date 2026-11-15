@@ -40,6 +40,22 @@ class CompositionEditTests(unittest.TestCase):
             self.assertFalse(invalid_output.exists())
             self.assertTrue(list(Path(directory).glob(".rogue-compose-*/pack/content.json")))
 
+    def test_validator_hashes_the_same_manifest_bytes_it_parsed(self) -> None:
+        pack = self._pack()
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "output"
+            report = {"schemaVersion": 1, "packId": pack["packId"]}
+            write_composed_pack(pack, [], output, report)
+            from tools.secure_pack_read import open_pack_file as real_open
+            reads = []
+            def tracking(root, relative, **kwargs):
+                if relative == "content.json":
+                    reads.append(relative)
+                return real_open(root, relative, **kwargs)
+            with patch("tools.validate_content_pack.open_pack_file", side_effect=tracking):
+                self.assertEqual([], validate_pack(str(output)))
+            self.assertEqual(["content.json"], reads)
+
     def test_new_staging_directory_rejects_preexisting_child(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

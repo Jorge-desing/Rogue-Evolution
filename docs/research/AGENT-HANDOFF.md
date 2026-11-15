@@ -3057,3 +3057,7 @@ A scoped share-delete experiment for the stage allowed the long-lived DELETE han
 ### Broad card scope reporting (2026-11-15)
 
 The composition CLI warns about filter-only cards and records `broadFilterCards` in its dependency report, including cards already in the destination. Composition and secure-read modules passed 31 tests with one skip. Windows handle integration remains unresolved; the earlier full-module batch anomaly needs further reproduction.
+
+### Guarded manifest snapshot (2026-11-15)
+
+`validate_pack` now parses guarded manifest bytes and hashes that same snapshot for report freshness instead of reading the manifest twice. Composition/secure-read tests passed 32 tests with one skip. Full Python `all` returned successful in 37.56 s; that run began before this edit, and the affected modules were rerun afterward. Windows stage publication, POSIX races and rollback remain open.

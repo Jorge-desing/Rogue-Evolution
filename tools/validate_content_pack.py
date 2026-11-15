@@ -56,8 +56,10 @@ def validate_pack(pack_dir: str, schema_path: str | None = None) -> list[str]:
         return [f"content.json no encontrado en: {pack_dir}"]
 
     try:
-        data = json.loads(content_json.read_text(encoding="utf-8"))
-    except (ValueError, OSError) as e:
+        with open_pack_file(pack_path, "content.json") as stream:
+            content_bytes = stream.read()
+        data = json.loads(content_bytes.decode("utf-8"))
+    except (ValueError, OSError, UnicodeError) as e:
         return [f"content.json inválido: {e}"]
 
     schema_file = Path(schema_path) if schema_path else SCHEMA_PATH
@@ -79,8 +81,7 @@ def validate_pack(pack_dir: str, schema_path: str | None = None) -> list[str]:
         try:
             with open_pack_file(pack_path, "composition-dependencies.json") as stream:
                 report = json.load(stream)
-            with open_pack_file(pack_path, "content.json") as stream:
-                digest = hashlib.sha256(stream.read()).hexdigest()
+            digest = hashlib.sha256(content_bytes).hexdigest()
             if not isinstance(report, dict) or report.get("schemaVersion") != 1:
                 errors.append("Informe de composición inválido: versión o formato no admitido")
             elif report.get("packId") != data.get("packId") or report.get("contentSha256") != digest:
