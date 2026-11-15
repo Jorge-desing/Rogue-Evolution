@@ -131,3 +131,5 @@ Tests, validaciones de schema y registry: evidencia **local** únicamente. No pr
 For `import-units`, `--rename-conflicts` preserves conflicting selected source AI profiles and stages under deterministic `-import-N` IDs and updates source-stage profile bindings. Batch operations use `"renameConflicts": true`. The CLI prints the mapping; external dependency packs are not rewritten, so review their references. Without the option conflicts fail as before. Unit, factory, building, relic and bundle conflicts are not renamed.
 
 The composition sidecar records successful conflict renames as `renamedIds`, with `sourcePackId`, `aiProfiles`, and `stages`; batch imports record one entry per successful rename-enabled operation. The content hash binds the report to the composed manifest, not to external dependency contents.
+
+If a supplied dependency stage references an original AI profile ID renamed during composition, the CLI aborts before publication: the reference could mean either the destination profile or the incoming renamed one. Resolve the dependency explicitly; external packs are not rewritten.

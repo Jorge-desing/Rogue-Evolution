@@ -252,3 +252,5 @@ The composition CLI also lists filter-only cards in required external packs, inc
 Use `import-units --rename-conflicts` (batch `renameConflicts: true`) to retain selected incoming stage/AI profile definitions with conflicting IDs under deterministic `-import-N` names; source stage bindings follow renamed profiles. Inspect the printed mapping and any external dependencies, which are not rewritten. Other conflict types still fail.
 
 Successful rename-enabled imports persist source pack ID and stage/profile maps in the composition report `renamedIds`, including batch operations. External packs are not rewritten; the sidecar is not an authenticated attestation.
+
+Rename-enabled composition fails before publication if any supplied dependency stage still references an original renamed AI profile ID; its intended target is ambiguous and must be resolved explicitly.

@@ -3133,3 +3133,7 @@ Composition now reports filter-only relics/upgrades in required external depende
 ### Persistent conflict mappings (2026-11-15)
 
 The composition sidecar now records successful rename-enabled imports in `renamedIds`, including source pack ID and AI/stage ID maps for direct and batch operations. Composition module passed 37 tests. External packs are not rewritten, the report is not authenticated, and Windows post-hash/POSIX safety limitations remain.
+
+### External profile ambiguity (2026-11-15)
+
+When a supplied dependency stage references an original AI profile ID renamed during import, composition now aborts before publishing rather than silently binding it to the existing destination profile. Resolve the external pack explicitly. Composition/dependency modules passed 50 tests; the final edit only ignores malformed non-string IDs in this ambiguity scan. Windows post-hash and POSIX publication/rollback remain open.

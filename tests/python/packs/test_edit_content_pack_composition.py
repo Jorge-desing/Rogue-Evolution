@@ -396,6 +396,16 @@ class CompositionEditTests(unittest.TestCase):
             self.assertIn(mappings["aiProfiles"][old_profile], text_out.getvalue())
             report = json.loads((output / "composition-dependencies.json").read_text(encoding="utf-8"))
             self.assertEqual({"sourcePackId": "other:pack", **mappings}, report["renamedIds"][0])
+            dependency = SCAFFOLD.generate_scaffold("third:pack", "gamma", stage_slug="sc", ai_slug="ac")
+            dependency["stages"][0]["aiProfileIds"] = [old_profile]
+            dependency_file = root / "dependency.json"
+            dependency_file.write_text(json.dumps(dependency), encoding="utf-8")
+            ambiguous_output = root / "ambiguous"
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as errors_out:
+                code = EDIT.main(["--pack", str(dest_file), "--operation", "import-units", "--source-pack", str(source_file), "--unit-ids", "other:beta", "--out-dir", str(ambiguous_output), "--rename-conflicts", "--dependency-pack", str(dependency_file)])
+            self.assertEqual(1, code)
+            self.assertIn("referencias ambiguas", errors_out.getvalue())
+            self.assertFalse(ambiguous_output.exists())
 
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()

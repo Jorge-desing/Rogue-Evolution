@@ -2217,6 +2217,18 @@ def main(argv: list[str] | None = None) -> int:
                 print(dependency_error, file=sys.stderr)
                 return 2
             packs[f"dependency-{index}"] = dependency
+        renamed_profiles = {old for mapping in composition_mappings for old in mapping["aiProfiles"]}
+        for name, dependency in packs.items():
+            if name == "composed":
+                continue
+            ambiguous_profiles = sorted({profile_id for stage in _as_list(dependency.get("stages"))
+                                         if isinstance(stage, dict)
+                                         for profile_id in _as_list(stage.get("aiProfileIds"))
+                                         if isinstance(profile_id, str) and profile_id in renamed_profiles})
+            if ambiguous_profiles:
+                print(f"{name}: referencias ambiguas a perfiles renombrados: {', '.join(ambiguous_profiles)}; "
+                      "revise explícitamente el pack de dependencia", file=sys.stderr)
+                return 1
         seen = set()
         pack_ids = set()
         for name, dependency in packs.items():
