@@ -208,3 +208,5 @@ Dependency analysis also reports native `copyUpgradesToEntityId` and upgrade/rel
 Composition carries referenced standalone buildings in its local closure, includes their bundle declarations during import and rejects conflicting destination definitions. Other reference families and destination race protection still require review.
 
 Composition rejects overlapping selected unit, factory and standalone-building IDs, as well as factories shared by multiple selected units, before emitting a pack.
+
+Composition selects relics and upgrades whose card changes explicitly target selected units or factories, closes over their referenced entities and bundles, and rejects conflicting card definitions. Role-, side-, and other filter-only card effects are not automatically associated with units; review these manually.

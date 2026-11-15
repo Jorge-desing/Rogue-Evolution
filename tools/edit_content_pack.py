@@ -878,12 +878,14 @@ def apply_edits(
     return current, all_diagnostics
 
 
-def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set[str], set[str], set[str]]:
+def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set[str], set[str], set[str], set[str], set[str]]:
     """Compute local unit/stage/profile/building dependencies until no new IDs are found."""
     units = _unit_index(pack)
     factories = {_entity_key(unit.get("productionBuilding")): uid for uid, unit in units.items()
                  if isinstance(unit.get("productionBuilding"), dict)}
     buildings = {_entity_key(row): row for row in _as_list(pack.get("buildings")) if _entity_key(row)}
+    relics = {_entity_key(row): row for row in _as_list(pack.get("relics")) if _entity_key(row)}
+    upgrades = {_entity_key(row): row for row in _as_list(pack.get("upgrades")) if _entity_key(row)}
     stages = {_entity_key(row): row for row in _as_list(pack.get("stages")) if _entity_key(row)}
     profiles = {_entity_key(row): row for row in _as_list(pack.get("aiProfiles")) if _entity_key(row)}
     if not isinstance(unit_ids, list) or not unit_ids or any(not isinstance(uid, str) or uid not in units for uid in unit_ids):
@@ -902,9 +904,15 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
                 yield from strings(child)
 
     selected_units, selected_stages, selected_profiles, selected_buildings = set(unit_ids), set(), set(), set()
+    selected_relics, selected_upgrades = set(), set()
     while True:
-        previous = (len(selected_units), len(selected_stages), len(selected_profiles), len(selected_buildings))
+        previous = (len(selected_units), len(selected_stages), len(selected_profiles), len(selected_buildings), len(selected_relics), len(selected_upgrades))
         selected_entity_ids = selected_units | {fid for fid, uid in factories.items() if uid in selected_units and fid}
+        for catalog, selected in ((relics, selected_relics), (upgrades, selected_upgrades)):
+            for card_id, card in catalog.items():
+                if any(set(_as_list(change.get("onlyForTheseEntityIds"))) & selected_entity_ids
+                       for change in _as_list(card.get("cardChanges")) if isinstance(change, dict)):
+                    selected.add(card_id)
         for pid, profile in profiles.items():
             if set(strings(profile)) & selected_entity_ids:
                 selected_profiles.add(pid)
@@ -913,7 +921,8 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
             if refs & (selected_units | selected_profiles):
                 selected_stages.add(sid)
         rows = ([units[uid] for uid in selected_units] + [stages[sid] for sid in selected_stages] +
-                [profiles[pid] for pid in selected_profiles] + [buildings[bid] for bid in selected_buildings])
+                [profiles[pid] for pid in selected_profiles] + [buildings[bid] for bid in selected_buildings] +
+                [relics[rid] for rid in selected_relics] + [upgrades[uid] for uid in selected_upgrades])
         for row in rows:
             for ref in strings(row):
                 if ref in units:
@@ -924,7 +933,7 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
                     selected_profiles.add(ref)
                 if ref in buildings:
                     selected_buildings.add(ref)
-        if previous == (len(selected_units), len(selected_stages), len(selected_profiles), len(selected_buildings)):
+        if previous == (len(selected_units), len(selected_stages), len(selected_profiles), len(selected_buildings), len(selected_relics), len(selected_upgrades)):
             factory_ids = [_entity_key(units[uid].get("productionBuilding")) for uid in selected_units]
             factory_ids = [fid for fid in factory_ids if fid]
             if len(factory_ids) != len(set(factory_ids)):
@@ -933,7 +942,7 @@ def _composition_closure(pack: dict, unit_ids: list[str]) -> tuple[set[str], set
             overlap = (selected_units & selected_factories) | (selected_units & selected_buildings) | (selected_factories & selected_buildings)
             if overlap:
                 raise ValueError("IDs de entidades de distinto tipo en conflicto: " + ", ".join(sorted(overlap)))
-            return selected_units, selected_stages, selected_profiles, selected_buildings
+            return selected_units, selected_stages, selected_profiles, selected_buildings, selected_relics, selected_upgrades
 
 
 def extract_units_to_pack(
@@ -960,7 +969,7 @@ def extract_units_to_pack(
         extracted["schemaVersion"] = source["schemaVersion"]
 
     try:
-        wanted, stage_ids, profile_ids, building_ids = _composition_closure(source, unit_ids)
+        wanted, stage_ids, profile_ids, building_ids, relic_ids, upgrade_ids = _composition_closure(source, unit_ids)
     except ValueError as exc:
         return {}, [str(exc)]
     extracted["units"] = [
@@ -983,6 +992,9 @@ def extract_units_to_pack(
             profiles.append(profile)
     extracted["aiProfiles"] = profiles
     extracted["buildings"] = [row for row in _as_list(source.get("buildings")) if _entity_key(row) in building_ids]
+
+    for section, ids in (("relics", relic_ids), ("upgrades", upgrade_ids)):
+        extracted[section] = [row for row in _as_list(source.get(section)) if _entity_key(row) in ids]
 
     # bundles: only those whose produced units are extracted
     # (keep assetBundles empty unless units declare assetBundleId)
@@ -1010,7 +1022,7 @@ def import_units(
 
     src_index = _unit_index(src)
     try:
-        closure_units, closure_stages, closure_profiles, closure_buildings = _composition_closure(src, unit_ids)
+        closure_units, closure_stages, closure_profiles, closure_buildings, closure_relics, closure_upgrades = _composition_closure(src, unit_ids)
     except ValueError as exc:
         return updated, [str(exc)]
     unit_ids = [uid for uid in src_index if uid in closure_units]
@@ -1064,6 +1076,9 @@ def import_units(
         if uid in existing_buildings:
             diagnostics.append(f"entity: conflicto con edificio existente '{uid}'")
 
+    relics = [row for row in _as_list(src.get("relics")) if _entity_key(row) in closure_relics]
+    upgrades = [row for row in _as_list(src.get("upgrades")) if _entity_key(row) in closure_upgrades]
+
     def bundle_refs(value):
         if isinstance(value, dict):
             for key, child in value.items():
@@ -1074,7 +1089,7 @@ def import_units(
             for child in value:
                 yield from bundle_refs(child)
 
-    needed_bundles = set(bundle_refs(to_import + stages + profiles + buildings))
+    needed_bundles = set(bundle_refs(to_import + stages + profiles + buildings + relics + upgrades))
     source_bundles = {_entity_key(bundle): bundle for bundle in _as_list(src.get("assetBundles")) if _entity_key(bundle)}
     destination_bundles = {_entity_key(bundle): bundle for bundle in _as_list(updated.get("assetBundles")) if _entity_key(bundle)}
     for bundle_id in sorted(needed_bundles):
@@ -1094,7 +1109,7 @@ def import_units(
                 diagnostics.append(f"bundle '{bundle_id}' tiene contenido distinto en el pack destino")
         needed_bundles = set(source_bundles)
 
-    for section, incoming in (("stages", stages), ("aiProfiles", profiles), ("buildings", buildings)):
+    for section, incoming in (("stages", stages), ("aiProfiles", profiles), ("buildings", buildings), ("relics", relics), ("upgrades", upgrades)):
         existing_rows = {_entity_key(row): row for row in _as_list(updated.get(section)) if _entity_key(row)}
         for row in incoming:
             key = _entity_key(row)
@@ -1107,7 +1122,7 @@ def import_units(
         return updated, diagnostics
 
     updated.setdefault("units", []).extend(json.loads(json.dumps(to_import)))
-    for section, incoming in (("stages", stages), ("aiProfiles", profiles), ("buildings", buildings)):
+    for section, incoming in (("stages", stages), ("aiProfiles", profiles), ("buildings", buildings), ("relics", relics), ("upgrades", upgrades)):
         existing_ids = {_entity_key(row) for row in _as_list(updated.get(section)) if _entity_key(row)}
         for row in incoming:
             if _entity_key(row) not in existing_ids:

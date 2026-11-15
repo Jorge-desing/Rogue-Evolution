@@ -155,6 +155,25 @@ class CompositionEditTests(unittest.TestCase):
         self.assertEqual({}, extracted)
         self.assertTrue(any("conflicto" in error for error in errors))
 
+    def test_composition_carries_explicit_unit_cards_and_dependencies(self) -> None:
+        source = self._pack()
+        extra = SCAFFOLD.generate_scaffold("ns:other", "beta")
+        source["units"].extend(extra["units"])
+        source["relics"] = [{"id": "ns:relic", "cardChanges": [{"onlyForTheseEntityIds": ["ns:alpha", "ns:beta"]}]}]
+        source["upgrades"] = [{"id": "ns:upgrade", "cardChanges": [{"onlyForTheseEntityIds": ["ns:alpha"]}]}]
+        extracted, errors = EDIT.extract_units_to_pack(source, ["ns:alpha"])
+        self.assertEqual([], errors)
+        self.assertEqual({"ns:alpha", "ns:beta"}, {row["id"] for row in extracted["units"]})
+        self.assertEqual("ns:relic", extracted["relics"][0]["id"])
+        destination = SCAFFOLD.generate_scaffold("other:pack", "gamma", stage_slug="sc", ai_slug="ac")
+        imported, errors = EDIT.import_units(destination, source, ["ns:alpha"])
+        self.assertEqual([], errors)
+        self.assertEqual("ns:upgrade", imported["upgrades"][0]["id"])
+        destination["relics"] = [{"id": "ns:relic", "cardChanges": []}]
+        unchanged, errors = EDIT.import_units(destination, source, ["ns:alpha"])
+        self.assertTrue(errors)
+        self.assertEqual(destination, unchanged)
+
     def test_extract_units_to_pack(self) -> None:
         pack = self._pack()
         extracted, diagnostics = EDIT.extract_units_to_pack(pack, ["ns:alpha"])

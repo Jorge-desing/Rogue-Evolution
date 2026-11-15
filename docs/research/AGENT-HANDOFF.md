@@ -3029,3 +3029,7 @@ Extraction and import now include locally referenced standalone buildings and th
 Composition rejects collisions between selected units, production factories and standalone buildings, including duplicate factory IDs. The dependency and composition modules passed 34 tests; see the full-suite result separately. Destination security and the remaining reference audit remain open.
 
 Full Python acceptance was run with `python -m tools.run_python_tests` in `all` mode and returned `successful: true` (47.28 s; `artifacts/python-tests/report.json`). It started before the final identity guard was edited; the affected dependency and composition modules were rerun afterward and passed 34 tests.
+
+### Explicit card composition (2026-11-15)
+
+Extraction/import carries relics and upgrades with `cardChanges.onlyForTheseEntityIds` targeting selected units/factories, closes their dependencies and bundles, and rejects conflicting card definitions. The targeted dependency/composition modules passed 35 tests. Filter-only cards are not selected automatically; destination races, rollback and remaining references still need review.
