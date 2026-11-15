@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from tests.python.helpers import load_tool_module
 
@@ -46,12 +51,36 @@ class CompositionEditTests(unittest.TestCase):
         ]
         pack["stages"][0]["aiProfileIds"].append("ns:ghost-profile")
 
-        updated, cleared = EDIT.purge_dangling_references(pack)
+        pack["aiProfiles"][0]["productionBuildingEntries"] = [{"unitId": "other:valid"}, {"unitId": "ns:ghost"}]
+        pack["stages"][0]["blueprintPoolEntries"][0]["unitIds"].append("PCXBaseTank")
+        unchanged, cleared_empty = EDIT.purge_dangling_references(pack)
+        self.assertEqual(pack, unchanged)
+        self.assertEqual([], cleared_empty)
+        updated, cleared = EDIT.purge_dangling_references(pack, ["ns:ghost"], ["ns:ghost-profile"])
         # ghost purged
         self.assertNotIn("ns:ghost", updated["stages"][0]["unitIds"])
         self.assertNotIn("ns:ghost", updated["stages"][0]["blueprintPoolEntries"][0]["unitIds"])
         self.assertNotIn("ns:ghost-profile", updated["stages"][0]["aiProfileIds"])
         self.assertIn("ns:ghost", cleared)
+        self.assertEqual([{"unitId": "other:valid"}], updated["aiProfiles"][0]["productionBuildingEntries"])
+        self.assertIn("PCXBaseTank", updated["stages"][0]["blueprintPoolEntries"][0]["unitIds"])
+        batched, diagnostics = EDIT.apply_edits(pack, [{"op": "purge-dangling", "unitIds": ["ns:ghost"], "profileIds": ["ns:ghost-profile"]}])
+        self.assertEqual(updated, batched)
+        self.assertTrue(diagnostics)
+
+    def test_purge_dangling_cli_uses_explicit_ids(self) -> None:
+        pack = self._pack()
+        pack["stages"][0]["unitIds"].extend(["ns:ghost", "other:valid"])
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "content.json"
+            source.write_text(json.dumps(pack), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                result = EDIT.main(["--pack", str(source), "--operation", "purge-dangling",
+                                    "--dangling-unit-ids", "ns:ghost", "--dry-run"])
+            self.assertEqual(0, result)
+            self.assertIn('"other:valid"', output.getvalue())
+            self.assertNotIn('"ns:ghost"', output.getvalue())
+            self.assertEqual(pack, json.loads(source.read_text(encoding="utf-8")))
 
     def test_rename_stage_and_profile(self) -> None:
         pack = self._pack()

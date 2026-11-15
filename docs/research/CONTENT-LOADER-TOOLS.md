@@ -83,7 +83,7 @@ Descubrimiento: `--operations-json` imprime el catálogo completo (JSON) y sale 
 
 **Bundles** · `add-bundle`/`remove-bundle` (bundleId)
 
-**Composición** · `extract-units` (unitIds) · `import-units` (source, unitIds) · `purge-dangling` (elimina refs colgantes)
+**Composición** · `extract-units` (unitIds) · `import-units` (source, unitIds) · `purge-dangling` (referencias a IDs explícitamente confirmados como inválidos). El CLI acepta `--dangling-unit-ids` y `--dangling-profile-ids`; en batch usa `unitIds` y `profileIds`. Sin listas no elimina referencias. Los IDs declarados en el pack se conservan; el agente debe resolver referencias nativas y de otros packs antes de señalar un ID como inválido. Se limpian etapas, pools, entradas AI y objetivos de sinergia. Si un pool queda vacío, revísalo antes de guardar un pack válido.
 
 **Identity** · `set-pack-id` (newId) · `set-schema-version` (version — solo 1)
 

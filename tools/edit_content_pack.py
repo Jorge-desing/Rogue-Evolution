@@ -86,7 +86,7 @@ def operations_catalog() -> list[dict]:
         {"op": "remove-bundle", "summary": "Elimina AssetBundle", "args": ["bundleId"]},
         {"op": "extract-units", "summary": "Extrae unidades a un pack nuevo", "args": ["unitIds"]},
         {"op": "import-units", "summary": "Importa unidades de otro pack", "args": ["source", "unitIds"]},
-        {"op": "purge-dangling", "summary": "Elimina referencias colgantes", "args": []},
+        {"op": "purge-dangling", "summary": "Elimina referencias a IDs confirmados como inválidos", "args": ["unitIds", "profileIds"]},
         {"op": "set-pack-id", "summary": "Fija packId (namespace:local)", "args": ["newId"]},
         {"op": "set-schema-version", "summary": "Fija schemaVersion (solo 1)", "args": ["version"]},
     ]
@@ -850,6 +850,9 @@ def apply_edits(
                 current, d = set_pack_id(current, op.get("newId", ""))
             elif name == "set-schema-version":
                 current, d = set_schema_version(current, op.get("version"))
+            elif name == "purge-dangling":
+                current, removed = purge_dangling_references(current, op.get("unitIds", []), op.get("profileIds", []))
+                d = [f"referencia eliminada: {value}" for value in removed]
             else:
                 d = [f"op desconocida '{name}'"]
         except Exception as exc:  # keep the batch running per-op
@@ -987,30 +990,44 @@ def import_units(
     return updated, []
 
 
-def purge_dangling_references(pack: dict) -> tuple[dict, list[str]]:
-    """Elimina referencias a entidades no definidas (auto-sanación).
+def purge_dangling_references(pack: dict, unit_ids: list[str] | None = None,
+                              profile_ids: list[str] | None = None) -> tuple[dict, list[str]]:
+    """Elimina referencias a IDs explícitamente identificados como inválidos.
 
     Devuelve ``(pack, cleared)`` donde ``cleared`` lista los IDs eliminados.
     """
     updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
-    known_units = set(_unit_index(updated))
-    known_factories = set(_factory_index(updated))
-    known_profiles = {
+    if any(not isinstance(ids, (list, type(None))) for ids in (unit_ids, profile_ids)):
+        raise ValueError("unitIds y profileIds deben ser listas de strings")
+    if any(not isinstance(value, str) or not value.strip() for ids in (unit_ids or [], profile_ids or []) for value in ids):
+        raise ValueError("Los IDs deben ser strings no vacíos")
+    remove_units = set(unit_ids or []) - set(_unit_index(updated))
+    remove_profiles = set(profile_ids or []) - {
         _entity_key(p) for p in _as_list(updated.get("aiProfiles")) if isinstance(p, dict)
     }
     cleared: list[str] = []
+
+    for unit in _as_list(updated.get("units")):
+        if not isinstance(unit, dict):
+            continue
+        for synergy in _as_list(unit.get("synergies")):
+            if not isinstance(synergy, dict) or not isinstance(synergy.get("targetUnitIds"), list):
+                continue
+            ids = synergy["targetUnitIds"]
+            cleared.extend(value for value in ids if isinstance(value, str) and value in remove_units)
+            synergy["targetUnitIds"] = [value for value in ids if not isinstance(value, str) or value not in remove_units]
 
     for stage in _as_list(updated.get("stages")):
         if not isinstance(stage, dict):
             continue
         for key in ("unitIds", "aiProfileIds"):
-            ids = stage.get(key, [])
+            ids = stage.get(key)
             if not isinstance(ids, list):
                 continue
-            known = known_units if key == "unitIds" else known_profiles
+            remove = remove_units if key == "unitIds" else remove_profiles
             kept = []
             for value in ids:
-                if isinstance(value, str) and value not in known:
+                if isinstance(value, str) and value in remove:
                     cleared.append(value)
                 else:
                     kept.append(value)
@@ -1018,12 +1035,12 @@ def purge_dangling_references(pack: dict) -> tuple[dict, list[str]]:
         for pool in _as_list(stage.get("blueprintPoolEntries")):
             if not isinstance(pool, dict):
                 continue
-            ids = pool.get("unitIds", [])
+            ids = pool.get("unitIds")
             if not isinstance(ids, list):
                 continue
             kept = []
             for value in ids:
-                if isinstance(value, str) and value not in known_units:
+                if isinstance(value, str) and value in remove_units:
                     cleared.append(value)
                 else:
                     kept.append(value)
@@ -1042,7 +1059,7 @@ def purge_dangling_references(pack: dict) -> tuple[dict, list[str]]:
                     kept.append(entry)
                     continue
                 scalar = entry.get("unitId")
-                if isinstance(scalar, str) and scalar not in known_units:
+                if isinstance(scalar, str) and scalar in remove_units:
                     cleared.append(scalar)
                     continue
                 kept.append(entry)
@@ -1541,7 +1558,7 @@ def main(argv: list[str] | None = None) -> int:
             "add-bundle", "remove-bundle", "duplicate-unit",
             "add-upgrade", "remove-upgrade", "set-upgrade-field",
             "set-upgrade-card-change", "set-landscape", "set-unit-assets",
-            "set-pack-id", "set-schema-version",
+            "set-pack-id", "set-schema-version", "purge-dangling",
             "batch",
         ],
         required=False,
@@ -1601,6 +1618,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--card-image", help="cardImageAssetName (set-unit-assets)")
     parser.add_argument("--new-pack-id", help="Nuevo packId (set-pack-id)")
     parser.add_argument("--schema-version", help="Versión de schema (set-schema-version)")
+    parser.add_argument("--dangling-unit-ids", nargs="*", default=[], help="IDs de unidad confirmados inválidos")
+    parser.add_argument("--dangling-profile-ids", nargs="*", default=[], help="IDs de perfil confirmados inválidos")
     parser.add_argument("--script", help="Ruta a un script JSON de operaciones (batch)")
     parser.add_argument("--operations-json", action="store_true",
                         help="Imprime el catálogo de operaciones (JSON) y sale")
@@ -1898,6 +1917,9 @@ def main(argv: list[str] | None = None) -> int:
         except ValueError:
             version = args.schema_version
         updated, diagnostics = set_schema_version(pack, version)
+    elif args.operation == "purge-dangling":
+        updated, removed = purge_dangling_references(pack, args.dangling_unit_ids, args.dangling_profile_ids)
+        diagnostics = [f"referencia eliminada: {value}" for value in removed]
     elif args.operation == "batch":
         if not args.script:
             print("--script es obligatorio para batch", file=sys.stderr)

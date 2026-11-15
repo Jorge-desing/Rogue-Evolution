@@ -134,3 +134,5 @@ The scaffold statistics localization and AI-module assertions share one `pack_st
 Unit-catalog scaffold count and JSON-serializability checks share one exported report; keep both checks when consolidating their identical input scenario.
 
 Scope exact-body duplicate scans to discoverable test methods. Identical `pass` bodies nested inside a test fixture may deliberately produce different outcomes through skip decorators or fixture setup; retain them when they exercise distinct runner states.
+
+`purge-dangling` in the pack editor requires explicit confirmed-invalid `unitIds` and `profileIds` (CLI: `--dangling-unit-ids`, `--dangling-profile-ids`); an empty selection removes nothing. Resolve native and cross-pack IDs first, and inspect emptied blueprint pools before writing.
