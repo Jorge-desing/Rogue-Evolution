@@ -198,7 +198,7 @@ class StateWaitTests(unittest.TestCase):
         spec = next(tool for tool in SERVER.TOOLS if tool["name"] == "automation_wait_for_state")
         self.assertEqual(set(spec["inputSchema"]["properties"]["tool"]["enum"]), SERVER.WAIT_STATE_TOOLS)
         canonical = [tool for tool in SERVER.TOOLS if not tool["description"].startswith("Alias for")]
-        self.assertEqual(len(canonical), 234)
+        self.assertEqual(len(canonical), 235)
         self.assertLess(len(json.dumps({"tools": canonical}, separators=(",", ":")).encode("utf-8")), 91000)
 
     def test_battlefield_sequence_dispatches_once_and_waits_for_arrival(self):
@@ -225,6 +225,37 @@ class StateWaitTests(unittest.TestCase):
                 "entityKeyId": "42", "destinationX": 30, "destinationZ": 40, "replaceCurrent": True})
             self.assertFalse(result.get("isError", False))
             call.assert_called_once_with("OrderUnitMoveJson", ["42", 30.0, 40.0, True])
+
+    def test_mixed_battlefield_plan_is_sent_in_one_bridge_call(self):
+        orders = [
+            {"commandType": "FormationMove", "entityKeyIds": ["11", "12"],
+             "arguments": {"formationType": "Wedge", "targetX": 20, "targetZ": 35}},
+            {"commandType": "CoordinatedAssault", "entityKeyIds": ["13", "14"],
+             "arguments": {"targetEntityKeyId": "90", "maxAttackers": 2}},
+            {"commandType": "ActiveSkill", "entityKeyIds": ["15"],
+             "arguments": {"targetX": 24, "targetZ": 33}},
+        ]
+        with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{"success":true,"completeOrderCount":3}') as call:
+            response = SERVER.execute_tool("diagnostics_order_battlefield_plan", {"orders": orders})
+        self.assertFalse(response.get("isError", False))
+        call.assert_called_once_with(
+            "OrderBattlefieldPlanJson",
+            [json.dumps(orders, separators=(",", ":"), ensure_ascii=False)],
+        )
+
+    def test_battlefield_plan_schema_bounds_orders_and_keeps_each_command_typed(self):
+        spec = next(tool for tool in SERVER.TOOLS if tool["name"] == "diagnostics_order_battlefield_plan")
+        orders_schema = spec["inputSchema"]["properties"]["orders"]
+        self.assertEqual((1, 16), (orders_schema["minItems"], orders_schema["maxItems"]))
+        item_schema = orders_schema["items"]
+        self.assertEqual(14, len(item_schema["properties"]["commandType"]["enum"]))
+        self.assertEqual(["commandType", "entityKeyIds"], item_schema["required"])
+        self.assertEqual("object", item_schema["properties"]["arguments"]["type"])
+        with mock.patch.object(SERVER, "_call_diagnostics_method") as call:
+            response = SERVER.execute_tool("diagnostics_order_battlefield_plan", {
+                "orders": [{"commandType": "Teleport", "entityKeyIds": ["11"]}]})
+            self.assertTrue(response["isError"])
+            call.assert_not_called()
 
     def test_local_wait_timeout_stops_sequence_before_outer_budget(self):
         with mock.patch.object(SERVER, "_call_diagnostics_method", return_value='{}') as call:
@@ -266,7 +297,7 @@ class StateWaitTests(unittest.TestCase):
     def test_skill_examples_validate_and_slider_recipe_runs_with_typed_refs(self):
         doc = REPO_ROOT / ".agents/skills/rogue-command-bepinex-mcp/references/automation.md"
         examples = [json.loads(block) for block in re.findall(r"```json\n(.*?)\n```", doc.read_text(encoding="utf-8"), re.S)]
-        self.assertEqual(len(examples), 4)
+        self.assertEqual(len(examples), 5)
         for example in examples:
             self.assertIsNone(SERVER._validate_tool_arguments(example["tool"], example["arguments"]))
         candidate = {"hierarchyPath": "MainMenu::/Canvas/Options/Slider", "gameObjectId": 23, "value": 0.25}

@@ -1933,6 +1933,14 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
             res = _call_diagnostics_method("OrderGroupCommandCsvJson", [keys_csv, cmd_type, x, z])
             return _tool_response(res)
 
+        elif name == "diagnostics_order_battlefield_plan":
+            try:
+                orders_json = json.dumps(arguments["orders"], separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+            except (KeyError, TypeError, ValueError) as exc:
+                return _tool_response(json.dumps({"success": False, "error": "Battlefield orders must be valid finite JSON: " + str(exc)}), True)
+            res = _call_diagnostics_method("OrderBattlefieldPlanJson", [orders_json])
+            return _tool_response(res)
+
         elif name == "diagnostics_order_formation_move":
             keys = arguments.get("entityKeyIds") or []
             f_type = str(arguments.get("formationType", "Line"))

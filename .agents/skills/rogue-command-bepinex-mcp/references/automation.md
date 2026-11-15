@@ -45,6 +45,35 @@ The census exposes `value` as a number for sliders. Inspect `controlType`, `minV
 
 ## Battlefield orders
 
+### Mixed plans from an external agent
+
+Use `diagnostics_order_battlefield_plan` when one tactical turn assigns different orders to different units. First read `diagnostics_get_battlefield_census` or `diagnostics_get_ai_roster` and use the current `runtimeEntityKeyId` values. Every order has `commandType`, an `entityKeyIds` array, and optional `arguments` containing command-specific fields; give single-unit commands exactly one key. A plan contains 1–16 orders and at most 32 distinct player units. A unit may receive only one order in a plan, which avoids conflicting commands being inserted into the native queue.
+
+Supported order shapes:
+
+| `commandType` | Required `arguments` fields | Optional `arguments` fields |
+| --- | --- | --- |
+| `Move` | `targetX`, `targetZ` | `replaceCurrent` |
+| `Attack` | `targetEntityKeyId` | — |
+| `AttackMove` | `targetX`, `targetZ` | — |
+| `Stop`, `HoldPosition`, `GroupStop`, `GroupHoldPosition` | — | — |
+| `GroupMove`, `GroupAttackMove` | `targetX`, `targetZ` | — |
+| `FormationMove` | `formationType`, `targetX`, `targetZ` | `spacing` (default 4 m) |
+| `ActiveSkill` | — | `targetEntityKeyId` **or** paired `targetX`/`targetZ`; omit all targets for native self skills |
+| `CoordinatedAssault` | `targetEntityKeyId` | `maxAttackers` (1–16, default 16) |
+| `Retreat` | `threatX`, `threatZ`, `distance` | — |
+| `Patrol` | parallel `waypointX` and `waypointZ` arrays (1–8 points) | — |
+
+The dispatcher requires the active `Game` scene, resolves every actor uniquely, and rejects the plan before dispatch if an actor is missing, ambiguous, destroyed, not a player-controlled unit, or reused by another order. `Attack` and `CoordinatedAssault` also require a live hostile target. Native dispatch follows the plan order in one Unity-thread callback. The response includes an item for each command and separates `accepted`, `complete`, and `partial`; if a native command fails after dispatch begins, later independent orders still run and earlier orders cannot be rolled back. Inspect `dispatchResult` and the plan counts before deciding what to replan.
+
+This is a one-shot command surface, not a game-side autopilot. The outside agent owns the observe → decide → dispatch → observe loop. Use fresh battlefield state after each plan; use `automation_run_sequence` when later commands depend on arrival, health, mana, or another changing condition. Do not put two orders for the same unit in one plan to simulate a queue; use the native order sequence and state waits instead.
+
+Example mixed order call (replace every key and coordinate with current live values):
+
+```json
+{"tool":"diagnostics_order_battlefield_plan","arguments":{"orders":[{"commandType":"FormationMove","entityKeyIds":["101","102"],"arguments":{"formationType":"Wedge","targetX":20,"targetZ":35}},{"commandType":"CoordinatedAssault","entityKeyIds":["103","104"],"arguments":{"targetEntityKeyId":"201","maxAttackers":2}},{"commandType":"ActiveSkill","entityKeyIds":["105"],"arguments":{"targetX":22,"targetZ":33}}]}}
+```
+
 Movement orders accept optional `replaceCurrent: true` to revise a unit's current destination using native `ExecuteAndCancelCurrentCommand`. Pending native orders stay in the chain. Omit the option to retain the interrupted current command through the existing prepend behavior. Use replacement when replanning an agent-owned approach, then observe arrival at the new goal.
 
 Native `Self` skills always dispatch through `ActiveSkillWithoutTarget`, including requests containing target arguments. This runs the native self-activation conditions and reports `Self` with the caster's coordinates.

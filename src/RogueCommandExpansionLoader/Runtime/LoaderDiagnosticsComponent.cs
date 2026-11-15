@@ -1521,6 +1521,16 @@ namespace RogueCommandExpansionLoader.Runtime
         }
 
         /// <summary>
+        /// Dispatches a bounded mixed combat plan created by an external MCP agent.
+        /// The plan is checked in full before any native order is issued.
+        /// </summary>
+        public string OrderBattlefieldPlanJson(string ordersJson)
+        {
+            string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            return RuntimeBattlefieldOrderPlan.DispatchJson(ordersJson, sceneName);
+        }
+
+        /// <summary>
         /// CSV-compatible bridge overload for native patrol waypoints. The HTTP
         /// reflection bridge cannot reliably materialize IReadOnlyList arguments.
         /// </summary>
