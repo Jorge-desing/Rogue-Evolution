@@ -138,3 +138,5 @@ Scope exact-body duplicate scans to discoverable test methods. Identical `pass` 
 `purge-dangling` in the pack editor requires explicit confirmed-invalid `unitIds` and `profileIds` (CLI: `--dangling-unit-ids`, `--dangling-profile-ids`); an empty selection removes nothing. Resolve native and cross-pack IDs first, and inspect emptied blueprint pools before writing.
 
 The editor routes `rename-stage`, `clone-stage`, `rename-ai-profile`, and `clone-ai-profile` through CLI and batch; supply a namespaced `newId`. The advertised extract/import helpers are Python-only and their dependency closure is not yet established.
+
+The Python composition helpers return independent extracted data and reject duplicate or cross-kind unit/factory IDs during import. They do not yet resolve full dependency closure or copy bundle files; review the resulting manifest and assets before use.

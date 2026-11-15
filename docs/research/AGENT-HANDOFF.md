@@ -2842,3 +2842,7 @@ The pack editor removes the deleted unit ID from remaining units' synergy target
 ## 2026-11-15 — Stage and AI profile editor routes
 
 The advertised `rename-stage`, `clone-stage`, `rename-ai-profile` and `clone-ai-profile` operations now work via CLI and batch and reject invalid new namespaced IDs. CLI errors for these operations exit nonzero. Local packs suite: 222/222 passed (`artifacts/pack-routes-suite.log`). `extract-units` and `import-units` remain Python-only; their dependency closure and collision handling require repair before routing. Game closed; Release DLL redeployed with matching SHA-256 `3F6F0F8205B76441453DBBE7B29AE016FC320384F0571939C20F459EF1568129`, backup/manifest `artifacts/editor-routes-deploy-20261115-092934/`. No in-game test.
+
+## 2026-11-15 — Composition identity and isolation
+
+`extract_units_to_pack` returns a deep copy, so editing extracted entities cannot mutate the source. `import_units` rejects repeated selections and collisions across unit and production-building IDs before changing the destination. Packs suite 223/223 passed (`artifacts/pack-composition-suite.log`). The composition helpers remain Python-only and do not establish complete dependency closure, bundle manifest/file transfer, or safe handling of conflicting stage/profile content; implement those before routing them as complete operations. Game closed; Release DLL redeployed with matching SHA-256 `3F6F0F8205B76441453DBBE7B29AE016FC320384F0571939C20F459EF1568129`; backup/manifest `artifacts/composition-deploy-20261115-093130/`. No gameplay test.

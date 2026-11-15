@@ -929,7 +929,8 @@ def extract_units_to_pack(
     )
     extracted["assetBundles"] = list(_as_list(source.get("assetBundles"))) if has_bundle_units else []
 
-    return extracted, []
+    # The caller may edit the extracted pack independently of its source.
+    return json.loads(json.dumps(extracted)), []
 
 
 def import_units(
@@ -949,19 +950,26 @@ def import_units(
     existing_factories = _factory_index(updated)
 
     to_import = []
+    claimed = set(existing) | set(existing_factories)
+    selected = set()
     for uid in unit_ids:
+        if uid in selected:
+            diagnostics.append(f"unit '{uid}' se solicitó más de una vez")
+            continue
+        selected.add(uid)
         if uid not in src_index:
             diagnostics.append(f"unit '{uid}' no existe en el pack origen")
             continue
-        if uid in existing:
-            diagnostics.append(f"unit '{uid}' ya existe en el pack destino")
+        if uid in claimed:
+            diagnostics.append(f"unit '{uid}' colisiona con una unidad o fábrica en el pack destino")
             continue
         unit = src_index[uid]
         factory = unit.get("productionBuilding") if isinstance(unit, dict) else None
         fid = _entity_key(factory) if isinstance(factory, dict) else None
-        if fid and fid in existing_factories:
-            diagnostics.append(f"factory '{fid}' ya existe en el pack destino")
+        if not fid or fid == uid or fid in claimed or fid in selected:
+            diagnostics.append(f"factory '{fid}' ausente o en conflicto para unit '{uid}'")
             continue
+        claimed.update((uid, fid))
         to_import.append(unit)
 
     if diagnostics:

@@ -85,7 +85,7 @@ Descubrimiento: `--operations-json` imprime el catálogo completo (JSON) y sale 
 
 **Composición** · `extract-units` (unitIds) · `import-units` (source, unitIds) · `purge-dangling` (referencias a IDs explícitamente confirmados como inválidos). El CLI acepta `--dangling-unit-ids` y `--dangling-profile-ids`; en batch usa `unitIds` y `profileIds`. Sin listas no elimina referencias. Los IDs declarados en el pack se conservan; el agente debe resolver referencias nativas y de otros packs antes de señalar un ID como inválido. Se limpian etapas, pools, entradas AI y objetivos de sinergia. Si un pool queda vacío, revísalo antes de guardar un pack válido.
 
-`rename-stage`, `clone-stage`, `rename-ai-profile` y `clone-ai-profile` están disponibles en CLI (`--stage-id` o `--profile-id`, más `--new-id`) y batch. El nuevo ID debe cumplir el formato namespaced. `extract-units` e `import-units` siguen siendo funciones Python, no operaciones CLI o batch; sus dependencias requieren revisión antes de exponerlas.
+`rename-stage`, `clone-stage`, `rename-ai-profile` y `clone-ai-profile` están disponibles en CLI (`--stage-id` o `--profile-id`, más `--new-id`) y batch. El nuevo ID debe cumplir el formato namespaced. `extract-units` e `import-units` siguen siendo funciones Python, no operaciones CLI o batch; no garantizan el cierre de dependencias ni copian archivos de bundles. La extracción devuelve una copia independiente; la importación rechaza IDs repetidos y colisiones entre unidades y fábricas. No trate sus resultados como packs completos sin resolver las dependencias.
 
 **Identity** · `set-pack-id` (newId) · `set-schema-version` (version — solo 1)
 

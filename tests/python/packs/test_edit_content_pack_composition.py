@@ -27,6 +27,8 @@ class CompositionEditTests(unittest.TestCase):
         self.assertEqual("ns:pack", extracted["packId"])
         # stage/AI kept only if they reference extracted units
         self.assertTrue(extracted["stages"])
+        extracted["units"][0]["id"] = "ns:changed"
+        self.assertEqual("ns:alpha", pack["units"][0]["id"])
 
     def test_extract_unknown_unit_fails(self) -> None:
         pack = self._pack()
@@ -42,6 +44,24 @@ class CompositionEditTests(unittest.TestCase):
 
         _, d2 = EDIT.import_units(pack, other, ["ns:alpha"])
         self.assertTrue(d2)  # already exists
+
+    def test_import_rejects_cross_kind_and_repeated_identity_collisions(self) -> None:
+        for mode in ("unit-is-factory", "factory-is-unit", "duplicate"):
+            with self.subTest(mode=mode):
+                dest = self._pack()
+                source = SCAFFOLD.generate_scaffold("ns:pack", "beta", stage_slug="sb", ai_slug="ab")
+                unit = source["units"][0]
+                selected = ["ns:beta"]
+                if mode == "unit-is-factory":
+                    unit["id"] = dest["units"][0]["productionBuilding"]["id"]
+                    selected = [unit["id"]]
+                elif mode == "factory-is-unit":
+                    unit["productionBuilding"]["id"] = "ns:alpha"
+                else:
+                    selected.append("ns:beta")
+                result, diagnostics = EDIT.import_units(dest, source, selected)
+                self.assertTrue(diagnostics)
+                self.assertEqual(dest, result)
 
     def test_purge_dangling_references(self) -> None:
         pack = self._pack()
