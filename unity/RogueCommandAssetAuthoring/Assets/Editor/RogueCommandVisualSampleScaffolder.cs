@@ -377,138 +377,7 @@ namespace RogueCommandExpansion.Authoring
         {
             try
             {
-                if (!String.Equals(Application.unityVersion, RequiredUnityVersion, StringComparison.Ordinal))
-                {
-                    throw new InvalidOperationException("Canonical Level 1 visuals require Unity " +
-                        RequiredUnityVersion + "; current Editor is " + Application.unityVersion + ".");
-                }
-
-                string projectRoot = Directory.GetParent(Application.dataPath).FullName;
-                ValidateRiggedWalkerSources(projectRoot);
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-
-                string[] unitPrefabPaths =
-                {
-                    PrefabPath, BikePrefabPath, ColossusPrefabPath, IroncladPrefabPath,
-                    AtlasCraneMechPrefabPath, BastionSiegeMechPrefabPath, SurgeArcTankPrefabPath,
-                    ArachnidHexapodVisualPrefabPath, OverlordCommandHQVisualPrefabPath,
-                    TacticalOperationsPackScaffolder.TidebreakerPrefabPath,
-                    TacticalOperationsPackScaffolder.SalvageHaulerPrefabPath,
-                    TacticalOperationsPackScaffolder.SkyguardSAMPrefabPath,
-                    TacticalOperationsPackScaffolder.BulwarkSiegeTankPrefabPath,
-                    TacticalOperationsPackScaffolder.ArcLanceWalkerPrefabPath,
-                    TacticalOperationsPackScaffolder.FieldMedicRoverPrefabPath,
-                    TacticalOperationsPackScaffolder.SentinelRelayPrefabPath,
-                    TacticalOperationsPackScaffolder.GravitasBreakerPrefabPath,
-                    TacticalOperationsPackScaffolder.CommandRelayPrefabPath
-                };
-                string[] unitNames =
-                {
-                    "SandlanceScout", "SkirmishStrikeBike", "ColossusSiegePlatform", "IroncladWalker",
-                    "AtlasCraneMech", "BastionSiegeMech", "SurgeArcTank",
-                    "ArachnidHexapod", "OverlordCommandHQ",
-                    "TidebreakerHovercraft", "SalvageHauler", "SkyguardSAM",
-                    "BulwarkSiegeTank", "ArcLanceWalker", "FieldMedicRover",
-                    "SentinelRelay", "GravitasBreaker", "CommandRelay"
-                };
-                for (int i = 0; i < unitPrefabPaths.Length; i++)
-                {
-                    GameObject prefabContents = PrefabUtility.LoadPrefabContents(unitPrefabPaths[i]);
-                    if (prefabContents == null)
-                    {
-                        throw new FileNotFoundException("Level 1 visual prefab could not be loaded: " + unitPrefabPaths[i]);
-                    }
-
-                    try
-                    {
-                        Transform modelTransform = GetUniqueNamedTransform(prefabContents, unitNames[i] + "Model", false);
-                        GameObject modelObject = modelTransform != null ? modelTransform.gameObject : prefabContents;
-                        string modelAssetPath = AssetRoot + "/Models/" + unitNames[i] + ".fbx";
-                        GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelAssetPath);
-                        if (modelAsset == null)
-                        {
-                            throw new FileNotFoundException("Level 1 unit FBX could not be loaded: " + modelAssetPath, modelAssetPath);
-                        }
-                        int transformCountBefore = prefabContents.GetComponentsInChildren<Transform>(true).Length;
-                        bool materialUpdated = EnsureAllRenderersUsePrefabVertexWearMaterial(prefabContents);
-                        bool lodUpdated = VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents);
-                        VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, modelObject);
-                        VehiclePrefabBuilder.SetupAnimatorIfAvailable(
-                            prefabContents,
-                            modelObject,
-                            modelAsset,
-                            unitNames[i],
-                            preferWalkForMovement: IsWalkerUnitName(unitNames[i]));
-                        Animator unitAnimator = prefabContents.GetComponent<Animator>();
-                        if (unitAnimator != null)
-                        {
-                            unitAnimator.applyRootMotion = false;
-                        }
-                        if (String.Equals(unitNames[i], "BulwarkSiegeTank", StringComparison.Ordinal))
-                        {
-                            Transform eraSocket = GetUniqueNamedTransform(prefabContents, "Socket_Hardpoint_ERA", true);
-                            eraSocket.localPosition = Vector3.zero;
-                            eraSocket.localRotation = Quaternion.identity;
-                            eraSocket.localScale = Vector3.one;
-                        }
-                        int transformCountAfter = prefabContents.GetComponentsInChildren<Transform>(true).Length;
-                        bool saved;
-                        PrefabUtility.SaveAsPrefabAsset(prefabContents, unitPrefabPaths[i], out saved);
-                        if (!saved)
-                        {
-                            throw new InvalidOperationException("Unity could not save canonical hardpoint/animator updates to " + unitPrefabPaths[i] + ".");
-                        }
-                        NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, unitPrefabPaths[i])));
-
-                        ValidateCanonicalModuleHardpoints(prefabContents, unitPrefabPaths[i]);
-                        ValidateLevelOnePbrAndLodContract(prefabContents, unitPrefabPaths[i], unitNames[i], requireLayeredAnimator: true);
-                    }
-                    finally
-                    {
-                        PrefabUtility.UnloadPrefabContents(prefabContents);
-                    }
-                }
-
-                string[] factoryPrefabPaths =
-                {
-                    ArachnidHexapodFactoryVisualPrefabPath,
-                    OverlordCommandHQFactoryVisualPrefabPath,
-                    "Assets/TacticalOperations/Prefabs/BulwarkFoundryVisual.prefab"
-                };
-                string[] factoryNames =
-                {
-                    "ArachnidHexapodFactory",
-                    "OverlordCommandHQFactory",
-                    "BulwarkFoundry"
-                };
-                for (int i = 0; i < factoryPrefabPaths.Length; i++)
-                {
-                    GameObject prefabContents = PrefabUtility.LoadPrefabContents(factoryPrefabPaths[i]);
-                    if (prefabContents == null)
-                    {
-                        throw new FileNotFoundException("Level 1 factory prefab could not be loaded: " + factoryPrefabPaths[i]);
-                    }
-                    try
-                    {
-                        if (VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents))
-                        {
-                            bool saved;
-                            PrefabUtility.SaveAsPrefabAsset(prefabContents, factoryPrefabPaths[i], out saved);
-                            if (!saved) throw new InvalidOperationException("Could not save LOD ownership: " + factoryPrefabPaths[i]);
-                        }
-                        ValidateLevelOnePbrAndLodContract(prefabContents, factoryPrefabPaths[i], factoryNames[i]);
-                    }
-                    finally
-                    {
-                        PrefabUtility.UnloadPrefabContents(prefabContents);
-                    }
-                }
-
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
-
-                Debug.Log("[CanonicalLevelOneVisuals] Validated " + unitPrefabPaths.Length + " unit prefabs and " +
-                    factoryPrefabPaths.Length + " factory prefabs with LODGroup, Material Maker VehiclePBR_VertexWear + steel micro-detail, and four unique canonical hardpoints per unit.");
+                RefreshCanonicalLevelOneVisualsCore();
                 if (Application.isBatchMode)
                 {
                     EditorApplication.Exit(0);
@@ -526,6 +395,142 @@ namespace RogueCommandExpansion.Authoring
                     EditorUtility.DisplayDialog("Canonical Level 1 refresh failed", exception.Message, "OK");
                 }
             }
+        }
+
+        internal static void RefreshCanonicalLevelOneVisualsCore()
+        {
+            if (!String.Equals(Application.unityVersion, RequiredUnityVersion, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Canonical Level 1 visuals require Unity " +
+                    RequiredUnityVersion + "; current Editor is " + Application.unityVersion + ".");
+            }
+
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            ValidateRiggedWalkerSources(projectRoot);
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+            string[] unitPrefabPaths =
+            {
+                PrefabPath, BikePrefabPath, ColossusPrefabPath, IroncladPrefabPath,
+                AtlasCraneMechPrefabPath, BastionSiegeMechPrefabPath, SurgeArcTankPrefabPath,
+                ArachnidHexapodVisualPrefabPath, OverlordCommandHQVisualPrefabPath,
+                TacticalOperationsPackScaffolder.TidebreakerPrefabPath,
+                TacticalOperationsPackScaffolder.SalvageHaulerPrefabPath,
+                TacticalOperationsPackScaffolder.SkyguardSAMPrefabPath,
+                TacticalOperationsPackScaffolder.BulwarkSiegeTankPrefabPath,
+                TacticalOperationsPackScaffolder.ArcLanceWalkerPrefabPath,
+                TacticalOperationsPackScaffolder.FieldMedicRoverPrefabPath,
+                TacticalOperationsPackScaffolder.SentinelRelayPrefabPath,
+                TacticalOperationsPackScaffolder.GravitasBreakerPrefabPath,
+                TacticalOperationsPackScaffolder.CommandRelayPrefabPath
+            };
+            string[] unitNames =
+            {
+                "SandlanceScout", "SkirmishStrikeBike", "ColossusSiegePlatform", "IroncladWalker",
+                "AtlasCraneMech", "BastionSiegeMech", "SurgeArcTank",
+                "ArachnidHexapod", "OverlordCommandHQ",
+                "TidebreakerHovercraft", "SalvageHauler", "SkyguardSAM",
+                "BulwarkSiegeTank", "ArcLanceWalker", "FieldMedicRover",
+                "SentinelRelay", "GravitasBreaker", "CommandRelay"
+            };
+            for (int i = 0; i < unitPrefabPaths.Length; i++)
+            {
+                GameObject prefabContents = PrefabUtility.LoadPrefabContents(unitPrefabPaths[i]);
+                if (prefabContents == null)
+                {
+                    throw new FileNotFoundException("Level 1 visual prefab could not be loaded: " + unitPrefabPaths[i]);
+                }
+
+                try
+                {
+                    Transform modelTransform = GetUniqueNamedTransform(prefabContents, unitNames[i] + "Model", false);
+                    GameObject modelObject = modelTransform != null ? modelTransform.gameObject : prefabContents;
+                    string modelAssetPath = AssetRoot + "/Models/" + unitNames[i] + ".fbx";
+                    GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelAssetPath);
+                    if (modelAsset == null)
+                    {
+                        throw new FileNotFoundException("Level 1 unit FBX could not be loaded: " + modelAssetPath, modelAssetPath);
+                    }
+                    int transformCountBefore = prefabContents.GetComponentsInChildren<Transform>(true).Length;
+                    bool materialUpdated = EnsureAllRenderersUsePrefabVertexWearMaterial(prefabContents);
+                    bool lodUpdated = VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents);
+                    VehiclePrefabBuilder.EnsureCanonicalHardpointSockets(prefabContents, modelObject);
+                    VehiclePrefabBuilder.SetupAnimatorIfAvailable(
+                        prefabContents,
+                        modelObject,
+                        modelAsset,
+                        unitNames[i],
+                        preferWalkForMovement: IsWalkerUnitName(unitNames[i]));
+                    Animator unitAnimator = prefabContents.GetComponent<Animator>();
+                    if (unitAnimator != null)
+                    {
+                        unitAnimator.applyRootMotion = false;
+                    }
+                    if (String.Equals(unitNames[i], "BulwarkSiegeTank", StringComparison.Ordinal))
+                    {
+                        Transform eraSocket = GetUniqueNamedTransform(prefabContents, "Socket_Hardpoint_ERA", true);
+                        eraSocket.localPosition = Vector3.zero;
+                        eraSocket.localRotation = Quaternion.identity;
+                        eraSocket.localScale = Vector3.one;
+                    }
+                    int transformCountAfter = prefabContents.GetComponentsInChildren<Transform>(true).Length;
+                    bool saved;
+                    PrefabUtility.SaveAsPrefabAsset(prefabContents, unitPrefabPaths[i], out saved);
+                    if (!saved)
+                    {
+                        throw new InvalidOperationException("Unity could not save canonical hardpoint/animator updates to " + unitPrefabPaths[i] + ".");
+                    }
+                    NormalizeEmptyUnityYamlStrings(Path.GetFullPath(Path.Combine(projectRoot, unitPrefabPaths[i])));
+
+                    ValidateCanonicalModuleHardpoints(prefabContents, unitPrefabPaths[i]);
+                    ValidateLevelOnePbrAndLodContract(prefabContents, unitPrefabPaths[i], unitNames[i], requireLayeredAnimator: true);
+                }
+                finally
+                {
+                    PrefabUtility.UnloadPrefabContents(prefabContents);
+                }
+            }
+
+            string[] factoryPrefabPaths =
+            {
+                ArachnidHexapodFactoryVisualPrefabPath,
+                OverlordCommandHQFactoryVisualPrefabPath,
+                "Assets/TacticalOperations/Prefabs/BulwarkFoundryVisual.prefab"
+            };
+            string[] factoryNames =
+            {
+                "ArachnidHexapodFactory",
+                "OverlordCommandHQFactory",
+                "BulwarkFoundry"
+            };
+            for (int i = 0; i < factoryPrefabPaths.Length; i++)
+            {
+                GameObject prefabContents = PrefabUtility.LoadPrefabContents(factoryPrefabPaths[i]);
+                if (prefabContents == null)
+                {
+                    throw new FileNotFoundException("Level 1 factory prefab could not be loaded: " + factoryPrefabPaths[i]);
+                }
+                try
+                {
+                    if (VehiclePrefabBuilder.RemoveConflictingNestedLodGroups(prefabContents))
+                    {
+                        bool saved;
+                        PrefabUtility.SaveAsPrefabAsset(prefabContents, factoryPrefabPaths[i], out saved);
+                        if (!saved) throw new InvalidOperationException("Could not save LOD ownership: " + factoryPrefabPaths[i]);
+                    }
+                    ValidateLevelOnePbrAndLodContract(prefabContents, factoryPrefabPaths[i], factoryNames[i]);
+                }
+                finally
+                {
+                    PrefabUtility.UnloadPrefabContents(prefabContents);
+                }
+            }
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+
+            Debug.Log("[CanonicalLevelOneVisuals] Validated " + unitPrefabPaths.Length + " unit prefabs and " +
+                factoryPrefabPaths.Length + " factory prefabs with LODGroup, Material Maker VehiclePBR_VertexWear + steel micro-detail, and four unique canonical hardpoints per unit.");
         }
 
         private static void ValidateCanonicalModuleHardpoints(GameObject prefab, string prefabPath)

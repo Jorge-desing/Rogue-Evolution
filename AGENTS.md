@@ -115,3 +115,6 @@ The handoff contains the current layout, verified commands, evidence boundaries,
     3. *Prefab & bundle structure:* `tools/validate_mech_rigging.py` (ignoring static `RCLModule_*` attachments in bundle critical-failure gating).
     4. *Unity Editor QA:* `unity/RogueCommandAssetAuthoring/Assets/Editor/AnimationQAValidator.cs` provides `Rogue Command/QA/Audit All Unit Animations` (batchmode `AuditAllUnitAnimationsBatch` and `AuditAllUnitAnimationsStrictBatch`) and `Rogue Command/QA/Animation Preview Scrubber` (`AnimationMode`-based SceneView scrubbing without Play Mode).
     5. *Steam runtime telemetry:* BepInEx MCP `diagnostics_wait_for_renderer_frame_evidence` and `diagnostics_inspect_entity_visual` (telemetry only, distinct from pixel appearance).
+
+### Canonical Visual Pipeline
+- Use `tools/Build-CanonicalVisualModules.ps1` as the single-command canonical visual pipeline: by default it runs Blender, Material Maker + strict URP PBR audit, single-startup Unity (`RefreshAndBuildCanonicalModules`) + `audit_unity_build --strict`, pack/bundle-reference validation, SHA-256-backed bundle promotion (`-NoPromoteBundles` to opt out), and offline animation matrix (`-SkipAnimationMatrix` to opt out). Use `-Incremental` for hash-cached iteration and `-DryRun` to inspect the execution plan without side effects.

@@ -182,6 +182,28 @@ namespace RogueCommandExpansion.Authoring
             }
         }
 
+        [MenuItem("Rogue Command/Asset Bundles/Refresh Level 1 and Build Canonical Modules")]
+        public static void RefreshAndBuildCanonicalModules()
+        {
+            try
+            {
+                RogueCommandVisualSampleScaffolder.RefreshCanonicalLevelOneVisualsCore();
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                BuildCanonicalModulesCore();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+                if (Application.isBatchMode)
+                {
+                    EditorApplication.Exit(1);
+                    return;
+                }
+                throw;
+            }
+        }
+
         private static void BuildCanonicalModulesCore()
         {
             if (!String.Equals(Application.unityVersion, "2021.3.45f2", StringComparison.Ordinal))
