@@ -210,9 +210,14 @@ Shader "RogueCommand/VehiclePBR_VertexWear"
                 half wear = saturate(vColor.g * _WearStrength);
                 half soot = saturate(vColor.b * _SootStrength);
 
-                // Team color modulation
+                // Team color modulation: lift overly dark primary variant tints in linear space so hulls stay readable while preserving bright/saturated tints
+                half teamLum = dot(_TeamColor.rgb, half3(0.2126h, 0.7152h, 0.0722h));
+                half3 safeTeam = max(_TeamColor.rgb, half3(0.01h, 0.01h, 0.01h));
+                half targetLum = 0.36h;
+                half3 liftedTeamColor = saturate(lerp(safeTeam * (targetLum / max(teamLum, 0.02h)), half3(0.42h, 0.45h, 0.49h), 0.35h));
+                half3 effectiveTeamColor = (teamLum < 0.25h) ? liftedTeamColor : _TeamColor.rgb;
                 surfaceData.albedo = lerp(surfaceData.albedo,
-                    surfaceData.albedo * _TeamColor.rgb, vColor.a);
+                    surfaceData.albedo * effectiveTeamColor, vColor.a);
 
                 // Cavity AO and Thermal Soot darkening (softened so dim URP maps do not crush dark hulls)
                 surfaceData.albedo *= lerp(0.82h, 1.0h, ao) * (1.0h - soot * 0.25h);

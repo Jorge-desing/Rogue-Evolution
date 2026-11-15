@@ -12050,7 +12050,8 @@ def setup_walker_ik_armature(
                 if pole_bone in pb:
                     ik_con.pole_target = armature_obj
                     ik_con.pole_subtarget = pole_bone
-                    ik_con.pole_angle = math.radians(-90.0 if "L" in tag else 90.0)
+                    # Match biped uniform pole angle so left-side quadruped knees do not invert underground.
+                    ik_con.pole_angle = math.radians(90.0)
                 ik_con.chain_count = 2
 
     bpy.ops.object.mode_set(mode="OBJECT")

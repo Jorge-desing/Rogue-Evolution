@@ -129,12 +129,30 @@ For non-walker vehicles (tanks, rovers, hovercraft) that have a turret but no ar
 - **Build validation must be adjusted for rigged models.** The `ValidateVisualBundleAssets` check counts `MeshFilter` components; rigged models use `SkinnedMeshRenderer` and report 0 MeshFilters. Set `minimumMeshFilters` to 0 for rigged units. Similarly, `ValidatePbrVisualBundlePrefab` checks for `RogueCommand/VehiclePBR_VertexWear` shader; units that no longer use PBR textures (because they are now rigged) will fail this check. Skip PBR validation for rigged units by commenting out the `ValidatePbrVisualBundlePrefab` calls.
 - **FBX export without mesh batching can preserve vertex weights.** If `batch_and_join_by_material` corrupts vertex groups during join (meshes lose their rigid 1.0 weight binding), export the original unbatched meshes directly: `rmk.export_unity_fbx(FBX_PATH, list(meshes) + [armature], ...)`. This preserves per-mesh vertex groups and Armature modifiers. The trade-off is more draw calls, but correctness takes priority over batching for rigged units.
 - **Patch safety for `assign_rigid_mesh_weights`.** When patching `RogueModelKit.py`, verify the function signature remains intact (`objects, prefix, armature_obj, leg_type=None`). A misplaced patch can silently drop parameters and break the build with `TypeError: got multiple values for argument`.
+- **Quadruped leg IK pole angle and FK export isolation:** In `RogueModelKit.setup_walker_ik_armature` (`quad`), keep uniform `ik_con.pole_angle = math.radians(90.0)` so left-side (`FL`/`RL`) knees do not invert underground (and keep the skill twin copy `.agents/skills/rogue-command-3d-model-authoring/scripts/RogueModelKit.py` byte-identical to pass `test_rogue_model_kit_byte_parity`). Before exporting FK-keyed clips with `bake_anim_use_all_actions=True`, remove runtime `IK` constraints on leg deform chains, key neutral rest rotation `(0, 0, 0)` on all leg bones in non-locomotion actions (`Idle`, `FireRecoil`, `Death`) so unmuted `Track_Walk` strips cannot bleed in, and clear `armature.animation_data.action = None` once NLA tracks are pushed. Assign dark `Gunmetal` rather than bright `WheelRim` trim to grounded walker foot pads.
 
 When a blend file already has an armature (e.g., from a previous authoring pass) but lacks animation clips, open the existing blend, retrieve the armature by name, and call `generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type=...)` to generate the four standard clips. Validate root motion and rigid weights, then export with `include_armature=True, bake_anim=True`. Create a separate build script with a `RiggedModel` suffix (e.g., `Build-ArachnidHexapodRiggedModel.py`) to avoid overwriting the original geometry-creation script. The exported FBX replaces the static one in the Unity project.
 
 ---
 
 ## 3. Auditing & Validation Tool
+
+Use the integrated 6-phase Animation Validation Matrix across Blender, FBX, Unity Editor, and Steam runtime:
+
+```bash
+# 0. Run the unified 6-phase matrix (Phases 1-5 offline) across all 18 canonical units
+.venv/Scripts/python.exe -m tools.run_animation_validation_matrix --output artifacts/animation-qa/matrix-report.json
+
+# 1. Pre-export algorithmic metrics (foot sliding, loop closure, Bone_Root=0)
+.venv/Scripts/python.exe -m unittest tests.python.rigging.test_unit_animation_algorithms tests.python.rigging.test_animation_validation_matrix -v
+
+# 2. Post-export FBX headless Blender 4.5.14 audit (+ optional animsmith/fbx-sanitizer probe)
+.venv/Scripts/python.exe -m tools.validate_fbx_animation_pipeline --all-units
+```
+
+- **Unity Editor QA (`unity/RogueCommandAssetAuthoring/Assets/Editor/AnimationQAValidator.cs`):**
+  - Menu `Rogue Command/QA/Audit All Unit Animations` (or batchmode `-executeMethod RogueCommandExpansion.Authoring.AnimationQAValidator.AuditAllUnitAnimationsBatch` / `AuditAllUnitAnimationsStrictBatch`) verifies single non-root-motion `Animator`, valid Generic `Avatar`, `RCL_*` parameters, `Bone_Root == 0`, loop seams, and `Action_FireRecoil` dual-chain motion without altering `Packages/manifest.json`.
+  - Menu `Rogue Command/QA/Animation Preview Scrubber` opens an `AnimationMode`-backed SceneView scrubber to inspect clips frame-by-frame without entering Play Mode.
 
 Run the dedicated validator CLI to audit models, prefabs, and compiled AssetBundles:
 

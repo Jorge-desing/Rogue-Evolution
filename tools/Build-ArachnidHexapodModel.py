@@ -135,12 +135,12 @@ def refine(builder):
                               p.primary_armor, ring_segments=10, exponent=0.82)
         elif "KneeKnuckle" in name:
             obj.scale = tuple(float(value) * 1.12 for value in obj.scale)
-        elif "FootPad" in name:
-            obj.data.materials.clear()
-            obj.data.materials.append(p.wheel_rim)
-        elif "FootTread" in name or "MidFootPad" in name:
+        elif "FootTread" in name:
             obj.data.materials.clear()
             obj.data.materials.append(p.tread)
+        elif "FootPad" in name or "MidFootPad" in name:
+            obj.data.materials.clear()
+            obj.data.materials.append(p.gunmetal)
 
     # The lateral middle pair now has a visible knee joint and a two-link bend
     # instead of a single straight support under the thorax.

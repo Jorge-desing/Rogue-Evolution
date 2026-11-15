@@ -154,6 +154,20 @@ def _clear_nla_tracks(armature: bpy.types.Object) -> None:
         armature.animation_data.nla_tracks.remove(track)
 
 
+def _normalize_foot_pad_materials(meshes: list[bpy.types.Object]) -> None:
+    """Replace bright WheelRim material on foot pads with dark gunmetal so feet do not read as white socks."""
+    target_mat = (
+        bpy.data.materials.get(f"{UNIT_NAME}_Gunmetal")
+        or bpy.data.materials.get(f"{UNIT_NAME}_Tread")
+    )
+    if target_mat is None:
+        return
+    for mesh in meshes:
+        if mesh.type == "MESH" and ("FootPad" in mesh.name):
+            mesh.data.materials.clear()
+            mesh.data.materials.append(target_mat)
+
+
 def _push_export_nla_tracks(
     armature: bpy.types.Object,
     actions: dict[str, bpy.types.Action],
@@ -167,6 +181,8 @@ def _push_export_nla_tracks(
     _clear_nla_tracks(armature)
     if armature.animation_data is None:
         armature.animation_data_create()
+    # Clear the active action so Idle leg rest keys cannot override Walk NLA strips during FBX bake.
+    armature.animation_data.action = None
     for name in ("Idle", "Drive", "Walk", "FireRecoil", "Death"):
         act = actions.get(name)
         if act is None:
@@ -176,30 +192,39 @@ def _push_export_nla_tracks(
         track.strips.new(name, 1, act)
 
 
-def _author_idle_leg_rest_pose(armature: bpy.types.Object, idle_action: bpy.types.Action) -> None:
-    """Key every leg chain at rest so export cannot retain the prior Walk/Death pose."""
+def _author_idle_leg_rest_pose(armature: bpy.types.Object, actions: dict[str, bpy.types.Action]) -> None:
+    """Key every leg chain at rest in Idle, FireRecoil, and Death so Walk poses never bleed in."""
     if armature.animation_data is None:
         raise ValueError("Arachnid Hexapod armature has no animation data")
-    armature.animation_data.action = idle_action
+    targets = (
+        ("Idle", (1, 30)),
+        ("FireRecoil", (1, 15)),
+        ("Death", (1, 35)),
+    )
     bpy.context.view_layer.objects.active = armature
     armature.select_set(True)
     bpy.ops.object.mode_set(mode="POSE")
     try:
-        for tag in ("FL", "FR", "ML", "MR", "RL", "RR"):
-            for segment in ("Thigh", "Shin", "Foot"):
-                bone_name = f"Bone_{segment}_{tag}"
-                pose_bone = armature.pose.bones.get(bone_name)
-                if pose_bone is None:
-                    raise ValueError(f"Arachnid Hexapod armature is missing {bone_name}")
-                pose_bone.location = (0.0, 0.0, 0.0)
-                pose_bone.rotation_mode = "XYZ"
-                pose_bone.rotation_euler = (0.0, 0.0, 0.0)
-                for frame in (1, 30):
-                    pose_bone.keyframe_insert(data_path="location", frame=frame, group=bone_name)
-                    pose_bone.keyframe_insert(data_path="rotation_euler", frame=frame, group=bone_name)
+        for action_key, frames in targets:
+            action = actions.get(action_key)
+            if action is None:
+                continue
+            armature.animation_data.action = action
+            for tag in ("FL", "FR", "ML", "MR", "RL", "RR"):
+                for segment in ("Thigh", "Shin", "Foot"):
+                    bone_name = f"Bone_{segment}_{tag}"
+                    pose_bone = armature.pose.bones.get(bone_name)
+                    if pose_bone is None:
+                        raise ValueError(f"Arachnid Hexapod armature is missing {bone_name}")
+                    pose_bone.location = (0.0, 0.0, 0.0)
+                    pose_bone.rotation_mode = "XYZ"
+                    pose_bone.rotation_euler = (0.0, 0.0, 0.0)
+                    for frame in frames:
+                        pose_bone.keyframe_insert(data_path="location", frame=frame, group=bone_name)
+                        pose_bone.keyframe_insert(data_path="rotation_euler", frame=frame, group=bone_name)
     finally:
         bpy.ops.object.mode_set(mode="OBJECT")
-    armature.animation_data.action = idle_action
+    armature.animation_data.action = actions["Idle"]
     bpy.context.view_layer.update()
 
 
@@ -235,12 +260,13 @@ def build_arachnid_hexapod_rigged_model() -> None:
         if obj.type == "MESH" and not obj.name.lower().startswith("preview")
     ]
     _retarget_leg_attachments(meshes)
+    _normalize_foot_pad_materials(meshes)
     _validate_rigid_weights(meshes, armature)
 
     # Generate animation clips for the complete six-leg armature.
     actions = rmk.generate_procedural_action_clips(armature, prefix=UNIT_NAME, leg_type="quad")
     _clear_nla_tracks(armature)
-    _author_idle_leg_rest_pose(armature, actions["Idle"])
+    _author_idle_leg_rest_pose(armature, actions)
     _validate_root_motion(armature, actions["Walk"])
 
     # Strip hull movement from Walk so ONLY legs animate (no body bob/pitch/roll).

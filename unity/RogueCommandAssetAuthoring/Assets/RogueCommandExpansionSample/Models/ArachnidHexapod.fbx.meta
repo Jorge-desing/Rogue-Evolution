@@ -34,7 +34,7 @@ ModelImporter:
     clipAnimations:
     - serializedVersion: 16
       name: ArachnidHexapod_Armature|ArachnidHexapod_Action_Idle
-      takeName: ArachnidHexapod_Armature|ArachnidHexapod_Action_Idle
+      takeName: Idle
       internalID: -3100369314251171874
       firstFrame: 0
       lastFrame: 29
@@ -63,7 +63,7 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: ArachnidHexapod_Armature|ArachnidHexapod_Action_Walk
-      takeName: ArachnidHexapod_Armature|ArachnidHexapod_Action_Walk
+      takeName: Walk
       internalID: 2667949614841947897
       firstFrame: 0
       lastFrame: 39
@@ -92,7 +92,7 @@ ModelImporter:
       additiveReferencePoseFrame: 0
     - serializedVersion: 16
       name: ArachnidHexapod_Armature|ArachnidHexapod_Action_Drive
-      takeName: ArachnidHexapod_Armature|ArachnidHexapod_Action_Drive
+      takeName: Walk
       internalID: -4698200198064148922
       firstFrame: 0
       lastFrame: 39

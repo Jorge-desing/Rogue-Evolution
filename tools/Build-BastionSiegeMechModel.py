@@ -43,6 +43,63 @@ def _validate_root_motion(armature, walk_action):
 _validate_rigid_weights = validate_rigid_weights
 
 
+def _remove_leg_ik_constraints(armature: bpy.types.Object) -> None:
+    """Remove leg IK constraints so FK quad gait and neutral Idle rest poses control the limbs."""
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="POSE")
+    try:
+        for tag in ("FL", "FR", "RL", "RR"):
+            shin = armature.pose.bones.get(f"Bone_Shin_{tag}")
+            if shin is None:
+                continue
+            for constraint in list(shin.constraints):
+                if constraint.type == "IK":
+                    shin.constraints.remove(constraint)
+        for pb in armature.pose.bones:
+            pb.location = (0.0, 0.0, 0.0)
+            pb.rotation_mode = "XYZ"
+            pb.rotation_euler = (0.0, 0.0, 0.0)
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+
+
+def _author_idle_leg_rest_pose(armature: bpy.types.Object, actions: dict[str, bpy.types.Action]) -> None:
+    """Key every quadruped leg chain at rest in Idle, FireRecoil, and Death so Walk NLA tracks never bleed in."""
+    if armature.animation_data is None:
+        raise ValueError("Bastion Siege Mech armature has no animation data")
+    targets = (
+        ("Idle", (1, 30)),
+        ("FireRecoil", (1, 15)),
+        ("Death", (1, 45)),
+    )
+    bpy.context.view_layer.objects.active = armature
+    armature.select_set(True)
+    bpy.ops.object.mode_set(mode="POSE")
+    try:
+        for action_key, frames in targets:
+            action = actions.get(action_key)
+            if action is None:
+                continue
+            armature.animation_data.action = action
+            for tag in ("FL", "FR", "RL", "RR"):
+                for segment in ("Thigh", "Shin", "Foot"):
+                    bone_name = f"Bone_{segment}_{tag}"
+                    pose_bone = armature.pose.bones.get(bone_name)
+                    if pose_bone is None:
+                        raise ValueError(f"Bastion Siege Mech armature is missing {bone_name}")
+                    pose_bone.location = (0.0, 0.0, 0.0)
+                    pose_bone.rotation_mode = "XYZ"
+                    pose_bone.rotation_euler = (0.0, 0.0, 0.0)
+                    for frame in frames:
+                        pose_bone.keyframe_insert(data_path="location", frame=frame, group=bone_name)
+                        pose_bone.keyframe_insert(data_path="rotation_euler", frame=frame, group=bone_name)
+    finally:
+        bpy.ops.object.mode_set(mode="OBJECT")
+    armature.animation_data.action = actions["Idle"]
+    bpy.context.view_layer.update()
+
+
 def build_model() -> None:
     if not SOURCE_BLEND.is_file():
         raise FileNotFoundError(f"Authored Blender source not found: {SOURCE_BLEND}")
@@ -76,11 +133,14 @@ def build_model() -> None:
             except (ReferenceError, RuntimeError):
                 pass
 
+    _remove_leg_ik_constraints(armature)
+
     # Quadrupedal siege mech; FireRecoil 15 / Death 45 is the Unity rig contract.
     actions = rmk.generate_procedural_action_clips(
         armature, prefix=UNIT_NAME, leg_type="quad", fire_profile="heavy",
         fire_end_frame=15, death_end_frame=45,
     )
+    _author_idle_leg_rest_pose(armature, actions)
     _validate_root_motion(armature, actions["Walk"])
 
     socket_positions = {
@@ -125,6 +185,10 @@ def build_model() -> None:
         batched_meshes, prefix=UNIT_NAME, texture_maps=atlas_maps, output_fbx_path=ATLAS_FBX_PATH,
     )
     create_canonical_hardpoint_sockets(UNIT_NAME)
+    if armature.animation_data is not None:
+        # Clear active action before FBX export so Idle/Death channels do not mask NLA Walk strips.
+        armature.animation_data.action = None
+    bpy.context.view_layer.update()
     sockets = [obj for obj in bpy.context.scene.objects if obj.type == "EMPTY"]
     rmk.export_unity_fbx(
         FBX_PATH, list(batched_meshes) + [armature] + sockets,
