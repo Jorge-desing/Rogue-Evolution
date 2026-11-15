@@ -93,6 +93,31 @@ class CompositionEditTests(unittest.TestCase):
         self.assertIn("ns:guard", [p["id"] for p in updated2["aiProfiles"]])
         self.assertIn("ns:guard", updated2["stages"][0]["aiProfileIds"])
 
+    def test_stage_and_profile_operations_are_routed_by_batch_and_cli(self) -> None:
+        cases = [
+            ("rename-stage", "stageId", "ns:sa", "--stage-id", "stages"),
+            ("clone-stage", "stageId", "ns:sa", "--stage-id", "stages"),
+            ("rename-ai-profile", "profileId", "ns:aa", "--profile-id", "aiProfiles"),
+            ("clone-ai-profile", "profileId", "ns:aa", "--profile-id", "aiProfiles"),
+        ]
+        for operation, key, original, flag, section in cases:
+            with self.subTest(operation=operation):
+                pack = self._pack()
+                updated, diagnostics = EDIT.apply_edits(pack, [{"op": operation, key: original, "newId": "ns:new"}])
+                self.assertEqual([], diagnostics)
+                self.assertIn("ns:new", [row["id"] for row in updated[section]])
+                invalid, errors = EDIT.apply_edits(pack, [{"op": operation, key: original, "newId": ""}])
+                self.assertTrue(errors)
+                self.assertEqual(pack, invalid)
+                with tempfile.TemporaryDirectory() as directory:
+                    source = Path(directory) / "content.json"
+                    source.write_text(json.dumps(pack), encoding="utf-8")
+                    with contextlib.redirect_stdout(io.StringIO()) as output:
+                        code = EDIT.main(["--pack", str(source), "--operation", operation, flag, original,
+                                          "--new-id", "ns:new", "--dry-run"])
+                    self.assertEqual(0, code)
+                    self.assertIn('"ns:new"', output.getvalue())
+
     def test_bulk_set_balance(self) -> None:
         pack = self._pack()
         other = SCAFFOLD.generate_scaffold("ns:pack", "beta", stage_slug="sb", ai_slug="ab")

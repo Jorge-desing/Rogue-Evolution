@@ -136,3 +136,5 @@ Unit-catalog scaffold count and JSON-serializability checks share one exported r
 Scope exact-body duplicate scans to discoverable test methods. Identical `pass` bodies nested inside a test fixture may deliberately produce different outcomes through skip decorators or fixture setup; retain them when they exercise distinct runner states.
 
 `purge-dangling` in the pack editor requires explicit confirmed-invalid `unitIds` and `profileIds` (CLI: `--dangling-unit-ids`, `--dangling-profile-ids`); an empty selection removes nothing. Resolve native and cross-pack IDs first, and inspect emptied blueprint pools before writing.
+
+The editor routes `rename-stage`, `clone-stage`, `rename-ai-profile`, and `clone-ai-profile` through CLI and batch; supply a namespaced `newId`. The advertised extract/import helpers are Python-only and their dependency closure is not yet established.

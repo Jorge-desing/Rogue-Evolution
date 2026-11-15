@@ -2838,3 +2838,7 @@ The pack editor removes the deleted unit ID from remaining units' synergy target
 ## 2026-11-15 — Explicit dangling-reference cleanup
 
 `purge-dangling` now runs through both CLI and batch and only removes explicitly supplied confirmed-invalid unit/profile IDs; native and cross-pack references are preserved unless selected. Locally declared IDs are retained. Stage lists, blueprint pools, AI entries and synergy targets are covered; an emptied pool needs review. Local suite `python -m unittest discover -s tests/python/packs -t .`: 221/221 passed, log `artifacts/pack-purge-suite.log`. No runtime behavior was tested. Game closed; Release DLL redeployed and hash verified (`3F6F0F8205B76441453DBBE7B29AE016FC320384F0571939C20F459EF1568129`), backup/manifest `artifacts/purge-editor-deploy-20261115-092709/`. Continue auditing other catalog operations for actual CLI and batch routing.
+
+## 2026-11-15 — Stage and AI profile editor routes
+
+The advertised `rename-stage`, `clone-stage`, `rename-ai-profile` and `clone-ai-profile` operations now work via CLI and batch and reject invalid new namespaced IDs. CLI errors for these operations exit nonzero. Local packs suite: 222/222 passed (`artifacts/pack-routes-suite.log`). `extract-units` and `import-units` remain Python-only; their dependency closure and collision handling require repair before routing. Game closed; Release DLL redeployed with matching SHA-256 `3F6F0F8205B76441453DBBE7B29AE016FC320384F0571939C20F459EF1568129`, backup/manifest `artifacts/editor-routes-deploy-20261115-092934/`. No in-game test.

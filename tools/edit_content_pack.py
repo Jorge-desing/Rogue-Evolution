@@ -34,6 +34,7 @@ Vocabulario clave (ver guía):
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -776,10 +777,18 @@ def apply_edits(
                 current, d = add_stage(current, op.get("stage", {}))
             elif name == "remove-stage":
                 current, d = remove_stage(current, op.get("stageId", ""))
+            elif name == "rename-stage":
+                current, d = rename_stage(current, op.get("stageId", ""), op.get("newId", ""))
+            elif name == "clone-stage":
+                current, d = clone_stage(current, op.get("stageId", ""), op.get("newId", ""))
             elif name == "add-ai-profile":
                 current, d = add_ai_profile(current, op.get("profile", {}))
             elif name == "remove-ai-profile":
                 current, d = remove_ai_profile(current, op.get("profileId", ""))
+            elif name == "rename-ai-profile":
+                current, d = rename_ai_profile(current, op.get("profileId", ""), op.get("newId", ""))
+            elif name == "clone-ai-profile":
+                current, d = clone_ai_profile(current, op.get("profileId", ""), op.get("newId", ""))
             elif name == "add-ai-module":
                 current, d = add_ai_module(
                     current, op.get("profileId", ""), op.get("module", {})
@@ -1071,6 +1080,8 @@ def purge_dangling_references(pack: dict, unit_ids: list[str] | None = None,
 def rename_stage(pack: dict, old_id: str, new_id: str) -> tuple[dict, list[str]]:
     """Renombra una etapa. Falla si no existe o el nuevo id colisiona."""
     updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(new_id, str) or not re.fullmatch(r"[a-z][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*", new_id):
+        return updated, ["newId debe ser un ID namespaced válido"]
     ids = {_entity_key(s) for s in _as_list(updated.get("stages")) if isinstance(s, dict)}
     if old_id not in ids:
         return updated, [f"stage '{old_id}' no existe en el pack"]
@@ -1086,6 +1097,8 @@ def rename_stage(pack: dict, old_id: str, new_id: str) -> tuple[dict, list[str]]
 def rename_ai_profile(pack: dict, old_id: str, new_id: str) -> tuple[dict, list[str]]:
     """Renombra un perfil AI (y su referencia en etapas)."""
     updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(new_id, str) or not re.fullmatch(r"[a-z][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*", new_id):
+        return updated, ["newId debe ser un ID namespaced válido"]
     ids = {_entity_key(p) for p in _as_list(updated.get("aiProfiles")) if isinstance(p, dict)}
     if old_id not in ids:
         return updated, [f"ai profile '{old_id}' no existe en el pack"]
@@ -1106,6 +1119,8 @@ def rename_ai_profile(pack: dict, old_id: str, new_id: str) -> tuple[dict, list[
 def clone_stage(pack: dict, stage_id: str, new_id: str) -> tuple[dict, list[str]]:
     """Clona una etapa con un nuevo id."""
     updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(new_id, str) or not re.fullmatch(r"[a-z][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*", new_id):
+        return updated, ["newId debe ser un ID namespaced válido"]
     ids = {_entity_key(s) for s in _as_list(updated.get("stages")) if isinstance(s, dict)}
     if stage_id not in ids:
         return updated, [f"stage '{stage_id}' no existe en el pack"]
@@ -1123,6 +1138,8 @@ def clone_stage(pack: dict, stage_id: str, new_id: str) -> tuple[dict, list[str]
 def clone_ai_profile(pack: dict, profile_id: str, new_id: str) -> tuple[dict, list[str]]:
     """Clona un perfil AI con un nuevo id."""
     updated = json.loads(json.dumps(pack)) if isinstance(pack, dict) else {}
+    if not isinstance(new_id, str) or not re.fullmatch(r"[a-z][a-z0-9._-]*:[a-z0-9][a-z0-9._-]*", new_id):
+        return updated, ["newId debe ser un ID namespaced válido"]
     ids = {_entity_key(p) for p in _as_list(updated.get("aiProfiles")) if isinstance(p, dict)}
     if profile_id not in ids:
         return updated, [f"ai profile '{profile_id}' no existe en el pack"]
@@ -1549,8 +1566,8 @@ def main(argv: list[str] | None = None) -> int:
             "add", "remove", "set-flag", "set-balance", "remove-balance",
             "set-map-size", "add-pool", "remove-pool", "set-ai-param",
             "rename-unit", "set-localization",
-            "add-stage", "remove-stage",
-            "add-ai-profile", "remove-ai-profile",
+            "add-stage", "remove-stage", "rename-stage", "clone-stage",
+            "add-ai-profile", "remove-ai-profile", "rename-ai-profile", "clone-ai-profile",
             "add-ai-module", "remove-ai-module",
             "set-stage-param", "set-ai-field",
             "set-template",
@@ -1752,6 +1769,12 @@ def main(argv: list[str] | None = None) -> int:
             print("--stage-id es obligatorio", file=sys.stderr)
             return 2
         updated, diagnostics = remove_stage(pack, args.stage_id)
+    elif args.operation in ("rename-stage", "clone-stage"):
+        if not (args.stage_id and args.new_id):
+            print("--stage-id y --new-id son obligatorios", file=sys.stderr)
+            return 2
+        operation = rename_stage if args.operation == "rename-stage" else clone_stage
+        updated, diagnostics = operation(pack, args.stage_id, args.new_id)
     elif args.operation == "add-ai-profile":
         if not args.profile_json:
             print("--profile-json es obligatorio para add-ai-profile", file=sys.stderr)
@@ -1765,6 +1788,12 @@ def main(argv: list[str] | None = None) -> int:
             print("--profile-id es obligatorio", file=sys.stderr)
             return 2
         updated, diagnostics = remove_ai_profile(pack, args.profile_id)
+    elif args.operation in ("rename-ai-profile", "clone-ai-profile"):
+        if not (args.profile_id and args.new_id):
+            print("--profile-id y --new-id son obligatorios", file=sys.stderr)
+            return 2
+        operation = rename_ai_profile if args.operation == "rename-ai-profile" else clone_ai_profile
+        updated, diagnostics = operation(pack, args.profile_id, args.new_id)
     elif args.operation == "add-ai-module":
         if not (args.profile_id and args.module_json):
             print("--profile-id y --module-json son obligatorios", file=sys.stderr)
@@ -1935,6 +1964,8 @@ def main(argv: list[str] | None = None) -> int:
     if diagnostics:
         for d in diagnostics:
             print(f"  ! {d}")
+        if args.operation in ("rename-stage", "clone-stage", "rename-ai-profile", "clone-ai-profile"):
+            return 1
         # operaciones que dejan el pack sin cambios válidos no escriben
         if args.operation in ("remove",) and any("no existe" in d for d in diagnostics):
             return 1
