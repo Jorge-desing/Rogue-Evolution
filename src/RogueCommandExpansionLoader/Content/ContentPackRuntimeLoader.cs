@@ -2631,8 +2631,10 @@ namespace RogueCommandExpansionLoader.Content
             DefaultAiBehaviour behaviour = gameBehaviour as DefaultAiBehaviour;
             LoadedAiProfile profile;
             bool isNativeTemplateFallback;
-            if (!TryGetAiProfile(behaviour, out profile, out isNativeTemplateFallback))
+            bool isUniversalFallback;
+            if (!TryGetAiProfile(behaviour, out profile, out isNativeTemplateFallback, out isUniversalFallback))
             {
+                WarmPlayerDeckUnitAndFactoryPools(behaviour);
                 return;
             }
 
@@ -2646,7 +2648,7 @@ namespace RogueCommandExpansionLoader.Content
 
                 if (!alreadyPreInjected)
                 {
-                    InjectAllowedAiUnitsIntoNativeBases(behaviour, profile);
+                    InjectAllowedAiUnitsIntoNativeBases(behaviour, profile, isUniversalFallback);
                 }
             }
 
@@ -3042,7 +3044,10 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
-        private void InjectAllowedAiUnitsIntoNativeBases(DefaultAiBehaviour behaviour, LoadedAiProfile profile)
+        private void InjectAllowedAiUnitsIntoNativeBases(
+            DefaultAiBehaviour behaviour,
+            LoadedAiProfile profile,
+            bool isUniversalFallback = false)
         {
             if (behaviour == null || _aiBasesField == null || _aiBaseEntitiesInDeckField == null ||
                 _aiDeckEntryType == null || _aiDeckEntryEntityIdField == null)
@@ -3100,7 +3105,8 @@ namespace RogueCommandExpansionLoader.Content
                     return;
                 }
 
-                var prioritizedUnits = BuildPrioritizedAiInjectionCandidates(profile);
+                string aiName = StripUnityCloneSuffix(behaviour.gameObject != null ? behaviour.gameObject.name : null);
+                var prioritizedUnits = BuildPrioritizedAiInjectionCandidates(profile, isUniversalFallback, aiName);
                 var injectedUnitIds = new List<string>();
                 int injectedCount = 0;
                 int injectedModFactoryCount = 0;
@@ -3210,52 +3216,60 @@ namespace RogueCommandExpansionLoader.Content
             return merged;
         }
 
-        private List<LoadedUnit> BuildPrioritizedAiInjectionCandidates(LoadedAiProfile profile)
+        private List<LoadedUnit> BuildPrioritizedAiInjectionCandidates(
+            LoadedAiProfile profile,
+            bool isUniversalFallback = false,
+            string aiResourceName = null)
         {
             var result = new List<LoadedUnit>();
             var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             lock (_gate)
             {
-                // 1. Primary profile unit/building entries
-                AppendProfileDeclaredCandidatesLocked(profile, seenIds, result);
-
-                // 2. Sibling profiles sharing the same nativeTemplateId (interleaved by pack)
-                var siblingIds = new List<string>();
-                string activeTemplate = profile != null && profile.Definition != null
-                    ? profile.Definition.nativeTemplateId
-                    : null;
-                if (!String.IsNullOrWhiteSpace(activeTemplate))
+                if (!isUniversalFallback)
                 {
-                    foreach (LoadedAiProfile candidateProfile in _aiProfiles.Values)
-                    {
-                        if (candidateProfile == null || ReferenceEquals(candidateProfile, profile) ||
-                            candidateProfile.Definition == null)
-                        {
-                            continue;
-                        }
+                    // 1. Primary profile unit/building entries
+                    AppendProfileDeclaredCandidatesLocked(profile, seenIds, result);
 
-                        if (!String.IsNullOrWhiteSpace(candidateProfile.Definition.nativeTemplateId) &&
-                            String.Equals(candidateProfile.Definition.nativeTemplateId.Trim(),
-                                activeTemplate.Trim(), StringComparison.OrdinalIgnoreCase))
+                    // 2. Sibling profiles sharing the same nativeTemplateId (interleaved by pack)
+                    var siblingIds = new List<string>();
+                    string activeTemplate = profile != null && profile.Definition != null
+                        ? profile.Definition.nativeTemplateId
+                        : null;
+                    if (!String.IsNullOrWhiteSpace(activeTemplate))
+                    {
+                        foreach (LoadedAiProfile candidateProfile in _aiProfiles.Values)
                         {
-                            CollectProfileDeclaredUnitIds(candidateProfile.Definition, siblingIds);
+                            if (candidateProfile == null || ReferenceEquals(candidateProfile, profile) ||
+                                candidateProfile.Definition == null)
+                            {
+                                continue;
+                            }
+
+                            if (!String.IsNullOrWhiteSpace(candidateProfile.Definition.nativeTemplateId) &&
+                                String.Equals(candidateProfile.Definition.nativeTemplateId.Trim(),
+                                    activeTemplate.Trim(), StringComparison.OrdinalIgnoreCase))
+                            {
+                                CollectProfileDeclaredUnitIds(candidateProfile.Definition, siblingIds);
+                            }
                         }
                     }
-                }
 
-                List<string> interleavedSiblings = ScheduledBaseBuildLimitPolicy.InterleaveEntityIdsByPack(siblingIds);
-                for (int i = 0; i < interleavedSiblings.Count; i++)
-                {
-                    LoadedUnit siblingUnit;
-                    if (_units.TryGetValue(interleavedSiblings[i], out siblingUnit) &&
-                        siblingUnit != null && seenIds.Add(siblingUnit.Id))
+                    List<string> interleavedSiblings = ScheduledBaseBuildLimitPolicy.InterleaveEntityIdsByPack(siblingIds);
+                    for (int i = 0; i < interleavedSiblings.Count; i++)
                     {
-                        result.Add(siblingUnit);
+                        LoadedUnit siblingUnit;
+                        if (_units.TryGetValue(interleavedSiblings[i], out siblingUnit) &&
+                            siblingUnit != null && seenIds.Add(siblingUnit.Id))
+                        {
+                            result.Add(siblingUnit);
+                        }
                     }
                 }
 
                 // 3. Remaining isAllowedForAi units across all active packs, interleaved round-robin by pack
+                // When isUniversalFallback is true, rotate deterministically by aiResourceName so unmapped
+                // native campaign levels face varied multi-pack compositions.
                 var fallbackIds = new List<string>();
                 foreach (LoadedUnit unit in _units.Values)
                 {
@@ -3285,7 +3299,11 @@ namespace RogueCommandExpansionLoader.Content
                 }
 
                 fallbackIds.Sort(StringComparer.Ordinal);
-                List<string> interleavedFallbacks = ScheduledBaseBuildLimitPolicy.InterleaveEntityIdsByPack(fallbackIds);
+                int rotationOffset = isUniversalFallback
+                    ? ScheduledBaseBuildLimitPolicy.ComputeDeterministicSeed(aiResourceName)
+                    : 0;
+                List<string> interleavedFallbacks = ScheduledBaseBuildLimitPolicy.InterleaveEntityIdsByPack(
+                    fallbackIds, rotationOffset);
                 for (int i = 0; i < interleavedFallbacks.Count; i++)
                 {
                     LoadedUnit fallbackUnit;
@@ -3498,10 +3516,21 @@ namespace RogueCommandExpansionLoader.Content
         public void OnAiBehaviourPreSetup(object gameBehaviour)
         {
             DefaultAiBehaviour behaviour = gameBehaviour as DefaultAiBehaviour;
+            if (behaviour == null || !_runtimeContentReady)
+            {
+                return;
+            }
+
+            if (behaviour.gameObject != null &&
+                String.Equals(behaviour.gameObject.tag, "AI", StringComparison.Ordinal))
+            {
+                WarmPlayerDeckUnitAndFactoryPools(behaviour);
+            }
+
             LoadedAiProfile profile;
             bool isNativeTemplateFallback;
-            if (behaviour == null || !_runtimeContentReady ||
-                !TryGetAiProfile(behaviour, out profile, out isNativeTemplateFallback))
+            bool isUniversalFallback;
+            if (!TryGetAiProfile(behaviour, out profile, out isNativeTemplateFallback, out isUniversalFallback))
             {
                 return;
             }
@@ -3519,7 +3548,7 @@ namespace RogueCommandExpansionLoader.Content
 
             if (!alreadyPreInjected)
             {
-                InjectAllowedAiUnitsIntoNativeBases(behaviour, profile);
+                InjectAllowedAiUnitsIntoNativeBases(behaviour, profile, isUniversalFallback);
             }
         }
 
@@ -3612,9 +3641,22 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static string StripUnityCloneSuffix(string name)
+        {
+            if (String.IsNullOrEmpty(name))
+            {
+                return String.Empty;
+            }
+
+            const string unityCloneSuffix = "(Clone)";
+            return name.EndsWith(unityCloneSuffix, StringComparison.Ordinal)
+                ? name.Substring(0, name.Length - unityCloneSuffix.Length)
+                : name;
+        }
+
         private bool TryGetAiProfile(DefaultAiBehaviour behaviour, out LoadedAiProfile profile)
         {
-            return TryGetAiProfile(behaviour, out profile, out _);
+            return TryGetAiProfile(behaviour, out profile, out _, out _);
         }
 
         private bool TryGetAiProfile(
@@ -3622,8 +3664,18 @@ namespace RogueCommandExpansionLoader.Content
             out LoadedAiProfile profile,
             out bool isNativeTemplateFallback)
         {
+            return TryGetAiProfile(behaviour, out profile, out isNativeTemplateFallback, out _);
+        }
+
+        private bool TryGetAiProfile(
+            DefaultAiBehaviour behaviour,
+            out LoadedAiProfile profile,
+            out bool isNativeTemplateFallback,
+            out bool isUniversalFallback)
+        {
             profile = null;
             isNativeTemplateFallback = false;
+            isUniversalFallback = false;
             // LoadScene sets the spawned instance's AI tag after Instantiate and before
             // the first Update-driven Init hook; the prefab asset itself need not carry it.
             if (behaviour == null || behaviour.gameObject == null ||
@@ -3632,12 +3684,7 @@ namespace RogueCommandExpansionLoader.Content
                 return false;
             }
 
-            string aiResourceName = behaviour.gameObject.name;
-            const string unityCloneSuffix = "(Clone)";
-            if (aiResourceName.EndsWith(unityCloneSuffix, StringComparison.Ordinal))
-            {
-                aiResourceName = aiResourceName.Substring(0, aiResourceName.Length - unityCloneSuffix.Length);
-            }
+            string aiResourceName = StripUnityCloneSuffix(behaviour.gameObject.name);
 
             lock (_gate)
             {
@@ -3649,6 +3696,7 @@ namespace RogueCommandExpansionLoader.Content
                 // Hybrid fallback 1: match a registered profile whose nativeTemplateId matches the native AI prefab.
                 LoadedAiProfile bestTemplateMatch = null;
                 LoadedAiProfile bestGeneralFallback = null;
+                var universalCandidates = new List<LoadedAiProfile>();
                 foreach (LoadedAiProfile candidate in _aiProfiles.Values)
                 {
                     if (candidate == null || candidate.Definition == null)
@@ -3666,12 +3714,13 @@ namespace RogueCommandExpansionLoader.Content
                         }
                     }
 
-                    if (!candidate.ScopeToReferencedStages &&
-                        candidate.ModuleIds != null &&
-                        candidate.ModuleIds.Length > 0 &&
-                        bestGeneralFallback == null)
+                    if (candidate.ModuleIds != null && candidate.ModuleIds.Length > 0)
                     {
-                        bestGeneralFallback = candidate;
+                        universalCandidates.Add(candidate);
+                        if (!candidate.ScopeToReferencedStages && bestGeneralFallback == null)
+                        {
+                            bestGeneralFallback = candidate;
+                        }
                     }
                 }
 
@@ -3686,6 +3735,16 @@ namespace RogueCommandExpansionLoader.Content
                 {
                     profile = bestGeneralFallback;
                     isNativeTemplateFallback = true;
+                    return true;
+                }
+
+                if (universalCandidates.Count > 0)
+                {
+                    universalCandidates.Sort((left, right) => StringComparer.Ordinal.Compare(left.Id, right.Id));
+                    int seed = ScheduledBaseBuildLimitPolicy.ComputeDeterministicSeed(aiResourceName);
+                    profile = universalCandidates[seed % universalCandidates.Count];
+                    isNativeTemplateFallback = true;
+                    isUniversalFallback = true;
                     return true;
                 }
 

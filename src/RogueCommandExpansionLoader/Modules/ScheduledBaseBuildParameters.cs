@@ -278,10 +278,37 @@ namespace RogueCommandExpansionLoader.Modules
         }
 
         /// <summary>
+        /// Computes a stable, cross-process FNV-1a 32-bit non-negative seed from an entity/level key.
+        /// </summary>
+        public static int ComputeDeterministicSeed(string key)
+        {
+            if (String.IsNullOrWhiteSpace(key))
+            {
+                return 0;
+            }
+
+            unchecked
+            {
+                uint hash = 2166136261u;
+                string normalized = key.Trim().ToUpperInvariant();
+                for (int i = 0; i < normalized.Length; i++)
+                {
+                    hash ^= normalized[i];
+                    hash *= 16777619u;
+                }
+
+                return (int)(hash & 0x7FFFFFFFu);
+            }
+        }
+
+        /// <summary>
         /// Interleaves namespaced entity IDs round-robin by pack prefix (before ':') so multiple active packs
         /// receive balanced representation rather than alphabetical starvation.
+        /// Optional rotationOffset shifts the starting index deterministically across the interleaved list.
         /// </summary>
-        public static List<string> InterleaveEntityIdsByPack(IReadOnlyList<string> orderedIds)
+        public static List<string> InterleaveEntityIdsByPack(
+            IReadOnlyList<string> orderedIds,
+            int rotationOffset = 0)
         {
             var result = new List<string>();
             if (orderedIds == null || orderedIds.Count == 0)
@@ -329,6 +356,20 @@ namespace RogueCommandExpansionLoader.Modules
                             remaining = true;
                         }
                     }
+                }
+            }
+
+            if (result.Count > 1 && rotationOffset != 0)
+            {
+                int shift = ((rotationOffset % result.Count) + result.Count) % result.Count;
+                if (shift > 0)
+                {
+                    var rotated = new List<string>(result.Count);
+                    for (int i = 0; i < result.Count; i++)
+                    {
+                        rotated.Add(result[(i + shift) % result.Count]);
+                    }
+                    return rotated;
                 }
             }
 

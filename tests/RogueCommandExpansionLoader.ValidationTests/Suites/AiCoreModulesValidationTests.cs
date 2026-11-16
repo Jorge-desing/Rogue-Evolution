@@ -2531,5 +2531,37 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Auto-attached skill settings did not match expected bounded values.");
         }
     }),
+    ("deterministic seed is case-insensitive, non-negative, and rotates interleaved packs", () =>
+    {
+        int seedA = ScheduledBaseBuildLimitPolicy.ComputeDeterministicSeed("_02_ Tank Army");
+        int seedB = ScheduledBaseBuildLimitPolicy.ComputeDeterministicSeed("  _02_ tank army ");
+        int seedC = ScheduledBaseBuildLimitPolicy.ComputeDeterministicSeed("_03_ Artillery");
+
+        if (seedA < 0 || seedC < 0 || seedA != seedB)
+        {
+            throw new InvalidOperationException($"Expected deterministic non-negative case-insensitive seed (A={seedA}, B={seedB}, C={seedC}).");
+        }
+
+        if (seedA == seedC)
+        {
+            throw new InvalidOperationException("Expected distinct native AI template names to produce distinct FNV-1a seeds.");
+        }
+
+        var input = new[]
+        {
+            "sample-native:arachnid-hexapod",
+            "sample-native:assault-walker",
+            "tactical-operations:arc-lance-walker",
+            "tactical-operations:bulwark-siege-tank"
+        };
+
+        List<string> rotated = ScheduledBaseBuildLimitPolicy.InterleaveEntityIdsByPack(input, 1);
+        if (rotated.Count != 4 || rotated[0] != "tactical-operations:arc-lance-walker" ||
+            rotated[1] != "sample-native:assault-walker" || rotated[2] != "tactical-operations:bulwark-siege-tank" ||
+            rotated[3] != "sample-native:arachnid-hexapod")
+        {
+            throw new InvalidOperationException("Rotated multi-pack interleaving order was unexpected: " + string.Join(", ", rotated));
+        }
+    }),
     };
 }
