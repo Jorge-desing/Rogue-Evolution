@@ -3024,6 +3024,10 @@ namespace RogueCommandExpansionLoader.Content
 
         public void ShutdownBundles()
         {
+            lock (_assetCacheGate)
+            {
+                _loadedBundleAssetCache.Clear();
+            }
             _bundleRegistry.UnloadAll(true);
         }
 
@@ -9188,6 +9192,47 @@ namespace RogueCommandExpansionLoader.Content
             }
         }
 
+        private static readonly object _assetCacheGate = new object();
+        private static readonly Dictionary<BundleAssetCacheKey, UnityEngine.Object> _loadedBundleAssetCache =
+            new Dictionary<BundleAssetCacheKey, UnityEngine.Object>();
+
+        private struct BundleAssetCacheKey : IEquatable<BundleAssetCacheKey>
+        {
+            public readonly int BundleInstanceId;
+            public readonly string AssetName;
+            public readonly Type ExpectedType;
+
+            public BundleAssetCacheKey(int bundleInstanceId, string assetName, Type expectedType)
+            {
+                BundleInstanceId = bundleInstanceId;
+                AssetName = assetName ?? string.Empty;
+                ExpectedType = expectedType;
+            }
+
+            public bool Equals(BundleAssetCacheKey other)
+            {
+                return BundleInstanceId == other.BundleInstanceId &&
+                    ExpectedType == other.ExpectedType &&
+                    String.Equals(AssetName, other.AssetName, StringComparison.Ordinal);
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is BundleAssetCacheKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int hash = BundleInstanceId;
+                    hash = (hash * 397) ^ StringComparer.Ordinal.GetHashCode(AssetName);
+                    hash = (hash * 397) ^ (ExpectedType != null ? ExpectedType.GetHashCode() : 0);
+                    return hash;
+                }
+            }
+        }
+
         private static UnityEngine.Object LoadRequiredAsset(
             AssetBundle bundle,
             string assetName,
@@ -9195,6 +9240,20 @@ namespace RogueCommandExpansionLoader.Content
             string expectedDescription,
             string packageName)
         {
+            if (bundle != null && !String.IsNullOrEmpty(assetName) && expectedType != null)
+            {
+                var cacheKey = new BundleAssetCacheKey(bundle.GetInstanceID(), assetName, expectedType);
+                lock (_assetCacheGate)
+                {
+                    UnityEngine.Object cachedAsset;
+                    if (_loadedBundleAssetCache.TryGetValue(cacheKey, out cachedAsset) &&
+                        cachedAsset != null && expectedType.IsInstanceOfType(cachedAsset))
+                    {
+                        return cachedAsset;
+                    }
+                }
+            }
+
             UnityEngine.Object asset;
             try
             {
@@ -9212,6 +9271,15 @@ namespace RogueCommandExpansionLoader.Content
             {
                 throw new InvalidDataException("Paquete '" + packageName + "': el asset '" + assetName +
                     "' falta o no es " + expectedDescription + ".");
+            }
+
+            if (bundle != null && !String.IsNullOrEmpty(assetName) && expectedType != null)
+            {
+                var cacheKey = new BundleAssetCacheKey(bundle.GetInstanceID(), assetName, expectedType);
+                lock (_assetCacheGate)
+                {
+                    _loadedBundleAssetCache[cacheKey] = asset;
+                }
             }
 
             return asset;

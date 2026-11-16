@@ -191,4 +191,62 @@ namespace RogueCommandExpansionLoader.Modules
             return Boolean.TryParse(value, out result);
         }
     }
+
+    internal struct FactoryReinforcementCandidate
+    {
+        public int OriginalIndex;
+        public bool IsModFactory;
+        public int MechanicsPriority;
+        public long LastProducedSequence;
+    }
+
+    internal static class FactoryReinforcementRotationPolicy
+    {
+        /// <summary>
+        /// Orders candidate factory indices by:
+        /// 1) Mod factory priority (when prioritizeModFactories is true),
+        /// 2) Least-recently-produced sequence ascending (fair rotation across active factories),
+        /// 3) Mechanics priority descending, and original index ascending as deterministic tie-breaker.
+        /// </summary>
+        public static List<int> OrderCandidates(
+            IList<FactoryReinforcementCandidate> candidates,
+            bool prioritizeModFactories)
+        {
+            var result = new List<int>();
+            if (candidates == null || candidates.Count == 0)
+            {
+                return result;
+            }
+
+            var sortable = new List<FactoryReinforcementCandidate>(candidates);
+            sortable.Sort((left, right) =>
+            {
+                if (prioritizeModFactories && left.IsModFactory != right.IsModFactory)
+                {
+                    return left.IsModFactory ? -1 : 1;
+                }
+
+                int seqCompare = left.LastProducedSequence.CompareTo(right.LastProducedSequence);
+                if (seqCompare != 0)
+                {
+                    return seqCompare;
+                }
+
+                int priorityCompare = right.MechanicsPriority.CompareTo(left.MechanicsPriority);
+                if (priorityCompare != 0)
+                {
+                    return priorityCompare;
+                }
+
+                return left.OriginalIndex.CompareTo(right.OriginalIndex);
+            });
+
+            for (int i = 0; i < sortable.Count; i++)
+            {
+                result.Add(sortable[i].OriginalIndex);
+            }
+
+            return result;
+        }
+    }
 }

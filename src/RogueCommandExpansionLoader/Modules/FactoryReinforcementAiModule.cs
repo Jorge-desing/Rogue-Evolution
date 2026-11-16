@@ -49,6 +49,9 @@ namespace RogueCommandExpansionLoader.Modules
         {
             private readonly DefaultAiBehaviour _gameBehaviour;
             private readonly FactoryReinforcementSettings _settings;
+            private readonly Dictionary<string, long> _lastProducedSequenceByFactoryId =
+                new Dictionary<string, long>(StringComparer.Ordinal);
+            private long _productionSequence;
             private float _nextCheckAt;
             private bool _stopped;
 
@@ -120,16 +123,33 @@ namespace RogueCommandExpansionLoader.Modules
                 }
                 if (currentArmy >= _settings.MaxStandingArmy) return;
 
-                foreach (EntityController factory in buildings
-                    .OrderByDescending(factory => _settings.PrioritizeModFactories &&
-                        ScheduledBaseBuildLimitPolicy.IsModNamespacedEntity(factory != null ? factory.EntityId : null) ? 1 : 0)
-                    .ThenByDescending(factory => RuntimeUnitMechanicsDirector.GetProductionPriority(factory)))
+                var factoryList = new List<EntityController>(buildings.Count);
+                var candidates = new List<FactoryReinforcementCandidate>(buildings.Count);
+                foreach (EntityController candidateFactory in buildings)
                 {
-                    if (!IsInScope(factory) || !factory.IsFactory)
+                    if (!IsInScope(candidateFactory) || !candidateFactory.IsFactory)
                     {
                         continue;
                     }
 
+                    string factoryKey = candidateFactory.EntityId ?? string.Empty;
+                    long lastSeq;
+                    _lastProducedSequenceByFactoryId.TryGetValue(factoryKey, out lastSeq);
+                    candidates.Add(new FactoryReinforcementCandidate
+                    {
+                        OriginalIndex = factoryList.Count,
+                        IsModFactory = ScheduledBaseBuildLimitPolicy.IsModNamespacedEntity(factoryKey),
+                        MechanicsPriority = RuntimeUnitMechanicsDirector.GetProductionPriority(candidateFactory),
+                        LastProducedSequence = lastSeq
+                    });
+                    factoryList.Add(candidateFactory);
+                }
+
+                List<int> orderedIndices = FactoryReinforcementRotationPolicy.OrderCandidates(
+                    candidates, _settings.PrioritizeModFactories);
+                for (int i = 0; i < orderedIndices.Count; i++)
+                {
+                    EntityController factory = factoryList[orderedIndices[i]];
                     if (_settings.BaseIndex >= 0 && factory.aiBaseIndex != _settings.BaseIndex)
                     {
                         continue;
@@ -157,6 +177,8 @@ namespace RogueCommandExpansionLoader.Modules
                         factory.Produce(false, !_settings.RequireEconomy, false);
                         int added = Math.Max(0, (factory.InProductionCount ?? 0) - queued);
                         if (added == 0) continue;
+                        string producedFactoryId = factory.EntityId ?? string.Empty;
+                        _lastProducedSequenceByFactoryId[producedFactoryId] = ++_productionSequence;
                         Debug.Log("[RogueCommandExpansionLoader] AI Factory '" + factory.gameObject.name +
                             "' queued reinforcement (" + (queued + 1) + "/" + _settings.MaxQueuePerFactory +
                             ", standing army: " + (currentArmy + 1) + "/" + _settings.MaxStandingArmy + ").");
@@ -177,6 +199,7 @@ namespace RogueCommandExpansionLoader.Modules
             public void OnDestroyed()
             {
                 _stopped = true;
+                _lastProducedSequenceByFactoryId.Clear();
             }
 
             private bool IsInScope(EntityController entity)

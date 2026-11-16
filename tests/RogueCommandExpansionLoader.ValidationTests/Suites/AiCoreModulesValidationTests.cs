@@ -2563,5 +2563,22 @@ internal static partial class ValidationTestRunner
             throw new InvalidOperationException("Rotated multi-pack interleaving order was unexpected: " + string.Join(", ", rotated));
         }
     }),
+    ("factory reinforcement rotation policy cycles least-recently-produced mod factories fairly", () =>
+    {
+        var candidates = new List<FactoryReinforcementCandidate>
+        {
+            new FactoryReinforcementCandidate { OriginalIndex = 0, IsModFactory = false, MechanicsPriority = 10, LastProducedSequence = 0 },
+            new FactoryReinforcementCandidate { OriginalIndex = 1, IsModFactory = true, MechanicsPriority = 5, LastProducedSequence = 2 },
+            new FactoryReinforcementCandidate { OriginalIndex = 2, IsModFactory = true, MechanicsPriority = 4, LastProducedSequence = 0 },
+            new FactoryReinforcementCandidate { OriginalIndex = 3, IsModFactory = true, MechanicsPriority = 6, LastProducedSequence = 1 }
+        };
+
+        List<int> ordered = FactoryReinforcementRotationPolicy.OrderCandidates(candidates, prioritizeModFactories: true);
+        if (ordered.Count != 4 || ordered[0] != 2 || ordered[1] != 3 || ordered[2] != 1 || ordered[3] != 0)
+        {
+            throw new InvalidOperationException("Expected fair least-recently-produced mod factory order [2, 3, 1, 0], got [" +
+                string.Join(", ", ordered) + "].");
+        }
+    }),
     };
 }
